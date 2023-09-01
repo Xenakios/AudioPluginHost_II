@@ -15,3 +15,6 @@ Future ideas that may or may not ever be implemented :
 - Some super simple way to generate MIDI for testing instrument plugins
 - Plugin parameter automation/modulation
 - Use Tracktion Graph instead of the Juce AudioProcessorGraph
+
+To build, you need JUCE at the repo root level and choc and SignalSmith Stretch in the libs
+directory. These will be made proper git submodules later.
