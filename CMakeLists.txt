@@ -39,6 +39,7 @@ target_sources(AudioPluginHost2 PRIVATE
     Source/Plugins/ARAPlugin.cpp
     Source/Plugins/IOConfigurationWindow.cpp
     Source/Plugins/InternalPlugins.cpp
+    Source/Plugins/AudioFilePlayerPlugin.cpp
     Source/Plugins/PluginGraph.cpp
     Source/UI/GraphEditorPanel.cpp
     Source/UI/MainHostWindow.cpp)

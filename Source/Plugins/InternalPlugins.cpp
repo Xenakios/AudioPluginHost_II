@@ -59,6 +59,7 @@ static std::unique_ptr<InputStream> createAssetInputStream (const char* resource
 #include "../../../../examples/Plugins/NoiseGatePluginDemo.h"
 #include "../../../../examples/Plugins/SamplerPluginDemo.h"
 #include "../../../../examples/Plugins/SurroundPluginDemo.h"
+#include "AudioFilePlayerPlugin.h"
 
 //==============================================================================
 class InternalPlugin   : public AudioPluginInstance
@@ -439,6 +440,7 @@ InternalPluginFormat::InternalPluginFormat()
         [] { return std::make_unique<AudioProcessorGraph::AudioGraphIOProcessor> (AudioProcessorGraph::AudioGraphIOProcessor::audioOutputNode); },
         [] { return std::make_unique<AudioProcessorGraph::AudioGraphIOProcessor> (AudioProcessorGraph::AudioGraphIOProcessor::midiOutputNode); },
 
+        [] { return std::make_unique<InternalPlugin> (std::make_unique<AudioFilePlayerPlugin>()); },
         [] { return std::make_unique<InternalPlugin> (std::make_unique<SineWaveSynth>()); },
         [] { return std::make_unique<InternalPlugin> (std::make_unique<ReverbPlugin>()); },
 

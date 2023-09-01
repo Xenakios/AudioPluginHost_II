@@ -1,0 +1,111 @@
+#pragma once
+
+#include "JuceHeader.h"
+#include "signalsmith-stretch/signalsmith-stretch.h"
+
+class AudioFilePlayerPlugin : public AudioProcessor
+{
+    class Editor : public juce::AudioProcessorEditor
+    {
+        juce::TextButton m_import_file_but;
+        juce::GenericAudioProcessorEditor m_gen_ed;
+        std::unique_ptr<juce::FileChooser> m_chooser;
+
+      public:
+        Editor(AudioFilePlayerPlugin &p) : juce::AudioProcessorEditor(p), m_gen_ed(p)
+        {
+            addAndMakeVisible(m_import_file_but);
+            m_import_file_but.setButtonText("Import file...");
+            m_import_file_but.onClick = [&p, this]() {
+                m_chooser =
+                    std::make_unique<juce::FileChooser>("Choose audio file", juce::File(), "*.wav");
+                m_chooser->launchAsync(0, [&p](const juce::FileChooser &chooser) {
+                    if (chooser.getResult() != juce::File())
+                    {
+                        p.importFile(chooser.getResult());
+                    }
+                });
+            };
+            addAndMakeVisible(m_gen_ed);
+            setSize(400, 200);
+        }
+        void resized() override
+        {
+            m_import_file_but.setBounds(1, 1, 200, 25);
+            m_gen_ed.setBounds(1, 27, getWidth(), getHeight() - 28);
+        }
+    };
+
+  public:
+    AudioFilePlayerPlugin()
+        : AudioProcessor(BusesProperties().withOutput("Output", AudioChannelSet::stereo()))
+    {
+        importFile(juce::File(R"(C:\MusicAudio\sourcesamples\there was a time .wav)"));
+        auto par = new juce::AudioParameterFloat("PITCHSHIFT", "Pitch shift", -12.0f, 12.0f, 0.0f);
+        addParameter(par);
+        par = new juce::AudioParameterFloat("RATE", "Play rate", 0.1f, 4.0f, 1.0f);
+        addParameter(par);
+        par = new juce::AudioParameterFloat("VOLUME", "Volume", -24.0f, 6.0f, -6.0f);
+        addParameter(par);
+    }
+    void importFile(juce::File f)
+    {
+        juce::AudioFormatManager man;
+        man.registerBasicFormats();
+        auto reader = man.createReaderFor(f);
+        jassert(reader);
+        if (reader)
+        {
+            juce::AudioBuffer<float> temp(2, reader->lengthInSamples);
+            reader->read(&temp, 0, reader->lengthInSamples, 0, true, true);
+            m_cs.enter();
+            std::swap(temp, m_file_buf);
+            if (m_buf_playpos >= m_file_buf.getNumSamples())
+                m_buf_playpos = 0;
+            m_cs.exit();
+            delete reader;
+        }
+    }
+    juce::CriticalSection m_cs;
+    static String getIdentifier() { return "AudioFilePlayer"; }
+
+    void prepareToPlay(double newSampleRate, int maxBlocksize) override
+    {
+        m_buf_playpos = 0;
+        m_stretch.presetDefault(2, newSampleRate);
+        m_work_buf.setSize(2, maxBlocksize * 16);
+    }
+
+    void reset() override {}
+
+    void releaseResources() override {}
+
+    juce::AudioParameterFloat *getFloatParam(int index)
+    {
+        return dynamic_cast<juce::AudioParameterFloat *>(getParameters()[index]);
+    }
+
+    void processBlock(AudioBuffer<float> &buffer, MidiBuffer &) override;
+
+    using AudioProcessor::processBlock;
+
+    const String getName() const override { return getIdentifier(); }
+    double getTailLengthSeconds() const override { return 0.0; }
+    bool acceptsMidi() const override { return false; }
+    bool producesMidi() const override { return false; }
+    AudioProcessorEditor *createEditor() override { return new Editor(*this); }
+    bool hasEditor() const override { return true; }
+    int getNumPrograms() override { return 1; }
+    int getCurrentProgram() override { return 0; }
+    void setCurrentProgram(int) override {}
+    const String getProgramName(int) override { return {}; }
+    void changeProgramName(int, const String &) override {}
+    void getStateInformation(juce::MemoryBlock &) override {}
+    void setStateInformation(const void *, int) override {}
+
+  private:
+    juce::AudioBuffer<float> m_file_buf;
+    juce::AudioBuffer<float> m_work_buf;
+    int m_buf_playpos = 0;
+    signalsmith::stretch::SignalsmithStretch<float> m_stretch;
+};
