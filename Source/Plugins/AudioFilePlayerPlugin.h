@@ -42,17 +42,9 @@ class AudioFilePlayerPlugin : public AudioProcessor, public juce::Timer
     void timerCallback() override;
     void importFile(juce::File f);
     static String getIdentifier() { return "AudioFilePlayer"; }
-    void prepareToPlay(double newSampleRate, int maxBlocksize) override
-    {
-        m_buf_playpos = 0;
-        m_stretch.presetDefault(2, newSampleRate);
-        m_work_buf.setSize(2, maxBlocksize * 16);
-    }
-
+    void prepareToPlay(double newSampleRate, int maxBlocksize) override;
     void reset() override {}
-
     void releaseResources() override {}
-
     juce::AudioParameterFloat *getFloatParam(int index)
     {
         return dynamic_cast<juce::AudioParameterFloat *>(getParameters()[index]);
@@ -89,11 +81,12 @@ class AudioFilePlayerPlugin : public AudioProcessor, public juce::Timer
     };
     choc::fifo::SingleReaderSingleWriterFIFO<CrossThreadMessage> m_from_gui_fifo;
     choc::fifo::SingleReaderSingleWriterFIFO<CrossThreadMessage> m_to_gui_fifo;
+
   private:
     juce::AudioBuffer<float> m_file_buf;
     juce::AudioBuffer<float> m_file_temp_buf;
     juce::AudioBuffer<float> m_work_buf;
     int m_buf_playpos = 0;
     signalsmith::stretch::SignalsmithStretch<float> m_stretch;
-    
+    juce::dsp::Gain<float> m_gain;
 };

@@ -5,7 +5,10 @@ AudioFilePlayerPlugin::AudioFilePlayerPlugin()
 {
     m_from_gui_fifo.reset(1024);
     m_to_gui_fifo.reset(1024);
+#define XENAKIOSDEBUG
+#ifdef XENAKIOSDEBUG
     importFile(juce::File(R"(C:\MusicAudio\sourcesamples\there was a time .wav)"));
+#endif
     auto par = new juce::AudioParameterFloat("PITCHSHIFT", "Pitch shift", -12.0f, 12.0f, 0.0f);
     addParameter(par);
     juce::NormalisableRange<float> nr{0.1f, 4.0f, 0.01f};
@@ -14,7 +17,7 @@ AudioFilePlayerPlugin::AudioFilePlayerPlugin()
     addParameter(par);
     par = new juce::AudioParameterFloat("VOLUME", "Volume", -24.0f, 6.0f, -6.0f);
     addParameter(par);
-    
+
     startTimer(1000);
 }
 
@@ -40,13 +43,28 @@ void AudioFilePlayerPlugin::timerCallback()
     {
         if (msg.opcode == CrossThreadMessage::Opcode::ClearTempBufferInGuiThread)
         {
+            // clear only large large buffers, so we can reuse the temp buffer for smaller files
             if (m_file_temp_buf.getNumSamples() > 3000000)
             {
                 DBG("AudioFilePlayerPlugin : Clearing temp audio file buffer");
+                // could setSize(0,0) be used instead...?
                 m_file_temp_buf = juce::AudioBuffer<float>();
             }
         }
     }
+}
+
+void AudioFilePlayerPlugin::prepareToPlay(double newSampleRate, int maxBlocksize)
+{
+    m_buf_playpos = 0;
+    m_stretch.presetDefault(2, newSampleRate);
+    m_work_buf.setSize(2, maxBlocksize * 16);
+    juce::dsp::ProcessSpec spec;
+    spec.maximumBlockSize = maxBlocksize;
+    spec.sampleRate = newSampleRate;
+    spec.numChannels = 2;
+    m_gain.prepare(spec);
+    m_gain.setRampDurationSeconds(0.1);
 }
 
 void AudioFilePlayerPlugin::processBlock(AudioBuffer<float> &buffer, MidiBuffer &)
@@ -56,12 +74,11 @@ void AudioFilePlayerPlugin::processBlock(AudioBuffer<float> &buffer, MidiBuffer 
     {
         if (msg.opcode == CrossThreadMessage::Opcode::SwapBufferInAudioThread)
         {
-            // IIRC swapping AudioBuffers like this is going to be fast, but in case it isn't really,
-            // need to figure out something else
+            // IIRC swapping AudioBuffers like this is going to be fast, but in case it isn't
+            // really, need to figure out something else
             std::swap(m_file_temp_buf, m_file_buf);
             if (m_buf_playpos >= m_file_buf.getNumSamples())
                 m_buf_playpos = 0;
-            // send message to GUI to clear the temp buffer
             m_to_gui_fifo.push({CrossThreadMessage::Opcode::ClearTempBufferInGuiThread});
         }
     }
@@ -85,6 +102,8 @@ void AudioFilePlayerPlugin::processBlock(AudioBuffer<float> &buffer, MidiBuffer 
     m_stretch.process(m_work_buf.getArrayOfReadPointers(), samplestopush,
                       buffer.getArrayOfWritePointers(), buffer.getNumSamples());
     float volume = *getFloatParam(2);
-    float gain = juce::Decibels::decibelsToGain(volume);
-    buffer.applyGain(gain);
+    juce::dsp::AudioBlock<float> block(buffer);
+    juce::dsp::ProcessContextReplacing<float> ctx(block);
+    m_gain.setGainDecibels(volume);
+    m_gain.process(ctx);
 }
