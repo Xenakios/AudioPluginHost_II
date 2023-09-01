@@ -6,14 +6,16 @@
 
 class AudioFilePlayerPlugin : public AudioProcessor, public juce::Timer
 {
-    class Editor : public juce::AudioProcessorEditor
+    class Editor : public juce::AudioProcessorEditor, public juce::Timer
     {
         juce::TextButton m_import_file_but;
         juce::GenericAudioProcessorEditor m_gen_ed;
         std::unique_ptr<juce::FileChooser> m_chooser;
+        juce::Label m_infolabel;
+        AudioFilePlayerPlugin &m_plug;
 
       public:
-        Editor(AudioFilePlayerPlugin &p) : juce::AudioProcessorEditor(p), m_gen_ed(p)
+        Editor(AudioFilePlayerPlugin &p) : juce::AudioProcessorEditor(p), m_gen_ed(p), m_plug(p)
         {
             addAndMakeVisible(m_import_file_but);
             m_import_file_but.setButtonText("Import file...");
@@ -28,12 +30,22 @@ class AudioFilePlayerPlugin : public AudioProcessor, public juce::Timer
                 });
             };
             addAndMakeVisible(m_gen_ed);
+            addAndMakeVisible(m_infolabel);
             setSize(600, 200);
+            startTimerHz(10);
+        }
+        void timerCallback() override
+        {
+            double dur = m_plug.getFileDurationSeconds();
+            double pos = m_plug.getFilePlayPositionSeconds();
+            m_infolabel.setText(juce::String(pos, 1) + " / " + juce::String(dur, 1),
+                                juce::dontSendNotification);
         }
         void resized() override
         {
             m_import_file_but.setBounds(1, 1, 200, 25);
-            m_gen_ed.setBounds(1, 27, getWidth(), getHeight() - 28);
+            m_gen_ed.setBounds(1, 27, getWidth() - 2, getHeight() - 28);
+            m_infolabel.setBounds(1, getHeight() - 20, getWidth() - 2, 20);
         }
     };
 
@@ -81,12 +93,28 @@ class AudioFilePlayerPlugin : public AudioProcessor, public juce::Timer
     };
     choc::fifo::SingleReaderSingleWriterFIFO<CrossThreadMessage> m_from_gui_fifo;
     choc::fifo::SingleReaderSingleWriterFIFO<CrossThreadMessage> m_to_gui_fifo;
+    double getFileDurationSeconds() const
+    {
+        if (m_file_sample_rate >= 1.0)
+            return m_file_buf.getNumSamples() / m_file_sample_rate;
+        return 0.0;
+    }
+    double getFilePlayPositionSeconds() const
+    {
+        if (m_file_sample_rate >= 1.0)
+            return m_buf_playpos_atomic.load() / m_file_sample_rate;
+        return 0.0;
+    }
 
   private:
     juce::AudioBuffer<float> m_file_buf;
     juce::AudioBuffer<float> m_file_temp_buf;
     juce::AudioBuffer<float> m_work_buf;
     int m_buf_playpos = 0;
+    // we don't want to make the hot play position atomic for perf reasons, but we need atomicity
+    // for the GUI
+    std::atomic<int> m_buf_playpos_atomic{0};
     signalsmith::stretch::SignalsmithStretch<float> m_stretch;
     juce::dsp::Gain<float> m_gain;
+    double m_file_sample_rate = 1.0;
 };

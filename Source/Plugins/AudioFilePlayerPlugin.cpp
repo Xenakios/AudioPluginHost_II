@@ -31,6 +31,7 @@ void AudioFilePlayerPlugin::importFile(juce::File f)
     {
         m_file_temp_buf.setSize(2, reader->lengthInSamples);
         reader->read(&m_file_temp_buf, 0, reader->lengthInSamples, 0, true, true);
+        m_file_sample_rate = reader->sampleRate;
         m_from_gui_fifo.push({CrossThreadMessage::Opcode::SwapBufferInAudioThread});
         delete reader;
     }
@@ -57,6 +58,7 @@ void AudioFilePlayerPlugin::timerCallback()
 void AudioFilePlayerPlugin::prepareToPlay(double newSampleRate, int maxBlocksize)
 {
     m_buf_playpos = 0;
+    m_buf_playpos_atomic.store(0);
     m_stretch.presetDefault(2, newSampleRate);
     m_work_buf.setSize(2, maxBlocksize * 16);
     juce::dsp::ProcessSpec spec;
@@ -106,4 +108,5 @@ void AudioFilePlayerPlugin::processBlock(AudioBuffer<float> &buffer, MidiBuffer 
     juce::dsp::ProcessContextReplacing<float> ctx(block);
     m_gain.setGainDecibels(volume);
     m_gain.process(ctx);
+    m_buf_playpos_atomic.store(m_buf_playpos);
 }
