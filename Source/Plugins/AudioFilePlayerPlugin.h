@@ -27,7 +27,7 @@ class AudioFilePlayerPlugin : public AudioProcessor
                 });
             };
             addAndMakeVisible(m_gen_ed);
-            setSize(400, 200);
+            setSize(600, 200);
         }
         void resized() override
         {
@@ -37,36 +37,10 @@ class AudioFilePlayerPlugin : public AudioProcessor
     };
 
   public:
-    AudioFilePlayerPlugin()
-        : AudioProcessor(BusesProperties().withOutput("Output", AudioChannelSet::stereo()))
-    {
-        importFile(juce::File(R"(C:\MusicAudio\sourcesamples\there was a time .wav)"));
-        auto par = new juce::AudioParameterFloat("PITCHSHIFT", "Pitch shift", -12.0f, 12.0f, 0.0f);
-        addParameter(par);
-        par = new juce::AudioParameterFloat("RATE", "Play rate", 0.1f, 4.0f, 1.0f);
-        addParameter(par);
-        par = new juce::AudioParameterFloat("VOLUME", "Volume", -24.0f, 6.0f, -6.0f);
-        addParameter(par);
-    }
-    void importFile(juce::File f)
-    {
-        juce::AudioFormatManager man;
-        man.registerBasicFormats();
-        auto reader = man.createReaderFor(f);
-        jassert(reader);
-        if (reader)
-        {
-            juce::AudioBuffer<float> temp(2, reader->lengthInSamples);
-            reader->read(&temp, 0, reader->lengthInSamples, 0, true, true);
-            m_cs.enter();
-            std::swap(temp, m_file_buf);
-            if (m_buf_playpos >= m_file_buf.getNumSamples())
-                m_buf_playpos = 0;
-            m_cs.exit();
-            delete reader;
-        }
-    }
-    juce::CriticalSection m_cs;
+    AudioFilePlayerPlugin();
+    void importFile(juce::File f);
+
+    
     static String getIdentifier() { return "AudioFilePlayer"; }
 
     void prepareToPlay(double newSampleRate, int maxBlocksize) override
@@ -108,4 +82,5 @@ class AudioFilePlayerPlugin : public AudioProcessor
     juce::AudioBuffer<float> m_work_buf;
     int m_buf_playpos = 0;
     signalsmith::stretch::SignalsmithStretch<float> m_stretch;
+    juce::CriticalSection m_cs;
 };
