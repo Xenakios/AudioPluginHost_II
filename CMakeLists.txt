@@ -26,6 +26,11 @@ project(AudioPluginHost2 VERSION 0.0.1)
 
 add_subdirectory(JUCE)
 
+include_directories(
+    libs/signalsmith-stretch
+    libs/choc
+)
+
 juce_add_gui_app(AudioPluginHost2
     BUNDLE_ID                       com.juce.pluginhost
     ICON_BIG                        "${CMAKE_CURRENT_SOURCE_DIR}/Source/JUCEAppIcon.png"

@@ -1,9 +1,10 @@
 #pragma once
 
 #include "JuceHeader.h"
-#include "signalsmith-stretch/signalsmith-stretch.h"
+#include "signalsmith-stretch.h"
+#include "containers/choc_SingleReaderSingleWriterFIFO.h"
 
-class AudioFilePlayerPlugin : public AudioProcessor
+class AudioFilePlayerPlugin : public AudioProcessor, public juce::Timer
 {
     class Editor : public juce::AudioProcessorEditor
     {
@@ -38,11 +39,9 @@ class AudioFilePlayerPlugin : public AudioProcessor
 
   public:
     AudioFilePlayerPlugin();
+    void timerCallback() override;
     void importFile(juce::File f);
-
-    
     static String getIdentifier() { return "AudioFilePlayer"; }
-
     void prepareToPlay(double newSampleRate, int maxBlocksize) override
     {
         m_buf_playpos = 0;
@@ -76,11 +75,25 @@ class AudioFilePlayerPlugin : public AudioProcessor
     void changeProgramName(int, const String &) override {}
     void getStateInformation(juce::MemoryBlock &) override {}
     void setStateInformation(const void *, int) override {}
-
+    struct CrossThreadMessage
+    {
+        enum class Opcode
+        {
+            NoAction,
+            SwapBufferInAudioThread,
+            ClearTempBufferInGuiThread
+        };
+        CrossThreadMessage() {}
+        CrossThreadMessage(Opcode opcode_) : opcode(opcode_) {}
+        Opcode opcode = Opcode::NoAction;
+    };
+    choc::fifo::SingleReaderSingleWriterFIFO<CrossThreadMessage> m_from_gui_fifo;
+    choc::fifo::SingleReaderSingleWriterFIFO<CrossThreadMessage> m_to_gui_fifo;
   private:
     juce::AudioBuffer<float> m_file_buf;
+    juce::AudioBuffer<float> m_file_temp_buf;
     juce::AudioBuffer<float> m_work_buf;
     int m_buf_playpos = 0;
     signalsmith::stretch::SignalsmithStretch<float> m_stretch;
-    juce::CriticalSection m_cs;
+    
 };
