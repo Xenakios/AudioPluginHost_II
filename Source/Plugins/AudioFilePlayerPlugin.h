@@ -61,7 +61,10 @@ class AudioFilePlayerPlugin : public AudioProcessor, public juce::Timer
     {
         return dynamic_cast<juce::AudioParameterFloat *>(getParameters()[index]);
     }
-
+    juce::AudioParameterBool *getBoolParam(int index)
+    {
+        return dynamic_cast<juce::AudioParameterBool *>(getParameters()[index]);
+    }
     void processBlock(AudioBuffer<float> &buffer, MidiBuffer &) override;
 
     using AudioProcessor::processBlock;
@@ -88,8 +91,14 @@ class AudioFilePlayerPlugin : public AudioProcessor, public juce::Timer
             ClearTempBufferInGuiThread
         };
         CrossThreadMessage() {}
-        CrossThreadMessage(Opcode opcode_) : opcode(opcode_) {}
+        CrossThreadMessage(Opcode opcode_, int par0_ = 0, int par1_ = 0, float par2_ = 0.0f)
+            : opcode(opcode_), par0(par0_), par1(par1_), par2(par2_)
+        {
+        }
         Opcode opcode = Opcode::NoAction;
+        int par0 = 0;
+        int par1 = 0;
+        float par2 = 0.0f;
     };
     choc::fifo::SingleReaderSingleWriterFIFO<CrossThreadMessage> m_from_gui_fifo;
     choc::fifo::SingleReaderSingleWriterFIFO<CrossThreadMessage> m_to_gui_fifo;
@@ -115,6 +124,8 @@ class AudioFilePlayerPlugin : public AudioProcessor, public juce::Timer
     // for the GUI
     std::atomic<int> m_buf_playpos_atomic{0};
     signalsmith::stretch::SignalsmithStretch<float> m_stretch;
+    std::array<juce::LagrangeInterpolator, 2> m_resamplers;
+    std::vector<float> m_resampler_work_buf;
     juce::dsp::Gain<float> m_gain;
     double m_file_sample_rate = 1.0;
 };

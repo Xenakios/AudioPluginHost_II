@@ -87,7 +87,7 @@ target_link_libraries(AudioPluginHost2 PRIVATE
     juce::juce_dsp
     juce::juce_opengl
     juce::juce_recommended_config_flags
-    juce::juce_recommended_lto_flags
+    
     juce::juce_recommended_warning_flags)
-
+# juce::juce_recommended_lto_flags
 juce_add_bundle_resources_directory(AudioPluginHost2 Assets)

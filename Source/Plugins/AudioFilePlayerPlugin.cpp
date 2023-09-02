@@ -7,7 +7,9 @@ AudioFilePlayerPlugin::AudioFilePlayerPlugin()
     m_to_gui_fifo.reset(1024);
 #define XENAKIOSDEBUG
 #ifdef XENAKIOSDEBUG
-    importFile(juce::File(R"(C:\MusicAudio\sourcesamples\there was a time .wav)"));
+    // importFile(juce::File(R"(C:\MusicAudio\sourcesamples\there was a time .wav)"));
+    // importFile(juce::File(R"(C:\MusicAudio\sourcesamples\test_signals\440hz_sine_0db.wav)"));
+    importFile(juce::File(R"(C:\MusicAudio\sourcesamples\count_96k.wav)"));
 #endif
     auto par = new juce::AudioParameterFloat("PITCHSHIFT", "Pitch shift", -12.0f, 12.0f, 0.0f);
     addParameter(par);
@@ -15,9 +17,11 @@ AudioFilePlayerPlugin::AudioFilePlayerPlugin()
     nr.setSkewForCentre(1.0f);
     par = new juce::AudioParameterFloat("RATE", "Play rate", nr, 1.0f);
     addParameter(par);
-    par = new juce::AudioParameterFloat("VOLUME", "Volume", -24.0f, 6.0f, -6.0f);
+    par = new juce::AudioParameterFloat("VOLUME", "Volume", -24.0f, 6.0f, -18.0f);
     addParameter(par);
-
+    auto bpar =
+        new juce::AudioParameterBool("PRESERVEPITCH", "Preserve pitch when changing rate", true);
+    addParameter(bpar);
     startTimer(1000);
 }
 
@@ -31,8 +35,8 @@ void AudioFilePlayerPlugin::importFile(juce::File f)
     {
         m_file_temp_buf.setSize(2, reader->lengthInSamples);
         reader->read(&m_file_temp_buf, 0, reader->lengthInSamples, 0, true, true);
-        m_file_sample_rate = reader->sampleRate;
-        m_from_gui_fifo.push({CrossThreadMessage::Opcode::SwapBufferInAudioThread});
+        m_from_gui_fifo.push(
+            {CrossThreadMessage::Opcode::SwapBufferInAudioThread, 0, 0, (float)reader->sampleRate});
         delete reader;
     }
 }
@@ -67,6 +71,9 @@ void AudioFilePlayerPlugin::prepareToPlay(double newSampleRate, int maxBlocksize
     spec.numChannels = 2;
     m_gain.prepare(spec);
     m_gain.setRampDurationSeconds(0.1);
+    for (auto &rs : m_resamplers)
+        rs.reset();
+    m_resampler_work_buf.resize(maxBlocksize * 32);
 }
 
 void AudioFilePlayerPlugin::processBlock(AudioBuffer<float> &buffer, MidiBuffer &)
@@ -79,6 +86,7 @@ void AudioFilePlayerPlugin::processBlock(AudioBuffer<float> &buffer, MidiBuffer 
             // IIRC swapping AudioBuffers like this is going to be fast, but in case it isn't
             // really, need to figure out something else
             std::swap(m_file_temp_buf, m_file_buf);
+            m_file_sample_rate = msg.par2;
             if (m_buf_playpos >= m_file_buf.getNumSamples())
                 m_buf_playpos = 0;
             m_to_gui_fifo.push({CrossThreadMessage::Opcode::ClearTempBufferInGuiThread});
@@ -87,22 +95,55 @@ void AudioFilePlayerPlugin::processBlock(AudioBuffer<float> &buffer, MidiBuffer 
     buffer.clear();
     if (m_file_buf.getNumSamples() == 0)
         return;
-    float pshift = *getFloatParam(0);
-    m_stretch.setTransposeSemitones(pshift);
-    float rate = *getFloatParam(1);
-    int samplestopush = buffer.getNumSamples() * rate;
-    auto wbuf = m_work_buf.getArrayOfWritePointers();
+
     auto filebuf = m_file_buf.getArrayOfReadPointers();
-    for (int i = 0; i < samplestopush; ++i)
+
+    auto wbuf = m_work_buf.getArrayOfWritePointers();
+    int cachedpos = m_buf_playpos;
+    float compensrate = m_file_sample_rate / getSampleRate();
+    bool preserve_pitch = *getBoolParam(3);
+    float rate = *getFloatParam(1);
+    if (preserve_pitch)
     {
-        wbuf[0][i] = filebuf[0][m_buf_playpos];
-        wbuf[1][i] = filebuf[1][m_buf_playpos];
-        ++m_buf_playpos;
-        if (m_buf_playpos >= m_file_buf.getNumSamples())
-            m_buf_playpos = 0;
+        float pshift = *getFloatParam(0);
+        float pitchratio = std::pow(2.0, pshift / 12.0);
+        m_stretch.setTransposeFactor(pitchratio * compensrate);
+        rate *= compensrate;
+        int samplestopush = buffer.getNumSamples() * rate;
+        for (int i = 0; i < samplestopush; ++i)
+        {
+            wbuf[0][i] = filebuf[0][m_buf_playpos];
+            wbuf[1][i] = filebuf[1][m_buf_playpos];
+            ++m_buf_playpos;
+            if (m_buf_playpos >= m_file_buf.getNumSamples())
+                m_buf_playpos = 0;
+        }
+        m_stretch.process(m_work_buf.getArrayOfReadPointers(), samplestopush,
+                          buffer.getArrayOfWritePointers(), buffer.getNumSamples());
     }
-    m_stretch.process(m_work_buf.getArrayOfReadPointers(), samplestopush,
-                      buffer.getArrayOfWritePointers(), buffer.getNumSamples());
+    else
+    {
+        rate *= compensrate;
+        int samplestopush = buffer.getNumSamples() * rate;
+        int consumed[2] = {0, 0};
+        samplestopush += 1;
+        for (int i = 0; i < samplestopush; ++i)
+        {
+            wbuf[0][i] = filebuf[0][m_buf_playpos];
+            wbuf[1][i] = filebuf[1][m_buf_playpos];
+            ++m_buf_playpos;
+            if (m_buf_playpos >= m_file_buf.getNumSamples())
+                m_buf_playpos = 0;
+        }
+        for (int ch = 0; ch < 2; ++ch)
+        {
+            consumed[ch] = m_resamplers[ch].process(rate, wbuf[ch], buffer.getWritePointer(ch),
+                                                    buffer.getNumSamples(), samplestopush, 0);
+        }
+        jassert(consumed[0] == consumed[1]);
+        m_buf_playpos = (cachedpos + consumed[0]) % m_file_buf.getNumSamples();
+    }
+
     float volume = *getFloatParam(2);
     juce::dsp::AudioBlock<float> block(buffer);
     juce::dsp::ProcessContextReplacing<float> ctx(block);
