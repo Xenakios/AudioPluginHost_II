@@ -175,7 +175,9 @@ struct GraphEditorPanel::PluginComponent   : public Component,
                                              private AudioProcessorParameter::Listener,
                                              private AsyncUpdater
 {
-    PluginComponent (GraphEditorPanel& p, AudioProcessorGraph::NodeID id)  : panel (p), graph (p.graph), pluginID (id)
+    juce::ResizableBorderComponent resizeBorder;
+    PluginComponent (GraphEditorPanel& p, AudioProcessorGraph::NodeID id)  : panel (p), graph (p.graph), pluginID (id),
+        resizeBorder(this,nullptr)
     {
         shadow.setShadowProperties (DropShadow (Colours::black.withAlpha (0.5f), 3, { 0, 1 }));
         setComponentEffect (&shadow);
@@ -188,8 +190,10 @@ struct GraphEditorPanel::PluginComponent   : public Component,
                     bypassParam->addListener (this);
             }
         }
-
+        //addAndMakeVisible(resizeBorder);
+        //resizeBorder.setBounds(0,0,150,60);
         setSize (150, 60);
+        
     }
 
     PluginComponent (const PluginComponent&) = delete;

@@ -8,20 +8,31 @@ AudioFilePlayerPlugin::AudioFilePlayerPlugin()
 #define XENAKIOSDEBUG
 #ifdef XENAKIOSDEBUG
     // importFile(juce::File(R"(C:\MusicAudio\sourcesamples\there was a time .wav)"));
-    // importFile(juce::File(R"(C:\MusicAudio\sourcesamples\test_signals\440hz_sine_0db.wav)"));
-    importFile(juce::File(R"(C:\MusicAudio\sourcesamples\count_96k.wav)"));
+    importFile(juce::File(R"(C:\MusicAudio\sourcesamples\test_signals\440hz_sine_0db.wav)"));
+    // importFile(juce::File(R"(C:\MusicAudio\sourcesamples\count_96k.wav)"));
 #endif
     auto par = new juce::AudioParameterFloat("PITCHSHIFT", "Pitch shift", -12.0f, 12.0f, 0.0f);
+    m_par_pitch = par;
     addParameter(par);
     juce::NormalisableRange<float> nr{0.1f, 4.0f, 0.01f};
     nr.setSkewForCentre(1.0f);
     par = new juce::AudioParameterFloat("RATE", "Play rate", nr, 1.0f);
+    m_par_rate = par;
     addParameter(par);
     par = new juce::AudioParameterFloat("VOLUME", "Volume", -24.0f, 6.0f, -18.0f);
+    m_par_volume = par;
     addParameter(par);
     auto bpar =
         new juce::AudioParameterBool("PRESERVEPITCH", "Preserve pitch when changing rate", true);
+    m_par_preserve_pitch = bpar;
     addParameter(bpar);
+    par = new juce::AudioParameterFloat("LOOPSTART", "Loop start", 0.0f, 1.0f, 0.0f);
+    m_par_loop_start = par;
+    addParameter(par);
+    par = new juce::AudioParameterFloat("LOOPEND", "Loop end", 0.0f, 1.0f, 1.0f);
+    m_par_loop_end = par;
+    addParameter(par);
+
     startTimer(1000);
 }
 
@@ -95,28 +106,60 @@ void AudioFilePlayerPlugin::processBlock(AudioBuffer<float> &buffer, MidiBuffer 
     buffer.clear();
     if (m_file_buf.getNumSamples() == 0)
         return;
-
+    int loop_start_samples = (*m_par_loop_start) * m_file_buf.getNumSamples();
+    int loop_end_samples = (*m_par_loop_end) * m_file_buf.getNumSamples();
+    if (loop_start_samples > loop_end_samples)
+        std::swap(loop_start_samples, loop_end_samples);
+    if (loop_start_samples == loop_end_samples)
+    {
+        loop_end_samples += 256;
+        if (loop_end_samples >= m_file_buf.getNumSamples())
+        {
+            loop_start_samples = m_file_buf.getNumSamples() - 128;
+            loop_end_samples = m_file_buf.getNumSamples() - 1;
+        }
+    }
+    if (m_buf_playpos < loop_start_samples)
+        m_buf_playpos = loop_start_samples;
+    if (m_buf_playpos >= loop_end_samples)
+        m_buf_playpos = loop_start_samples;
     auto filebuf = m_file_buf.getArrayOfReadPointers();
 
     auto wbuf = m_work_buf.getArrayOfWritePointers();
     int cachedpos = m_buf_playpos;
     float compensrate = m_file_sample_rate / getSampleRate();
-    bool preserve_pitch = *getBoolParam(3);
-    float rate = *getFloatParam(1);
+    bool preserve_pitch = *m_par_preserve_pitch;
+    float rate = *m_par_rate;
+    auto getxfadedsample = [](const float *srcbuf, int index, int start, int end, int xfadelen) {
+        // not within xfade region so just return original sample
+        int xfadestart = end - xfadelen;
+        if (index >= start && index < xfadestart)
+            return srcbuf[index];
+
+        float xfadegain = juce::jmap<float>(index, xfadestart, end, 1.0f, 0.0f);
+        jassert(xfadegain >= 0.0f && xfadegain <= 1.0);
+        float s0 = srcbuf[index];
+        int temp = index - end + xfadelen;
+        jassert(temp >= 0 && temp < end);
+        float s1 = srcbuf[temp];
+        return s0 * xfadegain + s1 * (1.0f - xfadegain);
+    };
     if (preserve_pitch)
     {
-        float pshift = *getFloatParam(0);
+        float pshift = *m_par_pitch;
         float pitchratio = std::pow(2.0, pshift / 12.0);
         m_stretch.setTransposeFactor(pitchratio * compensrate);
         rate *= compensrate;
         int samplestopush = buffer.getNumSamples() * rate;
         for (int i = 0; i < samplestopush; ++i)
         {
-            wbuf[0][i] = filebuf[0][m_buf_playpos];
-            wbuf[1][i] = filebuf[1][m_buf_playpos];
+            wbuf[0][i] = getxfadedsample(filebuf[0], m_buf_playpos, loop_start_samples,
+                                         loop_end_samples, 128);
+            wbuf[1][i] = getxfadedsample(filebuf[1], m_buf_playpos, loop_start_samples,
+                                         loop_end_samples, 128);
             ++m_buf_playpos;
-            if (m_buf_playpos >= m_file_buf.getNumSamples())
-                m_buf_playpos = 0;
+            if (m_buf_playpos >= loop_end_samples)
+                m_buf_playpos = loop_start_samples;
         }
         m_stretch.process(m_work_buf.getArrayOfReadPointers(), samplestopush,
                           buffer.getArrayOfWritePointers(), buffer.getNumSamples());
@@ -129,11 +172,13 @@ void AudioFilePlayerPlugin::processBlock(AudioBuffer<float> &buffer, MidiBuffer 
         samplestopush += 1;
         for (int i = 0; i < samplestopush; ++i)
         {
-            wbuf[0][i] = filebuf[0][m_buf_playpos];
-            wbuf[1][i] = filebuf[1][m_buf_playpos];
+            wbuf[0][i] = getxfadedsample(filebuf[0], m_buf_playpos, loop_start_samples,
+                                         loop_end_samples, 128);
+            wbuf[1][i] = getxfadedsample(filebuf[1], m_buf_playpos, loop_start_samples,
+                                         loop_end_samples, 128);
             ++m_buf_playpos;
-            if (m_buf_playpos >= m_file_buf.getNumSamples())
-                m_buf_playpos = 0;
+            if (m_buf_playpos >= loop_end_samples)
+                m_buf_playpos = loop_start_samples;
         }
         for (int ch = 0; ch < 2; ++ch)
         {
@@ -141,10 +186,14 @@ void AudioFilePlayerPlugin::processBlock(AudioBuffer<float> &buffer, MidiBuffer 
                                                     buffer.getNumSamples(), samplestopush, 0);
         }
         jassert(consumed[0] == consumed[1]);
-        m_buf_playpos = (cachedpos + consumed[0]) % m_file_buf.getNumSamples();
+        m_buf_playpos = (cachedpos + consumed[0]);
+        if (m_buf_playpos >= loop_end_samples)
+        {
+            m_buf_playpos = loop_start_samples;
+        }
     }
 
-    float volume = *getFloatParam(2);
+    float volume = *m_par_volume;
     juce::dsp::AudioBlock<float> block(buffer);
     juce::dsp::ProcessContextReplacing<float> ctx(block);
     m_gain.setGainDecibels(volume);

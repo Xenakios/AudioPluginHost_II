@@ -31,7 +31,7 @@ class AudioFilePlayerPlugin : public AudioProcessor, public juce::Timer
             };
             addAndMakeVisible(m_gen_ed);
             addAndMakeVisible(m_infolabel);
-            setSize(600, 200);
+            setSize(600, 290);
             startTimerHz(10);
         }
         void timerCallback() override
@@ -57,14 +57,7 @@ class AudioFilePlayerPlugin : public AudioProcessor, public juce::Timer
     void prepareToPlay(double newSampleRate, int maxBlocksize) override;
     void reset() override {}
     void releaseResources() override {}
-    juce::AudioParameterFloat *getFloatParam(int index)
-    {
-        return dynamic_cast<juce::AudioParameterFloat *>(getParameters()[index]);
-    }
-    juce::AudioParameterBool *getBoolParam(int index)
-    {
-        return dynamic_cast<juce::AudioParameterBool *>(getParameters()[index]);
-    }
+    
     void processBlock(AudioBuffer<float> &buffer, MidiBuffer &) override;
 
     using AudioProcessor::processBlock;
@@ -128,4 +121,11 @@ class AudioFilePlayerPlugin : public AudioProcessor, public juce::Timer
     std::vector<float> m_resampler_work_buf;
     juce::dsp::Gain<float> m_gain;
     double m_file_sample_rate = 1.0;
+    juce::Range<double> m_loop_range{0.0, 1.0};
+    juce::AudioParameterFloat *m_par_pitch = nullptr;
+    juce::AudioParameterFloat *m_par_rate = nullptr;
+    juce::AudioParameterFloat *m_par_volume = nullptr;
+    juce::AudioParameterBool *m_par_preserve_pitch = nullptr;
+    juce::AudioParameterFloat *m_par_loop_start = nullptr;
+    juce::AudioParameterFloat *m_par_loop_end = nullptr;
 };
