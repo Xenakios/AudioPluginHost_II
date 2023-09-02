@@ -112,10 +112,10 @@ void AudioFilePlayerPlugin::processBlock(AudioBuffer<float> &buffer, MidiBuffer 
         std::swap(loop_start_samples, loop_end_samples);
     if (loop_start_samples == loop_end_samples)
     {
-        loop_end_samples += 256;
+        loop_end_samples += 512;
         if (loop_end_samples >= m_file_buf.getNumSamples())
         {
-            loop_start_samples = m_file_buf.getNumSamples() - 128;
+            loop_start_samples = m_file_buf.getNumSamples() - 512;
             loop_end_samples = m_file_buf.getNumSamples() - 1;
         }
     }
@@ -136,14 +136,17 @@ void AudioFilePlayerPlugin::processBlock(AudioBuffer<float> &buffer, MidiBuffer 
         if (index >= start && index < xfadestart)
             return srcbuf[index];
 
-        float xfadegain = juce::jmap<float>(index, xfadestart, end, 1.0f, 0.0f);
+        float xfadegain = juce::jmap<float>(index, xfadestart, end - 1, 1.0f, 0.0f);
         jassert(xfadegain >= 0.0f && xfadegain <= 1.0);
         float s0 = srcbuf[index];
-        int temp = index - end + xfadelen;
+        int temp = index - xfadestart + (start - xfadelen);
+        if (temp < 0)
+            return s0 * xfadegain;
         jassert(temp >= 0 && temp < end);
         float s1 = srcbuf[temp];
         return s0 * xfadegain + s1 * (1.0f - xfadegain);
     };
+    int xfadelen = 256;
     if (preserve_pitch)
     {
         float pshift = *m_par_pitch;
@@ -154,9 +157,9 @@ void AudioFilePlayerPlugin::processBlock(AudioBuffer<float> &buffer, MidiBuffer 
         for (int i = 0; i < samplestopush; ++i)
         {
             wbuf[0][i] = getxfadedsample(filebuf[0], m_buf_playpos, loop_start_samples,
-                                         loop_end_samples, 128);
+                                         loop_end_samples, xfadelen);
             wbuf[1][i] = getxfadedsample(filebuf[1], m_buf_playpos, loop_start_samples,
-                                         loop_end_samples, 128);
+                                         loop_end_samples, xfadelen);
             ++m_buf_playpos;
             if (m_buf_playpos >= loop_end_samples)
                 m_buf_playpos = loop_start_samples;
@@ -173,9 +176,9 @@ void AudioFilePlayerPlugin::processBlock(AudioBuffer<float> &buffer, MidiBuffer 
         for (int i = 0; i < samplestopush; ++i)
         {
             wbuf[0][i] = getxfadedsample(filebuf[0], m_buf_playpos, loop_start_samples,
-                                         loop_end_samples, 128);
+                                         loop_end_samples, xfadelen);
             wbuf[1][i] = getxfadedsample(filebuf[1], m_buf_playpos, loop_start_samples,
-                                         loop_end_samples, 128);
+                                         loop_end_samples, xfadelen);
             ++m_buf_playpos;
             if (m_buf_playpos >= loop_end_samples)
                 m_buf_playpos = loop_start_samples;
