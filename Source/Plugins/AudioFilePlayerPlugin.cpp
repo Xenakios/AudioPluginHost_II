@@ -113,10 +113,10 @@ void AudioFilePlayerPlugin::processBlock(AudioBuffer<float> &buffer, MidiBuffer 
         std::swap(loop_start_samples, loop_end_samples);
     if (loop_start_samples == loop_end_samples)
     {
-        loop_end_samples += 512;
+        loop_end_samples += 4100;
         if (loop_end_samples >= m_file_buf.getNumSamples())
         {
-            loop_start_samples = m_file_buf.getNumSamples() - 512;
+            loop_start_samples = m_file_buf.getNumSamples() - 4100;
             loop_end_samples = m_file_buf.getNumSamples() - 1;
         }
     }
@@ -147,7 +147,7 @@ void AudioFilePlayerPlugin::processBlock(AudioBuffer<float> &buffer, MidiBuffer 
         float s1 = srcbuf[temp];
         return s0 * xfadegain + s1 * (1.0f - xfadegain);
     };
-    int xfadelen = 256;
+    int xfadelen = 4000;
     if (preserve_pitch)
     {
         float pshift = *m_par_pitch;
