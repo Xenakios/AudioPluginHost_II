@@ -46,6 +46,7 @@ void AudioFilePlayerPlugin::importFile(juce::File f)
     {
         m_file_temp_buf.setSize(2, reader->lengthInSamples);
         reader->read(&m_file_temp_buf, 0, reader->lengthInSamples, 0, true, true);
+        m_cur_file = f;
         m_from_gui_fifo.push(
             {CrossThreadMessage::Opcode::SwapBufferInAudioThread, 0, 0, (float)reader->sampleRate});
         delete reader;
@@ -202,4 +203,50 @@ void AudioFilePlayerPlugin::processBlock(AudioBuffer<float> &buffer, MidiBuffer 
     m_gain.setGainDecibels(volume);
     m_gain.process(ctx);
     m_buf_playpos_atomic.store(m_buf_playpos);
+}
+
+WaveFormComponent::WaveFormComponent(AudioFilePlayerPlugin &p) : m_proc(p), m_thumb_cache(10)
+{
+    // startTimerHz(10);
+    m_aman.registerBasicFormats();
+    m_thumb = std::make_unique<juce::AudioThumbnail>(256, m_aman, m_thumb_cache);
+    loadFile(p.getCurrentFile());
+}
+
+void WaveFormComponent::timerCallback() { repaint(); }
+
+void WaveFormComponent::paint(juce::Graphics &g)
+{
+    g.fillAll(juce::Colours::black);
+    if (m_thumb->getTotalLength() > 0)
+    {
+        g.setColour(juce::Colours::grey);
+        m_thumb->drawChannels(g, getLocalBounds(), 0.0, m_thumb->getTotalLength(), 1.0f);
+        double dur = m_proc.getFileDurationSeconds();
+        double pos = m_proc.getFilePlayPositionSeconds();
+        g.setColour(juce::Colours::lightgrey.withAlpha(0.5f));
+        float loopstart = *m_proc.m_par_loop_start;
+        float loopend = *m_proc.m_par_loop_end;
+        if (loopstart > loopend)
+            std::swap(loopstart, loopend);
+        float xcor0 = juce::jmap<float>(loopstart, 0.0, 1.0, 0, getWidth());
+        float xcor1 = juce::jmap<float>(loopend, 0.0, 1.0, 0, getWidth());
+        g.fillRect(xcor0, 0.0f, xcor1 - xcor0, (float)getHeight());
+        float xcor = juce::jmap<float>(pos, 0.0, dur, 0, getWidth());
+        g.setColour(juce::Colours::white);
+        g.drawLine(xcor, 0, xcor, getHeight());
+    }
+}
+
+void WaveFormComponent::loadFile(juce::File f) { m_thumb->setSource(new juce::FileInputSource(f)); }
+
+void AudioFilePlayerPlugin::AudioFilePlayerPluginEditor::resized()
+{
+    juce::FlexBox flex;
+    flex.flexDirection = juce::FlexBox::Direction::column;
+    flex.items.add(juce::FlexItem(m_import_file_but).withFlex(0.5f));
+    flex.items.add(juce::FlexItem(m_gen_ed).withFlex(3.0f));
+    flex.items.add(juce::FlexItem(m_wavecomponent).withFlex(2.0f));
+    flex.items.add(juce::FlexItem(m_infolabel).withFlex(0.5f));
+    flex.performLayout(getBounds());
 }

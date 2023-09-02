@@ -4,34 +4,56 @@
 #include "signalsmith-stretch.h"
 #include "containers/choc_SingleReaderSingleWriterFIFO.h"
 
+class AudioFilePlayerPlugin;
+
+class WaveFormComponent : public juce::Component, public juce::Timer
+{
+  public:
+    WaveFormComponent(AudioFilePlayerPlugin &p);
+    void timerCallback() override;
+    void paint(juce::Graphics &g) override;
+    void loadFile(juce::File f);
+
+  private:
+    AudioFilePlayerPlugin &m_proc;
+    juce::AudioThumbnailCache m_thumb_cache;
+    std::unique_ptr<juce::AudioThumbnail> m_thumb;
+    juce::AudioFormatManager m_aman;
+};
+
 class AudioFilePlayerPlugin : public AudioProcessor, public juce::Timer
 {
-    class Editor : public juce::AudioProcessorEditor, public juce::Timer
+  public:
+    class AudioFilePlayerPluginEditor : public juce::AudioProcessorEditor, public juce::Timer
     {
         juce::TextButton m_import_file_but;
         juce::GenericAudioProcessorEditor m_gen_ed;
         std::unique_ptr<juce::FileChooser> m_chooser;
         juce::Label m_infolabel;
         AudioFilePlayerPlugin &m_plug;
+        WaveFormComponent m_wavecomponent;
 
       public:
-        Editor(AudioFilePlayerPlugin &p) : juce::AudioProcessorEditor(p), m_gen_ed(p), m_plug(p)
+        AudioFilePlayerPluginEditor(AudioFilePlayerPlugin &p)
+            : juce::AudioProcessorEditor(p), m_gen_ed(p), m_plug(p), m_wavecomponent(p)
         {
             addAndMakeVisible(m_import_file_but);
             m_import_file_but.setButtonText("Import file...");
             m_import_file_but.onClick = [&p, this]() {
                 m_chooser =
                     std::make_unique<juce::FileChooser>("Choose audio file", juce::File(), "*.wav");
-                m_chooser->launchAsync(0, [&p](const juce::FileChooser &chooser) {
+                m_chooser->launchAsync(0, [&p, this](const juce::FileChooser &chooser) {
                     if (chooser.getResult() != juce::File())
                     {
+                        m_wavecomponent.loadFile(chooser.getResult());
                         p.importFile(chooser.getResult());
                     }
                 });
             };
             addAndMakeVisible(m_gen_ed);
             addAndMakeVisible(m_infolabel);
-            setSize(600, 290);
+            addAndMakeVisible(m_wavecomponent);
+            setSize(700, 500);
             startTimerHz(10);
         }
         void timerCallback() override
@@ -40,13 +62,9 @@ class AudioFilePlayerPlugin : public AudioProcessor, public juce::Timer
             double pos = m_plug.getFilePlayPositionSeconds();
             m_infolabel.setText(juce::String(pos, 1) + " / " + juce::String(dur, 1),
                                 juce::dontSendNotification);
+            m_wavecomponent.repaint();
         }
-        void resized() override
-        {
-            m_import_file_but.setBounds(1, 1, 200, 25);
-            m_gen_ed.setBounds(1, 27, getWidth() - 2, getHeight() - 28);
-            m_infolabel.setBounds(1, getHeight() - 20, getWidth() - 2, 20);
-        }
+        void resized() override;
     };
 
   public:
@@ -57,7 +75,7 @@ class AudioFilePlayerPlugin : public AudioProcessor, public juce::Timer
     void prepareToPlay(double newSampleRate, int maxBlocksize) override;
     void reset() override {}
     void releaseResources() override {}
-    
+
     void processBlock(AudioBuffer<float> &buffer, MidiBuffer &) override;
 
     using AudioProcessor::processBlock;
@@ -66,7 +84,7 @@ class AudioFilePlayerPlugin : public AudioProcessor, public juce::Timer
     double getTailLengthSeconds() const override { return 0.0; }
     bool acceptsMidi() const override { return false; }
     bool producesMidi() const override { return false; }
-    AudioProcessorEditor *createEditor() override { return new Editor(*this); }
+    AudioProcessorEditor *createEditor() override { return new AudioFilePlayerPluginEditor(*this); }
     bool hasEditor() const override { return true; }
     int getNumPrograms() override { return 1; }
     int getCurrentProgram() override { return 0; }
@@ -107,7 +125,9 @@ class AudioFilePlayerPlugin : public AudioProcessor, public juce::Timer
             return m_buf_playpos_atomic.load() / m_file_sample_rate;
         return 0.0;
     }
-
+    juce::AudioParameterFloat *m_par_loop_start = nullptr;
+    juce::AudioParameterFloat *m_par_loop_end = nullptr;
+    juce::File getCurrentFile() const { return m_cur_file; }
   private:
     juce::AudioBuffer<float> m_file_buf;
     juce::AudioBuffer<float> m_file_temp_buf;
@@ -126,6 +146,5 @@ class AudioFilePlayerPlugin : public AudioProcessor, public juce::Timer
     juce::AudioParameterFloat *m_par_rate = nullptr;
     juce::AudioParameterFloat *m_par_volume = nullptr;
     juce::AudioParameterBool *m_par_preserve_pitch = nullptr;
-    juce::AudioParameterFloat *m_par_loop_start = nullptr;
-    juce::AudioParameterFloat *m_par_loop_end = nullptr;
+    juce::File m_cur_file;
 };
