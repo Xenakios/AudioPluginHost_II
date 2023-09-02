@@ -435,10 +435,10 @@ std::unique_ptr<AudioPluginInstance> InternalPluginFormat::InternalPluginFactory
 
 InternalPluginFormat::InternalPluginFormat()
     : factory {
-        [] { return std::make_unique<AudioProcessorGraph::AudioGraphIOProcessor> (AudioProcessorGraph::AudioGraphIOProcessor::audioInputNode); },
-        [] { return std::make_unique<AudioProcessorGraph::AudioGraphIOProcessor> (AudioProcessorGraph::AudioGraphIOProcessor::midiInputNode); },
-        [] { return std::make_unique<AudioProcessorGraph::AudioGraphIOProcessor> (AudioProcessorGraph::AudioGraphIOProcessor::audioOutputNode); },
-        [] { return std::make_unique<AudioProcessorGraph::AudioGraphIOProcessor> (AudioProcessorGraph::AudioGraphIOProcessor::midiOutputNode); },
+        [] { return std::make_unique<xenakios::AudioProcessorGraph::AudioGraphIOProcessor> (xenakios::AudioProcessorGraph::AudioGraphIOProcessor::audioInputNode); },
+        [] { return std::make_unique<xenakios::AudioProcessorGraph::AudioGraphIOProcessor> (xenakios::AudioProcessorGraph::AudioGraphIOProcessor::midiInputNode); },
+        [] { return std::make_unique<xenakios::AudioProcessorGraph::AudioGraphIOProcessor> (xenakios::AudioProcessorGraph::AudioGraphIOProcessor::audioOutputNode); },
+        [] { return std::make_unique<xenakios::AudioProcessorGraph::AudioGraphIOProcessor> (xenakios::AudioProcessorGraph::AudioGraphIOProcessor::midiOutputNode); },
 
         [] { return std::make_unique<InternalPlugin> (std::make_unique<AudioFilePlayerPlugin>()); },
         [] { return std::make_unique<InternalPlugin> (std::make_unique<SineWaveSynth>()); },
