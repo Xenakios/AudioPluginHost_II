@@ -85,6 +85,9 @@ class AudioFilePlayerPlugin : public AudioProcessor, public juce::Timer
     juce::AudioParameterFloat *m_par_loop_start = nullptr;
     juce::AudioParameterFloat *m_par_loop_end = nullptr;
     juce::AudioParameterBool *m_par_preserve_pitch = nullptr;
+    juce::AudioParameterFloat *m_par_pitch = nullptr;
+    juce::AudioParameterFloat *m_par_rate = nullptr;
+    juce::AudioParameterFloat *m_par_volume = nullptr;
     juce::File getCurrentFile() const { return m_cur_file; }
 
   private:
@@ -101,9 +104,7 @@ class AudioFilePlayerPlugin : public AudioProcessor, public juce::Timer
     juce::dsp::Gain<float> m_gain;
     double m_file_sample_rate = 1.0;
     juce::Range<double> m_loop_range{0.0, 1.0};
-    juce::AudioParameterFloat *m_par_pitch = nullptr;
-    juce::AudioParameterFloat *m_par_rate = nullptr;
-    juce::AudioParameterFloat *m_par_volume = nullptr;
+    
     
     juce::File m_cur_file;
 };
@@ -118,6 +119,15 @@ class AudioFilePlayerPluginEditor : public juce::AudioProcessorEditor, public ju
     juce::Slider m_slider_loop_start;
     juce::Slider m_slider_loop_end;
     juce::ToggleButton m_toggle_preserve_pitch;
+    juce::SliderParameterAttachment m_attach_rate;
+    juce::SliderParameterAttachment m_attach_pitch;
+    juce::SliderParameterAttachment m_attach_volume;
+    juce::ButtonParameterAttachment m_attach_preserve_pitch;
+    juce::SliderParameterAttachment m_attach_loop_start;
+    juce::SliderParameterAttachment m_attach_loop_end;
+    juce::Label m_label_rate;
+    juce::Label m_label_pitch;
+    juce::Label m_label_volume;
     std::unique_ptr<juce::FileChooser> m_chooser;
     juce::Label m_infolabel;
     AudioFilePlayerPlugin &m_plug;

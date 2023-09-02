@@ -246,7 +246,13 @@ void WaveFormComponent::paint(juce::Graphics &g)
 void WaveFormComponent::loadFile(juce::File f) { m_thumb->setSource(new juce::FileInputSource(f)); }
 
 AudioFilePlayerPluginEditor::AudioFilePlayerPluginEditor(AudioFilePlayerPlugin &p)
-    : juce::AudioProcessorEditor(p), m_plug(p), m_wavecomponent(p)
+    : juce::AudioProcessorEditor(p), m_plug(p), m_wavecomponent(p),
+      m_attach_rate(*p.m_par_rate, m_slider_rate, nullptr),
+      m_attach_pitch(*p.m_par_pitch, m_slider_pitch, nullptr),
+      m_attach_volume(*p.m_par_volume, m_slider_volume, nullptr),
+      m_attach_preserve_pitch(*p.m_par_preserve_pitch, m_toggle_preserve_pitch, nullptr),
+      m_attach_loop_start(*p.m_par_loop_start, m_slider_loop_start, nullptr),
+      m_attach_loop_end(*p.m_par_loop_end, m_slider_loop_end, nullptr)
 {
     addAndMakeVisible(m_import_file_but);
     m_import_file_but.setButtonText("Import file...");
@@ -266,6 +272,13 @@ AudioFilePlayerPluginEditor::AudioFilePlayerPluginEditor(AudioFilePlayerPlugin &
     addAndMakeVisible(m_slider_loop_end);
     addAndMakeVisible(m_slider_loop_start);
     addAndMakeVisible(m_toggle_preserve_pitch);
+    addAndMakeVisible(m_label_rate);
+    m_label_rate.setText("Play rate", juce::dontSendNotification);
+    addAndMakeVisible(m_label_pitch);
+    m_label_pitch.setText("Pitch", juce::dontSendNotification);
+    addAndMakeVisible(m_label_volume);
+    m_label_volume.setText("Volume", juce::dontSendNotification);
+    m_toggle_preserve_pitch.setButtonText("Independent rate and pitch");
     addAndMakeVisible(m_infolabel);
     addAndMakeVisible(m_wavecomponent);
     setSize(700, 500);
@@ -279,19 +292,25 @@ void AudioFilePlayerPluginEditor::timerCallback()
     m_infolabel.setText(juce::String(pos, 1) + " / " + juce::String(dur, 1),
                         juce::dontSendNotification);
     m_wavecomponent.repaint();
+    m_slider_pitch.setEnabled(m_toggle_preserve_pitch.getToggleState());
+    m_label_pitch.setEnabled(m_toggle_preserve_pitch.getToggleState());
 }
 
 void AudioFilePlayerPluginEditor::resized()
 {
     juce::FlexBox flex;
     flex.flexDirection = juce::FlexBox::Direction::column;
-    flex.items.add(juce::FlexItem(m_import_file_but).withFlex(0.5f));
+    
+    flex.items.add(juce::FlexItem(m_label_rate).withFlex(0.4f));
     flex.items.add(juce::FlexItem(m_slider_rate).withFlex(0.4f));
     flex.items.add(juce::FlexItem(m_toggle_preserve_pitch).withFlex(0.4f));
+    flex.items.add(juce::FlexItem(m_label_pitch).withFlex(0.4f));
     flex.items.add(juce::FlexItem(m_slider_pitch).withFlex(0.4f));
     flex.items.add(juce::FlexItem(m_slider_loop_start).withFlex(0.4f));
     flex.items.add(juce::FlexItem(m_slider_loop_end).withFlex(0.4f));
+    flex.items.add(juce::FlexItem(m_label_volume).withFlex(0.4f));
     flex.items.add(juce::FlexItem(m_slider_volume).withFlex(0.4f));
+    flex.items.add(juce::FlexItem(m_import_file_but).withFlex(0.5f));
     flex.items.add(juce::FlexItem(m_wavecomponent).withFlex(2.0f));
     flex.items.add(juce::FlexItem(m_infolabel).withFlex(0.3f));
     flex.performLayout(getBounds());
