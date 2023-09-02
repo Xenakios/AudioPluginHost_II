@@ -205,6 +205,11 @@ void AudioFilePlayerPlugin::processBlock(AudioBuffer<float> &buffer, MidiBuffer 
     m_buf_playpos_atomic.store(m_buf_playpos);
 }
 
+AudioProcessorEditor *AudioFilePlayerPlugin::createEditor()
+{
+    return new AudioFilePlayerPluginEditor(*this);
+}
+
 WaveFormComponent::WaveFormComponent(AudioFilePlayerPlugin &p) : m_proc(p), m_thumb_cache(10)
 {
     // startTimerHz(10);
@@ -240,14 +245,45 @@ void WaveFormComponent::paint(juce::Graphics &g)
 
 void WaveFormComponent::loadFile(juce::File f) { m_thumb->setSource(new juce::FileInputSource(f)); }
 
-void AudioFilePlayerPlugin::AudioFilePlayerPluginEditor::resized()
+AudioFilePlayerPluginEditor::AudioFilePlayerPluginEditor(AudioFilePlayerPlugin &p)
+    : juce::AudioProcessorEditor(p), m_gen_ed(p), m_plug(p), m_wavecomponent(p)
+{
+    addAndMakeVisible(m_import_file_but);
+    m_import_file_but.setButtonText("Import file...");
+    m_import_file_but.onClick = [&p, this]() {
+        m_chooser = std::make_unique<juce::FileChooser>("Choose audio file", juce::File(), "*.wav");
+        m_chooser->launchAsync(0, [&p, this](const juce::FileChooser &chooser) {
+            if (chooser.getResult() != juce::File())
+            {
+                m_wavecomponent.loadFile(chooser.getResult());
+                p.importFile(chooser.getResult());
+            }
+        });
+    };
+    addAndMakeVisible(m_gen_ed);
+    addAndMakeVisible(m_infolabel);
+    addAndMakeVisible(m_wavecomponent);
+    setSize(700, 500);
+    startTimerHz(10);
+}
+
+void AudioFilePlayerPluginEditor::timerCallback()
+{
+    double dur = m_plug.getFileDurationSeconds();
+    double pos = m_plug.getFilePlayPositionSeconds();
+    m_infolabel.setText(juce::String(pos, 1) + " / " + juce::String(dur, 1),
+                        juce::dontSendNotification);
+    m_wavecomponent.repaint();
+}
+
+void AudioFilePlayerPluginEditor::resized()
 {
     juce::FlexBox flex;
     flex.flexDirection = juce::FlexBox::Direction::column;
     flex.items.add(juce::FlexItem(m_import_file_but).withFlex(0.5f));
     flex.items.add(juce::FlexItem(m_gen_ed).withFlex(3.0f));
     flex.items.add(juce::FlexItem(m_wavecomponent).withFlex(2.0f));
-    flex.items.add(juce::FlexItem(m_infolabel).withFlex(0.5f));
+    flex.items.add(juce::FlexItem(m_infolabel).withFlex(0.3f));
     flex.performLayout(getBounds());
 }
 

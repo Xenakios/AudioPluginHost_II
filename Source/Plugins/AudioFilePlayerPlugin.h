@@ -23,49 +23,6 @@ class WaveFormComponent : public juce::Component, public juce::Timer
 
 class AudioFilePlayerPlugin : public AudioProcessor, public juce::Timer
 {
-  public:
-    class AudioFilePlayerPluginEditor : public juce::AudioProcessorEditor, public juce::Timer
-    {
-        juce::TextButton m_import_file_but;
-        juce::GenericAudioProcessorEditor m_gen_ed;
-        std::unique_ptr<juce::FileChooser> m_chooser;
-        juce::Label m_infolabel;
-        AudioFilePlayerPlugin &m_plug;
-        WaveFormComponent m_wavecomponent;
-
-      public:
-        AudioFilePlayerPluginEditor(AudioFilePlayerPlugin &p)
-            : juce::AudioProcessorEditor(p), m_gen_ed(p), m_plug(p), m_wavecomponent(p)
-        {
-            addAndMakeVisible(m_import_file_but);
-            m_import_file_but.setButtonText("Import file...");
-            m_import_file_but.onClick = [&p, this]() {
-                m_chooser =
-                    std::make_unique<juce::FileChooser>("Choose audio file", juce::File(), "*.wav");
-                m_chooser->launchAsync(0, [&p, this](const juce::FileChooser &chooser) {
-                    if (chooser.getResult() != juce::File())
-                    {
-                        m_wavecomponent.loadFile(chooser.getResult());
-                        p.importFile(chooser.getResult());
-                    }
-                });
-            };
-            addAndMakeVisible(m_gen_ed);
-            addAndMakeVisible(m_infolabel);
-            addAndMakeVisible(m_wavecomponent);
-            setSize(700, 500);
-            startTimerHz(10);
-        }
-        void timerCallback() override
-        {
-            double dur = m_plug.getFileDurationSeconds();
-            double pos = m_plug.getFilePlayPositionSeconds();
-            m_infolabel.setText(juce::String(pos, 1) + " / " + juce::String(dur, 1),
-                                juce::dontSendNotification);
-            m_wavecomponent.repaint();
-        }
-        void resized() override;
-    };
 
   public:
     AudioFilePlayerPlugin();
@@ -84,7 +41,7 @@ class AudioFilePlayerPlugin : public AudioProcessor, public juce::Timer
     double getTailLengthSeconds() const override { return 0.0; }
     bool acceptsMidi() const override { return false; }
     bool producesMidi() const override { return false; }
-    AudioProcessorEditor *createEditor() override { return new AudioFilePlayerPluginEditor(*this); }
+    AudioProcessorEditor *createEditor() override;
     bool hasEditor() const override { return true; }
     int getNumPrograms() override { return 1; }
     int getCurrentProgram() override { return 0; }
@@ -128,6 +85,7 @@ class AudioFilePlayerPlugin : public AudioProcessor, public juce::Timer
     juce::AudioParameterFloat *m_par_loop_start = nullptr;
     juce::AudioParameterFloat *m_par_loop_end = nullptr;
     juce::File getCurrentFile() const { return m_cur_file; }
+
   private:
     juce::AudioBuffer<float> m_file_buf;
     juce::AudioBuffer<float> m_file_temp_buf;
@@ -147,4 +105,19 @@ class AudioFilePlayerPlugin : public AudioProcessor, public juce::Timer
     juce::AudioParameterFloat *m_par_volume = nullptr;
     juce::AudioParameterBool *m_par_preserve_pitch = nullptr;
     juce::File m_cur_file;
+};
+
+class AudioFilePlayerPluginEditor : public juce::AudioProcessorEditor, public juce::Timer
+{
+    juce::TextButton m_import_file_but;
+    juce::GenericAudioProcessorEditor m_gen_ed;
+    std::unique_ptr<juce::FileChooser> m_chooser;
+    juce::Label m_infolabel;
+    AudioFilePlayerPlugin &m_plug;
+    WaveFormComponent m_wavecomponent;
+
+  public:
+    AudioFilePlayerPluginEditor(AudioFilePlayerPlugin &p);
+    void timerCallback() override;
+    void resized() override;
 };
