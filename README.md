@@ -15,6 +15,7 @@ Future ideas that may or may not ever be implemented :
 - Offline render
 - Some super simple way to generate MIDI for testing instrument plugins
 - Plugin parameter automation/modulation
+- Clap plugins support
 - Use Tracktion Graph instead of the Juce AudioProcessorGraph
 
 To build, you need cmake, JUCE at the repo root level and choc and SignalSmith Stretch in the libs

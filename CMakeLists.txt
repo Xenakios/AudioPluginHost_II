@@ -27,6 +27,7 @@ project(AudioPluginHost2 VERSION 0.0.1)
 add_subdirectory(JUCE)
 
 include_directories(
+    Source/AudioGraph
     libs/signalsmith-stretch
     libs/choc
 )
@@ -74,6 +75,7 @@ target_compile_definitions(AudioPlayer
 
 
 target_sources(AudioPluginHost2 PRIVATE
+    Source/AudioGraph/xaudiograph.cpp
     Source/HostStartup.cpp
     Source/Plugins/ARAPlugin.cpp
     Source/Plugins/IOConfigurationWindow.cpp
