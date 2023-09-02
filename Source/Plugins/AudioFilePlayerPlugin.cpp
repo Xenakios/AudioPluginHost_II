@@ -250,3 +250,5 @@ void AudioFilePlayerPlugin::AudioFilePlayerPluginEditor::resized()
     flex.items.add(juce::FlexItem(m_infolabel).withFlex(0.5f));
     flex.performLayout(getBounds());
 }
+
+juce::AudioProcessor *JUCE_CALLTYPE createPluginFilter() { return new AudioFilePlayerPlugin(); }
