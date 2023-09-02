@@ -197,6 +197,7 @@ public:
         node->properties.set (getOpenProp (type), true);
 
         setVisible (true);
+        setAlwaysOnTop(true);
     }
 
     ~PluginWindow() override

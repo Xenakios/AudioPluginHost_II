@@ -8,7 +8,7 @@ AudioFilePlayerPlugin::AudioFilePlayerPlugin()
 #define XENAKIOSDEBUG
 #ifdef XENAKIOSDEBUG
     // importFile(juce::File(R"(C:\MusicAudio\sourcesamples\there was a time .wav)"));
-    importFile(juce::File(R"(C:\MusicAudio\sourcesamples\test_signals\440hz_sine_0db.wav)"));
+    // importFile(juce::File(R"(C:\MusicAudio\sourcesamples\test_signals\440hz_sine_0db.wav)"));
     // importFile(juce::File(R"(C:\MusicAudio\sourcesamples\count_96k.wav)"));
 #endif
     auto par = new juce::AudioParameterFloat("PITCHSHIFT", "Pitch shift", -12.0f, 12.0f, 0.0f);
@@ -246,7 +246,7 @@ void WaveFormComponent::paint(juce::Graphics &g)
 void WaveFormComponent::loadFile(juce::File f) { m_thumb->setSource(new juce::FileInputSource(f)); }
 
 AudioFilePlayerPluginEditor::AudioFilePlayerPluginEditor(AudioFilePlayerPlugin &p)
-    : juce::AudioProcessorEditor(p), m_gen_ed(p), m_plug(p), m_wavecomponent(p)
+    : juce::AudioProcessorEditor(p), m_plug(p), m_wavecomponent(p)
 {
     addAndMakeVisible(m_import_file_but);
     m_import_file_but.setButtonText("Import file...");
@@ -260,7 +260,12 @@ AudioFilePlayerPluginEditor::AudioFilePlayerPluginEditor(AudioFilePlayerPlugin &
             }
         });
     };
-    addAndMakeVisible(m_gen_ed);
+    addAndMakeVisible(m_slider_rate);
+    addAndMakeVisible(m_slider_pitch);
+    addAndMakeVisible(m_slider_volume);
+    addAndMakeVisible(m_slider_loop_end);
+    addAndMakeVisible(m_slider_loop_start);
+    addAndMakeVisible(m_toggle_preserve_pitch);
     addAndMakeVisible(m_infolabel);
     addAndMakeVisible(m_wavecomponent);
     setSize(700, 500);
@@ -281,7 +286,12 @@ void AudioFilePlayerPluginEditor::resized()
     juce::FlexBox flex;
     flex.flexDirection = juce::FlexBox::Direction::column;
     flex.items.add(juce::FlexItem(m_import_file_but).withFlex(0.5f));
-    flex.items.add(juce::FlexItem(m_gen_ed).withFlex(3.0f));
+    flex.items.add(juce::FlexItem(m_slider_rate).withFlex(0.4f));
+    flex.items.add(juce::FlexItem(m_toggle_preserve_pitch).withFlex(0.4f));
+    flex.items.add(juce::FlexItem(m_slider_pitch).withFlex(0.4f));
+    flex.items.add(juce::FlexItem(m_slider_loop_start).withFlex(0.4f));
+    flex.items.add(juce::FlexItem(m_slider_loop_end).withFlex(0.4f));
+    flex.items.add(juce::FlexItem(m_slider_volume).withFlex(0.4f));
     flex.items.add(juce::FlexItem(m_wavecomponent).withFlex(2.0f));
     flex.items.add(juce::FlexItem(m_infolabel).withFlex(0.3f));
     flex.performLayout(getBounds());
