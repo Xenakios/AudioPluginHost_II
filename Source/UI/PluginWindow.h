@@ -160,7 +160,7 @@ public:
         numTypes
     };
 
-    PluginWindow (AudioProcessorGraph::Node* n, Type t, OwnedArray<PluginWindow>& windowList)
+    PluginWindow (xenakios::AudioProcessorGraph::Node* n, Type t, OwnedArray<PluginWindow>& windowList)
         : DocumentWindow (n->getProcessor()->getName() + getFormatSuffix (n->getProcessor()),
                           LookAndFeel::getDefaultLookAndFeel().findColour (ResizableWindow::backgroundColourId),
                           DocumentWindow::minimiseButton | DocumentWindow::closeButton),
@@ -222,7 +222,7 @@ public:
     static String getOpenProp  (Type type)    { return "uiopen_"  + getTypeName (type); }
 
     OwnedArray<PluginWindow>& activeWindowList;
-    const AudioProcessorGraph::Node::Ptr node;
+    const xenakios::AudioProcessorGraph::Node::Ptr node;
     const Type type;
 
     BorderSize<int> getBorderThickness() override

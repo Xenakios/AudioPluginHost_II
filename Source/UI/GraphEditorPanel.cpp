@@ -95,7 +95,7 @@
 struct GraphEditorPanel::PinComponent   : public Component,
                                           public SettableTooltipClient
 {
-    PinComponent (GraphEditorPanel& p, AudioProcessorGraph::NodeAndChannel pinToUse, bool isIn)
+    PinComponent (GraphEditorPanel& p, xenakios::AudioProcessorGraph::NodeAndChannel pinToUse, bool isIn)
         : panel (p), graph (p.graph), pin (pinToUse), isInput (isIn)
     {
         if (auto node = graph.graph.getNodeForId (pin.nodeID))
@@ -143,7 +143,7 @@ struct GraphEditorPanel::PinComponent   : public Component,
 
     void mouseDown (const MouseEvent& e) override
     {
-        AudioProcessorGraph::NodeAndChannel dummy { {}, 0 };
+        xenakios::AudioProcessorGraph::NodeAndChannel dummy { {}, 0 };
 
         panel.beginConnectorDrag (isInput ? dummy : pin,
                                   isInput ? pin : dummy,
@@ -162,7 +162,7 @@ struct GraphEditorPanel::PinComponent   : public Component,
 
     GraphEditorPanel& panel;
     PluginGraph& graph;
-    AudioProcessorGraph::NodeAndChannel pin;
+    xenakios::AudioProcessorGraph::NodeAndChannel pin;
     const bool isInput;
     int busIdx = 0;
 
@@ -176,7 +176,7 @@ struct GraphEditorPanel::PluginComponent   : public Component,
                                              private AsyncUpdater
 {
     juce::ResizableBorderComponent resizeBorder;
-    PluginComponent (GraphEditorPanel& p, AudioProcessorGraph::NodeID id)  : panel (p), graph (p.graph), pluginID (id),
+    PluginComponent (GraphEditorPanel& p, xenakios::AudioProcessorGraph::NodeID id)  : panel (p), graph (p.graph), pluginID (id),
         resizeBorder(this,nullptr)
     {
         shadow.setShadowProperties (DropShadow (Colours::black.withAlpha (0.5f), 3, { 0, 1 }));
@@ -338,7 +338,7 @@ struct GraphEditorPanel::PluginComponent   : public Component,
 
     void update()
     {
-        const AudioProcessorGraph::Node::Ptr f (graph.graph.getNodeForId (pluginID));
+        const xenakios::AudioProcessorGraph::Node::Ptr f (graph.graph.getNodeForId (pluginID));
         jassert (f != nullptr);
 
         auto& processor = *f->getProcessor();
@@ -543,7 +543,7 @@ struct GraphEditorPanel::PluginComponent   : public Component,
 
     GraphEditorPanel& panel;
     PluginGraph& graph;
-    const AudioProcessorGraph::NodeID pluginID;
+    const xenakios::AudioProcessorGraph::NodeID pluginID;
     OwnedArray<PinComponent> pins;
     int numInputs = 0, numOutputs = 0;
     int pinSize = 16;
@@ -567,7 +567,7 @@ struct GraphEditorPanel::ConnectorComponent   : public Component,
         setAlwaysOnTop (true);
     }
 
-    void setInput (AudioProcessorGraph::NodeAndChannel newSource)
+    void setInput (xenakios::AudioProcessorGraph::NodeAndChannel newSource)
     {
         if (connection.source != newSource)
         {
@@ -576,7 +576,7 @@ struct GraphEditorPanel::ConnectorComponent   : public Component,
         }
     }
 
-    void setOutput (AudioProcessorGraph::NodeAndChannel newDest)
+    void setOutput (xenakios::AudioProcessorGraph::NodeAndChannel newDest)
     {
         if (connection.destination != newDest)
         {
@@ -680,7 +680,7 @@ struct GraphEditorPanel::ConnectorComponent   : public Component,
             getDistancesFromEnds (getPosition().toFloat() + e.position, distanceFromStart, distanceFromEnd);
             const bool isNearerSource = (distanceFromStart < distanceFromEnd);
 
-            AudioProcessorGraph::NodeAndChannel dummy { {}, 0 };
+            xenakios::AudioProcessorGraph::NodeAndChannel dummy { {}, 0 };
 
             panel.beginConnectorDrag (isNearerSource ? dummy : connection.source,
                                       isNearerSource ? connection.destination : dummy,
@@ -744,7 +744,7 @@ struct GraphEditorPanel::ConnectorComponent   : public Component,
 
     GraphEditorPanel& panel;
     PluginGraph& graph;
-    AudioProcessorGraph::Connection connection { { {}, 0 }, { {}, 0 } };
+    xenakios::AudioProcessorGraph::Connection connection { { {}, 0 }, { {}, 0 } };
     Point<float> lastInputPos, lastOutputPos;
     Path linePath, hitPath;
     bool dragging = false;
@@ -805,7 +805,7 @@ void GraphEditorPanel::createNewPlugin (const PluginDescriptionAndPreference& de
     graph.addPlugin (desc, position.toDouble() / Point<double> ((double) getWidth(), (double) getHeight()));
 }
 
-GraphEditorPanel::PluginComponent* GraphEditorPanel::getComponentForPlugin (AudioProcessorGraph::NodeID nodeID) const
+GraphEditorPanel::PluginComponent* GraphEditorPanel::getComponentForPlugin (xenakios::AudioProcessorGraph::NodeID nodeID) const
 {
     for (auto* fc : nodes)
        if (fc->pluginID == nodeID)
@@ -814,7 +814,7 @@ GraphEditorPanel::PluginComponent* GraphEditorPanel::getComponentForPlugin (Audi
     return nullptr;
 }
 
-GraphEditorPanel::ConnectorComponent* GraphEditorPanel::getComponentForConnection (const AudioProcessorGraph::Connection& conn) const
+GraphEditorPanel::ConnectorComponent* GraphEditorPanel::getComponentForConnection (const xenakios::AudioProcessorGraph::Connection& conn) const
 {
     for (auto* cc : connectors)
         if (cc->connection == conn)
@@ -905,8 +905,8 @@ void GraphEditorPanel::showPopupMenu (Point<int> mousePos)
     }
 }
 
-void GraphEditorPanel::beginConnectorDrag (AudioProcessorGraph::NodeAndChannel source,
-                                           AudioProcessorGraph::NodeAndChannel dest,
+void GraphEditorPanel::beginConnectorDrag (xenakios::AudioProcessorGraph::NodeAndChannel source,
+                                           xenakios::AudioProcessorGraph::NodeAndChannel dest,
                                            const MouseEvent& e)
 {
     auto* c = dynamic_cast<ConnectorComponent*> (e.originalComponent);
@@ -939,11 +939,11 @@ void GraphEditorPanel::dragConnector (const MouseEvent& e)
         {
             auto connection = draggingConnector->connection;
 
-            if (connection.source.nodeID == AudioProcessorGraph::NodeID() && ! pin->isInput)
+            if (connection.source.nodeID == xenakios::AudioProcessorGraph::NodeID() && ! pin->isInput)
             {
                 connection.source = pin->pin;
             }
-            else if (connection.destination.nodeID == AudioProcessorGraph::NodeID() && pin->isInput)
+            else if (connection.destination.nodeID == xenakios::AudioProcessorGraph::NodeID() && pin->isInput)
             {
                 connection.destination = pin->pin;
             }
@@ -955,7 +955,7 @@ void GraphEditorPanel::dragConnector (const MouseEvent& e)
             }
         }
 
-        if (draggingConnector->connection.source.nodeID == AudioProcessorGraph::NodeID())
+        if (draggingConnector->connection.source.nodeID == xenakios::AudioProcessorGraph::NodeID())
             draggingConnector->dragStart (pos);
         else
             draggingConnector->dragEnd (pos);
@@ -976,7 +976,7 @@ void GraphEditorPanel::endDraggingConnector (const MouseEvent& e)
 
     if (auto* pin = findPinAt (e2.position))
     {
-        if (connection.source.nodeID == AudioProcessorGraph::NodeID())
+        if (connection.source.nodeID == xenakios::AudioProcessorGraph::NodeID())
         {
             if (pin->isInput)
                 return;

@@ -501,7 +501,7 @@ void IOConfigurationWindow::update()
     auto nodeID = getNodeID();
 
     if (auto* graph = getGraph())
-        if (nodeID != AudioProcessorGraph::NodeID())
+        if (nodeID != xenakios::AudioProcessorGraph::NodeID())
             graph->disconnectNode (nodeID);
 
     if (auto* graphEditor = getGraphEditor())
@@ -509,7 +509,7 @@ void IOConfigurationWindow::update()
             panel->updateComponents();
 }
 
-AudioProcessorGraph::NodeID IOConfigurationWindow::getNodeID() const
+xenakios::AudioProcessorGraph::NodeID IOConfigurationWindow::getNodeID() const
 {
     if (auto* graph = getGraph())
         for (auto* node : graph->getNodes())
@@ -538,7 +538,7 @@ GraphDocumentComponent* IOConfigurationWindow::getGraphEditor() const
     return nullptr;
 }
 
-AudioProcessorGraph* IOConfigurationWindow::getGraph() const
+xenakios::AudioProcessorGraph* IOConfigurationWindow::getGraph() const
 {
     if (auto* graphEditor = getGraphEditor())
         if (auto* panel = graphEditor->graph.get())

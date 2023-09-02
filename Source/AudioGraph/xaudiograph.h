@@ -22,7 +22,7 @@
 
   ==============================================================================
 */
-
+#pragma once
 #include "JuceHeader.h"
 
 namespace xenakios
@@ -44,7 +44,7 @@ namespace xenakios
 
     @tags{Audio}
 */
-class JUCE_API  AudioProcessorGraph   : public AudioProcessor,
+class AudioProcessorGraph   : public AudioProcessor,
                                         public ChangeBroadcaster
 {
 public:

@@ -27,7 +27,7 @@
 
 class MainHostWindow;
 class GraphDocumentComponent;
-
+#include "../AudioGraph/xaudiograph.h"
 
 //==============================================================================
 class IOConfigurationWindow   : public  AudioProcessorEditor
@@ -52,8 +52,8 @@ private:
 
     MainHostWindow* getMainWindow() const;
     GraphDocumentComponent* getGraphEditor() const;
-    AudioProcessorGraph* getGraph() const;
-    AudioProcessorGraph::NodeID getNodeID() const;
+    xenakios::AudioProcessorGraph* getGraph() const;
+    xenakios::AudioProcessorGraph::NodeID getNodeID() const;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (IOConfigurationWindow)
 };

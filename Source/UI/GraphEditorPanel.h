@@ -60,8 +60,8 @@ public:
     void showPopupMenu (Point<int> position);
 
     //==============================================================================
-    void beginConnectorDrag (AudioProcessorGraph::NodeAndChannel source,
-                             AudioProcessorGraph::NodeAndChannel dest,
+    void beginConnectorDrag (xenakios::AudioProcessorGraph::NodeAndChannel source,
+                             xenakios::AudioProcessorGraph::NodeAndChannel dest,
                              const MouseEvent&);
     void dragConnector (const MouseEvent&);
     void endDraggingConnector (const MouseEvent&);
@@ -79,8 +79,8 @@ private:
     std::unique_ptr<ConnectorComponent> draggingConnector;
     std::unique_ptr<PopupMenu> menu;
 
-    PluginComponent* getComponentForPlugin (AudioProcessorGraph::NodeID) const;
-    ConnectorComponent* getComponentForConnection (const AudioProcessorGraph::Connection&) const;
+    PluginComponent* getComponentForPlugin (xenakios::AudioProcessorGraph::NodeID) const;
+    ConnectorComponent* getComponentForConnection (const xenakios::AudioProcessorGraph::Connection&) const;
     PinComponent* findPinAt (Point<float>) const;
 
     //==============================================================================

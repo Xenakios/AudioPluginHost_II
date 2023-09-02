@@ -26,6 +26,7 @@
 #pragma once
 
 #include "../UI/PluginWindow.h"
+#include "../AudioGraph/xaudiograph.h"
 
 //==============================================================================
 /** A type that encapsulates a PluginDescription and some preferences regarding
@@ -65,11 +66,11 @@ public:
     ~PluginGraph() override;
 
     //==============================================================================
-    using NodeID = AudioProcessorGraph::NodeID;
+    using NodeID = xenakios::AudioProcessorGraph::NodeID;
 
     void addPlugin (const PluginDescriptionAndPreference&, Point<double>);
 
-    AudioProcessorGraph::Node::Ptr getNodeForName (const String& name) const;
+    xenakios::AudioProcessorGraph::Node::Ptr getNodeForName (const String& name) const;
 
     void setNodePosition (NodeID, Point<double>);
     Point<double> getNodePosition (NodeID) const;
@@ -77,7 +78,7 @@ public:
     //==============================================================================
     void clear();
 
-    PluginWindow* getOrCreateWindowFor (AudioProcessorGraph::Node*, PluginWindow::Type);
+    PluginWindow* getOrCreateWindowFor (xenakios::AudioProcessorGraph::Node*, PluginWindow::Type);
     void closeCurrentlyOpenWindowsFor (AudioProcessorGraph::NodeID);
     bool closeAnyOpenPluginWindows();
 
@@ -103,7 +104,7 @@ public:
     static File getDefaultGraphDocumentOnMobile();
 
     //==============================================================================
-    AudioProcessorGraph graph;
+    xenakios::AudioProcessorGraph graph;
 
 private:
     //==============================================================================

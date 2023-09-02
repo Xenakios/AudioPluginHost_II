@@ -70,7 +70,7 @@ void PluginGraph::changeListenerCallback (ChangeBroadcaster*)
             activePluginWindows.remove (i);
 }
 
-AudioProcessorGraph::Node::Ptr PluginGraph::getNodeForName (const String& name) const
+xenakios::AudioProcessorGraph::Node::Ptr PluginGraph::getNodeForName (const String& name) const
 {
     for (auto* node : graph.getNodes())
         if (auto p = node->getProcessor())
@@ -153,7 +153,7 @@ void PluginGraph::clear()
     changed();
 }
 
-PluginWindow* PluginGraph::getOrCreateWindowFor (AudioProcessorGraph::Node* node, PluginWindow::Type type)
+PluginWindow* PluginGraph::getOrCreateWindowFor (xenakios::AudioProcessorGraph::Node* node, PluginWindow::Type type)
 {
     jassert (node != nullptr);
 
@@ -335,7 +335,7 @@ static XmlElement* createBusLayoutXml (const AudioProcessor::BusesLayout& layout
     return xml;
 }
 
-static XmlElement* createNodeXml (AudioProcessorGraph::Node* const node) noexcept
+static XmlElement* createNodeXml (xenakios::AudioProcessorGraph::Node* const node) noexcept
 {
     if (auto* plugin = dynamic_cast<AudioPluginInstance*> (node->getProcessor()))
     {
