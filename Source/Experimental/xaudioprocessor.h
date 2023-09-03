@@ -59,11 +59,11 @@ class XAudioProcessor
     }
     virtual void deactivate() noexcept {}
     // doubtful we'd ever want to have control over these...?
-    // the processor should be ready to process once activated etc, 
+    // the processor should be ready to process once activated etc,
     // but let's leave these on for the moment
     virtual bool startProcessing() noexcept { return true; }
     virtual void stopProcessing() noexcept {}
-    
+
     // This could maybe be pure virtual because the processor is useless if it doesn't process!
     virtual clap_process_status process(const clap_process *process) noexcept
     {
@@ -96,18 +96,16 @@ class XAudioProcessor
     // actively called. We might want to somehow abstract this, if possible...
     virtual void paramsFlush(const clap_input_events *in, const clap_output_events *out) noexcept {}
 
-    // Juce GUI
-    virtual bool hasEditor() noexcept
+    virtual uint32_t notePortsCount(bool isInput) const noexcept { return 0; }
+    virtual bool notePortsInfo(uint32_t index, bool isInput,
+                               clap_note_port_info *info) const noexcept
     {
         return false;
     }
-    virtual XAudioProcessorEditor* createEditorIfNeeded() noexcept
-    {
-        return nullptr;
-    }
-    virtual XAudioProcessorEditor* createEditor() noexcept
-    {
-        return nullptr;
-    }
+
+    // Juce GUI
+    virtual bool hasEditor() noexcept { return false; }
+    virtual XAudioProcessorEditor *createEditorIfNeeded() noexcept { return nullptr; }
+    virtual XAudioProcessorEditor *createEditor() noexcept { return nullptr; }
 };
 } // namespace xenakios

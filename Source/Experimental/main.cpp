@@ -40,9 +40,16 @@ int main()
     std::vector<float> procbuf(2 * numchans * blocksize);
 
     std::vector<std::unique_ptr<XAPNode>> proc_nodes;
-    proc_nodes.emplace_back(std::make_unique<XAPNode>(std::make_unique<ToneProcessorTest>()));
+    // proc_nodes.emplace_back(std::make_unique<XAPNode>(std::make_unique<ToneProcessorTest>()));
+    proc_nodes.emplace_back(std::make_unique<XAPNode>(std::make_unique<JucePluginWrapper>(
+        R"(C:\Program Files\Common Files\VST3\Surge Synth Team\Surge XT.vst3\Contents\x86_64-win\Surge XT.vst3)")));
     proc_nodes.emplace_back(std::make_unique<XAPNode>(std::make_unique<GainProcessorTest>()));
-    proc_nodes.emplace_back(std::make_unique<XAPNode>(std::make_unique<JucePluginWrapper>()));
+    proc_nodes.emplace_back(std::make_unique<XAPNode>(std::make_unique<JucePluginWrapper>(
+        R"(C:\Program Files\Common Files\VST3\ValhallaVintageVerb.vst3)")));
+    // auto surge = std::make_unique<XAPNode>(std::make_unique<JucePluginWrapper>(
+    //     R"(C:\Program Files\Common Files\VST3\Surge Synth Team\Surge
+    //     XT.vst3\Contents\x86_64-win\Surge XT.vst3)"));
+    // surge->processor->activate(44100, 0, blocksize);
     for (auto &n : proc_nodes)
         n->processor->activate(sr, 0, blocksize);
 
@@ -86,6 +93,7 @@ int main()
             auto &node = proc_nodes[index];
             if (index == 0)
             {
+#ifdef INTERNAL_TONEGEN
                 if (outcounter < outlen / 2)
                     xenakios::pushParamEvent(node->inEvents, false, 0,
                                              (clap_id)ToneProcessorTest::ParamIds::Pitch, 69.0);
@@ -102,14 +110,62 @@ int main()
                                     (clap_id)ToneProcessorTest::ParamIds::Pitch, 0.4);
                 modnode->inEvents.clear();
                 modnode->outEvents.clear();
+#else
+                auto pushmidimsg = [](clap::helpers::EventList &dest,
+                                      const juce::MidiMessage &midimsg, int timestamp) {
+                    clap_event_midi clapmsg;
+                    clapmsg.header.flags = 0;
+                    clapmsg.header.space_id = CLAP_CORE_EVENT_SPACE_ID;
+                    clapmsg.header.size = sizeof(clap_event_midi);
+                    clapmsg.header.time = timestamp;
+                    clapmsg.header.type = CLAP_EVENT_MIDI;
+                    clapmsg.port_index = 0;
+                    clapmsg.data[0] = midimsg.getRawData()[0];
+                    clapmsg.data[1] = midimsg.getRawData()[1];
+                    clapmsg.data[2] = midimsg.getRawData()[2];
+                    dest.push(reinterpret_cast<const clap_event_header *>(&clapmsg));
+                };
+                auto pushclapnotemsg = [](clap::helpers::EventList &dest,
+                                      uint16_t msgtype, int timestamp, int key, int channel, double velo) {
+                    clap_event_note clapmsg;
+                    clapmsg.header.flags = 0;
+                    clapmsg.header.space_id = CLAP_CORE_EVENT_SPACE_ID;
+                    clapmsg.header.size = sizeof(clap_event_note);
+                    clapmsg.header.time = timestamp;
+                    clapmsg.header.type = msgtype;
+                    
+                    clapmsg.port_index = 0;
+                    clapmsg.channel = channel;
+                    clapmsg.key = key;
+                    clapmsg.note_id = -1;
+                    clapmsg.velocity = velo;
+                    dest.push(reinterpret_cast<const clap_event_header *>(&clapmsg));
+                };
+                for (int i = 0; i < blocksize; ++i)
+                {
+                    int pos = outcounter + i;
+                    if (pos % 44100 == 0)
+                    {
+                        pushmidimsg(node->inEvents, juce::MidiMessage::noteOn(1, 60, 0.5f), i);
+                        pushmidimsg(node->inEvents, juce::MidiMessage::noteOn(1, 63, 0.5f), i);
+                        pushclapnotemsg(node->inEvents, CLAP_EVENT_NOTE_ON, i, 67, 0 , 0.5);
+                    }
+                    if (pos % 44100 == 11025)
+                    {
+                        pushclapnotemsg(node->inEvents, CLAP_EVENT_NOTE_OFF, i, 60, 0 , 0.5);
+                        pushmidimsg(node->inEvents, juce::MidiMessage::noteOff(1, 63, 0.5f), i);
+                        pushmidimsg(node->inEvents, juce::MidiMessage::noteOff(1, 67, 0.5f), i);
+                    }
+                }
+#endif
             }
             if (index == 1)
             {
                 float volume = juce::jmap<float>(outcounter, 0, outlen / 2, -36.0, 0.0);
                 if (outcounter >= outlen / 2)
                     volume = -12.0;
-                xenakios::pushParamEvent(node->inEvents, false, 0,
-                                         (clap_id)GainProcessorTest::ParamIds::Volume, volume);
+                //xenakios::pushParamEvent(node->inEvents, false, 0,
+                //                         (clap_id)GainProcessorTest::ParamIds::Volume, volume);
             }
             if (index == 2)
             {
