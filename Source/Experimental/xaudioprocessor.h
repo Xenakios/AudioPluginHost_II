@@ -1,9 +1,40 @@
 #pragma once
 
 #include <clap/clap.h>
-
+#include <clap/helpers/event-list.hh>
 namespace xenakios
 {
+
+inline void pushParamEvent(clap::helpers::EventList &elist, bool is_mod, uint32_t timeStamp,
+                           clap_id paramId, double value)
+{
+    if (!is_mod)
+    {
+        clap_event_param_value pv;
+        pv.header.space_id = CLAP_CORE_EVENT_SPACE_ID;
+        pv.header.size = sizeof(clap_event_param_value);
+        pv.header.flags = 0;
+        pv.header.time = timeStamp;
+        pv.header.type = CLAP_EVENT_PARAM_VALUE;
+        pv.cookie = nullptr;
+        pv.param_id = paramId;
+        pv.value = value;
+        elist.push(reinterpret_cast<const clap_event_header *>(&pv));
+    }
+    else
+    {
+        clap_event_param_mod pv;
+        pv.header.space_id = CLAP_CORE_EVENT_SPACE_ID;
+        pv.header.size = sizeof(clap_event_param_mod);
+        pv.header.flags = 0;
+        pv.header.time = timeStamp;
+        pv.header.type = CLAP_EVENT_PARAM_MOD;
+        pv.cookie = nullptr;
+        pv.param_id = paramId;
+        pv.amount = value;
+        elist.push(reinterpret_cast<const clap_event_header *>(&pv));
+    }
+}
 
 class XAudioProcessorEditor;
 
