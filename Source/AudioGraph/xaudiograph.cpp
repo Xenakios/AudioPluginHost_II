@@ -557,7 +557,15 @@ struct GraphRenderSequence
                                     numSamples };
 
             for (const auto& op : renderOps)
+            {
                 op->process (context);
+                if (auto rop = dynamic_cast<const ProcessOp*>(op.get()))
+                {
+                    //rop->node->;
+                }
+                
+            }
+                
         }
 
         for (int i = 0; i < buffer.getNumChannels(); ++i)
@@ -850,10 +858,12 @@ private:
                 audioChannels[i] = renderBuffer[audioChannelsToUse.getUnchecked ((int) i)];
 
             midiBuffer = buffers + midiBufferToUse;
+            
         }
 
         void process (const Context& c) final
         {
+            
             processor.setPlayHead (c.audioPlayHead);
 
             auto numAudioChannels = [this]
@@ -874,6 +884,7 @@ private:
             else
             {
                 const auto bypass = node->isBypassed() && processor.getBypassParameter() == nullptr;
+                
                 processWithBuffer (c.globalIO, bypass, buffer, *midiBuffer);
             }
         }
@@ -1523,7 +1534,10 @@ public:
     void process (AudioBuffer<FloatType>& audio, MidiBuffer& midi, AudioPlayHead* playHead)
     {
         if (auto* s = std::get_if<GraphRenderSequence<FloatType>> (&sequence.sequence))
+        {
             s->perform (audio, midi, playHead);
+        }
+            
         else
             jassertfalse; // Not prepared for this audio format!
     }

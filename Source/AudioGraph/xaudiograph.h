@@ -168,12 +168,12 @@ public:
         {
             jassert (processor != nullptr);
         }
-
+        
     private:
         //==============================================================================
         std::unique_ptr<AudioProcessor> processor;
         std::atomic<bool> bypassed { false };
-
+        juce::AudioProcessLoadMeasurer loadMeasurer;
         JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (Node)
     };
 
