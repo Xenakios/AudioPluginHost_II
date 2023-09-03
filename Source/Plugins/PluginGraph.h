@@ -79,7 +79,7 @@ public:
     void clear();
 
     PluginWindow* getOrCreateWindowFor (xenakios::AudioProcessorGraph::Node*, PluginWindow::Type);
-    void closeCurrentlyOpenWindowsFor (AudioProcessorGraph::NodeID);
+    void closeCurrentlyOpenWindowsFor (xenakios::AudioProcessorGraph::NodeID);
     bool closeAnyOpenPluginWindows();
 
     //==============================================================================

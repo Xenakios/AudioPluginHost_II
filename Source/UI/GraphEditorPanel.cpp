@@ -380,13 +380,13 @@ struct GraphEditorPanel::PluginComponent   : public Component,
                 addAndMakeVisible (pins.add (new PinComponent (panel, { pluginID, i }, true)));
 
             if (processor.acceptsMidi())
-                addAndMakeVisible (pins.add (new PinComponent (panel, { pluginID, AudioProcessorGraph::midiChannelIndex }, true)));
+                addAndMakeVisible (pins.add (new PinComponent (panel, { pluginID, xenakios::AudioProcessorGraph::midiChannelIndex }, true)));
 
             for (int i = 0; i < processor.getTotalNumOutputChannels(); ++i)
                 addAndMakeVisible (pins.add (new PinComponent (panel, { pluginID, i }, false)));
 
             if (processor.producesMidi())
-                addAndMakeVisible (pins.add (new PinComponent (panel, { pluginID, AudioProcessorGraph::midiChannelIndex }, false)));
+                addAndMakeVisible (pins.add (new PinComponent (panel, { pluginID, xenakios::AudioProcessorGraph::midiChannelIndex }, false)));
 
             resized();
         }
