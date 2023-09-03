@@ -30,6 +30,8 @@ include_directories(
     Source/AudioGraph
     libs/signalsmith-stretch
     libs/choc
+    libs/clap/include
+    libs/clap-helpers/include
 )
 
 juce_add_gui_app(AudioPluginHost2
@@ -84,6 +86,33 @@ target_sources(AudioPluginHost2 PRIVATE
     Source/Plugins/PluginGraph.cpp
     Source/UI/GraphEditorPanel.cpp
     Source/UI/MainHostWindow.cpp)
+
+    juce_add_console_app(ConsoleAppExample
+    PRODUCT_NAME "Console App Example") 
+juce_generate_juce_header(ConsoleAppExample)
+target_sources(ConsoleAppExample
+    PRIVATE
+        Source/Experimental/main.cpp
+        Source/Experimental/xaudioprocessor.cpp
+        Source/Experimental/xaudiograph2.cpp)
+    
+target_compile_definitions(ConsoleAppExample
+PRIVATE
+    # JUCE_WEB_BROWSER and JUCE_USE_CURL would be on by default, but you might not need them.
+    JUCE_WEB_BROWSER=0  # If you remove this, add `NEEDS_WEB_BROWSER TRUE` to the `juce_add_console_app` call
+    _USE_MATH_DEFINES=1
+    JUCE_USE_CURL=0)    # If you remove this, add `NEEDS_CURL TRUE` to the `juce_add_console_app` call
+    
+target_link_libraries(ConsoleAppExample
+    PRIVATE
+        # ConsoleAppData            # If you'd created a binary data target, you'd link to it here
+        juce::juce_core
+        juce::juce_audio_utils
+        juce::juce_dsp
+    PUBLIC
+        # juce::juce_recommended_config_flags
+        juce::juce_recommended_warning_flags)
+    
 
 juce_add_binary_data(AudioPluginHostData SOURCES
     Assets/cassette_recorder.wav
