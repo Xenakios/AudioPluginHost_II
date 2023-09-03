@@ -41,8 +41,10 @@ int main()
 
     std::vector<std::unique_ptr<XAPNode>> proc_nodes;
     // proc_nodes.emplace_back(std::make_unique<XAPNode>(std::make_unique<ToneProcessorTest>()));
-    proc_nodes.emplace_back(std::make_unique<XAPNode>(std::make_unique<JucePluginWrapper>(
-        R"(C:\Program Files\Common Files\VST3\Surge Synth Team\Surge XT.vst3\Contents\x86_64-win\Surge XT.vst3)")));
+    proc_nodes.emplace_back(std::make_unique<XAPNode>(std::make_unique<FilePlayerProcessor>()));
+    // proc_nodes.emplace_back(std::make_unique<XAPNode>(std::make_unique<JucePluginWrapper>(
+    //    R"(C:\Program Files\Common Files\VST3\Surge Synth Team\Surge
+    //    XT.vst3\Contents\x86_64-win\Surge XT.vst3)")));
     proc_nodes.emplace_back(std::make_unique<XAPNode>(std::make_unique<GainProcessorTest>()));
     proc_nodes.emplace_back(std::make_unique<XAPNode>(std::make_unique<JucePluginWrapper>(
         R"(C:\Program Files\Common Files\VST3\ValhallaVintageVerb.vst3)")));
@@ -58,8 +60,10 @@ int main()
 
     for (auto &m : mod_nodes)
         m->processor->activate(sr, 0, blocksize);
-
+    clap_event_transport transport;
+    memset(&transport, 0, sizeof(clap_event_transport));
     clap_process ctx;
+    ctx.transport = &transport;
     ctx.frames_count = blocksize;
     float *inputbuffers[2] = {&procbuf[0 * blocksize], &procbuf[1 * blocksize]};
     float *outputbuffers[2] = {&procbuf[2 * blocksize], &procbuf[3 * blocksize]};
@@ -83,15 +87,47 @@ int main()
     WavAudioFormat wav;
     auto writer = wav.createWriterFor(ostream.release(), sr, 2, 32, {}, 0);
 
-    int outlen = 44100 * 5;
+    int outlen = 44100 * 10;
     int outcounter = 0;
-
+    
+    juce::Random rng;
     while (outcounter < outlen)
     {
+        if (outcounter == 0)
+        {
+            xenakios_event_change_file ev;
+            ev.header.flags = 0;
+            ev.header.size = sizeof(xenakios_event_change_file);
+            ev.header.space_id = XENAKIOS_CLAP_NAMESPACE;
+            ev.header.time = 0;
+            ev.header.type = XENAKIOS_EVENT_CHANGEFILE;
+            ev.target = 0;
+            strcpy_s(ev.filepath,R"(C:\MusicAudio\sourcesamples\lareskitta01.wav)");
+            proc_nodes[0]->inEvents.push(reinterpret_cast<const clap_event_header *>(&ev));
+        }
+        transport.song_pos_seconds = outcounter * sr;
         for (size_t index = 0; index < proc_nodes.size(); ++index)
         {
             auto &node = proc_nodes[index];
             if (index == 0)
+            {
+                double rate = juce::jmap<float>(outcounter, 0, outlen, 1.0, 0.1);
+                if (rate < 0.1)
+                    rate = 0.1;
+                xenakios::pushParamEvent(node->inEvents, false, 0,
+                                         (clap_id)FilePlayerProcessor::ParamIds::Playrate, rate);
+                for (int i=0;i<blocksize;++i)
+                {
+                    int pos = outcounter+i;
+                    if (pos % 22050 == 0)
+                    {
+                        double pitch = -12.0+24.0*rng.nextDouble();
+                        xenakios::pushParamEvent(node->inEvents, false, 0,
+                                         (clap_id)FilePlayerProcessor::ParamIds::Pitch, pitch);
+                    }
+                }
+            }
+            if (index == 0 && false)
             {
 #ifdef INTERNAL_TONEGEN
                 if (outcounter < outlen / 2)
@@ -125,15 +161,15 @@ int main()
                     clapmsg.data[2] = midimsg.getRawData()[2];
                     dest.push(reinterpret_cast<const clap_event_header *>(&clapmsg));
                 };
-                auto pushclapnotemsg = [](clap::helpers::EventList &dest,
-                                      uint16_t msgtype, int timestamp, int key, int channel, double velo) {
+                auto pushclapnotemsg = [](clap::helpers::EventList &dest, uint16_t msgtype,
+                                          int timestamp, int key, int channel, double velo) {
                     clap_event_note clapmsg;
                     clapmsg.header.flags = 0;
                     clapmsg.header.space_id = CLAP_CORE_EVENT_SPACE_ID;
                     clapmsg.header.size = sizeof(clap_event_note);
                     clapmsg.header.time = timestamp;
                     clapmsg.header.type = msgtype;
-                    
+
                     clapmsg.port_index = 0;
                     clapmsg.channel = channel;
                     clapmsg.key = key;
@@ -148,11 +184,11 @@ int main()
                     {
                         pushmidimsg(node->inEvents, juce::MidiMessage::noteOn(1, 60, 0.5f), i);
                         pushmidimsg(node->inEvents, juce::MidiMessage::noteOn(1, 63, 0.5f), i);
-                        pushclapnotemsg(node->inEvents, CLAP_EVENT_NOTE_ON, i, 67, 0 , 0.5);
+                        pushclapnotemsg(node->inEvents, CLAP_EVENT_NOTE_ON, i, 67, 0, 0.5);
                     }
                     if (pos % 44100 == 11025)
                     {
-                        pushclapnotemsg(node->inEvents, CLAP_EVENT_NOTE_OFF, i, 60, 0 , 0.5);
+                        pushclapnotemsg(node->inEvents, CLAP_EVENT_NOTE_OFF, i, 60, 0, 0.5);
                         pushmidimsg(node->inEvents, juce::MidiMessage::noteOff(1, 63, 0.5f), i);
                         pushmidimsg(node->inEvents, juce::MidiMessage::noteOff(1, 67, 0.5f), i);
                     }
@@ -164,8 +200,8 @@ int main()
                 float volume = juce::jmap<float>(outcounter, 0, outlen / 2, -36.0, 0.0);
                 if (outcounter >= outlen / 2)
                     volume = -12.0;
-                //xenakios::pushParamEvent(node->inEvents, false, 0,
-                //                         (clap_id)GainProcessorTest::ParamIds::Volume, volume);
+                // xenakios::pushParamEvent(node->inEvents, false, 0,
+                //                          (clap_id)GainProcessorTest::ParamIds::Volume, volume);
             }
             if (index == 2)
             {

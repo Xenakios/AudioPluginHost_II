@@ -2,6 +2,17 @@
 
 #include <clap/clap.h>
 #include <clap/helpers/event-list.hh>
+
+#define XENAKIOS_CLAP_NAMESPACE 11111
+
+#define XENAKIOS_EVENT_CHANGEFILE 103
+struct xenakios_event_change_file
+{
+    clap_event_header header;
+    int target = 0; // which file should be changed
+    char filepath[256];
+};
+
 namespace xenakios
 {
 
