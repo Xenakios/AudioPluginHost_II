@@ -36,8 +36,7 @@ int main()
     int blocksize = 512;
     int numchans = 2;
     double sr = 44100;
-    // we need 4 buffers because inputs and outputs must be separate!
-    std::vector<float> procbuf(2 * numchans * blocksize);
+    
 
     std::vector<std::unique_ptr<XAPNode>> proc_nodes;
     // proc_nodes.emplace_back(std::make_unique<XAPNode>(std::make_unique<ToneProcessorTest>()));
@@ -65,21 +64,23 @@ int main()
     clap_process ctx;
     ctx.transport = &transport;
     ctx.frames_count = blocksize;
+    // we need 4 buffers because inputs and outputs are separate!
+    std::vector<float> procbuf(2 * numchans * blocksize);
     float *inputbuffers[2] = {&procbuf[0 * blocksize], &procbuf[1 * blocksize]};
     float *outputbuffers[2] = {&procbuf[2 * blocksize], &procbuf[3 * blocksize]};
     ctx.audio_inputs_count = 1;
-    clap_audio_buffer clapinputbuffer;
-    clapinputbuffer.channel_count = 2;
-    clapinputbuffer.constant_mask = 0;
-    clapinputbuffer.data32 = inputbuffers;
-    ctx.audio_inputs = &clapinputbuffer;
+    clap_audio_buffer clapinputbuffers[1];
+    clapinputbuffers[0].channel_count = 2;
+    clapinputbuffers[0].constant_mask = 0;
+    clapinputbuffers[0].data32 = inputbuffers;
+    ctx.audio_inputs = clapinputbuffers;
 
     ctx.audio_outputs_count = 1;
-    clap_audio_buffer clapoutputbuffer;
-    clapoutputbuffer.channel_count = 2;
-    clapoutputbuffer.constant_mask = 0;
-    clapoutputbuffer.data32 = outputbuffers;
-    ctx.audio_outputs = &clapoutputbuffer;
+    clap_audio_buffer clapoutputbuffers[1];
+    clapoutputbuffers[0].channel_count = 2;
+    clapoutputbuffers[0].constant_mask = 0;
+    clapoutputbuffers[0].data32 = outputbuffers;
+    ctx.audio_outputs = clapoutputbuffers;
 
     juce::File outfile(R"(C:\develop\AudioPluginHost_mk2\Source\Experimental\out.wav)");
     outfile.deleteFile();
