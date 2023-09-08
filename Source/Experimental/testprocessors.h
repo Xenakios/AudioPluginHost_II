@@ -3,6 +3,7 @@
 #include "xaudioprocessor.h"
 #include "JuceHeader.h"
 #include "signalsmith-stretch.h"
+#include "containers/choc_NonAllocatingStableSort.h"
 
 template <typename T> inline clap_id to_clap_id(T x) { return static_cast<clap_id>(x); }
 
@@ -660,6 +661,13 @@ struct ClapEventHolder
 };
 
 using SequenceType = std::vector<ClapEventHolder>;
+
+inline void sortSequence(SequenceType &c)
+{
+    choc::sorting::stable_sort(c.begin(), c.end(), [](const auto &a, const auto &b) {
+        return a.m_time_stamp < b.m_time_stamp;
+    });
+}
 
 struct ClapEventIterator
 {
