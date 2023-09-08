@@ -33,23 +33,30 @@ class XAPNode
 
 int main()
 {
+    auto evh = ClapEventHolder::makeNoteEvent(CLAP_EVENT_NOTE_ON, 0.0, 0, 0, 60, -1, 1.0);
+    auto ev = evh.dataAsEvent<clap_event_note>();
+    jassert(ev->channel == 0);
+    jassert(ev->key == 60);
+    jassert(ev->header.type == CLAP_EVENT_NOTE_ON);
+    // return 0;
     juce::ScopedJuceInitialiser_GUI gui_init;
     int blocksize = 512;
     int numchans = 2;
     double sr = 44100;
 
     std::vector<std::unique_ptr<XAPNode>> proc_nodes;
+    proc_nodes.emplace_back(
+        std::make_unique<XAPNode>(std::make_unique<ClapEventSequencerProcessor>()));
     // proc_nodes.emplace_back(std::make_unique<XAPNode>(std::make_unique<ToneProcessorTest>()));
-    proc_nodes.emplace_back(std::make_unique<XAPNode>(std::make_unique<FilePlayerProcessor>()));
-    // proc_nodes.emplace_back(std::make_unique<XAPNode>(std::make_unique<JucePluginWrapper>(
-    //    R"(C:\Program Files\Common Files\VST3\Surge Synth Team\Surge
-    //    XT.vst3\Contents\x86_64-win\Surge XT.vst3)")));
+    // proc_nodes.emplace_back(std::make_unique<XAPNode>(std::make_unique<FilePlayerProcessor>()));
+    proc_nodes.emplace_back(std::make_unique<XAPNode>(std::make_unique<JucePluginWrapper>(
+        R"(C:\Program Files\Common Files\VST3\Surge Synth Team\Surge XT.vst3\Contents\x86_64-win\Surge XT.vst3)")));
     proc_nodes.emplace_back(std::make_unique<XAPNode>(std::make_unique<GainProcessorTest>()));
-    // proc_nodes.emplace_back(std::make_unique<XAPNode>(std::make_unique<JucePluginWrapper>(
-    //     R"(C:\Program Files\Common Files\VST3\ValhallaVintageVerb.vst3)")));
-    proc_nodes.emplace_back(std::make_unique<XAPNode>(std::make_unique<ClapPluginFormatProcessor>(
-        R"(C:\Program Files\Common Files\CLAP\Surge Synth Team\Surge XT Effects.clap)", 0)));
-    
+    proc_nodes.emplace_back(std::make_unique<XAPNode>(std::make_unique<JucePluginWrapper>(
+        R"(C:\Program Files\Common Files\VST3\ValhallaVintageVerb.vst3)")));
+    // proc_nodes.emplace_back(std::make_unique<XAPNode>(std::make_unique<ClapPluginFormatProcessor>(
+    //     R"(C:\Program Files\Common Files\CLAP\Surge Synth Team\Surge XT Effects.clap)", 0)));
+
     // auto surge = std::make_unique<XAPNode>(std::make_unique<JucePluginWrapper>(
     //     R"(C:\Program Files\Common Files\VST3\Surge Synth Team\Surge
     //     XT.vst3\Contents\x86_64-win\Surge XT.vst3)"));
@@ -59,11 +66,11 @@ int main()
     //     R"(C:\Program Files\Common Files\CLAP\Surge Synth Team\Surge XT Effects.clap)", 0);
     for (auto &n : proc_nodes)
         n->processor->activate(sr, 1, blocksize);
-    auto& p = proc_nodes.back()->processor;
+    auto &p = proc_nodes.back()->processor;
     for (int i = 0; i < p->paramsCount(); ++i)
     {
         clap_param_info pinfo;
-        p->paramsInfo(i,&pinfo);
+        p->paramsInfo(i, &pinfo);
         std::cout << i << "\t" << pinfo.name << "\t" << pinfo.default_value << "\n";
     }
     std::vector<std::unique_ptr<XAPNode>> mod_nodes;
@@ -116,13 +123,17 @@ int main()
             ev.header.type = XENAKIOS_EVENT_CHANGEFILE;
             ev.target = 0;
             strcpy_s(ev.filepath, R"(C:\MusicAudio\sourcesamples\lareskitta01.wav)");
-            proc_nodes[0]->inEvents.push(reinterpret_cast<const clap_event_header *>(&ev));
+            // proc_nodes[0]->inEvents.push(reinterpret_cast<const clap_event_header *>(&ev));
         }
-        transport.song_pos_seconds = outcounter * sr;
+        // we need to do this stuff here because the clap transport doesn't have floating point
+        // seconds!!
+        double x = outcounter / sr; // in seconds
+        clap_sectime y = std::round(CLAP_SECTIME_FACTOR * x);
+        transport.song_pos_seconds = y;
         for (size_t index = 0; index < proc_nodes.size(); ++index)
         {
             auto &node = proc_nodes[index];
-            if (index == 0)
+            if (index == 0 && false)
             {
                 double rate = juce::jmap<float>(outcounter, 0, outlen, 1.0, 0.1);
                 if (rate < 0.1)
@@ -141,7 +152,7 @@ int main()
                     }
                 }
             }
-            if (index == 0 && false)
+            if (index == 0 && true)
             {
 #ifdef INTERNAL_TONEGEN
                 if (outcounter < outlen / 2)
@@ -191,6 +202,7 @@ int main()
                     clapmsg.velocity = velo;
                     dest.push(reinterpret_cast<const clap_event_header *>(&clapmsg));
                 };
+                /*
                 for (int i = 0; i < blocksize; ++i)
                 {
                     int pos = outcounter + i;
@@ -206,7 +218,8 @@ int main()
                         pushmidimsg(node->inEvents, juce::MidiMessage::noteOff(1, 63, 0.5f), i);
                         pushmidimsg(node->inEvents, juce::MidiMessage::noteOff(1, 67, 0.5f), i);
                     }
-                }
+                }*/
+
 #endif
             }
             if (index == 1)
@@ -217,13 +230,21 @@ int main()
                 // xenakios::pushParamEvent(node->inEvents, false, 0,
                 //                          (clap_id)GainProcessorTest::ParamIds::Volume, volume);
             }
-            if (index == 2)
+            if (index == 3)
             {
                 xenakios::pushParamEvent(node->inEvents, false, 0, 0, 0.2);
             }
             ctx.in_events = node->inEvents.clapInputEvents();
             ctx.out_events = node->outEvents.clapOutputEvents();
             node->processor->process(&ctx);
+            if (index == 0)
+            {
+                for (int i = 0; i < node->outEvents.size(); ++i)
+                {
+                    proc_nodes[1]->inEvents.push(node->outEvents.get(i));
+                }
+            }
+
             node->inEvents.clear();
             node->outEvents.clear();
             for (int i = 0; i < 2; ++i)

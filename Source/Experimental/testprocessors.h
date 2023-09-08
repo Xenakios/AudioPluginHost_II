@@ -477,7 +477,7 @@ class JucePluginWrapper : public xenakios::XAudioProcessor, public juce::AudioPl
             std::cout << err << "\n";
         }
     }
-    bool getDescriptor(clap_plugin_descriptor_t* dec) const override 
+    bool getDescriptor(clap_plugin_descriptor_t *dec) const override
     {
         if (m_internal)
         {
@@ -624,5 +624,158 @@ class JucePluginWrapper : public xenakios::XAudioProcessor, public juce::AudioPl
             return true;
         }
         return false;
+    }
+};
+
+const size_t maxHolderDataSize = 128;
+
+struct ClapEventHolder
+{
+    template <typename T> T *dataAsEvent() { return reinterpret_cast<T *>(m_data.data()); }
+    static ClapEventHolder makeNoteEvent(uint16_t eventType, double tpos, int port, int channel,
+                                         int key, int32_t noteId, double velo)
+    {
+        static_assert(sizeof(clap_event_note) <= maxHolderDataSize,
+                      "Clap event holder data size exceeded");
+        ClapEventHolder holder;
+        holder.m_time_stamp = tpos;
+        holder.m_eventType = eventType;
+        clap_event_note *ev = reinterpret_cast<clap_event_note *>(holder.m_data.data());
+        ev->header.flags = 0;
+        ev->header.type = eventType;
+        ev->header.size = sizeof(clap_event_note);
+        ev->header.time = 0;
+        ev->header.space_id = CLAP_CORE_EVENT_SPACE_ID;
+        ev->channel = channel;
+        ev->port_index = port;
+        ev->key = key;
+        ev->velocity = velo;
+        ev->note_id = noteId;
+        return holder;
+    }
+    double m_time_stamp = 0.0;
+    uint16_t m_eventType = 0;
+    ClapEventHolder *m_assoc_note_off_event = nullptr;
+    std::array<unsigned char, maxHolderDataSize> m_data;
+};
+
+using SequenceType = std::vector<ClapEventHolder>;
+
+struct ClapEventIterator
+{
+    /// Creates an iterator positioned at the start of the sequence.
+    ClapEventIterator(const SequenceType &o) : owner(o) {}
+    ClapEventIterator(const ClapEventIterator &) = default;
+    ClapEventIterator(ClapEventIterator &&) = default;
+
+    /// Seeks the iterator to the given time
+    void setTime(double newTimeStamp)
+    {
+        auto eventData = owner.data();
+
+        while (nextIndex != 0 && eventData[nextIndex - 1].m_time_stamp >= newTimeStamp)
+            --nextIndex;
+
+        while (nextIndex < owner.size() && eventData[nextIndex].m_time_stamp < newTimeStamp)
+            ++nextIndex;
+
+        currentTime = newTimeStamp;
+    }
+
+    /// Returns the current iterator time
+    double getTime() const noexcept { return currentTime; }
+
+    /// Returns a set of events which lie between the current time, up to (but not
+    /// including) the given duration. This function then increments the iterator to
+    /// set its current time to the end of this block.
+    std::pair<int, int> readNextEvents(double duration)
+    {
+        auto start = nextIndex;
+        auto eventData = owner.data();
+        auto end = start;
+        auto total = owner.size();
+        auto endTime = currentTime + duration;
+        currentTime = endTime;
+
+        while (end < total && eventData[end].m_time_stamp < endTime)
+            ++end;
+
+        nextIndex = end;
+
+        return {start, end};
+    }
+
+  private:
+    const SequenceType &owner;
+    double currentTime = 0;
+    size_t nextIndex = 0;
+};
+
+class ClapEventSequencerProcessor : public xenakios::XAudioProcessor
+{
+    SequenceType m_events;
+    ClapEventIterator m_event_iter;
+    double m_sr = 1.0;
+
+  public:
+    ClapEventSequencerProcessor() : m_event_iter(m_events)
+    {
+        m_events.reserve(4096);
+        for (int i = 0; i < 9; ++i)
+        {
+            int third = 64;
+            if (i % 2 == 1)
+                third = 63;
+            m_events.push_back(
+                ClapEventHolder::makeNoteEvent(CLAP_EVENT_NOTE_ON, 1.0 * i, 0, 0, 60, -1, 0.9));
+            m_events.push_back(
+                ClapEventHolder::makeNoteEvent(CLAP_EVENT_NOTE_ON, 1.0 * i, 0, 0, third, -1, 0.9));
+            m_events.push_back(
+                ClapEventHolder::makeNoteEvent(CLAP_EVENT_NOTE_ON, 1.0 * i, 0, 0, 67, -1, 0.9));
+            m_events.push_back(ClapEventHolder::makeNoteEvent(CLAP_EVENT_NOTE_OFF, 1.0 * i + 0.7, 0,
+                                                              0, 60, -1, 0.9));
+            m_events.push_back(ClapEventHolder::makeNoteEvent(CLAP_EVENT_NOTE_OFF, 1.0 * i + 0.7, 0,
+                                                              0, third, -1, 0.9));
+            m_events.push_back(ClapEventHolder::makeNoteEvent(CLAP_EVENT_NOTE_OFF, 1.0 * i + 0.7, 0,
+                                                              0, 67, -1, 0.9));
+        }
+    }
+    bool activate(double sampleRate, uint32_t minFrameCount,
+                  uint32_t maxFrameCount) noexcept override
+    {
+        m_sr = sampleRate;
+        return true;
+    }
+    uint32_t paramsCount() const noexcept override { 0; }
+    bool paramsInfo(uint32_t paramIndex, clap_param_info *info) const noexcept override
+    {
+        return false;
+    }
+    clap_process_status process(const clap_process *process) noexcept override
+    {
+        if (process->transport)
+        {
+            // note here the oddity that the clap transport doesn't contain floating point seconds!
+            auto curtime = process->transport->song_pos_seconds / (double)CLAP_SECTIME_FACTOR;
+            m_event_iter.setTime(curtime);
+            auto events = m_event_iter.readNextEvents(process->frames_count / m_sr);
+            if (events.first != events.second)
+            {
+                for (int i = events.first; i < events.second; ++i)
+                {
+                    auto etype = m_events[i].m_eventType;
+                    if (etype == CLAP_EVENT_NOTE_ON || etype == CLAP_EVENT_NOTE_OFF)
+                    {
+                        auto ev = m_events[i].dataAsEvent<clap_event_note>();
+                        std::cout << "GENERATED NOTE EVENT " << ev->header.type << " "
+                                  << m_events[i].m_time_stamp << "\n";
+                        process->out_events->try_push(process->out_events,
+                                                      reinterpret_cast<clap_event_header *>(ev));
+                    }
+                }
+            }
+        }
+
+        return CLAP_PROCESS_CONTINUE;
     }
 };
