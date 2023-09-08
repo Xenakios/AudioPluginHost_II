@@ -7,7 +7,7 @@ AudioFilePlayerPlugin::AudioFilePlayerPlugin()
     m_to_gui_fifo.reset(1024);
 #define XENAKIOSDEBUG
 #ifdef XENAKIOSDEBUG
-    // importFile(juce::File(R"(C:\MusicAudio\sourcesamples\there was a time .wav)"));
+    importFile(juce::File(R"(C:\MusicAudio\sourcesamples\there was a time .wav)"));
     // importFile(juce::File(R"(C:\MusicAudio\sourcesamples\test_signals\440hz_sine_0db.wav)"));
     // importFile(juce::File(R"(C:\MusicAudio\sourcesamples\count_96k.wav)"));
 #endif
@@ -83,6 +83,7 @@ void AudioFilePlayerPlugin::prepareToPlay(double newSampleRate, int maxBlocksize
     spec.numChannels = 2;
     m_gain.prepare(spec);
     m_gain.setRampDurationSeconds(0.1);
+    m_pitch_smoother.prepare(newSampleRate, 0.1);
     for (auto &rs : m_resamplers)
         rs.reset();
     m_resampler_work_buf.resize(maxBlocksize * 32);
@@ -150,7 +151,7 @@ void AudioFilePlayerPlugin::processBlock(AudioBuffer<float> &buffer, MidiBuffer 
     int xfadelen = 4000;
     if (preserve_pitch)
     {
-        float pshift = *m_par_pitch;
+        float pshift = m_pitch_smoother.processAndAdvance(*m_par_pitch, buffer.getNumSamples());
         float pitchratio = std::pow(2.0, pshift / 12.0);
         m_stretch.setTransposeFactor(pitchratio * compensrate);
         rate *= compensrate;
@@ -300,7 +301,7 @@ void AudioFilePlayerPluginEditor::resized()
 {
     juce::FlexBox flex;
     flex.flexDirection = juce::FlexBox::Direction::column;
-    
+
     flex.items.add(juce::FlexItem(m_label_rate).withFlex(0.4f));
     flex.items.add(juce::FlexItem(m_slider_rate).withFlex(0.4f));
     flex.items.add(juce::FlexItem(m_toggle_preserve_pitch).withFlex(0.4f));

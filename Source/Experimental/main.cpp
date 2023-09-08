@@ -36,7 +36,6 @@ int main()
     int blocksize = 512;
     int numchans = 2;
     double sr = 44100;
-    
 
     std::vector<std::unique_ptr<XAPNode>> proc_nodes;
     // proc_nodes.emplace_back(std::make_unique<XAPNode>(std::make_unique<ToneProcessorTest>()));
@@ -90,7 +89,7 @@ int main()
 
     int outlen = 44100 * 10;
     int outcounter = 0;
-    
+
     juce::Random rng;
     while (outcounter < outlen)
     {
@@ -103,7 +102,7 @@ int main()
             ev.header.time = 0;
             ev.header.type = XENAKIOS_EVENT_CHANGEFILE;
             ev.target = 0;
-            strcpy_s(ev.filepath,R"(C:\MusicAudio\sourcesamples\lareskitta01.wav)");
+            strcpy_s(ev.filepath, R"(C:\MusicAudio\sourcesamples\lareskitta01.wav)");
             proc_nodes[0]->inEvents.push(reinterpret_cast<const clap_event_header *>(&ev));
         }
         transport.song_pos_seconds = outcounter * sr;
@@ -117,14 +116,15 @@ int main()
                     rate = 0.1;
                 xenakios::pushParamEvent(node->inEvents, false, 0,
                                          (clap_id)FilePlayerProcessor::ParamIds::Playrate, rate);
-                for (int i=0;i<blocksize;++i)
+                for (int i = 0; i < blocksize; ++i)
                 {
-                    int pos = outcounter+i;
+                    int pos = outcounter + i;
                     if (pos % 22050 == 0)
                     {
-                        double pitch = -12.0+24.0*rng.nextDouble();
+                        double pitch = -12.0 + 24.0 * rng.nextDouble();
                         xenakios::pushParamEvent(node->inEvents, false, 0,
-                                         (clap_id)FilePlayerProcessor::ParamIds::Pitch, pitch);
+                                                 (clap_id)FilePlayerProcessor::ParamIds::Pitch,
+                                                 pitch);
                     }
                 }
             }

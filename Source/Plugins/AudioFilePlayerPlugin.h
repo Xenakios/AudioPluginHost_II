@@ -4,6 +4,66 @@
 #include "signalsmith-stretch.h"
 #include "containers/choc_SingleReaderSingleWriterFIFO.h"
 
+/*
+int playposi = 0;
+    double playposf = 0.0;
+    double rate = 0.5779;
+    int bufsize = 457;
+    int numiters = 1000000;
+    double acc = 0.0;
+    for (int i=0;i<numiters;++i)
+    {
+        int adjust = playposf - playposi;
+        int adjustedbufsize = rate * (bufsize + adjust);
+        if (i>numiters-10)
+            std::cout << i << " " << playposi << " " << playposf << " " << adjustedbufsize << "\n";
+        playposi += adjustedbufsize;
+        playposf += rate * bufsize;
+        acc += adjustedbufsize;
+    }
+    std::cout << playposf / 44100.0 << " seconds\n";
+    double expectedplaypos = numiters * rate * bufsize;
+    std::cout << expectedplaypos / 44100.0 << " seconds expected\n";
+    double avgbufsize = acc/numiters;
+    std::cout << "avg buf size " << acc/numiters << "\n";
+    double achieved = avgbufsize / bufsize;
+    std::cout << "achieved ratio " << achieved << "\n";
+    if (std::abs(rate-achieved)<0.001)
+        std::cout << "PASS\n";
+    else std::cout << "FAIL\n";
+  */
+
+template <typename OutputType> class FilterValueSmoother
+{
+  public:
+    FilterValueSmoother() {}
+    void prepare(double samplerate, double smoothingFrequency)
+    {
+        using namespace juce::dsp;
+        ProcessSpec spec;
+        spec.numChannels = 1;
+        spec.maximumBlockSize = 1;
+        spec.sampleRate = samplerate;
+        m_filter.prepare(spec);
+        m_filter.coefficients = 
+           IIR::Coefficients<double>::makeFirstOrderLowPass(samplerate, smoothingFrequency);
+    }
+    void setSmoothingFrequency(double hz) {}
+    OutputType process(OutputType x) { return m_filter.processSample(x); }
+    OutputType processAndAdvance(OutputType x, int advanceBySamples)
+    {
+        OutputType output{0};
+        for (int i = 0; i < advanceBySamples; ++i)
+        {
+            output = m_filter.processSample(x);
+        }
+        return output;
+    }
+  
+  private:
+    juce::dsp::IIR::Filter<double> m_filter;
+};
+
 class AudioFilePlayerPlugin;
 
 class WaveFormComponent : public juce::Component, public juce::Timer
@@ -104,15 +164,15 @@ class AudioFilePlayerPlugin : public AudioProcessor, public juce::Timer
     juce::dsp::Gain<float> m_gain;
     double m_file_sample_rate = 1.0;
     juce::Range<double> m_loop_range{0.0, 1.0};
-    
-    
+
     juce::File m_cur_file;
+    FilterValueSmoother<float> m_pitch_smoother;
 };
 
 class AudioFilePlayerPluginEditor : public juce::AudioProcessorEditor, public juce::Timer
 {
     juce::TextButton m_import_file_but;
-    
+
     juce::Slider m_slider_rate;
     juce::Slider m_slider_pitch;
     juce::Slider m_slider_volume;
