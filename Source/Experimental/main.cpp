@@ -4,6 +4,7 @@
 #include <vector>
 
 #include <clap/helpers/event-list.hh>
+#include "clap_xaudioprocessor.h"
 
 inline void mapModulationEvents(const clap::helpers::EventList &sourceList, clap_id sourceParId,
                                 clap::helpers::EventList &destList, clap_id destParId,
@@ -50,6 +51,9 @@ int main()
     //     R"(C:\Program Files\Common Files\VST3\Surge Synth Team\Surge
     //     XT.vst3\Contents\x86_64-win\Surge XT.vst3)"));
     // surge->processor->activate(44100, 0, blocksize);
+
+    auto surgefxclap = std::make_unique<ClapPluginFormatProcessor>(
+        R"(C:\Program Files\Common Files\CLAP\Surge Synth Team\Surge XT Effects.clap)", 0);
     for (auto &n : proc_nodes)
         n->processor->activate(sr, 0, blocksize);
 

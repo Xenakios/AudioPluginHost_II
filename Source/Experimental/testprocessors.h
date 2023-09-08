@@ -331,6 +331,7 @@ class FilePlayerProcessor : public xenakios::XAudioProcessor
         if (ev->space_id == XENAKIOS_CLAP_NAMESPACE && ev->type == XENAKIOS_EVENT_CHANGEFILE)
         {
             auto fch = reinterpret_cast<const xenakios_event_change_file*>(ev);
+            // this should obviously be asynced in some way...
             importFile(juce::File(fch->filepath));
         }
     }
@@ -498,6 +499,8 @@ class JucePluginWrapper : public xenakios::XAudioProcessor, public juce::AudioPl
         m_internal->prepareToPlay(sampleRate, maxFrameCount);
         m_param_infos.clear();
         auto &pars = m_internal->getParameters();
+        // We should probably create the clap parameter
+        // id in some other way that makes them non-contiguous...
         clap_id parid = 0;
         for (auto &par : pars)
         {
