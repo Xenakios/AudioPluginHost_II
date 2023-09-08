@@ -45,18 +45,27 @@ int main()
     //    R"(C:\Program Files\Common Files\VST3\Surge Synth Team\Surge
     //    XT.vst3\Contents\x86_64-win\Surge XT.vst3)")));
     proc_nodes.emplace_back(std::make_unique<XAPNode>(std::make_unique<GainProcessorTest>()));
-    proc_nodes.emplace_back(std::make_unique<XAPNode>(std::make_unique<JucePluginWrapper>(
-        R"(C:\Program Files\Common Files\VST3\ValhallaVintageVerb.vst3)")));
+    // proc_nodes.emplace_back(std::make_unique<XAPNode>(std::make_unique<JucePluginWrapper>(
+    //     R"(C:\Program Files\Common Files\VST3\ValhallaVintageVerb.vst3)")));
+    proc_nodes.emplace_back(std::make_unique<XAPNode>(std::make_unique<ClapPluginFormatProcessor>(
+        R"(C:\Program Files\Common Files\CLAP\Surge Synth Team\Surge XT Effects.clap)", 0)));
+    
     // auto surge = std::make_unique<XAPNode>(std::make_unique<JucePluginWrapper>(
     //     R"(C:\Program Files\Common Files\VST3\Surge Synth Team\Surge
     //     XT.vst3\Contents\x86_64-win\Surge XT.vst3)"));
     // surge->processor->activate(44100, 0, blocksize);
 
-    auto surgefxclap = std::make_unique<ClapPluginFormatProcessor>(
-        R"(C:\Program Files\Common Files\CLAP\Surge Synth Team\Surge XT Effects.clap)", 0);
+    // auto surgefxclap = std::make_unique<ClapPluginFormatProcessor>(
+    //     R"(C:\Program Files\Common Files\CLAP\Surge Synth Team\Surge XT Effects.clap)", 0);
     for (auto &n : proc_nodes)
-        n->processor->activate(sr, 0, blocksize);
-
+        n->processor->activate(sr, 1, blocksize);
+    auto& p = proc_nodes.back()->processor;
+    for (int i = 0; i < p->paramsCount(); ++i)
+    {
+        clap_param_info pinfo;
+        p->paramsInfo(i,&pinfo);
+        std::cout << i << "\t" << pinfo.name << "\t" << pinfo.default_value << "\n";
+    }
     std::vector<std::unique_ptr<XAPNode>> mod_nodes;
     mod_nodes.emplace_back(std::make_unique<XAPNode>(std::make_unique<ToneProcessorTest>(true, 0)));
 

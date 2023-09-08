@@ -8,6 +8,29 @@ inline const void *my_get_extension(const struct clap_host *host, const char *ei
     return nullptr;
 }
 
+inline void my_host_par_rescan(const clap_host_t *host, clap_param_rescan_flags flags)
+{
+    // auto cp = (ClapProcessor*)host->host_data;
+    // cp->updateParameterInfos();
+    std::cout << "plugin parameters changed, host should rescan\n";
+}
+
+inline void my_host_par_clear(const clap_host_t *host, clap_id param_id,
+                              clap_param_clear_flags flags)
+{
+}
+
+inline void my_host_par_request_flush(const clap_host_t *host) {}
+
+inline void request_restart(const struct clap_host *) {}
+
+inline void request_process(const struct clap_host *) {}
+
+inline void request_callback_nop(const struct clap_host *)
+{
+    std::cout << "nop request_callback\n";
+}
+
 class ClapPluginFormatProcessor : public xenakios::XAudioProcessor
 {
     choc::file::DynamicLibrary m_plugdll;
@@ -17,6 +40,7 @@ class ClapPluginFormatProcessor : public xenakios::XAudioProcessor
                             "0.0.0",           nullptr, nullptr,   nullptr,    nullptr};
     std::atomic<bool> m_inited{false};
     clap_plugin_params_t *m_ext_params = nullptr;
+    bool m_processingStarted = false;
 
   public:
     std::vector<clap_param_info> m_param_infos;
@@ -24,6 +48,9 @@ class ClapPluginFormatProcessor : public xenakios::XAudioProcessor
     {
         xen_host_info.host_data = this;
         xen_host_info.get_extension = my_get_extension;
+        xen_host_info.request_callback = request_callback_nop;
+        xen_host_info.request_process = request_process;
+        xen_host_info.request_restart = request_restart;
         if (m_plugdll.handle)
         {
             clap_plugin_entry_t *entry =
@@ -81,6 +108,7 @@ class ClapPluginFormatProcessor : public xenakios::XAudioProcessor
             if (m_plug->activate(m_plug, sampleRate, minFrameCount, maxFrameCount))
             {
                 initParamsExtension();
+                return true;
             }
         }
         return false;
@@ -103,6 +131,11 @@ class ClapPluginFormatProcessor : public xenakios::XAudioProcessor
     }
     clap_process_status process(const clap_process *process) noexcept override
     {
+        if (!m_processingStarted)
+        {
+            m_plug->start_processing(m_plug);
+            m_processingStarted = true;
+        }
         return m_plug->process(m_plug, process);
     }
 };
