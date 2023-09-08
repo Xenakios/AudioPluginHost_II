@@ -4,11 +4,7 @@
 #include "JuceHeader.h"
 #include "signalsmith-stretch.h"
 
-template<typename T>
-inline clap_id to_clap_id(T x)
-{
-    return static_cast<clap_id>(x);
-}
+template <typename T> inline clap_id to_clap_id(T x) { return static_cast<clap_id>(x); }
 
 inline clap_param_info makeParamInfo(clap_id paramId, juce::String name, double minval,
                                      double maxval, double defaultVal, clap_param_info_flags flags,
@@ -310,11 +306,11 @@ class FilePlayerProcessor : public xenakios::XAudioProcessor
             delete reader;
         }
     }
-    void handleEvent(const clap_event_header* ev)
+    void handleEvent(const clap_event_header *ev)
     {
         if (ev->type == CLAP_EVENT_PARAM_VALUE)
         {
-            auto aev = reinterpret_cast<const clap_event_param_value*>(ev);
+            auto aev = reinterpret_cast<const clap_event_param_value *>(ev);
             if (aev->param_id == to_clap_id(ParamIds::Volume))
                 m_volume = aev->value;
             if (aev->param_id == to_clap_id(ParamIds::Playrate))
@@ -330,7 +326,7 @@ class FilePlayerProcessor : public xenakios::XAudioProcessor
         }
         if (ev->space_id == XENAKIOS_CLAP_NAMESPACE && ev->type == XENAKIOS_EVENT_CHANGEFILE)
         {
-            auto fch = reinterpret_cast<const xenakios_event_change_file*>(ev);
+            auto fch = reinterpret_cast<const xenakios_event_change_file *>(ev);
             // this should obviously be asynced in some way...
             importFile(juce::File(fch->filepath));
         }
@@ -340,7 +336,7 @@ class FilePlayerProcessor : public xenakios::XAudioProcessor
         auto inevts = process->in_events;
         for (int i = 0; i < inevts->size(inevts); ++i)
         {
-            auto ev = inevts->get(inevts,i);
+            auto ev = inevts->get(inevts, i);
             handleEvent(ev);
         }
         if (m_file_buf.getNumSamples() == 0)
@@ -456,8 +452,10 @@ class JucePluginWrapper : public xenakios::XAudioProcessor, public juce::AudioPl
     std::unique_ptr<juce::AudioPluginInstance> m_internal;
     juce::AudioBuffer<float> m_work_buf;
     juce::MidiBuffer m_midi_buffer;
+    clap_plugin_descriptor m_plug_descriptor;
     JucePluginWrapper(juce::String plugfile)
     {
+        memset(&m_plug_descriptor, 0, sizeof(clap_plugin_descriptor));
         juce::AudioPluginFormatManager plugmana;
         plugmana.addDefaultFormats();
         for (auto &e : plugmana.getFormats())
@@ -478,6 +476,15 @@ class JucePluginWrapper : public xenakios::XAudioProcessor, public juce::AudioPl
             m_internal = plugmana.createPluginInstance(*typesFound[0], 44100, 512, err);
             std::cout << err << "\n";
         }
+    }
+    bool getDescriptor(clap_plugin_descriptor_t* dec) const override 
+    {
+        if (m_internal)
+        {
+            dec->name = m_internal->getName().getCharPointer();
+            return true;
+        }
+        return false;
     }
     juce::Optional<juce::AudioPlayHead::PositionInfo> getPosition() const override
     {

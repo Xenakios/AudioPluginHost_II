@@ -60,6 +60,10 @@ class XAudioProcessor
   public:
     XAudioProcessor() {}
     virtual ~XAudioProcessor() {}
+    virtual bool getDescriptor(clap_plugin_descriptor* desc) const
+    {
+        return false;
+    }
     // would we ever have a reason to return false here...?
     virtual bool init() noexcept { return true; }
     // should perhaps be pure virtual
