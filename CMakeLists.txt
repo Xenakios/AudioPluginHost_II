@@ -113,8 +113,8 @@ target_link_libraries(ConsoleAppExample
         juce::juce_dsp
     PUBLIC
         # juce::juce_recommended_config_flags
-        juce::juce_recommended_warning_flags)
-    
+        # juce::juce_recommended_warning_flags)
+)    
 
 juce_add_binary_data(AudioPluginHostData SOURCES
     Assets/cassette_recorder.wav

@@ -102,7 +102,7 @@ int main()
     WavAudioFormat wav;
     auto writer = wav.createWriterFor(ostream.release(), sr, 2, 32, {}, 0);
 
-    int outlen = 44100 * 10;
+    int outlen = 44100 * 120;
     int outcounter = 0;
 
     juce::Random rng;
@@ -227,7 +227,7 @@ int main()
             }
             if (index == 3)
             {
-                xenakios::pushParamEvent(node->inEvents, false, 0, 0, 0.2);
+                xenakios::pushParamEvent(node->inEvents, false, 0, 0, 0.1);
             }
             ctx.in_events = node->inEvents.clapInputEvents();
             ctx.out_events = node->outEvents.clapOutputEvents();
