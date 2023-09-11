@@ -33,12 +33,6 @@ class XAPNode
 
 int main()
 {
-    auto evh = ClapEventHolder::makeNoteEvent(CLAP_EVENT_NOTE_ON, 0.0, 0, 0, 60, -1, 1.0);
-    auto ev = evh.dataAsEvent<clap_event_note>();
-    jassert(ev->channel == 0);
-    jassert(ev->key == 60);
-    jassert(ev->header.type == CLAP_EVENT_NOTE_ON);
-    // return 0;
     juce::ScopedJuceInitialiser_GUI gui_init;
     int blocksize = 441;
     int numInchans = 2;
