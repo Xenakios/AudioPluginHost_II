@@ -660,7 +660,7 @@ class JucePluginWrapper : public xenakios::XAudioProcessor, public juce::AudioPl
         int frames = process->frames_count;
         auto inEvents = process->in_events;
         auto &pars = m_internal->getParameters();
-        uint32_t basechunk = 32;
+        uint32_t basechunk = 64;
         uint32_t smp = 0;
 
         const clap_event_header_t *nextEvent{nullptr};
@@ -673,7 +673,7 @@ class JucePluginWrapper : public xenakios::XAudioProcessor, public juce::AudioPl
         while (smp < frames)
         {
             uint32_t chunk = std::min(basechunk, frames - smp);
-
+            m_midi_buffer.clear();
             while (nextEvent && nextEvent->time < smp + chunk)
             {
                 auto ev = inEvents->get(inEvents, nextEventIndex);
@@ -685,6 +685,32 @@ class JucePluginWrapper : public xenakios::XAudioProcessor, public juce::AudioPl
                         if (pvev->param_id >= 0 && pvev->param_id < pars.size())
                         {
                             pars[pvev->param_id]->setValue(pvev->value);
+                        }
+                    }
+                    if (m_internal->acceptsMidi())
+                    {
+                        // we could do better with the event time stamps, but this shall suffice for now...
+                        if (ev->type == CLAP_EVENT_MIDI)
+                        {
+                            auto mev = reinterpret_cast<const clap_event_midi *>(ev);
+                            juce::MidiMessage midimsg(mev->data[0], mev->data[1], mev->data[2], 0);
+                            m_midi_buffer.addEvent(midimsg, smp);
+                        }
+                        auto mev = reinterpret_cast<const clap_event_note *>(ev);
+                        if (ev->type == CLAP_EVENT_NOTE_ON)
+                        {
+                            m_midi_buffer.addEvent(juce::MidiMessage::noteOn(mev->channel + 1,
+                                                                             mev->key,
+                                                                             (float)mev->velocity),
+                                                   smp);
+                        }
+                        else if (ev->type == CLAP_EVENT_NOTE_OFF ||
+                                 ev->type == CLAP_EVENT_NOTE_CHOKE)
+                        {
+                            m_midi_buffer.addEvent(juce::MidiMessage::noteOff(mev->channel + 1,
+                                                                              mev->key,
+                                                                              (float)mev->velocity),
+                                                   smp);
                         }
                     }
                 }
@@ -699,7 +725,7 @@ class JucePluginWrapper : public xenakios::XAudioProcessor, public juce::AudioPl
             {
                 for (int j = 0; j < chunk; ++j)
                 {
-                    m_work_buf.setSample(i, j, process->audio_inputs[0].data32[i][smp+j]);
+                    m_work_buf.setSample(i, j, process->audio_inputs[0].data32[i][smp + j]);
                 }
             }
             m_internal->processBlock(m_work_buf, m_midi_buffer);
@@ -707,63 +733,13 @@ class JucePluginWrapper : public xenakios::XAudioProcessor, public juce::AudioPl
             {
                 for (int j = 0; j < chunk; ++j)
                 {
-                    process->audio_outputs[0].data32[i][smp+j] = m_work_buf.getSample(i, j);
+                    process->audio_outputs[0].data32[i][smp + j] = m_work_buf.getSample(i, j);
                 }
             }
             smp += chunk;
         }
         return CLAP_PROCESS_CONTINUE;
-        for (int i = 0; i < inEvents->size(inEvents); ++i)
-        {
-            auto ev = inEvents->get(inEvents, i);
-            if (ev->type == CLAP_EVENT_PARAM_VALUE)
-            {
-                auto pvev = reinterpret_cast<const clap_event_param_value *>(ev);
-                if (pvev->param_id >= 0 && pvev->param_id < pars.size())
-                {
-                    pars[pvev->param_id]->setValue(pvev->value);
-                }
-            }
-            if (m_internal->acceptsMidi())
-            {
-                if (ev->type == CLAP_EVENT_MIDI)
-                {
-                    auto mev = reinterpret_cast<const clap_event_midi *>(ev);
-                    juce::MidiMessage midimsg(mev->data[0], mev->data[1], mev->data[2], 0);
-                    m_midi_buffer.addEvent(midimsg, mev->header.time);
-                }
-                auto mev = reinterpret_cast<const clap_event_note *>(ev);
-                if (ev->type == CLAP_EVENT_NOTE_ON)
-                {
-                    m_midi_buffer.addEvent(
-                        juce::MidiMessage::noteOn(mev->channel + 1, mev->key, (float)mev->velocity),
-                        mev->header.time);
-                }
-                else if (ev->type == CLAP_EVENT_NOTE_OFF || ev->type == CLAP_EVENT_NOTE_CHOKE)
-                {
-                    m_midi_buffer.addEvent(juce::MidiMessage::noteOff(mev->channel + 1, mev->key,
-                                                                      (float)mev->velocity),
-                                           mev->header.time);
-                }
-            }
-        }
-        for (int i = 0; i < 2; ++i)
-        {
-            for (int j = 0; j < frames; ++j)
-            {
-                m_work_buf.setSample(i, j, process->audio_inputs[0].data32[i][j]);
-            }
-        }
-
-        m_internal->processBlock(m_work_buf, m_midi_buffer);
-        for (int i = 0; i < 2; ++i)
-        {
-            for (int j = 0; j < frames; ++j)
-            {
-                process->audio_outputs[0].data32[i][j] = m_work_buf.getSample(i, j);
-            }
-        }
-        return CLAP_PROCESS_CONTINUE;
+        
     }
     uint32_t notePortsCount(bool isInput) const noexcept override
     {
@@ -936,7 +912,7 @@ class ClapEventSequencerProcessor : public xenakios::XAudioProcessor
         {
             // note here the oddity that the clap transport doesn't contain floating point seconds!
             auto curtime = process->transport->song_pos_seconds / (double)CLAP_SECTIME_FACTOR;
-            //m_event_iter.setTime(curtime);
+            // m_event_iter.setTime(curtime);
             auto events = m_event_iter.readNextEvents(process->frames_count / m_sr);
             if (events.first != events.second)
             {
