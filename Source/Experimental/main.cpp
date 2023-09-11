@@ -40,27 +40,23 @@ int main()
     jassert(ev->header.type == CLAP_EVENT_NOTE_ON);
     // return 0;
     juce::ScopedJuceInitialiser_GUI gui_init;
-    int blocksize = 512;
-    int numchans = 2;
+    int blocksize = 441;
+    int numInchans = 2;
+    int numOutChans = 2;
     double sr = 44100;
-
+    std::string pathprefix = R"(C:\Program Files\Common Files\)";
     std::vector<std::unique_ptr<XAPNode>> proc_nodes;
     proc_nodes.emplace_back(
         std::make_unique<XAPNode>(std::make_unique<ClapEventSequencerProcessor>()));
     // proc_nodes.emplace_back(std::make_unique<XAPNode>(std::make_unique<ToneProcessorTest>()));
     // proc_nodes.emplace_back(std::make_unique<XAPNode>(std::make_unique<FilePlayerProcessor>()));
-    proc_nodes.emplace_back(std::make_unique<XAPNode>(std::make_unique<JucePluginWrapper>(
-        R"(C:\Program Files\Common Files\VST3\Surge Synth Team\Surge XT.vst3\Contents\x86_64-win\Surge XT.vst3)")));
+    proc_nodes.emplace_back(std::make_unique<XAPNode>(std::make_unique<ClapPluginFormatProcessor>(
+        pathprefix + R"(CLAP\Surge Synth Team\Surge XT.clap)", 0)));
     proc_nodes.emplace_back(std::make_unique<XAPNode>(std::make_unique<GainProcessorTest>()));
-    proc_nodes.emplace_back(std::make_unique<XAPNode>(std::make_unique<JucePluginWrapper>(
-        R"(C:\Program Files\Common Files\VST3\ValhallaVintageVerb.vst3)")));
+    proc_nodes.emplace_back(std::make_unique<XAPNode>(
+        std::make_unique<JucePluginWrapper>(pathprefix + R"(VST3\ValhallaVintageVerb.vst3)")));
     // proc_nodes.emplace_back(std::make_unique<XAPNode>(std::make_unique<ClapPluginFormatProcessor>(
     //     R"(C:\Program Files\Common Files\CLAP\Surge Synth Team\Surge XT Effects.clap)", 0)));
-
-    // auto surge = std::make_unique<XAPNode>(std::make_unique<JucePluginWrapper>(
-    //     R"(C:\Program Files\Common Files\VST3\Surge Synth Team\Surge
-    //     XT.vst3\Contents\x86_64-win\Surge XT.vst3)"));
-    // surge->processor->activate(44100, 0, blocksize);
 
     // auto surgefxclap = std::make_unique<ClapPluginFormatProcessor>(
     //     R"(C:\Program Files\Common Files\CLAP\Surge Synth Team\Surge XT Effects.clap)", 0);
@@ -80,25 +76,30 @@ int main()
         m->processor->activate(sr, 0, blocksize);
     clap_event_transport transport;
     memset(&transport, 0, sizeof(clap_event_transport));
+    transport.flags = CLAP_TRANSPORT_HAS_SECONDS_TIMELINE | CLAP_TRANSPORT_IS_PLAYING;
     clap_process ctx;
     ctx.transport = &transport;
     ctx.frames_count = blocksize;
-    // we need 4 buffers because inputs and outputs are separate!
-    std::vector<float> procbuf(2 * numchans * blocksize);
-    float *inputbuffers[2] = {&procbuf[0 * blocksize], &procbuf[1 * blocksize]};
-    float *outputbuffers[2] = {&procbuf[2 * blocksize], &procbuf[3 * blocksize]};
+    std::vector<float> procbuf(numInchans * blocksize + numOutChans * blocksize);
+    std::vector<float *> inputbuffers;
+    for (int i = 0; i < numInchans; ++i)
+        inputbuffers.push_back(&procbuf[i * blocksize]);
+    std::vector<float *> outputbuffers;
+    for (int i = numInchans; i < numInchans + numOutChans; ++i)
+        outputbuffers.push_back(&procbuf[i * blocksize]);
+    
     ctx.audio_inputs_count = 1;
     clap_audio_buffer clapinputbuffers[1];
-    clapinputbuffers[0].channel_count = 2;
+    clapinputbuffers[0].channel_count = numInchans;
     clapinputbuffers[0].constant_mask = 0;
-    clapinputbuffers[0].data32 = inputbuffers;
+    clapinputbuffers[0].data32 = inputbuffers.data();
     ctx.audio_inputs = clapinputbuffers;
 
     ctx.audio_outputs_count = 1;
     clap_audio_buffer clapoutputbuffers[1];
-    clapoutputbuffers[0].channel_count = 2;
+    clapoutputbuffers[0].channel_count = numOutChans;
     clapoutputbuffers[0].constant_mask = 0;
-    clapoutputbuffers[0].data32 = outputbuffers;
+    clapoutputbuffers[0].data32 = outputbuffers.data();
     ctx.audio_outputs = clapoutputbuffers;
 
     juce::File outfile(R"(C:\develop\AudioPluginHost_mk2\Source\Experimental\out.wav)");
@@ -252,7 +253,7 @@ int main()
                     ctx.audio_inputs[0].data32[i][j] = ctx.audio_outputs[0].data32[i][j];
         }
 
-        writer->writeFromFloatArrays(outputbuffers, 2, blocksize);
+        writer->writeFromFloatArrays(outputbuffers.data(), 2, blocksize);
         outcounter += blocksize;
     }
     delete writer;

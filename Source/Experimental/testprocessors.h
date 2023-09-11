@@ -4,6 +4,7 @@
 #include "JuceHeader.h"
 #include "signalsmith-stretch.h"
 #include "containers/choc_NonAllocatingStableSort.h"
+#include "sst/basic-blocks/modulators/SimpleLFO.h"
 
 template <typename T> inline clap_id to_clap_id(T x) { return static_cast<clap_id>(x); }
 
@@ -140,6 +141,117 @@ class ToneProcessorTest : public xenakios::XAudioProcessor
     }
     int m_mod_out_block_size = 401;
     int m_mod_out_counter = 0;
+};
+
+class ModulatorSource : public xenakios::XAudioProcessor
+{
+  public:
+    std::vector<clap_param_info> m_param_infos;
+    enum class ParamIds
+    {
+        ModType = 4900,
+        Rate = 665,
+    };
+    int m_mod_type = 0;
+    double m_rate = 0.0;
+    static constexpr int BLOCK_SIZE = 32;
+    static constexpr int BLOCK_SIZE_OS = BLOCK_SIZE * 2;
+    alignas(32) float table_envrate_linear[512];
+    sst::basic_blocks::modulators::SimpleLFO<ModulatorSource, BLOCK_SIZE> m_lfo;
+    double samplerate = 44100;
+    void initTables()
+    {
+        double dsamplerate_os = samplerate * 2;
+        for (int i = 0; i < 512; ++i)
+        {
+            double k =
+                dsamplerate_os * pow(2.0, (((double)i - 256.0) / 16.0)) / (double)BLOCK_SIZE_OS;
+            table_envrate_linear[i] = (float)(1.f / k);
+        }
+    }
+    float envelope_rate_linear_nowrap(float x)
+    {
+        x *= 16.f;
+        x += 256.f;
+        int e = std::clamp<int>((int)x, 0, 0x1ff - 1);
+
+        float a = x - (float)e;
+
+        return (1 - a) * table_envrate_linear[e & 0x1ff] +
+               a * table_envrate_linear[(e + 1) & 0x1ff];
+    }
+
+    ModulatorSource() : m_lfo(this)
+    {
+        m_param_infos.push_back(makeParamInfo((clap_id)ParamIds::ModType, "Modulation type", 0.0,
+                                              2.0, 0.0,
+                                              CLAP_PARAM_IS_AUTOMATABLE | CLAP_PARAM_IS_STEPPED));
+        m_param_infos.push_back(
+            makeParamInfo((clap_id)ParamIds::Rate, "Rate", -1.0, 3.0, 0.00,
+                          CLAP_PARAM_IS_AUTOMATABLE | CLAP_PARAM_IS_MODULATABLE));
+    }
+    bool activate(double sampleRate, uint32_t minFrameCount,
+                  uint32_t maxFrameCount) noexcept override
+    {
+        samplerate = sampleRate;
+        initTables();
+
+        return true;
+    }
+    uint32_t paramsCount() const noexcept override { return m_param_infos.size(); }
+    bool paramsInfo(uint32_t paramIndex, clap_param_info *info) const noexcept override
+    {
+        *info = m_param_infos[paramIndex];
+        return true;
+    }
+    int m_update_counter = 0;
+
+    void handleInboundEvent(const clap_event_header *nextEvent)
+    {
+        if (nextEvent->space_id != CLAP_CORE_EVENT_SPACE_ID)
+            return;
+        if (nextEvent->type == CLAP_EVENT_PARAM_VALUE)
+        {
+            auto pev = reinterpret_cast<const clap_event_param_value *>(nextEvent);
+            if (pev->param_id == to_clap_id(ParamIds::Rate))
+                m_rate = pev->value;
+            if (pev->param_id == to_clap_id(ParamIds::ModType))
+                m_mod_type = static_cast<int>(pev->value);
+        }
+    }
+    clap_process_status process(const clap_process *process) noexcept override
+    {
+        auto inevents = process->in_events;
+        const clap_event_header *next_event = nullptr;
+        auto esz = inevents->size(inevents);
+        uint32_t nextEventIndex{0};
+        if (esz > 0)
+            next_event = inevents->get(inevents, nextEventIndex);
+        auto frames = process->frames_count;
+        for (uint32_t i = 0; i < frames; ++i)
+        {
+            // sample accurate event handling is overkill here because we do block processing
+            // of the LFO anyway...maybe look into doing this in some other way later
+            while (next_event && next_event->time == i)
+            {
+                handleInboundEvent(next_event);
+                nextEventIndex++;
+                if (nextEventIndex >= esz)
+                    next_event = nullptr;
+                else
+                    next_event = inevents->get(inevents, nextEventIndex);
+            }
+            if (m_update_counter == 0)
+            {
+                m_lfo.process_block(m_rate, 0.0f, m_mod_type, false);
+            }
+            ++m_update_counter;
+            if (m_update_counter == BLOCK_SIZE)
+                m_update_counter = 0;
+        }
+
+        return CLAP_PROCESS_CONTINUE;
+    }
 };
 
 class GainProcessorTest : public xenakios::XAudioProcessor
@@ -548,6 +660,59 @@ class JucePluginWrapper : public xenakios::XAudioProcessor, public juce::AudioPl
         int frames = process->frames_count;
         auto inEvents = process->in_events;
         auto &pars = m_internal->getParameters();
+        uint32_t basechunk = 32;
+        uint32_t smp = 0;
+
+        const clap_event_header_t *nextEvent{nullptr};
+        uint32_t nextEventIndex{0};
+        auto sz = inEvents->size(inEvents);
+        if (sz != 0)
+        {
+            nextEvent = inEvents->get(inEvents, nextEventIndex);
+        }
+        while (smp < frames)
+        {
+            uint32_t chunk = std::min(basechunk, frames - smp);
+
+            while (nextEvent && nextEvent->time < smp + chunk)
+            {
+                auto ev = inEvents->get(inEvents, nextEventIndex);
+                if (ev->space_id == CLAP_CORE_EVENT_SPACE_ID)
+                {
+                    if (ev->type == CLAP_EVENT_PARAM_VALUE)
+                    {
+                        auto pvev = reinterpret_cast<const clap_event_param_value *>(ev);
+                        if (pvev->param_id >= 0 && pvev->param_id < pars.size())
+                        {
+                            pars[pvev->param_id]->setValue(pvev->value);
+                        }
+                    }
+                }
+                nextEventIndex++;
+                if (nextEventIndex >= sz)
+                    nextEvent = nullptr;
+                else
+                    nextEvent = inEvents->get(inEvents, nextEventIndex);
+            }
+            m_work_buf.setSize(m_work_buf.getNumChannels(), chunk, false, false, true);
+            for (int i = 0; i < 2; ++i)
+            {
+                for (int j = 0; j < chunk; ++j)
+                {
+                    m_work_buf.setSample(i, j, process->audio_inputs[0].data32[i][smp+j]);
+                }
+            }
+            m_internal->processBlock(m_work_buf, m_midi_buffer);
+            for (int i = 0; i < 2; ++i)
+            {
+                for (int j = 0; j < chunk; ++j)
+                {
+                    process->audio_outputs[0].data32[i][smp+j] = m_work_buf.getSample(i, j);
+                }
+            }
+            smp += chunk;
+        }
+        return CLAP_PROCESS_CONTINUE;
         for (int i = 0; i < inEvents->size(inEvents); ++i)
         {
             auto ev = inEvents->get(inEvents, i);
@@ -731,9 +896,9 @@ class ClapEventSequencerProcessor : public xenakios::XAudioProcessor
         m_events.reserve(4096);
         for (int i = 0; i < 9; ++i)
         {
-            int third = 64;
+            int third = 63;
             if (i % 2 == 1)
-                third = 63;
+                third = 64;
             m_events.push_back(
                 ClapEventHolder::makeNoteEvent(CLAP_EVENT_NOTE_ON, 1.0 * i, 0, 0, 60, -1, 0.9));
             m_events.push_back(
@@ -759,13 +924,19 @@ class ClapEventSequencerProcessor : public xenakios::XAudioProcessor
     {
         return false;
     }
+    bool m_processing_started = false;
     clap_process_status process(const clap_process *process) noexcept override
     {
+        if (!m_processing_started)
+        {
+            m_processing_started = true;
+            m_event_iter.setTime(0.0);
+        }
         if (process->transport)
         {
             // note here the oddity that the clap transport doesn't contain floating point seconds!
             auto curtime = process->transport->song_pos_seconds / (double)CLAP_SECTIME_FACTOR;
-            m_event_iter.setTime(curtime);
+            //m_event_iter.setTime(curtime);
             auto events = m_event_iter.readNextEvents(process->frames_count / m_sr);
             if (events.first != events.second)
             {
