@@ -15,7 +15,8 @@ inline Type maprange(Type sourceValue, Type sourceRangeMin, Type sourceRangeMax,
 struct DejaVuRandom
 {
     std::array<unsigned int, 256> m_state;
-    std::minstd_rand0 m_rng;
+    using UnderlyingEngine = std::minstd_rand0;
+    UnderlyingEngine m_rng;
     int m_loop_index = 0;
     int m_loop_len = 8;
     float m_deja_vu = 0.0;
@@ -25,8 +26,8 @@ struct DejaVuRandom
         for (int i = 0; i < m_state.size(); ++i)
             m_state[i] = m_rng();
     }
-    unsigned int max() const { return m_rng.max(); }
-    unsigned int min() const { return m_rng.min(); }
+    static constexpr unsigned int max() { return UnderlyingEngine::max(); }
+    static constexpr unsigned int min() { return UnderlyingEngine::min(); }
     unsigned int operator()() { return next(); }
     unsigned int next()
     {
