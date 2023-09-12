@@ -889,26 +889,28 @@ class ClapEventSequencerProcessor : public xenakios::XAudioProcessor
     SequenceType m_events;
     ClapEventIterator m_event_iter;
     double m_sr = 1.0;
-    DejaVuRandom m_dvpitchrand{934};
-    DejaVuRandom m_dvchordrand{5777};
-    DejaVuRandom m_dvvelorand{14};
-
+    DejaVuRandom m_dvpitchrand;
+    DejaVuRandom m_dvchordrand;
+    DejaVuRandom m_dvvelorand;
+    
   public:
-    ClapEventSequencerProcessor() : m_event_iter(m_events)
+    ClapEventSequencerProcessor(int seed, double pulselen)
+        : m_event_iter(m_events), m_dvpitchrand(seed), m_dvchordrand(seed + 13),
+          m_dvvelorand(seed + 101)
     {
         m_events.reserve(4096);
         std::uniform_real_distribution<float> pitchdist{48.0f, 72.0f};
         std::uniform_int_distribution<int> chorddist{0, 3};
         std::uniform_real_distribution<float> accentdist{0.0f, 1.0f};
         // std::discrete_distribution<> d({40, 10, 10, 40});
-        
+
         m_dvpitchrand.m_loop_len = 8;
         m_dvpitchrand.m_deja_vu = 0.48;
         m_dvchordrand.m_loop_len = 8;
         m_dvchordrand.m_deja_vu = 0.4;
         m_dvvelorand.m_loop_len = 8;
         m_dvvelorand.m_deja_vu = 0.3;
-        double pulselen = 0.25;
+        
         float chord_notes[4][3] = {{0.0f, 3.1564f, 7.02f},
                                    {0.0f, 3.8631f, 7.02f},
                                    {-12.0f, 7.02f, 10.8827f},
@@ -925,15 +927,16 @@ class ClapEventSequencerProcessor : public xenakios::XAudioProcessor
             double tpos = i * pulselen;
             for (int j = 0; j < 3; ++j)
             {
+                double offtpos = tpos + j * 0.03;
                 float pitch = key + chord_notes[chordtype][j];
-                m_events.push_back(ClapEventHolder::makeNoteEvent(CLAP_EVENT_NOTE_ON, tpos, 0, 0,
+                m_events.push_back(ClapEventHolder::makeNoteEvent(CLAP_EVENT_NOTE_ON, offtpos, 0, 0,
                                                                   pitch, -1, velo));
                 float fracpitch = pitch - (int)pitch;
                 m_events.push_back(ClapEventHolder::makeNoteExpressionEvent(
-                    CLAP_NOTE_EXPRESSION_TUNING, tpos, 0, 0, pitch, -1, fracpitch));
+                    CLAP_NOTE_EXPRESSION_TUNING, offtpos, 0, 0, pitch, -1, fracpitch));
 
                 m_events.push_back(ClapEventHolder::makeNoteEvent(
-                    CLAP_EVENT_NOTE_OFF, tpos + pulselen * 0.90, 0, 0, pitch, -1, 0.0));
+                    CLAP_EVENT_NOTE_OFF, offtpos + pulselen * 0.90, 0, 0, pitch, -1, 0.0));
             }
         }
         sortSequence(m_events);
@@ -971,16 +974,16 @@ class ClapEventSequencerProcessor : public xenakios::XAudioProcessor
                     if (etype == CLAP_EVENT_NOTE_ON || etype == CLAP_EVENT_NOTE_OFF)
                     {
                         auto ev = m_events[i].dataAsEvent<clap_event_note>();
-                        //std::cout << "GENERATED NOTE EVENT " << ev->header.type << " "
-                        //          << m_events[i].m_time_stamp << "\n";
+                        // std::cout << "GENERATED NOTE EVENT " << ev->header.type << " "
+                        //           << m_events[i].m_time_stamp << "\n";
                         process->out_events->try_push(process->out_events,
                                                       reinterpret_cast<clap_event_header *>(ev));
                     }
                     if (etype == CLAP_EVENT_NOTE_EXPRESSION)
                     {
                         auto ev = m_events[i].dataAsEvent<clap_event_note_expression>();
-                        //std::cout << "GENERATED NOTE EXP EVENT " << ev->header.type << " "
-                        //          << m_events[i].m_time_stamp << " " << ev->value << "\n";
+                        // std::cout << "GENERATED NOTE EXP EVENT " << ev->header.type << " "
+                        //           << m_events[i].m_time_stamp << " " << ev->value << "\n";
                         process->out_events->try_push(process->out_events,
                                                       reinterpret_cast<clap_event_header *>(ev));
                     }

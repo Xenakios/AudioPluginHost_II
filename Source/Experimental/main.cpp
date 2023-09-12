@@ -177,8 +177,10 @@ inline void test_node_connecting()
 {
     std::string pathprefix = R"(C:\Program Files\Common Files\)";
     std::vector<std::unique_ptr<XAPNode>> proc_nodes;
-    proc_nodes.emplace_back(
-        std::make_unique<XAPNode>(std::make_unique<ClapEventSequencerProcessor>(), "Event Gen"));
+    proc_nodes.emplace_back(std::make_unique<XAPNode>(
+        std::make_unique<ClapEventSequencerProcessor>(444, 0.25), "Event Gen 1"));
+    proc_nodes.emplace_back(std::make_unique<XAPNode>(
+        std::make_unique<ClapEventSequencerProcessor>(1234, 0.40), "Event Gen 2"));
     proc_nodes.emplace_back(
         std::make_unique<XAPNode>(std::make_unique<ClapPluginFormatProcessor>(
                                       pathprefix + R"(CLAP\Surge Synth Team\Surge XT.clap)", 0),
@@ -191,20 +193,25 @@ inline void test_node_connecting()
         std::make_unique<XAPNode>(std::make_unique<ClapPluginFormatProcessor>(
                                       pathprefix + R"(CLAP\Surge Synth Team\Surge XT.clap)", 0),
                                   "Surge XT 2"));
-    connectEventPorts(findByName(proc_nodes, "Event Gen"), 0, findByName(proc_nodes, "Surge XT 1"),
-                      0);
-    connectEventPorts(findByName(proc_nodes, "Event Gen"), 0, findByName(proc_nodes, "Surge XT 2"),
-                      0);
-    connectAudioBetweenNodes(proc_nodes[1].get(), 0, 0, proc_nodes[2].get(), 0, 0);
-    connectAudioBetweenNodes(proc_nodes[1].get(), 0, 1, proc_nodes[2].get(), 0, 1);
-    connectAudioBetweenNodes(proc_nodes[3].get(), 0, 0, proc_nodes[2].get(), 0, 0);
-    connectAudioBetweenNodes(proc_nodes[3].get(), 0, 1, proc_nodes[2].get(), 0, 1);
+    connectEventPorts(findByName(proc_nodes, "Event Gen 1"), 0,
+                      findByName(proc_nodes, "Surge XT 1"), 0);
+    connectEventPorts(findByName(proc_nodes, "Event Gen 2"), 0,
+                      findByName(proc_nodes, "Surge XT 2"), 0);
+    //connectAudioBetweenNodes(findByName(proc_nodes, "Surge XT 1"), 0, 0,
+    //                         findByName(proc_nodes, "Valhalla"), 0, 0);
+    //connectAudioBetweenNodes(findByName(proc_nodes, "Surge XT 1"), 0, 1,
+    //                          findByName(proc_nodes, "Valhalla"), 0, 1);
+    // connectAudioBetweenNodes(findByName(proc_nodes, "Surge XT 2"), 0, 0,
+    //                          findByName(proc_nodes, "Valhalla"), 0, 0);
+    connectAudioBetweenNodes(findByName(proc_nodes, "Surge XT 2"), 0, 1,
+                             findByName(proc_nodes, "Valhalla"), 0, 1);
+
     findByName(proc_nodes, "Valhalla")->PreProcessFunc = [](XAPNode *node) {
         // set reverb mix
-        xenakios::pushParamEvent(node->inEvents, false, 0, 0, 0.1);
+        xenakios::pushParamEvent(node->inEvents, false, 0, 0, 0.2);
     };
 
-    auto runOrder = topoSort(proc_nodes[2].get());
+    auto runOrder = topoSort(findByName(proc_nodes, "Valhalla"));
     std::cout << "**** GRAPH RUN ORDER ****\n";
     for (auto &n : runOrder)
     {
@@ -230,9 +237,9 @@ inline void test_node_connecting()
         clap_param_info pinfo;
         surge2->paramsInfo(i, &pinfo);
         juce::String pname(pinfo.name);
-        if (pname.containsIgnoreCase("A Pitch"))
+        if (pname.containsIgnoreCase("Active Scene"))
         {
-            std::cout << "A Pitch found " << pinfo.id << "\n";
+            std::cout << "Active Scene found " << pinfo.id << "\n";
             parid = pinfo.id;
             break;
         }
@@ -241,7 +248,7 @@ inline void test_node_connecting()
     {
         findByName(proc_nodes, "Surge XT 2")->PreProcessFunc = [parid](XAPNode *node) {
             // set surge param
-            xenakios::pushParamEvent(node->inEvents, false, 0, parid, 0.7);
+            xenakios::pushParamEvent(node->inEvents, false, 0, parid, 1.0);
         };
     }
     int outlen = 10 * sr;
@@ -317,7 +324,7 @@ inline void test_node_connecting()
             }
             if (n->displayName == "Surge XT 2")
             {
-                //printClapEvents(n->inEvents);
+                // printClapEvents(n->inEvents);
             }
             n->processor->process(&ctx);
         }
