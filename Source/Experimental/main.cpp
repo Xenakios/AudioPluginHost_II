@@ -180,7 +180,7 @@ inline void test_node_connecting()
     proc_nodes.emplace_back(std::make_unique<XAPNode>(
         std::make_unique<ClapEventSequencerProcessor>(444, 0.25), "Event Gen 1"));
     proc_nodes.emplace_back(std::make_unique<XAPNode>(
-        std::make_unique<ClapEventSequencerProcessor>(1234, 0.40), "Event Gen 2"));
+        std::make_unique<ClapEventSequencerProcessor>(2347, 0.75), "Event Gen 2"));
     proc_nodes.emplace_back(
         std::make_unique<XAPNode>(std::make_unique<ClapPluginFormatProcessor>(
                                       pathprefix + R"(CLAP\Surge Synth Team\Surge XT.clap)", 0),
@@ -201,8 +201,8 @@ inline void test_node_connecting()
     //                         findByName(proc_nodes, "Valhalla"), 0, 0);
     //connectAudioBetweenNodes(findByName(proc_nodes, "Surge XT 1"), 0, 1,
     //                          findByName(proc_nodes, "Valhalla"), 0, 1);
-    // connectAudioBetweenNodes(findByName(proc_nodes, "Surge XT 2"), 0, 0,
-    //                          findByName(proc_nodes, "Valhalla"), 0, 0);
+    connectAudioBetweenNodes(findByName(proc_nodes, "Surge XT 2"), 0, 0,
+                              findByName(proc_nodes, "Valhalla"), 0, 0);
     connectAudioBetweenNodes(findByName(proc_nodes, "Surge XT 2"), 0, 1,
                              findByName(proc_nodes, "Valhalla"), 0, 1);
 
@@ -251,7 +251,7 @@ inline void test_node_connecting()
             xenakios::pushParamEvent(node->inEvents, false, 0, parid, 1.0);
         };
     }
-    int outlen = 10 * sr;
+    int outlen = 180 * sr;
     int outcounter = 0;
     juce::File outfile(R"(C:\develop\AudioPluginHost_mk2\Source\Experimental\graph_out.wav)");
     outfile.deleteFile();
