@@ -900,6 +900,8 @@ class ClapEventSequencerProcessor : public xenakios::XAudioProcessor
         std::uniform_real_distribution<float> pitchdist{48.0f, 72.0f};
         std::uniform_int_distribution<int> chorddist{0, 3};
         std::uniform_real_distribution<float> accentdist{0.0f, 1.0f};
+        // std::discrete_distribution<> d({40, 10, 10, 40});
+        
         m_dvpitchrand.m_loop_len = 8;
         m_dvpitchrand.m_deja_vu = 0.48;
         m_dvchordrand.m_loop_len = 8;
