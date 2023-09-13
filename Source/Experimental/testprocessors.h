@@ -928,7 +928,7 @@ class ClapEventSequencerProcessor : public xenakios::XAudioProcessor
             double tpos = i * pulselen;
             for (int j = 0; j < 3; ++j)
             {
-                double offtpos = tpos + j * 0.03;
+                double offtpos = tpos + j * 0.07;
                 float pitch = key + chord_notes[chordtype][j];
                 m_events.push_back(ClapEventHolder::makeNoteEvent(CLAP_EVENT_NOTE_ON, offtpos, 0, 0,
                                                                   pitch, -1, velo));

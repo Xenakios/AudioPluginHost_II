@@ -180,7 +180,7 @@ inline void test_node_connecting()
     proc_nodes.emplace_back(std::make_unique<XAPNode>(
         std::make_unique<ClapEventSequencerProcessor>(444, 0.25), "Event Gen 1"));
     proc_nodes.emplace_back(std::make_unique<XAPNode>(
-        std::make_unique<ClapEventSequencerProcessor>(2347, 0.75), "Event Gen 2"));
+        std::make_unique<ClapEventSequencerProcessor>(2349, 0.5), "Event Gen 2"));
     proc_nodes.emplace_back(
         std::make_unique<XAPNode>(std::make_unique<ClapPluginFormatProcessor>(
                                       pathprefix + R"(CLAP\Surge Synth Team\Surge XT.clap)", 0),
