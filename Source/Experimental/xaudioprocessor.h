@@ -68,10 +68,7 @@ class XAudioProcessor
   public:
     XAudioProcessor() {}
     virtual ~XAudioProcessor() {}
-    virtual bool getDescriptor(clap_plugin_descriptor* desc) const
-    {
-        return false;
-    }
+    virtual bool getDescriptor(clap_plugin_descriptor *desc) const { return false; }
     // would we ever have a reason to return false here...?
     virtual bool init() noexcept { return true; }
     // should perhaps be pure virtual
@@ -118,6 +115,13 @@ class XAudioProcessor
     // paramsFlush is intended to be used to set parameters even when the processing isn't
     // actively called. We might want to somehow abstract this, if possible...
     virtual void paramsFlush(const clap_input_events *in, const clap_output_events *out) noexcept {}
+
+    virtual uint32_t audioPortsCount(bool isInput) const noexcept { return 0; }
+    virtual bool audioPortsInfo(uint32_t index, bool isInput,
+                                clap_audio_port_info *info) const noexcept
+    {
+        return false;
+    }
 
     virtual uint32_t notePortsCount(bool isInput) const noexcept { return 0; }
     virtual bool notePortsInfo(uint32_t index, bool isInput,

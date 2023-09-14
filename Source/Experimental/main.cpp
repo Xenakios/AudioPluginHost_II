@@ -238,6 +238,57 @@ inline std::optional<clap_id> findParameterFromName(xenakios::XAudioProcessor *p
     return {};
 }
 
+inline void handleNodeModulationEvents(XAPNode::Connection &conn,
+                                       clap::helpers::EventList &modulationMergeList)
+{
+    auto &oevents = conn.source->outEvents;
+    for (int j = 0; j < oevents.size(); ++j)
+    {
+        auto ev = oevents.get(j);
+        if (ev->type == CLAP_EVENT_PARAM_MOD)
+        {
+            auto sourcemev = (const clap_event_param_mod *)ev;
+            if (conn.sourceParameter == sourcemev->param_id)
+            {
+                double val = sourcemev->amount;
+                if (conn.isDestructiveModulation)
+                {
+                    val = 0.5 + 0.5 * sourcemev->amount;
+                    xenakios::pushParamEvent(modulationMergeList, false, sourcemev->header.time,
+                                             conn.destinationParameter, val);
+                }
+                else
+                {
+                    val *= conn.modulationDepth;
+                    xenakios::pushParamEvent(modulationMergeList, true, sourcemev->header.time,
+                                             conn.destinationParameter, val);
+                }
+            }
+        }
+    }
+}
+
+inline void handleNodeEvents(XAPNode::Connection &conn,
+                             std::vector<clap_event_header *> &eventMergeList)
+{
+    auto &oevents = conn.source->outEvents;
+    for (int j = 0; j < oevents.size(); ++j)
+    {
+        eventMergeList.push_back(oevents.get(j));
+    }
+}
+
+inline void handleNodeAudioInputs(XAPNode *n, XAPNode::Connection &conn, int procbufsize)
+{
+    int srcChan = conn.sourceChannel;
+    int destChan = conn.destinationChannel;
+    for (int j = 0; j < procbufsize; ++j)
+    {
+        n->inPortBuffers[0].data32[destChan][j] +=
+            conn.source->outPortBuffers[0].data32[srcChan][j];
+    }
+}
+
 inline void test_node_connecting()
 {
 
@@ -288,7 +339,7 @@ inline void test_node_connecting()
     connectModulation(findByName(proc_nodes, "LFO 3"), 0, findByName(proc_nodes, "Surge XT 2"),
                       *findParameterFromName(findByName(proc_nodes, "Surge XT 2")->processor.get(),
                                              "B Osc 1 Pitch"),
-                      false, 0.05);
+                      false, 0.00);
 
     findByName(proc_nodes, "Valhalla")->PreProcessFunc = [](XAPNode *node) {
         // set reverb mix
@@ -317,7 +368,6 @@ inline void test_node_connecting()
         n->processor->renderSetMode(CLAP_RENDER_OFFLINE);
     }
     auto surge2 = findByName(proc_nodes, "Surge XT 2")->processor.get();
-    // B Volume
     auto parid = findParameterFromName(surge2, "Active Scene");
     if (parid)
     {
@@ -353,64 +403,23 @@ inline void test_node_connecting()
             }
             eventMergeList.clear();
             accumModValues.clear();
-            if (n->inputConnections.size() > 0)
+
+            for (auto &conn : n->inputConnections)
             {
-                for (auto &conn : n->inputConnections)
+                if (conn.type == XAPNode::ConnectionType::Audio)
                 {
-                    if (conn.type == XAPNode::ConnectionType::Audio)
-                    {
-                        int srcChan = conn.sourceChannel;
-                        int destChan = conn.destinationChannel;
-
-                        for (int j = 0; j < procbufsize; ++j)
-                        {
-                            n->inPortBuffers[0].data32[destChan][j] +=
-                                conn.source->outPortBuffers[0].data32[srcChan][j];
-                        }
-                    }
-                    else if (conn.type == XAPNode::ConnectionType::Events)
-                    {
-                        auto &oevents = conn.source->outEvents;
-                        for (int j = 0; j < oevents.size(); ++j)
-                        {
-                            eventMergeList.push_back(oevents.get(j));
-                        }
-                    }
-                    else
-                    {
-                        auto &oevents = conn.source->outEvents;
-                        for (int j = 0; j < oevents.size(); ++j)
-                        {
-                            auto ev = oevents.get(j);
-                            if (ev->type == CLAP_EVENT_PARAM_MOD)
-                            {
-                                auto sourcemev = (const clap_event_param_mod *)ev;
-                                if (conn.sourceParameter == sourcemev->param_id)
-                                {
-                                    double val = sourcemev->amount;
-                                    if (conn.isDestructiveModulation)
-                                    {
-                                        val = 0.5 + 0.5 * sourcemev->amount;
-                                        xenakios::pushParamEvent(modulationMergeList, false,
-                                                                 sourcemev->header.time,
-                                                                 conn.destinationParameter, val);
-                                    }
-                                    else
-                                    {
-                                        // accumModValues[conn.destinationParameter] +=
-                                        //     val * conn.modulationDepth;
-
-                                        val *= conn.modulationDepth;
-                                        xenakios::pushParamEvent(modulationMergeList, true,
-                                                                 sourcemev->header.time,
-                                                                 conn.destinationParameter, val);
-                                    }
-                                }
-                            }
-                        }
-                    }
+                    handleNodeAudioInputs(n, conn, procbufsize);
+                }
+                else if (conn.type == XAPNode::ConnectionType::Events)
+                {
+                    handleNodeEvents(conn, eventMergeList);
+                }
+                else
+                {
+                    handleNodeModulationEvents(conn, modulationMergeList);
                 }
             }
+
             n->inEvents.clear();
             if (eventMergeList.size() > 0 || modulationMergeList.size() > 0)
             {

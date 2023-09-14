@@ -109,6 +109,8 @@ class ClapPluginFormatProcessor : public xenakios::XAudioProcessor
             if (m_plug->activate(m_plug, sampleRate, minFrameCount, maxFrameCount))
             {
                 initParamsExtension();
+                m_ext_audio_ports =
+                    (clap_plugin_audio_ports *)m_plug->get_extension(m_plug, CLAP_EXT_AUDIO_PORTS);
                 return true;
             }
         }
@@ -125,14 +127,28 @@ class ClapPluginFormatProcessor : public xenakios::XAudioProcessor
             }
         }
     }
-    uint32_t paramsCount() const noexcept override 
-    { 
-        return m_ext_params->count(m_plug); 
-    }
+    uint32_t paramsCount() const noexcept override { return m_ext_params->count(m_plug); }
     bool paramsInfo(uint32_t paramIndex, clap_param_info *info) const noexcept override
     {
         return m_ext_params->get_info(m_plug, paramIndex, info);
     }
+    
+    clap_plugin_audio_ports *m_ext_audio_ports = nullptr;
+    uint32_t audioPortsCount(bool isInput) const noexcept override
+    {
+        if (!m_ext_audio_ports)
+            return 0;
+        return m_ext_audio_ports->count(m_plug, isInput);
+    }
+
+    bool audioPortsInfo(uint32_t index, bool isInput,
+                        clap_audio_port_info *info) const noexcept override
+    {
+        if (!m_ext_audio_ports)
+            return false;
+        return m_ext_audio_ports->get(m_plug, index, isInput, info);
+    }
+
     clap_process_status process(const clap_process *process) noexcept override
     {
         if (!m_processingStarted)
