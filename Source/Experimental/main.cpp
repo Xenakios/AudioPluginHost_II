@@ -521,7 +521,7 @@ class GuiAppApplication : public juce::JUCEApplication
     */
     class MainWindow : public juce::DocumentWindow
     {
-      std::unique_ptr<GainProcessorTest> m_test_proc;
+      std::unique_ptr<xenakios::XAudioProcessor> m_test_proc;
       public:
         explicit MainWindow(juce::String name)
             : DocumentWindow(name,
@@ -529,7 +529,7 @@ class GuiAppApplication : public juce::JUCEApplication
                                  ResizableWindow::backgroundColourId),
                              DocumentWindow::allButtons)
         {
-            m_test_proc = std::make_unique<GainProcessorTest>();
+            m_test_proc = std::make_unique<FilePlayerProcessor>();
             setUsingNativeTitleBar(true);
             auto comp = m_test_proc->createEditor();
             comp->setSize(400,300);

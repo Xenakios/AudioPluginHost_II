@@ -474,6 +474,18 @@ class FilePlayerProcessor : public xenakios::XAudioProcessor
         LoopStart = 3322,
         LoopEnd = 888777
     };
+    xenakios::XAudioProcessorEditor *m_editor = nullptr;
+    bool hasEditor() noexcept override { return true; }
+    xenakios::XAudioProcessorEditor *createEditorIfNeeded() noexcept override
+    {
+        if (!m_editor)
+            m_editor = new GenericEditor(*this);
+        return m_editor;
+    }
+    xenakios::XAudioProcessorEditor *createEditor() noexcept override
+    {
+        return createEditorIfNeeded();
+    }
     FilePlayerProcessor()
     {
         m_param_infos.push_back(
