@@ -25,16 +25,27 @@ inline void mapModulationEvents(const clap::helpers::EventList &sourceList, clap
 class XAPNode
 {
   public:
+    enum ConnectionType
+    {
+        Audio,
+        Events,
+        Modulation
+    };
     struct Connection
     {
         XAPNode *source = nullptr;
-        bool isAudio = true; // otherwise, events
+        ConnectionType type = ConnectionType::Audio;
         int sourcePort = 0;
         // we could use this for events but we probably want to do stuff like note channel
         // mapping as a separate thing
         int sourceChannel = 0;
         int destinationPort = 0;
         int destinationChannel = 0;
+        bool isDestructiveModulation = false;
+        clap_id sourceParameter = 0;
+        double modulationDepth = 0.0;
+        clap_id destinationParameter = 0;
+        double modulationValue = 0.0;
     };
     XAPNode(std::unique_ptr<xenakios::XAudioProcessor> nodeIn, std::string name = "")
         : processor(std::move(nodeIn)), displayName(name)
@@ -87,6 +98,7 @@ inline bool connectAudioBetweenNodes(XAPNode *sourceNode, int sourcePort, int so
     if (sourceNode == nullptr || destinationNode == nullptr)
         return false;
     XAPNode::Connection conn;
+    conn.type = XAPNode::ConnectionType::Audio;
     conn.source = sourceNode;
     conn.sourceChannel = sourceChannel;
     conn.sourcePort = sourcePort;
@@ -102,10 +114,28 @@ inline bool connectEventPorts(XAPNode *sourceNode, int sourcePort, XAPNode *dest
     if (sourceNode == nullptr || destinationNode == nullptr)
         return false;
     XAPNode::Connection conn;
-    conn.isAudio = false;
+    conn.type = XAPNode::ConnectionType::Events;
     conn.source = sourceNode;
     conn.sourcePort = sourcePort;
     conn.destinationPort = destinationPort;
+    destinationNode->inputConnections.push_back(conn);
+    return true;
+}
+
+inline bool connectModulation(XAPNode *sourceNode, clap_id sourceParamId, XAPNode *destinationNode,
+                              clap_id destinationParamId, bool destructive, double initialModDepth)
+{
+    if (sourceNode == nullptr || destinationNode == nullptr)
+        return false;
+    XAPNode::Connection conn;
+    conn.type = XAPNode::ConnectionType::Modulation;
+    conn.source = sourceNode;
+    conn.sourcePort = 0;
+    conn.destinationPort = 0;
+    conn.sourceParameter = sourceParamId;
+    conn.destinationParameter = destinationParamId;
+    conn.modulationDepth = initialModDepth;
+    conn.isDestructiveModulation = destructive;
     destinationNode->inputConnections.push_back(conn);
     return true;
 }
@@ -221,7 +251,9 @@ inline void test_node_connecting()
                                       pathprefix + R"(CLAP\Surge Synth Team\Surge XT.clap)", 0),
                                   "Surge XT 2"));
     proc_nodes.emplace_back(
-        std::make_unique<XAPNode>(std::make_unique<ModulatorSource>(), "LFO 1"));
+        std::make_unique<XAPNode>(std::make_unique<ModulatorSource>(1, 0.0), "LFO 1"));
+    proc_nodes.emplace_back(
+        std::make_unique<XAPNode>(std::make_unique<ModulatorSource>(1, 2.0), "LFO 2"));
 
     connectEventPorts(findByName(proc_nodes, "Event Gen 1"), 0,
                       findByName(proc_nodes, "Surge XT 1"), 0);
@@ -236,9 +268,16 @@ inline void test_node_connecting()
     connectAudioBetweenNodes(findByName(proc_nodes, "Surge XT 2"), 0, 1,
                              findByName(proc_nodes, "Valhalla"), 0, 1);
 
+    // connectModulation(findByName(proc_nodes, "LFO 1"), 0, findByName(proc_nodes, "Valhalla"), 0,
+    //                   true, 1.0);
+    connectModulation(
+        findByName(proc_nodes, "LFO 2"), 0, findByName(proc_nodes, "Surge XT 2"),
+        *findParameterFromName(findByName(proc_nodes, "Surge XT 2")->processor.get(), "B Osc 1 Pitch"),
+        false, 0.1);
+
     findByName(proc_nodes, "Valhalla")->PreProcessFunc = [](XAPNode *node) {
         // set reverb mix
-        xenakios::pushParamEvent(node->inEvents, false, 0, 0, 0.2);
+        xenakios::pushParamEvent(node->inEvents, false, 0, 0, 0.0);
     };
 
     auto runOrder = topoSort(findByName(proc_nodes, "Valhalla"));
@@ -263,7 +302,8 @@ inline void test_node_connecting()
         n->processor->renderSetMode(CLAP_RENDER_OFFLINE);
     }
     auto surge2 = findByName(proc_nodes, "Surge XT 2")->processor.get();
-    auto parid = findParameterFromName(surge2,"Active Scene");
+    // B Volume
+    auto parid = findParameterFromName(surge2, "Active Scene");
     if (parid)
     {
         findByName(proc_nodes, "Surge XT 2")->PreProcessFunc = [parid](XAPNode *node) {
@@ -271,7 +311,7 @@ inline void test_node_connecting()
             xenakios::pushParamEvent(node->inEvents, false, 0, *parid, 1.0);
         };
     }
-    int outlen = 180 * sr;
+    int outlen = 30 * sr;
     int outcounter = 0;
     juce::File outfile(R"(C:\develop\AudioPluginHost_mk2\Source\Experimental\graph_out_02.wav)");
     outfile.deleteFile();
@@ -280,6 +320,7 @@ inline void test_node_connecting()
     auto writer = wav.createWriterFor(ostream.release(), sr, 2, 32, {}, 0);
     std::vector<clap_event_header *> eventMergeList;
     eventMergeList.reserve(1024);
+    clap::helpers::EventList modulationMergeList;
     transport.flags = CLAP_TRANSPORT_HAS_SECONDS_TIMELINE | CLAP_TRANSPORT_IS_PLAYING;
     while (outcounter < outlen)
     {
@@ -299,7 +340,7 @@ inline void test_node_connecting()
             {
                 for (auto &conn : n->inputConnections)
                 {
-                    if (conn.isAudio)
+                    if (conn.type == XAPNode::ConnectionType::Audio)
                     {
                         int srcChan = conn.sourceChannel;
                         int destChan = conn.destinationChannel;
@@ -310,7 +351,7 @@ inline void test_node_connecting()
                                 conn.source->outPortBuffers[0].data32[srcChan][j];
                         }
                     }
-                    else
+                    else if (conn.type == XAPNode::ConnectionType::Events)
                     {
                         auto &oevents = conn.source->outEvents;
                         for (int j = 0; j < oevents.size(); ++j)
@@ -318,11 +359,43 @@ inline void test_node_connecting()
                             eventMergeList.push_back(oevents.get(j));
                         }
                     }
+                    else
+                    {
+                        auto &oevents = conn.source->outEvents;
+                        for (int j = 0; j < oevents.size(); ++j)
+                        {
+                            auto ev = oevents.get(j);
+                            if (ev->type == CLAP_EVENT_PARAM_MOD)
+                            {
+                                auto sourcemev = (const clap_event_param_mod *)ev;
+                                if (conn.sourceParameter == sourcemev->param_id)
+                                {
+                                    double val = sourcemev->amount;
+                                    if (conn.isDestructiveModulation)
+                                    {
+                                        val = 0.5 + 0.5 * sourcemev->amount;
+                                        xenakios::pushParamEvent(modulationMergeList, false,
+                                                                 sourcemev->header.time,
+                                                                 conn.destinationParameter, val);
+                                    }
+                                    else
+                                    {
+                                        val *= conn.modulationDepth;
+                                        xenakios::pushParamEvent(modulationMergeList, true,
+                                                                 sourcemev->header.time,
+                                                                 conn.destinationParameter, val);
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
             n->inEvents.clear();
-            if (eventMergeList.size() > 0)
+            if (eventMergeList.size() > 0 || modulationMergeList.size() > 0)
             {
+                for (int i = 0; i < modulationMergeList.size(); ++i)
+                    eventMergeList.push_back(modulationMergeList.get(i));
                 choc::sorting::stable_sort(
                     eventMergeList.begin(), eventMergeList.end(),
                     [](auto &lhs, auto &rhs) { return lhs->time < rhs->time; });
@@ -353,6 +426,7 @@ inline void test_node_connecting()
             n->inEvents.clear();
             n->outEvents.clear();
         }
+        modulationMergeList.clear();
         auto outbufs = runOrder.back()->outChannels;
         writer->writeFromFloatArrays(outbufs.data(), 2, procbufsize);
         outcounter += procbufsize;

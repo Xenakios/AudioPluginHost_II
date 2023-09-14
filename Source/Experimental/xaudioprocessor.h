@@ -30,6 +30,10 @@ inline void pushParamEvent(clap::helpers::EventList &elist, bool is_mod, uint32_
         pv.cookie = nullptr;
         pv.param_id = paramId;
         pv.value = value;
+        pv.channel = -1;
+        pv.key = -1;
+        pv.note_id = -1;
+        pv.port_index = -1;
         elist.push(reinterpret_cast<const clap_event_header *>(&pv));
     }
     else
@@ -43,6 +47,10 @@ inline void pushParamEvent(clap::helpers::EventList &elist, bool is_mod, uint32_
         pv.cookie = nullptr;
         pv.param_id = paramId;
         pv.amount = value;
+        pv.channel = -1;
+        pv.key = -1;
+        pv.note_id = -1;
+        pv.port_index = -1;
         elist.push(reinterpret_cast<const clap_event_header *>(&pv));
     }
 }

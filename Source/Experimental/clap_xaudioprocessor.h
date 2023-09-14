@@ -77,6 +77,7 @@ class ClapPluginFormatProcessor : public xenakios::XAudioProcessor
                     m_plug = plug;
                     m_plug->init(m_plug);
                     m_inited = true;
+                    initParamsExtension();
                 }
                 else
                     std::cout << "could not create clap plugin instance\n";
@@ -124,7 +125,10 @@ class ClapPluginFormatProcessor : public xenakios::XAudioProcessor
             }
         }
     }
-    uint32_t paramsCount() const noexcept override { return m_ext_params->count(m_plug); }
+    uint32_t paramsCount() const noexcept override 
+    { 
+        return m_ext_params->count(m_plug); 
+    }
     bool paramsInfo(uint32_t paramIndex, clap_param_info *info) const noexcept override
     {
         return m_ext_params->get_info(m_plug, paramIndex, info);

@@ -152,13 +152,17 @@ class ModulatorSource : public xenakios::XAudioProcessor
     {
         ModType = 4900,
         Rate = 665,
+        PolyShift = 5
     };
     int m_mod_type = 0;
     double m_rate = 0.0;
+    double m_poly_shift = 0.0;
     static constexpr int BLOCK_SIZE = 64;
     static constexpr int BLOCK_SIZE_OS = BLOCK_SIZE * 2;
     alignas(32) float table_envrate_linear[512];
-    sst::basic_blocks::modulators::SimpleLFO<ModulatorSource, BLOCK_SIZE> m_lfo;
+    using LFOType = sst::basic_blocks::modulators::SimpleLFO<ModulatorSource, BLOCK_SIZE>;
+    std::vector<std::unique_ptr<LFOType>> m_lfos;
+
     double samplerate = 44100;
     void initTables()
     {
@@ -182,13 +186,21 @@ class ModulatorSource : public xenakios::XAudioProcessor
                a * table_envrate_linear[(e + 1) & 0x1ff];
     }
 
-    ModulatorSource() : m_lfo(this)
+    ModulatorSource(int maxpolyphony, double initialRate)
     {
+        m_rate = initialRate;
+        for (int i = 0; i < maxpolyphony; ++i)
+        {
+            m_lfos.push_back(std::make_unique<LFOType>(this));
+        }
         m_param_infos.push_back(makeParamInfo((clap_id)ParamIds::ModType, "Modulation type", 0.0,
                                               2.0, 0.0,
                                               CLAP_PARAM_IS_AUTOMATABLE | CLAP_PARAM_IS_STEPPED));
         m_param_infos.push_back(
             makeParamInfo((clap_id)ParamIds::Rate, "Rate", -1.0, 3.0, 0.00,
+                          CLAP_PARAM_IS_AUTOMATABLE | CLAP_PARAM_IS_MODULATABLE));
+        m_param_infos.push_back(
+            makeParamInfo((clap_id)ParamIds::PolyShift, "Phase shift", 0.0, 1.0, 0.00,
                           CLAP_PARAM_IS_AUTOMATABLE | CLAP_PARAM_IS_MODULATABLE));
     }
     bool activate(double sampleRate, uint32_t minFrameCount,
@@ -216,6 +228,8 @@ class ModulatorSource : public xenakios::XAudioProcessor
             auto pev = reinterpret_cast<const clap_event_param_value *>(nextEvent);
             if (pev->param_id == to_clap_id(ParamIds::Rate))
                 m_rate = pev->value;
+            if (pev->param_id == to_clap_id(ParamIds::PolyShift))
+                m_poly_shift = pev->value;
             if (pev->param_id == to_clap_id(ParamIds::ModType))
                 m_mod_type = static_cast<int>(pev->value);
         }
@@ -244,21 +258,26 @@ class ModulatorSource : public xenakios::XAudioProcessor
             }
             if (m_update_counter == 0)
             {
-                m_lfo.process_block(m_rate, 0.0f, m_mod_type, false);
-                clap_event_param_mod ev;
-                ev.header.size = sizeof(clap_event_param_mod);
-                ev.header.space_id = CLAP_CORE_EVENT_SPACE_ID;
-                ev.header.flags = 0;
-                ev.header.type = CLAP_EVENT_PARAM_MOD;
-                ev.header.time = i;
-                ev.cookie = nullptr;
-                ev.channel = -1;
-                ev.port_index = -1;
-                ev.key = -1;
-                ev.note_id = -1;
-                ev.param_id = 0;
-                ev.amount = m_lfo.outputBlock[0];
-                process->out_events->try_push(process->out_events, (const clap_event_header *)&ev);
+                for (int j = 0; j < m_lfos.size(); ++j)
+                {
+                    m_lfos[j]->applyPhaseOffset(m_poly_shift);
+                    m_lfos[j]->process_block(m_rate, 0.0f, m_mod_type, false);
+                    clap_event_param_mod ev;
+                    ev.header.size = sizeof(clap_event_param_mod);
+                    ev.header.space_id = CLAP_CORE_EVENT_SPACE_ID;
+                    ev.header.flags = 0;
+                    ev.header.type = CLAP_EVENT_PARAM_MOD;
+                    ev.header.time = i;
+                    ev.cookie = nullptr;
+                    ev.channel = -1;
+                    ev.port_index = -1;
+                    ev.key = -1;
+                    ev.note_id = -1;
+                    ev.param_id = j;
+                    ev.amount = m_lfos[j]->outputBlock[0];
+                    process->out_events->try_push(process->out_events,
+                                                  (const clap_event_header *)&ev);
+                }
             }
             ++m_update_counter;
             if (m_update_counter == BLOCK_SIZE)
