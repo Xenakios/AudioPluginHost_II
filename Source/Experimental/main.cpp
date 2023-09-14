@@ -521,6 +521,7 @@ class GuiAppApplication : public juce::JUCEApplication
     */
     class MainWindow : public juce::DocumentWindow
     {
+      std::unique_ptr<GainProcessorTest> m_test_proc;
       public:
         explicit MainWindow(juce::String name)
             : DocumentWindow(name,
@@ -528,8 +529,9 @@ class GuiAppApplication : public juce::JUCEApplication
                                  ResizableWindow::backgroundColourId),
                              DocumentWindow::allButtons)
         {
+            m_test_proc = std::make_unique<GainProcessorTest>();
             setUsingNativeTitleBar(true);
-            auto comp = new juce::Component;
+            auto comp = m_test_proc->createEditor();
             comp->setSize(400,300);
             setContentOwned(comp, true);
 
@@ -560,9 +562,10 @@ class GuiAppApplication : public juce::JUCEApplication
 
   private:
     std::unique_ptr<MainWindow> mainWindow;
+    
 };
 
-#define TESTJUCEGUI 0
+#define TESTJUCEGUI 1
 
 #if TESTJUCEGUI
 
