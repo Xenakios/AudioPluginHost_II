@@ -155,7 +155,7 @@ class ModulatorSource : public xenakios::XAudioProcessor
     };
     int m_mod_type = 0;
     double m_rate = 0.0;
-    static constexpr int BLOCK_SIZE = 32;
+    static constexpr int BLOCK_SIZE = 64;
     static constexpr int BLOCK_SIZE_OS = BLOCK_SIZE * 2;
     alignas(32) float table_envrate_linear[512];
     sst::basic_blocks::modulators::SimpleLFO<ModulatorSource, BLOCK_SIZE> m_lfo;
@@ -245,6 +245,20 @@ class ModulatorSource : public xenakios::XAudioProcessor
             if (m_update_counter == 0)
             {
                 m_lfo.process_block(m_rate, 0.0f, m_mod_type, false);
+                clap_event_param_mod ev;
+                ev.header.size = sizeof(clap_event_param_mod);
+                ev.header.space_id = CLAP_CORE_EVENT_SPACE_ID;
+                ev.header.flags = 0;
+                ev.header.type = CLAP_EVENT_PARAM_MOD;
+                ev.header.time = i;
+                ev.cookie = nullptr;
+                ev.channel = -1;
+                ev.port_index = -1;
+                ev.key = -1;
+                ev.note_id = -1;
+                ev.param_id = 0;
+                ev.amount = m_lfo.outputBlock[0];
+                process->out_events->try_push(process->out_events, (const clap_event_header *)&ev);
             }
             ++m_update_counter;
             if (m_update_counter == BLOCK_SIZE)
@@ -336,6 +350,8 @@ class GainProcessorTest : public xenakios::XAudioProcessor
 class FilePlayerProcessor : public xenakios::XAudioProcessor
 {
   public:
+    double m_sr = 44100;
+    std::atomic<bool> m_running_offline{false};
     juce::AudioBuffer<float> m_file_buf;
     juce::AudioBuffer<float> m_file_temp_buf;
     juce::AudioBuffer<float> m_work_buf;
@@ -375,9 +391,26 @@ class FilePlayerProcessor : public xenakios::XAudioProcessor
         m_param_infos.push_back(
             makeParamInfo((clap_id)ParamIds::Pitch, "Pitch", -12.0, 12.0, 0.0,
                           CLAP_PARAM_IS_AUTOMATABLE | CLAP_PARAM_IS_MODULATABLE));
+        m_param_infos.push_back(makeParamInfo((clap_id)ParamIds::PreservePitch, "Preserve pitch",
+                                              0.0, 1.0, 1.0,
+                                              CLAP_PARAM_IS_AUTOMATABLE | CLAP_PARAM_IS_STEPPED));
+        m_param_infos.push_back(
+            makeParamInfo((clap_id)ParamIds::LoopStart, "Loop start", 0.0, 1.0, 0.0,
+                          CLAP_PARAM_IS_AUTOMATABLE | CLAP_PARAM_IS_MODULATABLE));
+        m_param_infos.push_back(
+            makeParamInfo((clap_id)ParamIds::LoopEnd, "Loop end", 0.0, 1.0, 1.0,
+                          CLAP_PARAM_IS_AUTOMATABLE | CLAP_PARAM_IS_MODULATABLE));
         importFile(juce::File(R"(C:\MusicAudio\sourcesamples\there was a time .wav)"));
     }
-    double m_sr = 44100;
+
+    bool renderSetMode(clap_plugin_render_mode mode) noexcept override
+    {
+        if (mode == CLAP_RENDER_OFFLINE)
+            m_running_offline = true;
+        else
+            m_running_offline = false;
+        return true;
+    }
     bool activate(double sampleRate, uint32_t minFrameCount,
                   uint32_t maxFrameCount) noexcept override
     {
@@ -441,8 +474,11 @@ class FilePlayerProcessor : public xenakios::XAudioProcessor
         if (ev->space_id == XENAKIOS_CLAP_NAMESPACE && ev->type == XENAKIOS_EVENT_CHANGEFILE)
         {
             auto fch = reinterpret_cast<const xenakios_event_change_file *>(ev);
-            // this should obviously be asynced in some way...
-            importFile(juce::File(fch->filepath));
+            // this should obviously be asynced in some way when realtime...
+            if (m_running_offline)
+                importFile(juce::File(fch->filepath));
+            else
+                importFile(juce::File(fch->filepath));
         }
     }
     clap_process_status process(const clap_process *process) noexcept override
@@ -892,7 +928,7 @@ class ClapEventSequencerProcessor : public xenakios::XAudioProcessor
     DejaVuRandom m_dvpitchrand;
     DejaVuRandom m_dvchordrand;
     DejaVuRandom m_dvvelorand;
-    
+
   public:
     ClapEventSequencerProcessor(int seed, double pulselen)
         : m_event_iter(m_events), m_dvpitchrand(seed), m_dvchordrand(seed + 13),
@@ -910,7 +946,7 @@ class ClapEventSequencerProcessor : public xenakios::XAudioProcessor
         m_dvchordrand.m_deja_vu = 0.4;
         m_dvvelorand.m_loop_len = 3;
         m_dvvelorand.m_deja_vu = 0.3;
-        
+
         float chord_notes[5][3] = {{0.0f, 3.1564f, 7.02f},
                                    {0.0f, 3.8631f, 7.02f},
                                    {-12.0f, 7.02f, 10.8827f},

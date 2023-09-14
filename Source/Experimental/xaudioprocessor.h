@@ -118,6 +118,8 @@ class XAudioProcessor
         return false;
     }
 
+    virtual bool renderSetMode(clap_plugin_render_mode mode) noexcept { return false; }
+
     // Juce GUI
     virtual bool hasEditor() noexcept { return false; }
     virtual XAudioProcessorEditor *createEditorIfNeeded() noexcept { return nullptr; }

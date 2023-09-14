@@ -39,29 +39,40 @@ class XAPNode
     XAPNode(std::unique_ptr<xenakios::XAudioProcessor> nodeIn, std::string name = "")
         : processor(std::move(nodeIn)), displayName(name)
     {
-        audioBuffer.resize(2048);
-        inBuffers[0].channel_count = 2;
-        inBuffers[0].constant_mask = 0;
-        inBuffers[0].latency = 0;
-        inBuffers[0].data64 = nullptr;
-        inChannels[0] = &audioBuffer[0];
-        inChannels[1] = &audioBuffer[512];
-        inBuffers[0].data32 = inChannels;
+    }
+    void initBuffers(int numInChans, int numOutChans, int maxFrames)
+    {
+        audioBuffer.resize(numInChans * maxFrames + numOutChans * maxFrames);
+        inChannels.clear();
+        for (int i = 0; i < numInChans; ++i)
+        {
+            inChannels.push_back(&audioBuffer[i * maxFrames]);
+        }
+        inPortBuffers[0].channel_count = numInChans;
+        inPortBuffers[0].constant_mask = 0;
+        inPortBuffers[0].latency = 0;
+        inPortBuffers[0].data64 = nullptr;
+        inPortBuffers[0].data32 = inChannels.data();
 
-        outBuffers[0].channel_count = 2;
-        outBuffers[0].constant_mask = 0;
-        outBuffers[0].latency = 0;
-        outBuffers[0].data64 = nullptr;
-        outChannels[0] = &audioBuffer[1024];
-        outChannels[1] = &audioBuffer[1024 + 512];
-        outBuffers[0].data32 = outChannels;
+        outChannels.clear();
+        for (int i = numInChans; i < numInChans + numOutChans; ++i)
+        {
+            outChannels.push_back(&audioBuffer[i * maxFrames]);
+        }
+        outPortBuffers[0].channel_count = numOutChans;
+        outPortBuffers[0].constant_mask = 0;
+        outPortBuffers[0].latency = 0;
+        outPortBuffers[0].data64 = nullptr;
+        outPortBuffers[0].data32 = outChannels.data();
     }
     std::unique_ptr<xenakios::XAudioProcessor> processor;
     std::vector<float> audioBuffer;
-    float *inChannels[2];
-    clap_audio_buffer inBuffers[1];
-    float *outChannels[2];
-    clap_audio_buffer outBuffers[1];
+
+    std::vector<float *> inChannels;
+    clap_audio_buffer inPortBuffers[1];
+
+    std::vector<float *> outChannels;
+    clap_audio_buffer outPortBuffers[1];
     clap::helpers::EventList inEvents;
     clap::helpers::EventList outEvents;
     std::vector<Connection> inputConnections;
@@ -173,6 +184,22 @@ inline void printClapEvents(clap::helpers::EventList &elist)
     }
 }
 
+inline std::optional<clap_id> findParameterFromName(xenakios::XAudioProcessor *proc,
+                                                    std::string parNameToFind)
+{
+    for (int i = 0; i < proc->paramsCount(); ++i)
+    {
+        clap_param_info pinfo;
+        proc->paramsInfo(i, &pinfo);
+        juce::String pname(pinfo.name);
+        if (pname.containsIgnoreCase(parNameToFind))
+        {
+            return pinfo.id;
+        }
+    }
+    return {};
+}
+
 inline void test_node_connecting()
 {
     std::string pathprefix = R"(C:\Program Files\Common Files\)";
@@ -193,16 +220,19 @@ inline void test_node_connecting()
         std::make_unique<XAPNode>(std::make_unique<ClapPluginFormatProcessor>(
                                       pathprefix + R"(CLAP\Surge Synth Team\Surge XT.clap)", 0),
                                   "Surge XT 2"));
+    proc_nodes.emplace_back(
+        std::make_unique<XAPNode>(std::make_unique<ModulatorSource>(), "LFO 1"));
+
     connectEventPorts(findByName(proc_nodes, "Event Gen 1"), 0,
                       findByName(proc_nodes, "Surge XT 1"), 0);
     connectEventPorts(findByName(proc_nodes, "Event Gen 2"), 0,
                       findByName(proc_nodes, "Surge XT 2"), 0);
-    //connectAudioBetweenNodes(findByName(proc_nodes, "Surge XT 1"), 0, 0,
-    //                         findByName(proc_nodes, "Valhalla"), 0, 0);
-    //connectAudioBetweenNodes(findByName(proc_nodes, "Surge XT 1"), 0, 1,
-    //                          findByName(proc_nodes, "Valhalla"), 0, 1);
+    // connectAudioBetweenNodes(findByName(proc_nodes, "Surge XT 1"), 0, 0,
+    //                          findByName(proc_nodes, "Valhalla"), 0, 0);
+    // connectAudioBetweenNodes(findByName(proc_nodes, "Surge XT 1"), 0, 1,
+    //                           findByName(proc_nodes, "Valhalla"), 0, 1);
     connectAudioBetweenNodes(findByName(proc_nodes, "Surge XT 2"), 0, 0,
-                              findByName(proc_nodes, "Valhalla"), 0, 0);
+                             findByName(proc_nodes, "Valhalla"), 0, 0);
     connectAudioBetweenNodes(findByName(proc_nodes, "Surge XT 2"), 0, 1,
                              findByName(proc_nodes, "Valhalla"), 0, 1);
 
@@ -228,32 +258,22 @@ inline void test_node_connecting()
     double sr = 44100.0;
     for (auto &n : runOrder)
     {
+        n->initBuffers(2, 2, procbufsize);
         n->processor->activate(sr, procbufsize, procbufsize);
+        n->processor->renderSetMode(CLAP_RENDER_OFFLINE);
     }
     auto surge2 = findByName(proc_nodes, "Surge XT 2")->processor.get();
-    clap_id parid = -1;
-    for (int i = 0; i < surge2->paramsCount(); ++i)
-    {
-        clap_param_info pinfo;
-        surge2->paramsInfo(i, &pinfo);
-        juce::String pname(pinfo.name);
-        if (pname.containsIgnoreCase("Active Scene"))
-        {
-            std::cout << "Active Scene found " << pinfo.id << "\n";
-            parid = pinfo.id;
-            break;
-        }
-    }
-    if (parid >= 0)
+    auto parid = findParameterFromName(surge2,"Active Scene");
+    if (parid)
     {
         findByName(proc_nodes, "Surge XT 2")->PreProcessFunc = [parid](XAPNode *node) {
             // set surge param
-            xenakios::pushParamEvent(node->inEvents, false, 0, parid, 1.0);
+            xenakios::pushParamEvent(node->inEvents, false, 0, *parid, 1.0);
         };
     }
     int outlen = 180 * sr;
     int outcounter = 0;
-    juce::File outfile(R"(C:\develop\AudioPluginHost_mk2\Source\Experimental\graph_out.wav)");
+    juce::File outfile(R"(C:\develop\AudioPluginHost_mk2\Source\Experimental\graph_out_02.wav)");
     outfile.deleteFile();
     auto ostream = outfile.createOutputStream();
     WavAudioFormat wav;
@@ -271,8 +291,8 @@ inline void test_node_connecting()
             // could bypass if we don't have audio inputs
             for (int j = 0; j < procbufsize; ++j)
             {
-                n->inBuffers[0].data32[0][j] = 0.0f;
-                n->inBuffers[0].data32[1][j] = 0.0f;
+                n->inPortBuffers[0].data32[0][j] = 0.0f;
+                n->inPortBuffers[0].data32[1][j] = 0.0f;
             }
             eventMergeList.clear();
             if (n->inputConnections.size() > 0)
@@ -286,8 +306,8 @@ inline void test_node_connecting()
 
                         for (int j = 0; j < procbufsize; ++j)
                         {
-                            n->inBuffers[0].data32[destChan][j] +=
-                                conn.source->outBuffers[0].data32[srcChan][j];
+                            n->inPortBuffers[0].data32[destChan][j] +=
+                                conn.source->outPortBuffers[0].data32[srcChan][j];
                         }
                     }
                     else
@@ -313,9 +333,9 @@ inline void test_node_connecting()
             }
 
             ctx.audio_inputs_count = 1;
-            ctx.audio_inputs = n->inBuffers;
+            ctx.audio_inputs = n->inPortBuffers;
             ctx.audio_outputs_count = 1;
-            ctx.audio_outputs = n->outBuffers;
+            ctx.audio_outputs = n->outPortBuffers;
             ctx.in_events = n->inEvents.clapInputEvents();
             ctx.out_events = n->outEvents.clapOutputEvents();
             if (n->PreProcessFunc)
@@ -334,7 +354,7 @@ inline void test_node_connecting()
             n->outEvents.clear();
         }
         auto outbufs = runOrder.back()->outChannels;
-        writer->writeFromFloatArrays(outbufs, 2, procbufsize);
+        writer->writeFromFloatArrays(outbufs.data(), 2, procbufsize);
         outcounter += procbufsize;
     }
     delete writer;
