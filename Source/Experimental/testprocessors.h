@@ -990,7 +990,9 @@ class ClapEventSequencerProcessor : public xenakios::XAudioProcessor
                 float fracpitch = pitch - (int)pitch;
                 m_events.push_back(ClapEventHolder::makeNoteExpressionEvent(
                     CLAP_NOTE_EXPRESSION_TUNING, offtpos, 0, 0, pitch, -1, fracpitch));
-
+                double pan = juce::jmap<double>(j, 0, 2, 0.05, 0.95);
+                m_events.push_back(ClapEventHolder::makeNoteExpressionEvent(
+                    CLAP_NOTE_EXPRESSION_PAN, offtpos, 0, 0, pitch, -1, pan));
                 m_events.push_back(ClapEventHolder::makeNoteEvent(
                     CLAP_EVENT_NOTE_OFF, offtpos + pulselen * 0.90, 0, 0, pitch, -1, 0.0));
             }

@@ -25,6 +25,14 @@ inline void mapModulationEvents(const clap::helpers::EventList &sourceList, clap
 class XAPNode
 {
   public:
+    /*
+    Audio : 32 bit floating point audio buffers
+    Events : Events that should be passed directly from the source node to the destination,
+    typically musical notes
+    Modulation : the source node sends Clap parameter modulation messages with values between
+    -1 and 1 that are mapped by the graph playback system into suitable parameter mod/value
+    messages for the desination node
+    */
     enum ConnectionType
     {
         Audio,
@@ -232,6 +240,7 @@ inline std::optional<clap_id> findParameterFromName(xenakios::XAudioProcessor *p
 
 inline void test_node_connecting()
 {
+
     std::string pathprefix = R"(C:\Program Files\Common Files\)";
     std::vector<std::unique_ptr<XAPNode>> proc_nodes;
     proc_nodes.emplace_back(std::make_unique<XAPNode>(
@@ -254,6 +263,8 @@ inline void test_node_connecting()
         std::make_unique<XAPNode>(std::make_unique<ModulatorSource>(1, 0.0), "LFO 1"));
     proc_nodes.emplace_back(
         std::make_unique<XAPNode>(std::make_unique<ModulatorSource>(1, 2.0), "LFO 2"));
+    proc_nodes.emplace_back(
+        std::make_unique<XAPNode>(std::make_unique<ModulatorSource>(1, 1.03), "LFO 3"));
 
     connectEventPorts(findByName(proc_nodes, "Event Gen 1"), 0,
                       findByName(proc_nodes, "Surge XT 1"), 0);
@@ -270,10 +281,14 @@ inline void test_node_connecting()
 
     // connectModulation(findByName(proc_nodes, "LFO 1"), 0, findByName(proc_nodes, "Valhalla"), 0,
     //                   true, 1.0);
-    connectModulation(
-        findByName(proc_nodes, "LFO 2"), 0, findByName(proc_nodes, "Surge XT 2"),
-        *findParameterFromName(findByName(proc_nodes, "Surge XT 2")->processor.get(), "B Osc 1 Pitch"),
-        false, 0.1);
+    connectModulation(findByName(proc_nodes, "LFO 2"), 0, findByName(proc_nodes, "Surge XT 2"),
+                      *findParameterFromName(findByName(proc_nodes, "Surge XT 2")->processor.get(),
+                                             "B Osc 1 Pitch"),
+                      false, 0.1);
+    connectModulation(findByName(proc_nodes, "LFO 3"), 0, findByName(proc_nodes, "Surge XT 2"),
+                      *findParameterFromName(findByName(proc_nodes, "Surge XT 2")->processor.get(),
+                                             "B Osc 1 Pitch"),
+                      false, 0.05);
 
     findByName(proc_nodes, "Valhalla")->PreProcessFunc = [](XAPNode *node) {
         // set reverb mix
@@ -321,6 +336,7 @@ inline void test_node_connecting()
     std::vector<clap_event_header *> eventMergeList;
     eventMergeList.reserve(1024);
     clap::helpers::EventList modulationMergeList;
+    std::unordered_map<clap_id, double> accumModValues;
     transport.flags = CLAP_TRANSPORT_HAS_SECONDS_TIMELINE | CLAP_TRANSPORT_IS_PLAYING;
     while (outcounter < outlen)
     {
@@ -336,6 +352,7 @@ inline void test_node_connecting()
                 n->inPortBuffers[0].data32[1][j] = 0.0f;
             }
             eventMergeList.clear();
+            accumModValues.clear();
             if (n->inputConnections.size() > 0)
             {
                 for (auto &conn : n->inputConnections)
@@ -380,6 +397,9 @@ inline void test_node_connecting()
                                     }
                                     else
                                     {
+                                        // accumModValues[conn.destinationParameter] +=
+                                        //     val * conn.modulationDepth;
+
                                         val *= conn.modulationDepth;
                                         xenakios::pushParamEvent(modulationMergeList, true,
                                                                  sourcemev->header.time,
@@ -396,6 +416,7 @@ inline void test_node_connecting()
             {
                 for (int i = 0; i < modulationMergeList.size(); ++i)
                     eventMergeList.push_back(modulationMergeList.get(i));
+
                 choc::sorting::stable_sort(
                     eventMergeList.begin(), eventMergeList.end(),
                     [](auto &lhs, auto &rhs) { return lhs->time < rhs->time; });
