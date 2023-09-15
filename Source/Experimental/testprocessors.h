@@ -4,8 +4,87 @@
 #include "JuceHeader.h"
 #include "signalsmith-stretch.h"
 #include "containers/choc_NonAllocatingStableSort.h"
+#include "containers/choc_SingleReaderSingleWriterFIFO.h"
 #include "sst/basic-blocks/modulators/SimpleLFO.h"
 #include "dejavurandom.h"
+
+inline clap_event_param_value makeClapParameterValueEvent(int time, clap_id paramId, double value,
+                                                          void *cookie = nullptr, int port = -1,
+                                                          int channel = -1, int key = -1,
+                                                          int noteid = -1)
+{
+    clap_event_param_value pv;
+    pv.header.time = time;
+    pv.header.size = sizeof(clap_event_param_value);
+    pv.header.space_id = CLAP_CORE_EVENT_SPACE_ID;
+    pv.header.flags = 0;
+    pv.header.type = CLAP_EVENT_PARAM_VALUE;
+    pv.channel = channel;
+    pv.cookie = cookie;
+    pv.key = key;
+    pv.note_id = noteid;
+    pv.param_id = paramId;
+    pv.port_index = port;
+    pv.value = value;
+    return pv;
+}
+
+inline clap_event_param_mod makeClapParameterModEvent(int time, clap_id paramId, double value,
+                                                      void *cookie = nullptr, int port = -1,
+                                                      int channel = -1, int key = -1,
+                                                      int noteid = -1)
+{
+    clap_event_param_mod pv;
+    pv.header.time = time;
+    pv.header.size = sizeof(clap_event_param_mod);
+    pv.header.space_id = CLAP_CORE_EVENT_SPACE_ID;
+    pv.header.flags = 0;
+    pv.header.type = CLAP_EVENT_PARAM_MOD;
+    pv.channel = channel;
+    pv.cookie = cookie;
+    pv.key = key;
+    pv.note_id = noteid;
+    pv.param_id = paramId;
+    pv.port_index = port;
+    pv.amount = value;
+    return pv;
+}
+
+struct CrossThreadParameterMessage
+{
+    clap_id paramId = 0;
+    int eventType = CLAP_EVENT_PARAM_VALUE;
+    double value = 0.0;
+};
+
+inline void insertToEndOfEventListFromFIFO(
+    choc::fifo::SingleReaderSingleWriterFIFO<CrossThreadParameterMessage> &source,
+    clap_input_events *processDestination, clap_output_events *outputList = nullptr)
+{
+    int lastpos = 0;
+    int lasteventindex = processDestination->size(processDestination) - 1;
+    if (lasteventindex > 0)
+    {
+        auto ev = processDestination->get(processDestination, lasteventindex);
+        lastpos = ev->time;
+    }
+
+    CrossThreadParameterMessage msg;
+    while (source.pop(msg))
+    {
+        if (msg.eventType == CLAP_EVENT_PARAM_VALUE)
+        {
+            auto pv = makeClapParameterValueEvent(lastpos, msg.paramId, msg.value);
+            
+        }
+        else if (msg.eventType == CLAP_EVENT_PARAM_GESTURE_BEGIN ||
+                 msg.eventType == CLAP_EVENT_PARAM_GESTURE_END)
+        {
+            clap_event_param_gesture ge;
+            
+        }
+    }
+}
 
 template <typename T> inline clap_id to_clap_id(T x) { return static_cast<clap_id>(x); }
 
@@ -313,6 +392,17 @@ class GenericEditor : public xenakios::XAudioProcessorEditor
                 comps->slider.setRange(pinfo.min_value, pinfo.max_value);
             comps->slider.setDoubleClickReturnValue(true, pinfo.default_value);
             comps->slider.setValue(pinfo.default_value, juce::dontSendNotification);
+
+            comps->slider.onDragStart = [this, pid = pinfo.id, &slid = comps->slider]() {
+                m_proc.enqueueParameterChange(pid, CLAP_EVENT_PARAM_GESTURE_BEGIN, slid.getValue());
+            };
+            comps->slider.onValueChange = [this, pid = pinfo.id, &slid = comps->slider]() {
+                m_proc.enqueueParameterChange(pid, CLAP_EVENT_PARAM_VALUE, slid.getValue());
+            };
+            comps->slider.onDragEnd = [this, pid = pinfo.id, &slid = comps->slider]() {
+                m_proc.enqueueParameterChange(pid, CLAP_EVENT_PARAM_GESTURE_END, slid.getValue());
+            };
+
             addAndMakeVisible(comps->label);
             addAndMakeVisible(comps->slider);
             m_param_comps.push_back(std::move(comps));

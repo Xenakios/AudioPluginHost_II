@@ -132,6 +132,16 @@ class XAudioProcessor
 
     virtual bool renderSetMode(clap_plugin_render_mode mode) noexcept { return false; }
 
+    // This should thread safely insert a parameter change into the processor's event list.
+    // That may be a bit challenging/annoying to do, so we might want some kind of ready-to-use
+    // solution for that...
+    // eventType : CLAP_EVENT_PARAM_GESTURE_BEGIN, CLAP_EVENT_PARAM_GESTURE_END,
+    // CLAP_EVENT_PARAM_VALUE
+    virtual bool enqueueParameterChange(clap_id paramId, int eventType, double value) noexcept
+    {
+        return false;
+    }
+
     // Juce GUI
     virtual bool hasEditor() noexcept { return false; }
     virtual XAudioProcessorEditor *createEditorIfNeeded() noexcept { return nullptr; }
