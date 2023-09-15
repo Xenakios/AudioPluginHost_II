@@ -41,9 +41,17 @@ class ClapPluginFormatProcessor : public xenakios::XAudioProcessor
     std::atomic<bool> m_inited{false};
     clap_plugin_params_t *m_ext_params = nullptr;
     bool m_processingStarted = false;
+    std::atomic<bool> m_activated{false};
 
   public:
     std::vector<clap_param_info> m_param_infos;
+    bool getDescriptor(clap_plugin_descriptor *desc) const 
+    { 
+        if (!m_plug)
+            return false; 
+        *desc = *m_plug->desc;
+        return true;
+    }
     ClapPluginFormatProcessor(std::string plugfilename, int plugindex) : m_plugdll(plugfilename)
     {
         xen_host_info.host_data = this;
@@ -92,7 +100,8 @@ class ClapPluginFormatProcessor : public xenakios::XAudioProcessor
     {
         if (m_plug)
         {
-            m_plug->deactivate(m_plug);
+            if (m_activated.load())
+                m_plug->deactivate(m_plug);
             m_plug->destroy(m_plug);
             m_plug = nullptr;
         }
@@ -108,6 +117,7 @@ class ClapPluginFormatProcessor : public xenakios::XAudioProcessor
         {
             if (m_plug->activate(m_plug, sampleRate, minFrameCount, maxFrameCount))
             {
+                m_activated = true;
                 initParamsExtension();
                 m_ext_audio_ports =
                     (clap_plugin_audio_ports *)m_plug->get_extension(m_plug, CLAP_EXT_AUDIO_PORTS);
@@ -132,7 +142,7 @@ class ClapPluginFormatProcessor : public xenakios::XAudioProcessor
     {
         return m_ext_params->get_info(m_plug, paramIndex, info);
     }
-    
+
     clap_plugin_audio_ports *m_ext_audio_ports = nullptr;
     uint32_t audioPortsCount(bool isInput) const noexcept override
     {
@@ -158,4 +168,8 @@ class ClapPluginFormatProcessor : public xenakios::XAudioProcessor
         }
         return m_plug->process(m_plug, process);
     }
+
+    // bool hasEditor() noexcept override { return false; }
+    // xenakios::XAudioProcessorEditor *createEditorIfNeeded() noexcept { return nullptr; }
+    // virtual XAudioProcessorEditor *createEditor() noexcept { return nullptr; }
 };

@@ -423,6 +423,16 @@ inline void test_node_connecting()
             n->inEvents.clear();
             if (eventMergeList.size() > 0 || modulationMergeList.size() > 0)
             {
+                xenakios::CrossThreadMessage ctmsg;
+                while (n->processor->dequeueParameterChange(ctmsg))
+                {
+                    if (ctmsg.eventType == CLAP_EVENT_PARAM_VALUE)
+                    {
+                        auto from_ui_ev =
+                            makeClapParameterValueEvent(0, ctmsg.paramId, ctmsg.value);
+                        modulationMergeList.push((clap_event_header *)&from_ui_ev);
+                    }
+                }
                 for (int i = 0; i < modulationMergeList.size(); ++i)
                     eventMergeList.push_back(modulationMergeList.get(i));
 
@@ -521,7 +531,8 @@ class GuiAppApplication : public juce::JUCEApplication
     */
     class MainWindow : public juce::DocumentWindow
     {
-      std::unique_ptr<xenakios::XAudioProcessor> m_test_proc;
+        std::unique_ptr<xenakios::XAudioProcessor> m_test_proc;
+
       public:
         explicit MainWindow(juce::String name)
             : DocumentWindow(name,
@@ -529,10 +540,19 @@ class GuiAppApplication : public juce::JUCEApplication
                                  ResizableWindow::backgroundColourId),
                              DocumentWindow::allButtons)
         {
-            m_test_proc = std::make_unique<FilePlayerProcessor>();
+            m_test_proc = std::make_unique<ClapPluginFormatProcessor>(
+                R"(C:\Program Files\Common Files\CLAP\airwin-to-clap.clap)", 1);
+            m_test_proc->activate(44100.0, 512, 512);
             setUsingNativeTitleBar(true);
-            auto comp = m_test_proc->createEditor();
-            comp->setSize(400,300);
+
+            clap_plugin_descriptor desc;
+            if (m_test_proc->getDescriptor(&desc))
+            {
+                setName(juce::String(desc.vendor) + " : " + desc.name);
+            }
+
+            auto comp = new GenericEditor(*m_test_proc);
+            comp->setSize(500, 400);
             setContentOwned(comp, true);
 
             setResizable(true, true);
@@ -562,7 +582,6 @@ class GuiAppApplication : public juce::JUCEApplication
 
   private:
     std::unique_ptr<MainWindow> mainWindow;
-    
 };
 
 #define TESTJUCEGUI 1

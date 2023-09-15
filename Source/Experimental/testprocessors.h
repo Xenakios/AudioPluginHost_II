@@ -50,15 +50,8 @@ inline clap_event_param_mod makeClapParameterModEvent(int time, clap_id paramId,
     return pv;
 }
 
-struct CrossThreadParameterMessage
-{
-    clap_id paramId = 0;
-    int eventType = CLAP_EVENT_PARAM_VALUE;
-    double value = 0.0;
-};
-
 inline void insertToEndOfEventListFromFIFO(
-    choc::fifo::SingleReaderSingleWriterFIFO<CrossThreadParameterMessage> &source,
+    choc::fifo::SingleReaderSingleWriterFIFO<xenakios::CrossThreadMessage> &source,
     clap_input_events *processDestination, clap_output_events *outputList = nullptr)
 {
     int lastpos = 0;
@@ -69,19 +62,17 @@ inline void insertToEndOfEventListFromFIFO(
         lastpos = ev->time;
     }
 
-    CrossThreadParameterMessage msg;
+    xenakios::CrossThreadMessage msg;
     while (source.pop(msg))
     {
         if (msg.eventType == CLAP_EVENT_PARAM_VALUE)
         {
             auto pv = makeClapParameterValueEvent(lastpos, msg.paramId, msg.value);
-            
         }
         else if (msg.eventType == CLAP_EVENT_PARAM_GESTURE_BEGIN ||
                  msg.eventType == CLAP_EVENT_PARAM_GESTURE_END)
         {
             clap_event_param_gesture ge;
-            
         }
     }
 }
@@ -394,13 +385,14 @@ class GenericEditor : public xenakios::XAudioProcessorEditor
             comps->slider.setValue(pinfo.default_value, juce::dontSendNotification);
 
             comps->slider.onDragStart = [this, pid = pinfo.id, &slid = comps->slider]() {
-                m_proc.enqueueParameterChange(pid, CLAP_EVENT_PARAM_GESTURE_BEGIN, slid.getValue());
+                m_proc.enqueueParameterChange(
+                    {pid, CLAP_EVENT_PARAM_GESTURE_BEGIN, slid.getValue()});
             };
             comps->slider.onValueChange = [this, pid = pinfo.id, &slid = comps->slider]() {
-                m_proc.enqueueParameterChange(pid, CLAP_EVENT_PARAM_VALUE, slid.getValue());
+                m_proc.enqueueParameterChange({pid, CLAP_EVENT_PARAM_VALUE, slid.getValue()});
             };
             comps->slider.onDragEnd = [this, pid = pinfo.id, &slid = comps->slider]() {
-                m_proc.enqueueParameterChange(pid, CLAP_EVENT_PARAM_GESTURE_END, slid.getValue());
+                m_proc.enqueueParameterChange({pid, CLAP_EVENT_PARAM_GESTURE_END, slid.getValue()});
             };
 
             addAndMakeVisible(comps->label);

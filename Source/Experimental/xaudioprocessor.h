@@ -16,6 +16,16 @@ struct xenakios_event_change_file
 namespace xenakios
 {
 
+struct CrossThreadMessage
+{
+    CrossThreadMessage() {}
+    CrossThreadMessage(clap_id parId, int eType, double val) 
+        : paramId(parId), eventType(eType), value(val) {}
+    clap_id paramId = 0;
+    int eventType = CLAP_EVENT_PARAM_VALUE;
+    double value = 0.0;
+};
+
 inline void pushParamEvent(clap::helpers::EventList &elist, bool is_mod, uint32_t timeStamp,
                            clap_id paramId, double value)
 {
@@ -137,10 +147,15 @@ class XAudioProcessor
     // solution for that...
     // eventType : CLAP_EVENT_PARAM_GESTURE_BEGIN, CLAP_EVENT_PARAM_GESTURE_END,
     // CLAP_EVENT_PARAM_VALUE
-    virtual bool enqueueParameterChange(clap_id paramId, int eventType, double value) noexcept
+    virtual bool enqueueParameterChange(CrossThreadMessage msg) noexcept
     {
         return false;
     }
+    virtual bool dequeueParameterChange(CrossThreadMessage& msg) noexcept
+    {
+        return false;
+    }
+
 
     // Juce GUI
     virtual bool hasEditor() noexcept { return false; }
