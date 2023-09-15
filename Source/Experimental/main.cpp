@@ -540,8 +540,9 @@ class GuiAppApplication : public juce::JUCEApplication
                                  ResizableWindow::backgroundColourId),
                              DocumentWindow::allButtons)
         {
-            m_test_proc = std::make_unique<ClapPluginFormatProcessor>(
-                R"(C:\Program Files\Common Files\CLAP\airwin-to-clap.clap)", 1);
+            // m_test_proc = std::make_unique<ClapPluginFormatProcessor>(
+            //     R"(C:\Program Files\Common Files\CLAP\airwin-to-clap.clap)", 3);
+            m_test_proc = std::make_unique<FilePlayerProcessor>();
             m_test_proc->activate(44100.0, 512, 512);
             setUsingNativeTitleBar(true);
 
@@ -550,11 +551,10 @@ class GuiAppApplication : public juce::JUCEApplication
             {
                 setName(juce::String(desc.vendor) + " : " + desc.name);
             }
-
-            auto comp = new GenericEditor(*m_test_proc);
-            comp->setSize(500, 400);
-            setContentOwned(comp, true);
-
+            m_test_proc->guiCreate("", false);
+            clap_window win;
+            win.ptr = this;
+            m_test_proc->guiSetParent(&win);
             setResizable(true, true);
             centreWithSize(getWidth(), getHeight());
 
@@ -563,6 +563,7 @@ class GuiAppApplication : public juce::JUCEApplication
 
         void closeButtonPressed() override
         {
+            m_test_proc->guiDestroy();
             // This is called when the user tries to close this window. Here, we'll just
             // ask the app to quit when this happens, but you can change this to do
             // whatever you need.

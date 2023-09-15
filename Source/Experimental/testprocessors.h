@@ -556,18 +556,73 @@ class FilePlayerProcessor : public xenakios::XAudioProcessor
         LoopStart = 3322,
         LoopEnd = 888777
     };
+    bool getDescriptor(clap_plugin_descriptor *desc) const override
+    {
+        memset(desc, 0, sizeof(clap_plugin_descriptor));
+        desc->clap_version = CLAP_VERSION;
+        desc->id = "com.xenakios.fileplayer";
+        desc->name = "File player";
+        desc->vendor = "Xenakios";
+        return true;
+    }
     xenakios::XAudioProcessorEditor *m_editor = nullptr;
     bool hasEditor() noexcept override { return true; }
     xenakios::XAudioProcessorEditor *createEditorIfNeeded() noexcept override
     {
         if (!m_editor)
-            m_editor = new GenericEditor(*this);
+            m_editor = createEditor();
         return m_editor;
     }
     xenakios::XAudioProcessorEditor *createEditor() noexcept override
     {
-        return createEditorIfNeeded();
+        return new GenericEditor(*this);
     }
+    xenakios::XAudioProcessorEditor *getActiveEditor() noexcept override { return m_editor; }
+
+    bool implementsGui() const noexcept override { return true; }
+    // virtual bool guiIsApiSupported(const char *api, bool isFloating) noexcept { return false; }
+    // virtual bool guiGetPreferredApi(const char **api, bool *is_floating) noexcept { return false;
+    // }
+    bool guiCreate(const char *api, bool isFloating) noexcept override
+    {
+        m_editor = new GenericEditor(*this);
+        m_editor->setSize(500, 400);
+        return true;
+    }
+    void guiDestroy() noexcept override
+    {
+        delete m_editor;
+        m_editor = nullptr;
+    }
+    // virtual bool guiSetScale(double scale) noexcept { return false; }
+    bool guiShow() noexcept override
+    {
+        if (!m_editor)
+            return false;
+        return true;
+    }
+    bool guiHide() noexcept override { return false; }
+    // virtual bool guiGetSize(uint32_t *width, uint32_t *height) noexcept { return false; }
+    // virtual bool guiCanResize() const noexcept { return false; }
+    // virtual bool guiGetResizeHints(clap_gui_resize_hints_t *hints) noexcept { return false; }
+    // virtual bool guiAdjustSize(uint32_t *width, uint32_t *height) noexcept
+    //{
+    //     return guiGetSize(width, height);
+    // }
+    bool guiSetSize(uint32_t width, uint32_t height) noexcept override { return false; }
+    // virtual void guiSuggestTitle(const char *title) noexcept {}
+    bool guiSetParent(const clap_window *window) noexcept override
+    {
+        if (!m_editor)
+            return false;
+        // This is a bit iffy hack but will have to suffice for now.
+        // We don't really want to start dealing with the OS native handles
+        // and such when both the processor GUI and the host GUI are Juce based anyway...
+        auto parent = (juce::ResizableWindow *)window->ptr;
+        parent->setContentNonOwned(m_editor, true);
+        return true;
+    }
+
     FilePlayerProcessor()
     {
         m_param_infos.push_back(

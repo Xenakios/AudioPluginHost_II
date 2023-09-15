@@ -19,8 +19,10 @@ namespace xenakios
 struct CrossThreadMessage
 {
     CrossThreadMessage() {}
-    CrossThreadMessage(clap_id parId, int eType, double val) 
-        : paramId(parId), eventType(eType), value(val) {}
+    CrossThreadMessage(clap_id parId, int eType, double val)
+        : paramId(parId), eventType(eType), value(val)
+    {
+    }
     clap_id paramId = 0;
     int eventType = CLAP_EVENT_PARAM_VALUE;
     double value = 0.0;
@@ -147,19 +149,36 @@ class XAudioProcessor
     // solution for that...
     // eventType : CLAP_EVENT_PARAM_GESTURE_BEGIN, CLAP_EVENT_PARAM_GESTURE_END,
     // CLAP_EVENT_PARAM_VALUE
-    virtual bool enqueueParameterChange(CrossThreadMessage msg) noexcept
-    {
-        return false;
-    }
-    virtual bool dequeueParameterChange(CrossThreadMessage& msg) noexcept
-    {
-        return false;
-    }
-
+    virtual bool enqueueParameterChange(CrossThreadMessage msg) noexcept { return false; }
+    virtual bool dequeueParameterChange(CrossThreadMessage &msg) noexcept { return false; }
 
     // Juce GUI
     virtual bool hasEditor() noexcept { return false; }
+    virtual XAudioProcessorEditor *getActiveEditor() noexcept { return nullptr; }
     virtual XAudioProcessorEditor *createEditorIfNeeded() noexcept { return nullptr; }
     virtual XAudioProcessorEditor *createEditor() noexcept { return nullptr; }
+
+    // the original Clap C++ helper methods for GUI. 
+    // We really might not want to handle *all* this, but I wonder
+    // if we are kind of forced when hosting actual Clap plugins?
+    virtual bool implementsGui() const noexcept { return false; }
+    virtual bool guiIsApiSupported(const char *api, bool isFloating) noexcept { return false; }
+    virtual bool guiGetPreferredApi(const char **api, bool *is_floating) noexcept { return false; }
+    virtual bool guiCreate(const char *api, bool isFloating) noexcept { return false; }
+    virtual void guiDestroy() noexcept {}
+    virtual bool guiSetScale(double scale) noexcept { return false; }
+    virtual bool guiShow() noexcept { return false; }
+    virtual bool guiHide() noexcept { return false; }
+    virtual bool guiGetSize(uint32_t *width, uint32_t *height) noexcept { return false; }
+    virtual bool guiCanResize() const noexcept { return false; }
+    virtual bool guiGetResizeHints(clap_gui_resize_hints_t *hints) noexcept { return false; }
+    virtual bool guiAdjustSize(uint32_t *width, uint32_t *height) noexcept
+    {
+        return guiGetSize(width, height);
+    }
+    virtual bool guiSetSize(uint32_t width, uint32_t height) noexcept { return false; }
+    virtual void guiSuggestTitle(const char *title) noexcept {}
+    virtual bool guiSetParent(const clap_window *window) noexcept { return false; }
+    virtual bool guiSetTransient(const clap_window *window) noexcept { return false; }
 };
 } // namespace xenakios

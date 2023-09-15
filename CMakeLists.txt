@@ -22,6 +22,10 @@
 # ==============================================================================
 cmake_minimum_required(VERSION 3.15)
 
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED True)
+
+
 project(AudioPluginHost2 VERSION 0.0.1)
 
 add_subdirectory(JUCE)

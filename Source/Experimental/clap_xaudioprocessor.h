@@ -45,7 +45,7 @@ class ClapPluginFormatProcessor : public xenakios::XAudioProcessor
 
   public:
     std::vector<clap_param_info> m_param_infos;
-    bool getDescriptor(clap_plugin_descriptor *desc) const 
+    bool getDescriptor(clap_plugin_descriptor *desc) const override
     { 
         if (!m_plug)
             return false; 
