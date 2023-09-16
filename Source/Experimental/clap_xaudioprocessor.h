@@ -185,17 +185,42 @@ class ClapPluginFormatProcessor : public xenakios::XAudioProcessor
             m_generic_editor = std::make_unique<xenakios::GenericEditor>(*this);
             return true;
         }
+        if (m_ext_gui)
+        {
+            return m_ext_gui->create(m_plug, "win32", false);
+        }
         return false;
     }
-    void guiDestroy() noexcept override { m_generic_editor = nullptr; }
+    void guiDestroy() noexcept override
+    {
+        m_generic_editor = nullptr;
+        if (m_ext_gui)
+        {
+            m_ext_gui->destroy(m_plug);
+        }
+    }
     // virtual bool guiIsApiSupported(const char *api, bool isFloating) noexcept { return false; }
     // virtual bool guiGetPreferredApi(const char **api, bool *is_floating) noexcept { return false;
     // }
 
     // virtual bool guiSetScale(double scale) noexcept { return false; }
-    bool guiShow() noexcept override { return true; }
-    bool guiHide() noexcept override { return true; }
-    virtual bool guiGetSize(uint32_t *width, uint32_t *height) noexcept override
+    bool guiShow() noexcept override
+    {
+        if (m_ext_gui)
+        {
+            return m_ext_gui->show(m_plug);
+        }
+        return true;
+    }
+    bool guiHide() noexcept override
+    {
+        if (m_ext_gui)
+        {
+            return m_ext_gui->hide(m_plug);
+        }
+        return true;
+    }
+    bool guiGetSize(uint32_t *width, uint32_t *height) noexcept override
     {
         if (m_generic_editor)
         {
@@ -203,14 +228,33 @@ class ClapPluginFormatProcessor : public xenakios::XAudioProcessor
             *height = m_generic_editor->getHeight();
             return true;
         }
+        if (m_ext_gui)
+        {
+            return m_ext_gui->get_size(m_plug, width, height);
+        }
         return false;
     }
-    // virtual bool guiCanResize() const noexcept { return false; }
+    bool guiCanResize() const noexcept override
+    {
+        if (m_generic_editor)
+            return true;
+        if (m_ext_gui)
+        {
+            return m_ext_gui->can_resize(m_plug);
+        }
+        return false;
+    }
     // virtual bool guiGetResizeHints(clap_gui_resize_hints_t *hints) noexcept { return false; }
-    // virtual bool guiAdjustSize(uint32_t *width, uint32_t *height) noexcept
-    //{
-    //     return guiGetSize(width, height);
-    // }
+    bool guiAdjustSize(uint32_t *width, uint32_t *height) noexcept override
+    {
+        if (m_generic_editor)
+            return guiGetSize(width, height);
+        if (m_ext_gui)
+        {
+            return m_ext_gui->adjust_size(m_plug, width, height);
+        }
+        return false;
+    }
     bool guiSetSize(uint32_t width, uint32_t height) noexcept override
     {
         if (m_generic_editor)
@@ -218,22 +262,33 @@ class ClapPluginFormatProcessor : public xenakios::XAudioProcessor
             m_generic_editor->setSize(width, height);
             return true;
         }
+        if (m_ext_gui)
+        {
+            uint32_t w = width;
+            uint32_t h = height;
+            if (guiAdjustSize(&w, &h))
+            {
+                return m_ext_gui->set_size(m_plug, w, h);
+            }
+        }
         return false;
     }
     // virtual void guiSuggestTitle(const char *title) noexcept {}
     bool guiSetParent(const clap_window *window) noexcept override
     {
         // we only support attaching to Juce components
-        if (std::string(window->api) != "JUCECOMPONENT")
-            return false;
-        if (m_generic_editor)
+        auto parent = (juce::Component *)window->ptr;
+        if (m_generic_editor && std::string(window->api) == "JUCECOMPONENT")
         {
-            // This is a bit iffy hack but will have to suffice for now.
-            // We don't really want to start dealing with the OS native handles
-            // and such when both the processor GUI and the host GUI are Juce based anyway...
-            auto parent = (juce::Component *)window->ptr;
             parent->addAndMakeVisible(*m_generic_editor);
             return true;
+        }
+        if (m_ext_gui)
+        {
+            clap_window win;
+            win.api = "win32";
+            win.win32 = parent->getWindowHandle();
+            return m_ext_gui->set_parent(m_plug, &win);
         }
         return false;
     }

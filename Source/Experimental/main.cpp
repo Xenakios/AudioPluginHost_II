@@ -481,28 +481,48 @@ class MainComponent : public juce::Component
     MainComponent()
     {
         m_test_proc = std::make_unique<ClapPluginFormatProcessor>(
-            R"(C:\Program Files\Common Files\CLAP\airwin-to-clap.clap)", 0);
-        // m_test_proc = std::make_unique<FilePlayerProcessor>();
+            R"(C:\Program Files\Common Files\CLAP\ChowMultiTool.clap)", 0);
+        // m_test_proc = std::make_unique<ClapPluginFormatProcessor>(
+        //     R"(C:\Program Files\Common Files\CLAP\airwin-to-clap.clap)", 0);
+        //  m_test_proc = std::make_unique<FilePlayerProcessor>();
         m_test_proc->activate(44100.0, 512, 512);
         clap_plugin_descriptor desc;
         if (m_test_proc->getDescriptor(&desc))
         {
             // setName(juce::String(desc.vendor) + " : " + desc.name);
         }
-        m_test_proc->guiCreate("", false);
-        clap_window win;
-        win.api = "JUCECOMPONENT";
-        win.ptr = this;
-        m_test_proc->guiSetParent(&win);
-        uint32 w = 0;
-        uint32_t h = 0;
-        if (m_test_proc->guiGetSize(&w, &h))
-        {
-            setSize(w, h);
-        }
+        // for attaching plugin provided GUIs we need the native window handle
+        // which might not exist yet, so init the GUI later in the message loop
+        juce::MessageManager::callAsync([this] {
+            m_test_proc->guiCreate("", false);
+            clap_window win;
+            win.api = "JUCECOMPONENT";
+            win.ptr = this;
+            if (m_test_proc->guiSetParent(&win))
+            {
+                // DBG("set clap plugin gui parent");
+            }
+            uint32 w = 0;
+            uint32_t h = 0;
+            if (m_test_proc->guiGetSize(&w, &h))
+            {
+                setSize(w, h);
+            }
+            m_test_proc->guiShow();
+        });
+        setSize(10, 10);
     }
-    ~MainComponent() override { m_test_proc->guiDestroy(); }
-    void resized() override { m_test_proc->guiSetSize(getWidth(), getHeight()); }
+    ~MainComponent() override
+    {
+        m_test_proc->guiHide();
+        m_test_proc->guiDestroy();
+    }
+    void resized() override
+    {
+        if (m_test_proc->guiCanResize())
+            m_test_proc->guiSetSize(getWidth(), getHeight());
+        // else m_test_proc->guiSetSize()
+    }
 };
 
 class MyApp : public juce::JUCEApplication
