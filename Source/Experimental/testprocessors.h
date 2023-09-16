@@ -96,6 +96,59 @@ inline clap_param_info makeParamInfo(clap_id paramId, juce::String name, double 
     return result;
 }
 
+class XAPWithJuceGUI : public xenakios::XAudioProcessor
+{
+protected:
+    std::unique_ptr<juce::Component> m_editor;
+public:
+    bool implementsGui() const noexcept override { return true; }
+    // virtual bool guiIsApiSupported(const char *api, bool isFloating) noexcept { return false; }
+    // virtual bool guiGetPreferredApi(const char **api, bool *is_floating) noexcept { return false;
+    // }
+    
+    // virtual bool guiSetScale(double scale) noexcept { return false; }
+    bool guiShow() noexcept override
+    {
+        if (!m_editor)
+            return false;
+        return true;
+    }
+    bool guiHide() noexcept override { return false; }
+    virtual bool guiGetSize(uint32_t *width, uint32_t *height) noexcept override
+    {
+        if (!m_editor)
+            return false;
+        *width = m_editor->getWidth();
+        *height = m_editor->getHeight();
+        return true;
+    }
+    // virtual bool guiCanResize() const noexcept { return false; }
+    // virtual bool guiGetResizeHints(clap_gui_resize_hints_t *hints) noexcept { return false; }
+    // virtual bool guiAdjustSize(uint32_t *width, uint32_t *height) noexcept
+    //{
+    //     return guiGetSize(width, height);
+    // }
+    bool guiSetSize(uint32_t width, uint32_t height) noexcept override
+    {
+        if (!m_editor)
+            return false;
+        m_editor->setSize(width, height);
+        return true;
+    }
+    // virtual void guiSuggestTitle(const char *title) noexcept {}
+    bool guiSetParent(const clap_window *window) noexcept override
+    {
+        if (!m_editor || std::string(window->api) != "JUCECOMPONENT")
+            return false;
+        // This is a bit iffy hack but will have to suffice for now.
+        // We don't really want to start dealing with the OS native handles
+        // and such when both the processor GUI and the host GUI are Juce based anyway...
+        auto parent = (juce::Component *)window->ptr;
+        parent->addAndMakeVisible(*m_editor);
+        return true;
+    }
+};
+
 class ToneProcessorTest : public xenakios::XAudioProcessor
 {
   public:
@@ -509,21 +562,10 @@ class GainProcessorTest : public xenakios::XAudioProcessor
         Editor(GainProcessorTest *proc) : m_proc(proc) { addAndMakeVisible(m_slider_volume); }
         void resized() override { m_slider_volume.setBounds(0, 0, getWidth(), 30); }
     };
-    xenakios::XAudioProcessorEditor *m_editor = nullptr;
-    bool hasEditor() noexcept override { return true; }
-    xenakios::XAudioProcessorEditor *createEditorIfNeeded() noexcept override
-    {
-        if (!m_editor)
-            m_editor = new GenericEditor(*this);
-        return m_editor;
-    }
-    xenakios::XAudioProcessorEditor *createEditor() noexcept override
-    {
-        return createEditorIfNeeded();
-    }
+    
 };
 
-class FilePlayerProcessor : public xenakios::XAudioProcessor
+class FilePlayerProcessor : public XAPWithJuceGUI
 {
   public:
     double m_sr = 44100;
@@ -565,64 +607,18 @@ class FilePlayerProcessor : public xenakios::XAudioProcessor
         desc->vendor = "Xenakios";
         return true;
     }
-    xenakios::XAudioProcessorEditor *m_editor = nullptr;
-    bool hasEditor() noexcept override { return true; }
-    xenakios::XAudioProcessorEditor *createEditorIfNeeded() noexcept override
-    {
-        if (!m_editor)
-            m_editor = createEditor();
-        return m_editor;
-    }
-    xenakios::XAudioProcessorEditor *createEditor() noexcept override
-    {
-        return new GenericEditor(*this);
-    }
-    xenakios::XAudioProcessorEditor *getActiveEditor() noexcept override { return m_editor; }
-
-    bool implementsGui() const noexcept override { return true; }
-    // virtual bool guiIsApiSupported(const char *api, bool isFloating) noexcept { return false; }
-    // virtual bool guiGetPreferredApi(const char **api, bool *is_floating) noexcept { return false;
-    // }
+    
     bool guiCreate(const char *api, bool isFloating) noexcept override
     {
-        m_editor = new GenericEditor(*this);
+        m_editor = std::make_unique<GenericEditor>(*this);
         m_editor->setSize(500, 400);
         return true;
     }
     void guiDestroy() noexcept override
     {
-        delete m_editor;
         m_editor = nullptr;
     }
-    // virtual bool guiSetScale(double scale) noexcept { return false; }
-    bool guiShow() noexcept override
-    {
-        if (!m_editor)
-            return false;
-        return true;
-    }
-    bool guiHide() noexcept override { return false; }
-    // virtual bool guiGetSize(uint32_t *width, uint32_t *height) noexcept { return false; }
-    // virtual bool guiCanResize() const noexcept { return false; }
-    // virtual bool guiGetResizeHints(clap_gui_resize_hints_t *hints) noexcept { return false; }
-    // virtual bool guiAdjustSize(uint32_t *width, uint32_t *height) noexcept
-    //{
-    //     return guiGetSize(width, height);
-    // }
-    bool guiSetSize(uint32_t width, uint32_t height) noexcept override { return false; }
-    // virtual void guiSuggestTitle(const char *title) noexcept {}
-    bool guiSetParent(const clap_window *window) noexcept override
-    {
-        if (!m_editor)
-            return false;
-        // This is a bit iffy hack but will have to suffice for now.
-        // We don't really want to start dealing with the OS native handles
-        // and such when both the processor GUI and the host GUI are Juce based anyway...
-        auto parent = (juce::ResizableWindow *)window->ptr;
-        parent->setContentNonOwned(m_editor, true);
-        return true;
-    }
-
+    
     FilePlayerProcessor()
     {
         m_param_infos.push_back(

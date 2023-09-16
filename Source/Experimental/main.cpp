@@ -474,6 +474,37 @@ inline void test_node_connecting()
     delete writer;
 }
 
+class MainComponent : public juce::Component
+{
+  public:
+    std::unique_ptr<xenakios::XAudioProcessor> m_test_proc;
+    MainComponent()
+    {
+        // m_test_proc = std::make_unique<ClapPluginFormatProcessor>(
+        //     R"(C:\Program Files\Common Files\CLAP\airwin-to-clap.clap)", 3);
+        m_test_proc = std::make_unique<FilePlayerProcessor>();
+        m_test_proc->activate(44100.0, 512, 512);
+        clap_plugin_descriptor desc;
+        if (m_test_proc->getDescriptor(&desc))
+        {
+            // setName(juce::String(desc.vendor) + " : " + desc.name);
+        }
+        m_test_proc->guiCreate("", false);
+        clap_window win;
+        win.api = "JUCECOMPONENT";
+        win.ptr = this;
+        m_test_proc->guiSetParent(&win);
+        uint32 w = 0;
+        uint32_t h = 0;
+        if (m_test_proc->guiGetSize(&w, &h))
+        {
+            setSize(w, h);
+        }
+    }
+    ~MainComponent() override { m_test_proc->guiDestroy(); }
+    void resized() override { m_test_proc->guiSetSize(getWidth(), getHeight()); }
+};
+
 class MyApp : public juce::JUCEApplication
 {
   public:
@@ -531,7 +562,6 @@ class GuiAppApplication : public juce::JUCEApplication
     */
     class MainWindow : public juce::DocumentWindow
     {
-        std::unique_ptr<xenakios::XAudioProcessor> m_test_proc;
 
       public:
         explicit MainWindow(juce::String name)
@@ -540,21 +570,10 @@ class GuiAppApplication : public juce::JUCEApplication
                                  ResizableWindow::backgroundColourId),
                              DocumentWindow::allButtons)
         {
-            // m_test_proc = std::make_unique<ClapPluginFormatProcessor>(
-            //     R"(C:\Program Files\Common Files\CLAP\airwin-to-clap.clap)", 3);
-            m_test_proc = std::make_unique<FilePlayerProcessor>();
-            m_test_proc->activate(44100.0, 512, 512);
+
             setUsingNativeTitleBar(true);
 
-            clap_plugin_descriptor desc;
-            if (m_test_proc->getDescriptor(&desc))
-            {
-                setName(juce::String(desc.vendor) + " : " + desc.name);
-            }
-            m_test_proc->guiCreate("", false);
-            clap_window win;
-            win.ptr = this;
-            m_test_proc->guiSetParent(&win);
+            setContentOwned(new MainComponent, true);
             setResizable(true, true);
             centreWithSize(getWidth(), getHeight());
 
@@ -563,7 +582,7 @@ class GuiAppApplication : public juce::JUCEApplication
 
         void closeButtonPressed() override
         {
-            m_test_proc->guiDestroy();
+
             // This is called when the user tries to close this window. Here, we'll just
             // ask the app to quit when this happens, but you can change this to do
             // whatever you need.

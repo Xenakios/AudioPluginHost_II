@@ -152,13 +152,7 @@ class XAudioProcessor
     virtual bool enqueueParameterChange(CrossThreadMessage msg) noexcept { return false; }
     virtual bool dequeueParameterChange(CrossThreadMessage &msg) noexcept { return false; }
 
-    // Juce GUI
-    virtual bool hasEditor() noexcept { return false; }
-    virtual XAudioProcessorEditor *getActiveEditor() noexcept { return nullptr; }
-    virtual XAudioProcessorEditor *createEditorIfNeeded() noexcept { return nullptr; }
-    virtual XAudioProcessorEditor *createEditor() noexcept { return nullptr; }
-
-    // the original Clap C++ helper methods for GUI. 
+    // the original Clap C++ helper methods for GUI.
     // We really might not want to handle *all* this, but I wonder
     // if we are kind of forced when hosting actual Clap plugins?
     virtual bool implementsGui() const noexcept { return false; }
