@@ -43,6 +43,7 @@ class ClapPluginFormatProcessor : public xenakios::XAudioProcessor
     clap_plugin_params_t *m_ext_params = nullptr;
     bool m_processingStarted = false;
     std::atomic<bool> m_activated{false};
+    choc::fifo::SingleReaderSingleWriterFIFO<xenakios::CrossThreadMessage> m_from_generic_editor;
 
   public:
     std::vector<clap_param_info> m_param_infos;
@@ -62,6 +63,8 @@ class ClapPluginFormatProcessor : public xenakios::XAudioProcessor
         xen_host_info.request_restart = request_restart;
         if (m_plugdll.handle)
         {
+            // entry is not really a function but a struct, but luckily the choc
+            // dll loader seems to work for this anyway, at least on Windows!
             clap_plugin_entry_t *entry =
                 (clap_plugin_entry_t *)m_plugdll.findFunction("clap_entry");
             if (entry)
@@ -88,6 +91,7 @@ class ClapPluginFormatProcessor : public xenakios::XAudioProcessor
                     m_inited = true;
                     initParamsExtension();
                     initGUIExtension();
+                    m_from_generic_editor.reset(2048);
                 }
                 else
                     std::cout << "could not create clap plugin instance\n";
@@ -119,6 +123,7 @@ class ClapPluginFormatProcessor : public xenakios::XAudioProcessor
         {
             if (m_plug->activate(m_plug, sampleRate, minFrameCount, maxFrameCount))
             {
+
                 m_activated = true;
                 initParamsExtension();
                 m_ext_audio_ports =
@@ -144,7 +149,12 @@ class ClapPluginFormatProcessor : public xenakios::XAudioProcessor
     {
         return m_ext_params->get_info(m_plug, paramIndex, info);
     }
-
+    bool paramsValue(clap_id paramId, double *value) noexcept override
+    {
+        if (m_ext_params)
+            return m_ext_params->get_value(m_plug, paramId, value);
+        return false;
+    }
     clap_plugin_audio_ports *m_ext_audio_ports = nullptr;
     uint32_t audioPortsCount(bool isInput) const noexcept override
     {
@@ -160,7 +170,11 @@ class ClapPluginFormatProcessor : public xenakios::XAudioProcessor
             return false;
         return m_ext_audio_ports->get(m_plug, index, isInput, info);
     }
-
+    clap::helpers::EventList m_eventMergeList;
+    bool enqueueParameterChange(xenakios::CrossThreadMessage msg) noexcept override 
+    { 
+        return m_from_generic_editor.push(msg);
+    }
     clap_process_status process(const clap_process *process) noexcept override
     {
         if (!m_processingStarted)
@@ -168,8 +182,46 @@ class ClapPluginFormatProcessor : public xenakios::XAudioProcessor
             m_plug->start_processing(m_plug);
             m_processingStarted = true;
         }
-        return m_plug->process(m_plug, process);
+        // we need a copy to be able to switch the used event list because the passed in process
+        // is const
+        clap_process processCtxCopy = *process;
+        // shenanigans to get parameter changes from the GenericEditor
+        if (m_generic_editor)
+        {
+            m_eventMergeList.clear();
+            processCtxCopy.in_events = m_eventMergeList.clapInputEvents();
+            // first insert all GenericEditor events at position 0 in the list
+            xenakios::CrossThreadMessage msg;
+            while (m_from_generic_editor.pop(msg))
+            {
+                if (msg.eventType == CLAP_EVENT_PARAM_VALUE)
+                {
+                    auto pev = makeClapParameterValueEvent(0, msg.paramId, msg.value);
+                    m_eventMergeList.push((const clap_event_header *)&pev);
+                }
+            }
+            // then copy messages from original process context
+            auto sz = process->in_events->size(process->in_events);
+            for (uint32_t i = 0; i < sz; ++i)
+            {
+                auto ev = process->in_events->get(process->in_events, i);
+                m_eventMergeList.push(ev);
+            }
+            // we should now have a properly time sorted list for use by the plugin
+        }
+        return m_plug->process(m_plug, &processCtxCopy);
     }
+
+    void paramsFlush(const clap_input_events *in, const clap_output_events *out) noexcept override
+    {
+        if (m_ext_params)
+        {
+            // FIXME should flush events from the GenericEditor too
+            m_ext_params->flush(m_plug, in, out);
+        }
+            
+    }
+
     clap_plugin_gui *m_ext_gui = nullptr;
     void initGUIExtension()
     {
