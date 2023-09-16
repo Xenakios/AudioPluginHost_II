@@ -481,7 +481,7 @@ class MainComponent : public juce::Component
     MainComponent()
     {
         // m_test_proc = std::make_unique<ClapPluginFormatProcessor>(
-        //     R"(C:\Program Files\Common Files\CLAP\airwin-to-clap.clap)", 3);
+        //      R"(C:\Program Files\Common Files\CLAP\airwin-to-clap.clap)", 0);
         m_test_proc = std::make_unique<FilePlayerProcessor>();
         m_test_proc->activate(44100.0, 512, 512);
         clap_plugin_descriptor desc;

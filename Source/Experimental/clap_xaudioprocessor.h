@@ -2,6 +2,7 @@
 
 #include "xaudioprocessor.h"
 #include "platform/choc_DynamicLibrary.h"
+#include "xap_generic_editor.h"
 
 inline const void *my_get_extension(const struct clap_host *host, const char *eid)
 {
@@ -46,9 +47,9 @@ class ClapPluginFormatProcessor : public xenakios::XAudioProcessor
   public:
     std::vector<clap_param_info> m_param_infos;
     bool getDescriptor(clap_plugin_descriptor *desc) const override
-    { 
+    {
         if (!m_plug)
-            return false; 
+            return false;
         *desc = *m_plug->desc;
         return true;
     }
@@ -86,6 +87,7 @@ class ClapPluginFormatProcessor : public xenakios::XAudioProcessor
                     m_plug->init(m_plug);
                     m_inited = true;
                     initParamsExtension();
+                    initGUIExtension();
                 }
                 else
                     std::cout << "could not create clap plugin instance\n";
@@ -168,8 +170,49 @@ class ClapPluginFormatProcessor : public xenakios::XAudioProcessor
         }
         return m_plug->process(m_plug, process);
     }
+    clap_plugin_gui *m_ext_gui = nullptr;
+    void initGUIExtension()
+    {
+        m_ext_gui = (clap_plugin_gui *)m_plug->get_extension(m_plug, CLAP_EXT_GUI);
+    }
+    std::unique_ptr<juce::Component> m_generic_editor;
+    // if external plugin doesn't implement GUI, we'll use our generic editor,
+    bool implementsGui() const noexcept override { return true; }
+    // virtual bool guiIsApiSupported(const char *api, bool isFloating) noexcept { return false; }
+    // virtual bool guiGetPreferredApi(const char **api, bool *is_floating) noexcept { return false;
+    // }
 
-    // bool hasEditor() noexcept override { return false; }
-    // xenakios::XAudioProcessorEditor *createEditorIfNeeded() noexcept { return nullptr; }
-    // virtual XAudioProcessorEditor *createEditor() noexcept { return nullptr; }
+    // virtual bool guiSetScale(double scale) noexcept { return false; }
+    bool guiShow() noexcept override { return true; }
+    bool guiHide() noexcept override { return false; }
+    virtual bool guiGetSize(uint32_t *width, uint32_t *height) noexcept override
+    {
+        //*width = m_editor->getWidth();
+        //*height = m_editor->getHeight();
+        return true;
+    }
+    // virtual bool guiCanResize() const noexcept { return false; }
+    // virtual bool guiGetResizeHints(clap_gui_resize_hints_t *hints) noexcept { return false; }
+    // virtual bool guiAdjustSize(uint32_t *width, uint32_t *height) noexcept
+    //{
+    //     return guiGetSize(width, height);
+    // }
+    bool guiSetSize(uint32_t width, uint32_t height) noexcept override { return true; }
+    // virtual void guiSuggestTitle(const char *title) noexcept {}
+    bool guiSetParent(const clap_window *window) noexcept override
+    {
+        // we only support attaching to Juce components
+        if (std::string(window->api) != "JUCECOMPONENT")
+            return false;
+        if (m_generic_editor)
+        {
+            // This is a bit iffy hack but will have to suffice for now.
+            // We don't really want to start dealing with the OS native handles
+            // and such when both the processor GUI and the host GUI are Juce based anyway...
+            auto parent = (juce::Component *)window->ptr;
+            parent->addAndMakeVisible(*m_generic_editor);
+            return true;
+        }
+        return false;
+    }
 };
