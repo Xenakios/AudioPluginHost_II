@@ -39,6 +39,8 @@ class GenericEditor : public juce::Component
             addAndMakeVisible(comps->slider);
             m_param_comps.push_back(std::move(comps));
         }
+        int defaultH = m_proc.paramsCount() * 50;
+        setSize(500,defaultH);
     }
     void resized() override
     {
@@ -51,7 +53,6 @@ class GenericEditor : public juce::Component
             mainflex.items.add(juce::FlexItem(m_param_comps[i]->slider).withFlex(1.0));
         }
         mainflex.performLayout(getLocalBounds());
-        DBG(m_param_comps[0]->slider.getBounds().getHeight());
     }
 
   private:

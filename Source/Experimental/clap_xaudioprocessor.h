@@ -178,18 +178,32 @@ class ClapPluginFormatProcessor : public xenakios::XAudioProcessor
     std::unique_ptr<juce::Component> m_generic_editor;
     // if external plugin doesn't implement GUI, we'll use our generic editor,
     bool implementsGui() const noexcept override { return true; }
+    bool guiCreate(const char *api, bool isFloating) noexcept override
+    {
+        if (!m_ext_gui)
+        {
+            m_generic_editor = std::make_unique<xenakios::GenericEditor>(*this);
+            return true;
+        }
+        return false;
+    }
+    void guiDestroy() noexcept override { m_generic_editor = nullptr; }
     // virtual bool guiIsApiSupported(const char *api, bool isFloating) noexcept { return false; }
     // virtual bool guiGetPreferredApi(const char **api, bool *is_floating) noexcept { return false;
     // }
 
     // virtual bool guiSetScale(double scale) noexcept { return false; }
     bool guiShow() noexcept override { return true; }
-    bool guiHide() noexcept override { return false; }
+    bool guiHide() noexcept override { return true; }
     virtual bool guiGetSize(uint32_t *width, uint32_t *height) noexcept override
     {
-        //*width = m_editor->getWidth();
-        //*height = m_editor->getHeight();
-        return true;
+        if (m_generic_editor)
+        {
+            *width = m_generic_editor->getWidth();
+            *height = m_generic_editor->getHeight();
+            return true;
+        }
+        return false;
     }
     // virtual bool guiCanResize() const noexcept { return false; }
     // virtual bool guiGetResizeHints(clap_gui_resize_hints_t *hints) noexcept { return false; }
@@ -197,7 +211,15 @@ class ClapPluginFormatProcessor : public xenakios::XAudioProcessor
     //{
     //     return guiGetSize(width, height);
     // }
-    bool guiSetSize(uint32_t width, uint32_t height) noexcept override { return true; }
+    bool guiSetSize(uint32_t width, uint32_t height) noexcept override
+    {
+        if (m_generic_editor)
+        {
+            m_generic_editor->setSize(width, height);
+            return true;
+        }
+        return false;
+    }
     // virtual void guiSuggestTitle(const char *title) noexcept {}
     bool guiSetParent(const clap_window *window) noexcept override
     {

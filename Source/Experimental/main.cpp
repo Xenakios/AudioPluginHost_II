@@ -480,9 +480,9 @@ class MainComponent : public juce::Component
     std::unique_ptr<xenakios::XAudioProcessor> m_test_proc;
     MainComponent()
     {
-        // m_test_proc = std::make_unique<ClapPluginFormatProcessor>(
-        //      R"(C:\Program Files\Common Files\CLAP\airwin-to-clap.clap)", 0);
-        m_test_proc = std::make_unique<FilePlayerProcessor>();
+        m_test_proc = std::make_unique<ClapPluginFormatProcessor>(
+            R"(C:\Program Files\Common Files\CLAP\airwin-to-clap.clap)", 0);
+        // m_test_proc = std::make_unique<FilePlayerProcessor>();
         m_test_proc->activate(44100.0, 512, 512);
         clap_plugin_descriptor desc;
         if (m_test_proc->getDescriptor(&desc))
