@@ -4,11 +4,6 @@
 #include "platform/choc_DynamicLibrary.h"
 #include "xap_generic_editor.h"
 
-inline const void *my_get_extension(const struct clap_host *host, const char *eid)
-{
-    return nullptr;
-}
-
 inline void my_host_par_rescan(const clap_host_t *host, clap_param_rescan_flags flags)
 {
     // auto cp = (ClapProcessor*)host->host_data;
@@ -56,8 +51,28 @@ class ClapPluginFormatProcessor : public xenakios::XAudioProcessor
     }
     ClapPluginFormatProcessor(std::string plugfilename, int plugindex) : m_plugdll(plugfilename)
     {
+        auto get_extension_lambda = [](const struct clap_host *host,
+                                       const char *eid) -> const void * {
+            DBG("plugin requested host extension " << eid);
+            if (!strcmp(eid, CLAP_EXT_GUI))
+            {
+                static clap_host_gui ext_gui;
+                ext_gui.closed = [](const clap_host *, bool) {};
+                ext_gui.request_hide = [](const clap_host *) { return false; };
+                ext_gui.request_show = [](const clap_host *) { return false; };
+                ext_gui.resize_hints_changed = [](const clap_host *) {};
+                ext_gui.request_resize = [](const clap_host *host_, uint32_t w, uint32_t h) {
+                    auto claphost = (ClapPluginFormatProcessor *)host_->host_data;
+                    claphost->onPluginRequestedResizeInternal(w, h);
+                    return true;
+                };
+                return &ext_gui;
+            }
+            return nullptr;
+        };
+
         xen_host_info.host_data = this;
-        xen_host_info.get_extension = my_get_extension;
+        xen_host_info.get_extension = get_extension_lambda;
         xen_host_info.request_callback = request_callback_nop;
         xen_host_info.request_process = request_process;
         xen_host_info.request_restart = request_restart;
@@ -116,6 +131,12 @@ class ClapPluginFormatProcessor : public xenakios::XAudioProcessor
             m_entry->deinit();
         }
     }
+    void onPluginRequestedResizeInternal(uint32_t w, uint32_t h)
+    {
+        // DBG("Plugin requested to be resized to " << (int)w << " " << (int)h);
+        if (OnPluginRequestedResize)
+            OnPluginRequestedResize(w, h);
+    }
     bool activate(double sampleRate, uint32_t minFrameCount,
                   uint32_t maxFrameCount) noexcept override
     {
@@ -171,8 +192,8 @@ class ClapPluginFormatProcessor : public xenakios::XAudioProcessor
         return m_ext_audio_ports->get(m_plug, index, isInput, info);
     }
     clap::helpers::EventList m_eventMergeList;
-    bool enqueueParameterChange(xenakios::CrossThreadMessage msg) noexcept override 
-    { 
+    bool enqueueParameterChange(xenakios::CrossThreadMessage msg) noexcept override
+    {
         return m_from_generic_editor.push(msg);
     }
     clap_process_status process(const clap_process *process) noexcept override
@@ -219,7 +240,6 @@ class ClapPluginFormatProcessor : public xenakios::XAudioProcessor
             // FIXME should flush events from the GenericEditor too
             m_ext_params->flush(m_plug, in, out);
         }
-            
     }
 
     clap_plugin_gui *m_ext_gui = nullptr;

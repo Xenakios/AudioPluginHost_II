@@ -480,11 +480,11 @@ class MainComponent : public juce::Component
     std::unique_ptr<xenakios::XAudioProcessor> m_test_proc;
     MainComponent()
     {
-        //m_test_proc = std::make_unique<ClapPluginFormatProcessor>(
-        //    R"(C:\Program Files\Common Files\CLAP\ChowMultiTool.clap)", 0);
         m_test_proc = std::make_unique<ClapPluginFormatProcessor>(
-             R"(C:\Program Files\Common Files\CLAP\airwin-to-clap.clap)", 0);
-        //  m_test_proc = std::make_unique<FilePlayerProcessor>();
+            R"(C:\Program Files\Common Files\CLAP\ChowMultiTool.clap)", 0);
+        // m_test_proc = std::make_unique<ClapPluginFormatProcessor>(
+        //      R"(C:\Program Files\Common Files\CLAP\airwin-to-clap.clap)", 0);
+        //   m_test_proc = std::make_unique<FilePlayerProcessor>();
         m_test_proc->activate(44100.0, 512, 512);
         clap_plugin_descriptor desc;
         if (m_test_proc->getDescriptor(&desc))
@@ -509,6 +509,12 @@ class MainComponent : public juce::Component
                 setSize(w, h);
             }
             m_test_proc->guiShow();
+            m_test_proc->OnPluginRequestedResize = [this](uint32_t neww, uint32_t newh) {
+                // setSize is a synchronous call, so we can toggle the flag like this(?)
+                m_plugin_requested_resize = true;
+                setSize(neww, newh);
+                m_plugin_requested_resize = false;
+            };
         });
         setSize(100, 100);
     }
@@ -517,11 +523,15 @@ class MainComponent : public juce::Component
         m_test_proc->guiHide();
         m_test_proc->guiDestroy();
     }
+    bool m_plugin_requested_resize = false;
     void resized() override
     {
+        // if it was the plugin that requested the resize, don't
+        // resize the plugin again!
+        if (m_plugin_requested_resize)
+            return;
         if (m_test_proc->guiCanResize())
             m_test_proc->guiSetSize(getWidth(), getHeight());
-        // else m_test_proc->guiSetSize()
     }
 };
 
@@ -595,7 +605,7 @@ class GuiAppApplication : public juce::JUCEApplication
 
             setContentOwned(new MainComponent, true);
             setResizable(true, true);
-            setTopLeftPosition(50,50);
+            setTopLeftPosition(50, 50);
 
             setVisible(true);
         }

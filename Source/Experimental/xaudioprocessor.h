@@ -174,5 +174,6 @@ class XAudioProcessor
     virtual void guiSuggestTitle(const char *title) noexcept {}
     virtual bool guiSetParent(const clap_window *window) noexcept { return false; }
     virtual bool guiSetTransient(const clap_window *window) noexcept { return false; }
+    std::function<void(uint32_t w, uint32_t h)> OnPluginRequestedResize;
 };
 } // namespace xenakios
