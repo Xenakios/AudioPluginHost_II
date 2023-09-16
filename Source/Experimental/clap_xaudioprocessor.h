@@ -121,6 +121,8 @@ class ClapPluginFormatProcessor : public xenakios::XAudioProcessor
     {
         if (m_plug)
         {
+            if (m_processingStarted)
+                m_plug->stop_processing(m_plug);
             if (m_activated.load())
                 m_plug->deactivate(m_plug);
             m_plug->destroy(m_plug);
