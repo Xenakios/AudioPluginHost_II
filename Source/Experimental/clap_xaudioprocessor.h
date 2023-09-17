@@ -350,8 +350,8 @@ class ClapPluginFormatProcessor : public xenakios::XAudioProcessor
     // virtual void guiSuggestTitle(const char *title) noexcept {}
     bool guiSetParent(const clap_window *window) noexcept override
     {
-        // we only support attaching to Juce components
         auto parent = (juce::Component *)window->ptr;
+        // we only support attaching the GenericEditor to Juce components
         if (m_generic_editor && std::string(window->api) == "JUCECOMPONENT")
         {
             parent->addAndMakeVisible(*m_generic_editor);
