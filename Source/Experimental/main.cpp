@@ -501,7 +501,51 @@ class XAPGraph : public xenakios::XAudioProcessor
     double m_sr = 0.0;
 };
 
-inline void test_graph_processor()
+class XAPPlayer : public juce::AudioIODeviceCallback
+{
+  public:
+    XAPPlayer(xenakios::XAudioProcessor &procToPlay) : m_proc(procToPlay) {}
+    void audioDeviceIOCallbackWithContext(const float *const *inputChannelData,
+                                          int numInputChannels, float *const *outputChannelData,
+                                          int numOutputChannels, int numSamples,
+                                          const AudioIODeviceCallbackContext &context) override
+    {
+        clap_process process;
+        juce::zerostruct(process);
+        clap_audio_buffer cab[1];
+        cab[0].channel_count = 2;
+        cab[0].constant_mask = 0;
+        cab[0].data64 = nullptr;
+        cab[0].latency = 0;
+        // float *chandatas[2] = {&procbuf[blocksize * 0], &procbuf[blocksize * 1]};
+        cab[0].data32 = (float **)outputChannelData;
+        process.audio_outputs_count = 1;
+        process.audio_outputs = cab;
+        process.frames_count = numSamples;
+        m_proc.process(&process);
+    }
+    void audioDeviceAboutToStart(AudioIODevice *device) override
+    {
+        m_proc.activate(device->getCurrentSampleRate(), device->getCurrentBufferSizeSamples(),
+                        device->getCurrentBufferSizeSamples());
+    }
+    void audioDeviceStopped() override {}
+
+  private:
+    xenakios::XAudioProcessor &m_proc;
+};
+
+inline void test_graph_processor_realtime()
+{
+    auto g = std::make_unique<XAPGraph>();
+    juce::AudioDeviceManager man;
+    man.initialiseWithDefaultDevices(0, 2);
+    XAPPlayer xplayer(*g);
+    man.addAudioCallback(&xplayer);
+    juce::Thread::sleep(5000);
+}
+
+inline void test_graph_processor_offline()
 {
     auto g = std::make_unique<XAPGraph>();
     double sr = 44100;
@@ -701,7 +745,7 @@ int main()
 {
     juce::ScopedJuceInitialiser_GUI gui_init;
     // test_node_connecting();
-    test_graph_processor();
+    test_graph_processor_realtime();
     return 0;
 }
 #endif
