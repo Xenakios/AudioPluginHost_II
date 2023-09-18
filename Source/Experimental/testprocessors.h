@@ -623,6 +623,27 @@ class FilePlayerProcessor : public XAPWithJuceGUI
         *info = m_param_infos[paramIndex];
         return true;
     }
+    bool paramsValue(clap_id paramId, double *value) noexcept override 
+    { 
+        std::optional<double> result;
+        if (paramId == (clap_id)ParamIds::Volume)
+            result = m_volume;
+        else if (paramId == (clap_id)ParamIds::Playrate)
+            result = m_rate;
+        else if (paramId == (clap_id)ParamIds::Pitch)
+            result = m_pitch;
+        else if (paramId == (clap_id)ParamIds::PreservePitch)
+            result = m_preserve_pitch;
+        else if (paramId == (clap_id)ParamIds::LoopStart)
+            result = m_loop_start;
+        else if (paramId == (clap_id)ParamIds::LoopEnd)
+            result = m_loop_end;
+        if (result)
+        {
+            return true;
+        }
+        return false; 
+    }
     void importFile(juce::File f)
     {
         juce::AudioFormatManager man;
@@ -860,6 +881,7 @@ class JucePluginWrapper : public xenakios::XAudioProcessor, public juce::AudioPl
         *info = m_param_infos[paramIndex];
         return true;
     }
+    
     clap_process_status process(const clap_process *process) noexcept override
     {
         jassert(m_internal);

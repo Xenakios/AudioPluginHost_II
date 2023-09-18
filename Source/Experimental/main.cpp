@@ -542,7 +542,15 @@ inline void test_graph_processor_realtime()
     man.initialiseWithDefaultDevices(0, 2);
     XAPPlayer xplayer(*g);
     man.addAudioCallback(&xplayer);
-    juce::Thread::sleep(5000);
+    double t0 = juce::Time::getMillisecondCounterHiRes();
+    while (true)
+    {
+        double t1 = juce::Time::getMillisecondCounterHiRes();
+        if (t1 - t0 > 5000)
+            break;
+        std::cout << t1 - t0 << "\t" << man.getCpuUsage() * 100.0 << "% CPU" << std::endl;
+        juce::Thread::sleep(500);
+    }
 }
 
 inline void test_graph_processor_offline()
@@ -586,20 +594,21 @@ class MainComponent : public juce::Component
     std::unique_ptr<xenakios::XAudioProcessor> m_test_proc;
     MainComponent()
     {
-        m_test_proc = std::make_unique<ClapPluginFormatProcessor>(
-            R"(C:\Program Files\Common Files\CLAP\ChowMultiTool.clap)", 0);
         // m_test_proc = std::make_unique<ClapPluginFormatProcessor>(
-        //      R"(C:\Program Files\Common Files\CLAP\airwin-to-clap.clap)", 0);
-        //   m_test_proc = std::make_unique<FilePlayerProcessor>();
+        //     R"(C:\Program Files\Common Files\CLAP\ChowMultiTool.clap)", 0);
+        m_test_proc = std::make_unique<ClapPluginFormatProcessor>(
+            R"(C:\Program Files\Common Files\CLAP\airwin-to-clap.clap)", 0);
+        // m_test_proc = std::make_unique<FilePlayerProcessor>();
         m_test_proc->activate(44100.0, 512, 512);
-        clap_plugin_descriptor desc;
-        if (m_test_proc->getDescriptor(&desc))
-        {
-            // setName(juce::String(desc.vendor) + " : " + desc.name);
-        }
+
         // for attaching plugin provided GUIs we need the native window handle
         // which might not exist yet, so init the GUI later in the message loop
         juce::MessageManager::callAsync([this] {
+            clap_plugin_descriptor desc;
+            if (m_test_proc->getDescriptor(&desc))
+            {
+                getParentComponent()->setName(juce::String(desc.vendor) + " : " + desc.name);
+            }
             m_test_proc->guiCreate("", false);
             clap_window win;
             win.api = "JUCECOMPONENT";
@@ -647,9 +656,6 @@ class GuiAppApplication : public juce::JUCEApplication
     //==============================================================================
     GuiAppApplication() {}
 
-    // We inject these as compile definitions from the CMakeLists.txt
-    // If you've enabled the juce header with `juce_generate_juce_header(<thisTarget>)`
-    // you could `#include <JuceHeader.h>` and use `ProjectInfo::projectName` etc. instead.
     const juce::String getApplicationName() override { return "FOO"; }
     const juce::String getApplicationVersion() override { return "0.0.0"; }
     bool moreThanOneInstanceAllowed() override { return true; }
@@ -657,39 +663,23 @@ class GuiAppApplication : public juce::JUCEApplication
     //==============================================================================
     void initialise(const juce::String &commandLine) override
     {
-        // This method is where you should put your application's initialisation code..
         juce::ignoreUnused(commandLine);
         mainWindow.reset(new MainWindow(getApplicationName()));
     }
 
     void shutdown() override
     {
-        // Add your application's shutdown code here..
-
         mainWindow = nullptr; // (deletes our window)
     }
 
     //==============================================================================
-    void systemRequestedQuit() override
-    {
-        // This is called when the app is being asked to quit: you can ignore this
-        // request and let the app carry on running, or call quit() to allow the app to close.
-        quit();
-    }
+    void systemRequestedQuit() override { quit(); }
 
     void anotherInstanceStarted(const juce::String &commandLine) override
     {
-        // When another instance of the app is launched while this one is running,
-        // this method is invoked, and the commandLine parameter tells you what
-        // the other instance's command-line arguments were.
         juce::ignoreUnused(commandLine);
     }
 
-    //==============================================================================
-    /*
-        This class implements the desktop window that contains an instance of
-        our MainComponent class.
-    */
     class MainWindow : public juce::DocumentWindow
     {
 
@@ -713,18 +703,8 @@ class GuiAppApplication : public juce::JUCEApplication
         void closeButtonPressed() override
         {
 
-            // This is called when the user tries to close this window. Here, we'll just
-            // ask the app to quit when this happens, but you can change this to do
-            // whatever you need.
             JUCEApplication::getInstance()->systemRequestedQuit();
         }
-
-        /* Note: Be careful if you override any DocumentWindow methods - the base
-           class uses a lot of them, so by overriding you might break its functionality.
-           It's best to do all your work in your content component instead, but if
-           you really have to override any DocumentWindow methods, make sure your
-           subclass also calls the superclass's method.
-        */
 
       private:
         JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(MainWindow)
@@ -734,7 +714,7 @@ class GuiAppApplication : public juce::JUCEApplication
     std::unique_ptr<MainWindow> mainWindow;
 };
 
-#define TESTJUCEGUI 0
+#define TESTJUCEGUI 1
 
 #if TESTJUCEGUI
 
