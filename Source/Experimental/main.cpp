@@ -5,6 +5,7 @@
 
 #include <clap/helpers/event-list.hh>
 #include "clap_xaudioprocessor.h"
+#include "juce_xaudioprocessor.h"
 
 inline void mapModulationEvents(const clap::helpers::EventList &sourceList, clap_id sourceParId,
                                 clap::helpers::EventList &destList, clap_id destParId,
@@ -596,11 +597,10 @@ class MainComponent : public juce::Component
     {
         // m_test_proc = std::make_unique<ClapPluginFormatProcessor>(
         //     R"(C:\Program Files\Common Files\CLAP\ChowMultiTool.clap)", 0);
-        m_test_proc = std::make_unique<ClapPluginFormatProcessor>(
-            R"(C:\Program Files\Common Files\CLAP\airwin-to-clap.clap)", 0);
-        // m_test_proc = std::make_unique<FilePlayerProcessor>();
+        //m_test_proc = std::make_unique<ClapPluginFormatProcessor>(
+        //    R"(C:\Program Files\Common Files\CLAP\airwin-to-clap.clap)", 0);
+         m_test_proc = std::make_unique<FilePlayerProcessor>();
         m_test_proc->activate(44100.0, 512, 512);
-
         // for attaching plugin provided GUIs we need the native window handle
         // which might not exist yet, so init the GUI later in the message loop
         juce::MessageManager::callAsync([this] {
