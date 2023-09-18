@@ -597,9 +597,13 @@ class MainComponent : public juce::Component
     {
         // m_test_proc = std::make_unique<ClapPluginFormatProcessor>(
         //     R"(C:\Program Files\Common Files\CLAP\ChowMultiTool.clap)", 0);
-        //m_test_proc = std::make_unique<ClapPluginFormatProcessor>(
+        // m_test_proc = std::make_unique<ClapPluginFormatProcessor>(
         //    R"(C:\Program Files\Common Files\CLAP\airwin-to-clap.clap)", 0);
-         m_test_proc = std::make_unique<FilePlayerProcessor>();
+        // m_test_proc = std::make_unique<FilePlayerProcessor>();
+
+        std::string pathprefix = R"(C:\Program Files\Common Files\)";
+        m_test_proc =
+            std::make_unique<JucePluginWrapper>(pathprefix + R"(VST3\ValhallaVintageVerb.vst3)");
         m_test_proc->activate(44100.0, 512, 512);
         // for attaching plugin provided GUIs we need the native window handle
         // which might not exist yet, so init the GUI later in the message loop

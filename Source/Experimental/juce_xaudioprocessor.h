@@ -35,11 +35,16 @@ class JucePluginWrapper : public xenakios::XAudioProcessor, public juce::AudioPl
             std::cout << err << "\n";
         }
     }
+    mutable juce::String descVendor;
     bool getDescriptor(clap_plugin_descriptor_t *dec) const override
     {
+        memset(dec,0,sizeof(clap_plugin_descriptor));
         if (m_internal)
         {
             dec->name = m_internal->getName().getCharPointer();
+            auto jucedesc = m_internal->getPluginDescription();
+            descVendor = jucedesc.manufacturerName;
+            dec->vendor = descVendor.getCharPointer();
             return true;
         }
         return false;
@@ -213,4 +218,62 @@ class JucePluginWrapper : public xenakios::XAudioProcessor, public juce::AudioPl
         }
         return false;
     }
+    bool implementsGui() const noexcept override { return true; }
+    // virtual bool guiIsApiSupported(const char *api, bool isFloating) noexcept { return false; }
+    // virtual bool guiGetPreferredApi(const char **api, bool *is_floating) noexcept { return false;
+    // }
+    
+    // virtual bool guiSetScale(double scale) noexcept { return false; }
+    bool guiCreate(const char *api, bool isFloating) noexcept override 
+    { 
+        if (m_internal->hasEditor())
+        {
+            m_editor = m_internal->createEditor();
+            return true;
+        }
+        return false;
+    }
+    void guiDestroy() noexcept override 
+    {
+        delete m_editor;
+        m_editor = nullptr;
+    }
+    bool guiShow() noexcept override
+    {
+        if (!m_editor)
+            return false;
+        return true;
+    }
+    bool guiHide() noexcept override { return false; }
+    virtual bool guiGetSize(uint32_t *width, uint32_t *height) noexcept override
+    {
+        if (!m_editor)
+            return false;
+        *width = m_editor->getWidth();
+        *height = m_editor->getHeight();
+        return true;
+    }
+    // virtual bool guiCanResize() const noexcept { return false; }
+    // virtual bool guiGetResizeHints(clap_gui_resize_hints_t *hints) noexcept { return false; }
+    // virtual bool guiAdjustSize(uint32_t *width, uint32_t *height) noexcept
+    //{
+    //     return guiGetSize(width, height);
+    // }
+    bool guiSetSize(uint32_t width, uint32_t height) noexcept override
+    {
+        if (!m_editor)
+            return false;
+        m_editor->setSize(width, height);
+        return true;
+    }
+    // virtual void guiSuggestTitle(const char *title) noexcept {}
+    bool guiSetParent(const clap_window *window) noexcept override
+    {
+        if (!m_editor || std::string(window->api) != "JUCECOMPONENT")
+            return false;
+        auto parent = (juce::Component *)window->ptr;
+        parent->addAndMakeVisible(*m_editor);
+        return true;
+    }
+    juce::AudioProcessorEditor* m_editor = nullptr;
 };
