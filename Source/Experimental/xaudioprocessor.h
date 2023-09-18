@@ -67,8 +67,6 @@ inline void pushParamEvent(clap::helpers::EventList &elist, bool is_mod, uint32_
     }
 }
 
-class XAudioProcessorEditor;
-
 /*
 We mirror Clap C++ plugin helper as much as possible/sensible, but we do assume certain
 things are implemented even though not required by the official Clap standard, such

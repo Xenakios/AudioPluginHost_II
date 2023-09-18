@@ -289,110 +289,119 @@ inline void handleNodeAudioInputs(XAPNode *n, XAPNode::Connection &conn, int pro
     }
 }
 
-inline void test_node_connecting()
+class XAPGraph : public xenakios::XAudioProcessor
 {
-
-    std::string pathprefix = R"(C:\Program Files\Common Files\)";
-    std::vector<std::unique_ptr<XAPNode>> proc_nodes;
-    proc_nodes.emplace_back(std::make_unique<XAPNode>(
-        std::make_unique<ClapEventSequencerProcessor>(444, 0.25), "Event Gen 1"));
-    proc_nodes.emplace_back(std::make_unique<XAPNode>(
-        std::make_unique<ClapEventSequencerProcessor>(2349, 0.5), "Event Gen 2"));
-    proc_nodes.emplace_back(
-        std::make_unique<XAPNode>(std::make_unique<ClapPluginFormatProcessor>(
-                                      pathprefix + R"(CLAP\Surge Synth Team\Surge XT.clap)", 0),
-                                  "Surge XT 1"));
-
-    proc_nodes.emplace_back(std::make_unique<XAPNode>(
-        std::make_unique<JucePluginWrapper>(pathprefix + R"(VST3\ValhallaVintageVerb.vst3)"),
-        "Valhalla"));
-    proc_nodes.emplace_back(
-        std::make_unique<XAPNode>(std::make_unique<ClapPluginFormatProcessor>(
-                                      pathprefix + R"(CLAP\Surge Synth Team\Surge XT.clap)", 0),
-                                  "Surge XT 2"));
-    proc_nodes.emplace_back(
-        std::make_unique<XAPNode>(std::make_unique<ModulatorSource>(1, 0.0), "LFO 1"));
-    proc_nodes.emplace_back(
-        std::make_unique<XAPNode>(std::make_unique<ModulatorSource>(1, 2.0), "LFO 2"));
-    proc_nodes.emplace_back(
-        std::make_unique<XAPNode>(std::make_unique<ModulatorSource>(1, 1.03), "LFO 3"));
-
-    connectEventPorts(findByName(proc_nodes, "Event Gen 1"), 0,
-                      findByName(proc_nodes, "Surge XT 1"), 0);
-    connectEventPorts(findByName(proc_nodes, "Event Gen 2"), 0,
-                      findByName(proc_nodes, "Surge XT 2"), 0);
-    // connectAudioBetweenNodes(findByName(proc_nodes, "Surge XT 1"), 0, 0,
-    //                          findByName(proc_nodes, "Valhalla"), 0, 0);
-    // connectAudioBetweenNodes(findByName(proc_nodes, "Surge XT 1"), 0, 1,
-    //                           findByName(proc_nodes, "Valhalla"), 0, 1);
-    connectAudioBetweenNodes(findByName(proc_nodes, "Surge XT 2"), 0, 0,
-                             findByName(proc_nodes, "Valhalla"), 0, 0);
-    connectAudioBetweenNodes(findByName(proc_nodes, "Surge XT 2"), 0, 1,
-                             findByName(proc_nodes, "Valhalla"), 0, 1);
-
-    // connectModulation(findByName(proc_nodes, "LFO 1"), 0, findByName(proc_nodes, "Valhalla"), 0,
-    //                   true, 1.0);
-    connectModulation(findByName(proc_nodes, "LFO 2"), 0, findByName(proc_nodes, "Surge XT 2"),
-                      *findParameterFromName(findByName(proc_nodes, "Surge XT 2")->processor.get(),
-                                             "B Osc 1 Pitch"),
-                      false, 0.1);
-    connectModulation(findByName(proc_nodes, "LFO 3"), 0, findByName(proc_nodes, "Surge XT 2"),
-                      *findParameterFromName(findByName(proc_nodes, "Surge XT 2")->processor.get(),
-                                             "B Osc 1 Pitch"),
-                      false, 0.00);
-
-    findByName(proc_nodes, "Valhalla")->PreProcessFunc = [](XAPNode *node) {
-        // set reverb mix
-        xenakios::pushParamEvent(node->inEvents, false, 0, 0, 0.0);
-    };
-
-    auto runOrder = topoSort(findByName(proc_nodes, "Valhalla"));
-    std::cout << "**** GRAPH RUN ORDER ****\n";
-    for (auto &n : runOrder)
+  public:
+    XAPGraph() {}
+    bool activate(double sampleRate, uint32_t minFrameCount,
+                  uint32_t maxFrameCount) noexcept override
     {
-        std::cout << n->displayName << "\n";
-    }
-    std::cout << "****  ****\n";
-    int procbufsize = 128;
-    clap_event_transport transport;
-    memset(&transport, 0, sizeof(clap_event_transport));
-    clap_process ctx;
-    memset(&ctx, 0, sizeof(clap_process));
-    ctx.frames_count = procbufsize;
-    ctx.transport = &transport;
-    double sr = 44100.0;
-    for (auto &n : runOrder)
-    {
-        n->initBuffers(2, 2, procbufsize);
-        n->processor->activate(sr, procbufsize, procbufsize);
-        n->processor->renderSetMode(CLAP_RENDER_OFFLINE);
-    }
-    auto surge2 = findByName(proc_nodes, "Surge XT 2")->processor.get();
-    auto parid = findParameterFromName(surge2, "Active Scene");
-    if (parid)
-    {
-        findByName(proc_nodes, "Surge XT 2")->PreProcessFunc = [parid](XAPNode *node) {
-            // set surge param
-            xenakios::pushParamEvent(node->inEvents, false, 0, *parid, 1.0);
+        std::string pathprefix = R"(C:\Program Files\Common Files\)";
+        proc_nodes.clear();
+        proc_nodes.emplace_back(std::make_unique<XAPNode>(
+            std::make_unique<ClapEventSequencerProcessor>(444, 0.25), "Event Gen 1"));
+        proc_nodes.emplace_back(std::make_unique<XAPNode>(
+            std::make_unique<ClapEventSequencerProcessor>(2349, 0.5), "Event Gen 2"));
+        proc_nodes.emplace_back(
+            std::make_unique<XAPNode>(std::make_unique<ClapPluginFormatProcessor>(
+                                          pathprefix + R"(CLAP\Surge Synth Team\Surge XT.clap)", 0),
+                                      "Surge XT 1"));
+
+        proc_nodes.emplace_back(std::make_unique<XAPNode>(
+            std::make_unique<JucePluginWrapper>(pathprefix + R"(VST3\ValhallaVintageVerb.vst3)"),
+            "Valhalla"));
+        proc_nodes.emplace_back(
+            std::make_unique<XAPNode>(std::make_unique<ClapPluginFormatProcessor>(
+                                          pathprefix + R"(CLAP\Surge Synth Team\Surge XT.clap)", 0),
+                                      "Surge XT 2"));
+        proc_nodes.emplace_back(
+            std::make_unique<XAPNode>(std::make_unique<ModulatorSource>(1, 0.0), "LFO 1"));
+        proc_nodes.emplace_back(
+            std::make_unique<XAPNode>(std::make_unique<ModulatorSource>(1, 2.0), "LFO 2"));
+        proc_nodes.emplace_back(
+            std::make_unique<XAPNode>(std::make_unique<ModulatorSource>(1, 1.03), "LFO 3"));
+
+        connectEventPorts(findByName(proc_nodes, "Event Gen 1"), 0,
+                          findByName(proc_nodes, "Surge XT 1"), 0);
+        connectEventPorts(findByName(proc_nodes, "Event Gen 2"), 0,
+                          findByName(proc_nodes, "Surge XT 2"), 0);
+        // connectAudioBetweenNodes(findByName(proc_nodes, "Surge XT 1"), 0, 0,
+        //                          findByName(proc_nodes, "Valhalla"), 0, 0);
+        // connectAudioBetweenNodes(findByName(proc_nodes, "Surge XT 1"), 0, 1,
+        //                           findByName(proc_nodes, "Valhalla"), 0, 1);
+        connectAudioBetweenNodes(findByName(proc_nodes, "Surge XT 2"), 0, 0,
+                                 findByName(proc_nodes, "Valhalla"), 0, 0);
+        connectAudioBetweenNodes(findByName(proc_nodes, "Surge XT 2"), 0, 1,
+                                 findByName(proc_nodes, "Valhalla"), 0, 1);
+
+        // connectModulation(findByName(proc_nodes, "LFO 1"), 0, findByName(proc_nodes, "Valhalla"),
+        // 0,
+        //                   true, 1.0);
+        connectModulation(
+            findByName(proc_nodes, "LFO 2"), 0, findByName(proc_nodes, "Surge XT 2"),
+            *findParameterFromName(findByName(proc_nodes, "Surge XT 2")->processor.get(),
+                                   "B Osc 1 Pitch"),
+            false, 0.1);
+        connectModulation(
+            findByName(proc_nodes, "LFO 3"), 0, findByName(proc_nodes, "Surge XT 2"),
+            *findParameterFromName(findByName(proc_nodes, "Surge XT 2")->processor.get(),
+                                   "B Osc 1 Pitch"),
+            false, 0.00);
+
+        findByName(proc_nodes, "Valhalla")->PreProcessFunc = [](XAPNode *node) {
+            // set reverb mix
+            xenakios::pushParamEvent(node->inEvents, false, 0, 0, 0.0);
         };
+
+        runOrder = topoSort(findByName(proc_nodes, "Valhalla"));
+        std::cout << "**** GRAPH RUN ORDER ****\n";
+        for (auto &n : runOrder)
+        {
+            std::cout << n->displayName << "\n";
+        }
+        std::cout << "****  ****\n";
+        int procbufsize = maxFrameCount;
+
+        memset(&transport, 0, sizeof(clap_event_transport));
+        clap_process ctx;
+        memset(&ctx, 0, sizeof(clap_process));
+        ctx.frames_count = procbufsize;
+        ctx.transport = &transport;
+        double sr = sampleRate;
+        m_sr = sampleRate;
+        for (auto &n : runOrder)
+        {
+            n->initBuffers(2, 2, procbufsize);
+            n->processor->activate(sr, procbufsize, procbufsize);
+            n->processor->renderSetMode(CLAP_RENDER_OFFLINE);
+        }
+        auto surge2 = findByName(proc_nodes, "Surge XT 2")->processor.get();
+        auto parid = findParameterFromName(surge2, "Active Scene");
+        if (parid)
+        {
+            findByName(proc_nodes, "Surge XT 2")->PreProcessFunc = [parid](XAPNode *node) {
+                // set surge param
+                xenakios::pushParamEvent(node->inEvents, false, 0, *parid, 1.0);
+            };
+        }
+        int outlen = 30 * sr;
+
+        eventMergeList.reserve(1024);
+
+        transport.flags = CLAP_TRANSPORT_HAS_SECONDS_TIMELINE | CLAP_TRANSPORT_IS_PLAYING;
+        return true;
     }
-    int outlen = 30 * sr;
-    int outcounter = 0;
-    juce::File outfile(R"(C:\develop\AudioPluginHost_mk2\Source\Experimental\graph_out_02.wav)");
-    outfile.deleteFile();
-    auto ostream = outfile.createOutputStream();
-    WavAudioFormat wav;
-    auto writer = wav.createWriterFor(ostream.release(), sr, 2, 32, {}, 0);
-    std::vector<clap_event_header *> eventMergeList;
-    eventMergeList.reserve(1024);
-    clap::helpers::EventList modulationMergeList;
-    std::unordered_map<clap_id, double> accumModValues;
-    transport.flags = CLAP_TRANSPORT_HAS_SECONDS_TIMELINE | CLAP_TRANSPORT_IS_PLAYING;
-    while (outcounter < outlen)
+
+    clap_process_status process(const clap_process *process) noexcept override
     {
-        double x = outcounter / sr; // in seconds
+        auto procbufsize = process->frames_count;
+        double x = outcounter / m_sr; // in seconds
         clap_sectime y = std::round(CLAP_SECTIME_FACTOR * x);
         transport.song_pos_seconds = y;
+        clap_process ctx;
+        memset(&ctx, 0, sizeof(clap_process));
+        ctx.frames_count = procbufsize;
+        ctx.transport = &transport;
         for (auto &n : runOrder)
         {
             // could bypass if we don't have audio inputs
@@ -468,8 +477,61 @@ inline void test_node_connecting()
         }
         modulationMergeList.clear();
         auto outbufs = runOrder.back()->outChannels;
-        writer->writeFromFloatArrays(outbufs.data(), 2, procbufsize);
+        for (int i = 0; i < process->audio_outputs[0].channel_count; ++i)
+        {
+            for (int j = 0; j < process->frames_count; ++j)
+            {
+                process->audio_outputs[0].data32[i][j] = outbufs[i][j];
+            }
+        }
+
         outcounter += procbufsize;
+        return CLAP_PROCESS_CONTINUE;
+    }
+
+  private:
+    std::vector<std::unique_ptr<XAPNode>> proc_nodes;
+    std::vector<XAPNode *> runOrder;
+    clap_event_transport transport;
+    int outcounter = 0;
+
+    std::vector<clap_event_header *> eventMergeList;
+    clap::helpers::EventList modulationMergeList;
+    std::unordered_map<clap_id, double> accumModValues;
+    double m_sr = 0.0;
+};
+
+inline void test_graph_processor()
+{
+    auto g = std::make_unique<XAPGraph>();
+    double sr = 44100;
+    int blocksize = 128;
+    std::vector<float> procbuf(blocksize * 2);
+    clap_audio_buffer cab[1];
+    cab[0].channel_count = 2;
+    cab[0].constant_mask = 0;
+    cab[0].data64 = nullptr;
+    cab[0].latency = 0;
+    float *chandatas[2] = {&procbuf[blocksize * 0], &procbuf[blocksize * 1]};
+    cab[0].data32 = chandatas;
+    clap_process process;
+    memset(&process, 0, sizeof(clap_process));
+    process.audio_outputs_count = 1;
+    process.audio_outputs = cab;
+    process.frames_count = blocksize;
+    g->activate(sr, blocksize, blocksize);
+    int outlen = 10 * sr;
+    int outcounter = 0;
+    juce::File outfile(R"(C:\develop\AudioPluginHost_mk2\Source\Experimental\graph_out_03.wav)");
+    outfile.deleteFile();
+    auto ostream = outfile.createOutputStream();
+    WavAudioFormat wav;
+    auto writer = wav.createWriterFor(ostream.release(), sr, 2, 32, {}, 0);
+    while (outcounter < outlen)
+    {
+        g->process(&process);
+        writer->writeFromFloatArrays(chandatas, 2, blocksize);
+        outcounter += blocksize;
     }
     delete writer;
 }
@@ -535,11 +597,6 @@ class MainComponent : public juce::Component
     }
 };
 
-class MyApp : public juce::JUCEApplication
-{
-  public:
-};
-
 class GuiAppApplication : public juce::JUCEApplication
 {
   public:
@@ -558,7 +615,6 @@ class GuiAppApplication : public juce::JUCEApplication
     {
         // This method is where you should put your application's initialisation code..
         juce::ignoreUnused(commandLine);
-
         mainWindow.reset(new MainWindow(getApplicationName()));
     }
 
@@ -634,7 +690,7 @@ class GuiAppApplication : public juce::JUCEApplication
     std::unique_ptr<MainWindow> mainWindow;
 };
 
-#define TESTJUCEGUI 1
+#define TESTJUCEGUI 0
 
 #if TESTJUCEGUI
 
@@ -644,7 +700,8 @@ START_JUCE_APPLICATION(GuiAppApplication)
 int main()
 {
     juce::ScopedJuceInitialiser_GUI gui_init;
-    test_node_connecting();
+    // test_node_connecting();
+    test_graph_processor();
     return 0;
 }
 #endif
