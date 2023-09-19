@@ -613,7 +613,7 @@ class XapWindow : public juce::DocumentWindow
   public:
     xenakios::XAudioProcessor &m_proc;
     XapWindow(xenakios::XAudioProcessor &proc)
-        : juce::DocumentWindow("XAP", juce::Colours::green, 4, true), m_proc(proc)
+        : juce::DocumentWindow("XAP", juce::Colours::darkgrey, 4, true), m_proc(proc)
     {
         setUsingNativeTitleBar(true);
         setVisible(true);
@@ -676,7 +676,6 @@ class XapWindow : public juce::DocumentWindow
         {
             OnRequestDelete(this);
         }
-            
     }
     std::function<void(XapWindow *)> OnRequestDelete;
     bool m_plugin_requested_resize = false;
@@ -704,6 +703,7 @@ class MainComponent : public juce::Component
         m_graph->addProcessorAsNode(
             std::make_unique<JucePluginWrapper>(pathprefix + R"(VST3\ValhallaVintageVerb.vst3)"),
             "Valhalla");
+        m_graph->addProcessorAsNode(std::make_unique<GainProcessorTest>(),"Main out");
         // m_test_proc = std::make_unique<ClapPluginFormatProcessor>(
         //    R"(C:\Program Files\Common Files\CLAP\airwin-to-clap.clap)", 0);
         // m_test_proc = std::make_unique<FilePlayerProcessor>();
@@ -716,6 +716,10 @@ class MainComponent : public juce::Component
                                  findByName(m_graph->proc_nodes, "Valhalla"), 0, 0);
         connectAudioBetweenNodes(findByName(m_graph->proc_nodes, "Chow"), 0, 1,
                                  findByName(m_graph->proc_nodes, "Valhalla"), 0, 1);
+        connectAudioBetweenNodes(findByName(m_graph->proc_nodes, "Valhalla"), 0, 0,
+                                 findByName(m_graph->proc_nodes, "Main out"), 0, 0);
+        connectAudioBetweenNodes(findByName(m_graph->proc_nodes, "Valhalla"), 0, 1,
+                                 findByName(m_graph->proc_nodes, "Main out"), 0, 1);
         for (auto &n : m_graph->proc_nodes)
         {
             m_xap_windows.emplace_back(std::make_unique<XapWindow>(*n->processor));

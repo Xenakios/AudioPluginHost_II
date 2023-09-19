@@ -412,17 +412,7 @@ class ModulatorSource : public xenakios::XAudioProcessor
     }
 };
 
-namespace xenakios
-{
-class XAudioProcessorEditor : public juce::Component
-{
-  public:
-};
-} // namespace xenakios
-
-
-
-class GainProcessorTest : public xenakios::XAudioProcessor
+class GainProcessorTest : public XAPWithJuceGUI
 {
   public:
     std::vector<clap_param_info> m_param_infos;
@@ -498,16 +488,17 @@ class GainProcessorTest : public xenakios::XAudioProcessor
 
         return CLAP_PROCESS_CONTINUE;
     }
-    class Editor : public xenakios::XAudioProcessorEditor
-    {
-        GainProcessorTest *m_proc = nullptr;
-        Slider m_slider_volume;
-
-      public:
-        Editor(GainProcessorTest *proc) : m_proc(proc) { addAndMakeVisible(m_slider_volume); }
-        void resized() override { m_slider_volume.setBounds(0, 0, getWidth(), 30); }
-    };
     
+    bool guiCreate(const char *api, bool isFloating) noexcept override
+    {
+        m_editor = std::make_unique<xenakios::GenericEditor>(*this);
+        m_editor->setSize(500, 80);
+        return true;
+    }
+    void guiDestroy() noexcept override
+    {
+        m_editor = nullptr;
+    }
 };
 
 class FilePlayerProcessor : public XAPWithJuceGUI
