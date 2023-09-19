@@ -608,19 +608,92 @@ inline void test_graph_processor_offline()
     delete writer;
 }
 
+class XapWindow : public juce::DocumentWindow
+{
+  public:
+    xenakios::XAudioProcessor &m_proc;
+    XapWindow(xenakios::XAudioProcessor &proc)
+        : juce::DocumentWindow("XAP", juce::Colours::green, 4, true), m_proc(proc)
+    {
+        setUsingNativeTitleBar(true);
+        setVisible(true);
+        setAlwaysOnTop(true);
+        setWantsKeyboardFocus(true);
+
+        juce::MessageManager::callAsync([this]() {
+            clap_plugin_descriptor desc;
+            auto m_test_proc = &m_proc;
+            if (m_test_proc->getDescriptor(&desc))
+            {
+                setName(juce::String(desc.vendor) + " : " + desc.name);
+            }
+            m_test_proc->guiCreate("", false);
+            clap_window win;
+            win.api = "JUCECOMPONENT";
+            win.ptr = this;
+
+            m_test_proc->guiSetParent(&win);
+
+            uint32 w = 0;
+            uint32_t h = 0;
+            if (m_test_proc->guiGetSize(&w, &h))
+            {
+                setSize(w, h);
+            }
+            m_test_proc->guiShow();
+            m_test_proc->OnPluginRequestedResize = [this](uint32_t neww, uint32_t newh) {
+                // setSize is a synchronous call, so we can toggle the flag like this(?)
+                m_plugin_requested_resize = true;
+                setSize(neww, newh + m_info_area_margin);
+                m_plugin_requested_resize = false;
+            };
+        });
+    }
+    ~XapWindow() override
+    {
+        m_proc.guiHide();
+        m_proc.guiDestroy();
+    }
+    void resized() override
+    {
+        // if it was the plugin that requested the resize, don't
+        // resize the plugin again!
+        // if (m_plugin_requested_resize)
+        //    return;
+        auto m_test_proc = &m_proc;
+        uint32_t w = 0;
+        uint32_t h = 0;
+        m_test_proc->guiGetSize(&w, &h);
+        // m_info_label.setBounds(0, getHeight() - m_info_area_margin, getWidth(),
+        // m_info_area_margin);
+        //  m_plug_area.setBounds(0, 25, getWidth(), h);
+        if (!m_plugin_requested_resize && m_test_proc->guiCanResize())
+            m_test_proc->guiSetSize(getWidth(), getHeight() - m_info_area_margin);
+    }
+    void closeButtonPressed() override
+    {
+        if (OnRequestDelete)
+        {
+            OnRequestDelete(this);
+        }
+            
+    }
+    std::function<void(XapWindow *)> OnRequestDelete;
+    bool m_plugin_requested_resize = false;
+    int m_info_area_margin = 25;
+};
+
 class MainComponent : public juce::Component
 {
   public:
-    juce::Component m_plug_area;
-    juce::Label m_info_label;
+    std::vector<std::unique_ptr<XapWindow>> m_xap_windows;
     juce::AudioDeviceManager m_aman;
     std::unique_ptr<XAPGraph> m_graph;
     std::unique_ptr<XAPPlayer> m_player;
     int m_info_area_margin = 25;
     MainComponent()
     {
-        addAndMakeVisible(m_plug_area);
-        addAndMakeVisible(m_info_label);
+
         std::string pathprefix = R"(C:\Program Files\Common Files\)";
 
         m_graph = std::make_unique<XAPGraph>();
@@ -643,69 +716,34 @@ class MainComponent : public juce::Component
                                  findByName(m_graph->proc_nodes, "Valhalla"), 0, 0);
         connectAudioBetweenNodes(findByName(m_graph->proc_nodes, "Chow"), 0, 1,
                                  findByName(m_graph->proc_nodes, "Valhalla"), 0, 1);
-
-        // for attaching plugin provided GUIs we need the native window handle
-        // which might not exist yet, so init the GUI later in the message loop
-        juce::MessageManager::callAsync([this] {
-            clap_plugin_descriptor desc;
-            auto m_test_proc = findByName(m_graph->proc_nodes, "Chow")->processor.get();
-            if (m_test_proc->getDescriptor(&desc))
-            {
-                getParentComponent()->setName(juce::String(desc.vendor) + " : " + desc.name);
-            }
-            m_test_proc->guiCreate("", false);
-            clap_window win;
-            win.api = "JUCECOMPONENT";
-            win.ptr = this;
-
-            if (m_test_proc->guiSetParent(&win))
-            {
-                // DBG("set clap plugin gui parent");
-            }
-            uint32 w = 0;
-            uint32_t h = 0;
-            if (m_test_proc->guiGetSize(&w, &h))
-            {
-                setSize(w, h);
-            }
-            m_test_proc->guiShow();
-            m_test_proc->OnPluginRequestedResize = [this](uint32_t neww, uint32_t newh) {
-                // setSize is a synchronous call, so we can toggle the flag like this(?)
-                m_plugin_requested_resize = true;
-                setSize(neww, newh + m_info_area_margin);
-                m_plugin_requested_resize = false;
+        for (auto &n : m_graph->proc_nodes)
+        {
+            m_xap_windows.emplace_back(std::make_unique<XapWindow>(*n->processor));
+            m_xap_windows.back()->setTopLeftPosition(50, 50);
+            m_xap_windows.back()->OnRequestDelete = [this](XapWindow *w) {
+                for (int i = 0; i < m_xap_windows.size(); ++i)
+                {
+                    if (m_xap_windows[i].get() == w)
+                    {
+                        m_xap_windows.erase(m_xap_windows.begin() + i);
+                        break;
+                    }
+                }
             };
-        });
+        }
+
         m_player = std::make_unique<XAPPlayer>(*m_graph);
         m_aman.initialiseWithDefaultDevices(0, 2);
         m_aman.addAudioCallback(m_player.get());
         setSize(100, 100);
-        m_info_label.setText("Info label", juce::dontSendNotification);
     }
     ~MainComponent() override
     {
+        m_xap_windows.clear();
         m_aman.removeAudioCallback(m_player.get());
-        auto m_test_proc = findByName(m_graph->proc_nodes, "Chow")->processor.get();
-        m_test_proc->guiHide();
-        m_test_proc->guiDestroy();
     }
     bool m_plugin_requested_resize = false;
-    void resized() override
-    {
-
-        // if it was the plugin that requested the resize, don't
-        // resize the plugin again!
-        //if (m_plugin_requested_resize)
-        //    return;
-        auto m_test_proc = findByName(m_graph->proc_nodes, "Chow")->processor.get();
-        uint32_t w = 0;
-        uint32_t h = 0;
-        m_test_proc->guiGetSize(&w, &h);
-        m_info_label.setBounds(0, getHeight() - m_info_area_margin, getWidth(), m_info_area_margin);
-        // m_plug_area.setBounds(0, 25, getWidth(), h);
-        if (!m_plugin_requested_resize && m_test_proc->guiCanResize())
-            m_test_proc->guiSetSize(getWidth(), getHeight() - m_info_area_margin);
-    }
+    void resized() override {}
 };
 
 class GuiAppApplication : public juce::JUCEApplication
