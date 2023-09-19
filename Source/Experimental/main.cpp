@@ -294,8 +294,11 @@ class XAPGraph : public xenakios::XAudioProcessor
 {
   public:
     XAPGraph() {}
-    bool activate(double sampleRate, uint32_t minFrameCount,
-                  uint32_t maxFrameCount) noexcept override
+    void addProcessorAsNode(std::unique_ptr<xenakios::XAudioProcessor> proc, std::string id)
+    {
+        proc_nodes.emplace_back(std::make_unique<XAPNode>(std::move(proc), id));
+    }
+    void addTestNodes()
     {
         std::string pathprefix = R"(C:\Program Files\Common Files\)";
         proc_nodes.clear();
@@ -353,29 +356,6 @@ class XAPGraph : public xenakios::XAudioProcessor
             // set reverb mix
             xenakios::pushParamEvent(node->inEvents, false, 0, 0, 0.0);
         };
-
-        runOrder = topoSort(findByName(proc_nodes, "Valhalla"));
-        std::cout << "**** GRAPH RUN ORDER ****\n";
-        for (auto &n : runOrder)
-        {
-            std::cout << n->displayName << "\n";
-        }
-        std::cout << "****  ****\n";
-        int procbufsize = maxFrameCount;
-
-        memset(&transport, 0, sizeof(clap_event_transport));
-        clap_process ctx;
-        memset(&ctx, 0, sizeof(clap_process));
-        ctx.frames_count = procbufsize;
-        ctx.transport = &transport;
-        double sr = sampleRate;
-        m_sr = sampleRate;
-        for (auto &n : runOrder)
-        {
-            n->initBuffers(2, 2, procbufsize);
-            n->processor->activate(sr, procbufsize, procbufsize);
-            n->processor->renderSetMode(CLAP_RENDER_OFFLINE);
-        }
         auto surge2 = findByName(proc_nodes, "Surge XT 2")->processor.get();
         auto parid = findParameterFromName(surge2, "Active Scene");
         if (parid)
@@ -385,16 +365,46 @@ class XAPGraph : public xenakios::XAudioProcessor
                 xenakios::pushParamEvent(node->inEvents, false, 0, *parid, 1.0);
             };
         }
+    }
+    std::string outputNodeId = "Valhalla";
+    bool m_activated = false;
+    bool activate(double sampleRate, uint32_t minFrameCount,
+                  uint32_t maxFrameCount) noexcept override
+    {
+        if (proc_nodes.size() == 0)
+            return false;
+        runOrder = topoSort(findByName(proc_nodes, outputNodeId));
+        std::cout << "**** GRAPH RUN ORDER ****\n";
+        for (auto &n : runOrder)
+        {
+            std::cout << n->displayName << "\n";
+        }
+        std::cout << "****  ****\n";
+        int procbufsize = maxFrameCount;
+
+        memset(&transport, 0, sizeof(clap_event_transport));
+        double sr = sampleRate;
+        m_sr = sampleRate;
+        for (auto &n : runOrder)
+        {
+            n->initBuffers(2, 2, procbufsize);
+            n->processor->activate(sr, procbufsize, procbufsize);
+            n->processor->renderSetMode(CLAP_RENDER_OFFLINE);
+        }
+
         int outlen = 30 * sr;
 
         eventMergeList.reserve(1024);
 
         transport.flags = CLAP_TRANSPORT_HAS_SECONDS_TIMELINE | CLAP_TRANSPORT_IS_PLAYING;
+        m_activated = true;
         return true;
     }
 
     clap_process_status process(const clap_process *process) noexcept override
     {
+        if (!m_activated)
+            return CLAP_PROCESS_ERROR;
         auto procbufsize = process->frames_count;
         double x = outcounter / m_sr; // in seconds
         clap_sectime y = std::round(CLAP_SECTIME_FACTOR * x);
@@ -489,9 +499,9 @@ class XAPGraph : public xenakios::XAudioProcessor
         outcounter += procbufsize;
         return CLAP_PROCESS_CONTINUE;
     }
+    std::vector<std::unique_ptr<XAPNode>> proc_nodes;
 
   private:
-    std::vector<std::unique_ptr<XAPNode>> proc_nodes;
     std::vector<XAPNode *> runOrder;
     clap_event_transport transport;
     int outcounter = 0;
@@ -518,12 +528,21 @@ class XAPPlayer : public juce::AudioIODeviceCallback
         cab[0].constant_mask = 0;
         cab[0].data64 = nullptr;
         cab[0].latency = 0;
-        // float *chandatas[2] = {&procbuf[blocksize * 0], &procbuf[blocksize * 1]};
         cab[0].data32 = (float **)outputChannelData;
         process.audio_outputs_count = 1;
         process.audio_outputs = cab;
         process.frames_count = numSamples;
-        m_proc.process(&process);
+        auto err = m_proc.process(&process);
+        if (err == CLAP_PROCESS_ERROR)
+        {
+            for (int i = 0; i < numOutputChannels; ++i)
+            {
+                for (int j = 0; j < numSamples; ++j)
+                {
+                    outputChannelData[i][j] = 0.0f;
+                }
+            }
+        }
     }
     void audioDeviceAboutToStart(AudioIODevice *device) override
     {
@@ -592,23 +611,40 @@ inline void test_graph_processor_offline()
 class MainComponent : public juce::Component
 {
   public:
-    std::unique_ptr<xenakios::XAudioProcessor> m_test_proc;
+    juce::AudioDeviceManager m_aman;
+    std::unique_ptr<XAPGraph> m_graph;
+    std::unique_ptr<XAPPlayer> m_player;
     MainComponent()
     {
-        // m_test_proc = std::make_unique<ClapPluginFormatProcessor>(
-        //     R"(C:\Program Files\Common Files\CLAP\ChowMultiTool.clap)", 0);
+        std::string pathprefix = R"(C:\Program Files\Common Files\)";
+
+        m_graph = std::make_unique<XAPGraph>();
+        m_graph->addProcessorAsNode(
+            std::make_unique<ClapPluginFormatProcessor>(
+                R"(C:\Program Files\Common Files\CLAP\ChowMultiTool.clap)", 0),
+            "Chow");
+        m_graph->addProcessorAsNode(
+            std::make_unique<JucePluginWrapper>(pathprefix + R"(VST3\ValhallaVintageVerb.vst3)"),
+            "Valhalla");
         // m_test_proc = std::make_unique<ClapPluginFormatProcessor>(
         //    R"(C:\Program Files\Common Files\CLAP\airwin-to-clap.clap)", 0);
         // m_test_proc = std::make_unique<FilePlayerProcessor>();
+        // m_test_proc = std::make_unique<ClapPluginFormatProcessor>(
+        //    R"(C:\NetDownloads\17022023\conduit-win32-x64-nightly-2023-09-19-15-42\conduit_products\Conduit.clap)",
+        //    1);
 
-        std::string pathprefix = R"(C:\Program Files\Common Files\)";
-        m_test_proc =
-            std::make_unique<JucePluginWrapper>(pathprefix + R"(VST3\ValhallaVintageVerb.vst3)");
-        m_test_proc->activate(44100.0, 512, 512);
+        m_graph->outputNodeId = "Valhalla";
+        connectAudioBetweenNodes(findByName(m_graph->proc_nodes, "Chow"), 0, 0,
+                                 findByName(m_graph->proc_nodes, "Valhalla"), 0, 0);
+        connectAudioBetweenNodes(findByName(m_graph->proc_nodes, "Chow"), 0, 1,
+                                 findByName(m_graph->proc_nodes, "Valhalla"), 0, 1);
+        m_graph->activate(44100.0, 512, 512);
+
         // for attaching plugin provided GUIs we need the native window handle
         // which might not exist yet, so init the GUI later in the message loop
         juce::MessageManager::callAsync([this] {
             clap_plugin_descriptor desc;
+            auto m_test_proc = findByName(m_graph->proc_nodes, "Chow")->processor.get();
             if (m_test_proc->getDescriptor(&desc))
             {
                 getParentComponent()->setName(juce::String(desc.vendor) + " : " + desc.name);
@@ -635,10 +671,15 @@ class MainComponent : public juce::Component
                 m_plugin_requested_resize = false;
             };
         });
+        m_player = std::make_unique<XAPPlayer>(*m_graph);
+        m_aman.initialiseWithDefaultDevices(0, 2);
+        m_aman.addAudioCallback(m_player.get());
         setSize(100, 100);
     }
     ~MainComponent() override
     {
+        m_aman.removeAudioCallback(m_player.get());
+        auto m_test_proc = findByName(m_graph->proc_nodes, "Chow")->processor.get();
         m_test_proc->guiHide();
         m_test_proc->guiDestroy();
     }
@@ -649,6 +690,7 @@ class MainComponent : public juce::Component
         // resize the plugin again!
         if (m_plugin_requested_resize)
             return;
+        auto m_test_proc = findByName(m_graph->proc_nodes, "Chow")->processor.get();
         if (m_test_proc->guiCanResize())
             m_test_proc->guiSetSize(getWidth(), getHeight());
     }
