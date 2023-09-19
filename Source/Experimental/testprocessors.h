@@ -99,19 +99,49 @@ inline clap_param_info makeParamInfo(clap_id paramId, juce::String name, double 
 
 class XAPWithJuceGUI : public xenakios::XAudioProcessor
 {
-protected:
+  protected:
     std::unique_ptr<juce::Component> m_editor;
-public:
+    choc::fifo::SingleReaderSingleWriterFIFO<xenakios::CrossThreadMessage> m_from_ui_fifo;
+    clap::helpers::EventList m_merge_list;
+
+  public:
+    bool enqueueParameterChange(xenakios::CrossThreadMessage msg) noexcept override
+    {
+        return m_from_ui_fifo.push(msg);
+    }
+
+    void mergeParameterEvents(const clap_process *process_ctx)
+    {
+        m_merge_list.clear();
+        xenakios::CrossThreadMessage msg;
+        while (m_from_ui_fifo.pop(msg))
+        {
+            if (msg.eventType == CLAP_EVENT_PARAM_VALUE)
+            {
+                auto pev = makeClapParameterValueEvent(0, msg.paramId, msg.value);
+                m_merge_list.push((const clap_event_header *)&pev);
+            }
+        }
+        auto in_evts = process_ctx->in_events;
+        auto sz = in_evts->size(in_evts);
+        for (uint32_t i = 0; i < sz; ++i)
+        {
+            auto ev = in_evts->get(in_evts, i);
+            m_merge_list.push(ev);
+        }
+    }
     bool implementsGui() const noexcept override { return true; }
     // virtual bool guiIsApiSupported(const char *api, bool isFloating) noexcept { return false; }
     // virtual bool guiGetPreferredApi(const char **api, bool *is_floating) noexcept { return false;
     // }
-    
+
     // virtual bool guiSetScale(double scale) noexcept { return false; }
     bool guiShow() noexcept override
     {
         if (!m_editor)
             return false;
+        // maybe not the best place to init this, but...
+        m_from_ui_fifo.reset(2048);
         return true;
     }
     bool guiHide() noexcept override { return false; }
@@ -454,7 +484,8 @@ class GainProcessorTest : public XAPWithJuceGUI
         auto numInChans = process->audio_inputs->channel_count;
         auto numOutChans = process->audio_outputs->channel_count;
         int frames = process->frames_count;
-        auto inEvents = process->in_events;
+        mergeParameterEvents(process);
+        auto inEvents = m_merge_list.clapInputEvents();
         for (int i = 0; i < inEvents->size(inEvents); ++i)
         {
             auto ev = inEvents->get(inEvents, i);
@@ -488,17 +519,14 @@ class GainProcessorTest : public XAPWithJuceGUI
 
         return CLAP_PROCESS_CONTINUE;
     }
-    
+
     bool guiCreate(const char *api, bool isFloating) noexcept override
     {
         m_editor = std::make_unique<xenakios::GenericEditor>(*this);
         m_editor->setSize(500, 80);
         return true;
     }
-    void guiDestroy() noexcept override
-    {
-        m_editor = nullptr;
-    }
+    void guiDestroy() noexcept override { m_editor = nullptr; }
 };
 
 class FilePlayerProcessor : public XAPWithJuceGUI
@@ -543,18 +571,15 @@ class FilePlayerProcessor : public XAPWithJuceGUI
         desc->vendor = "Xenakios";
         return true;
     }
-    
+
     bool guiCreate(const char *api, bool isFloating) noexcept override
     {
         m_editor = std::make_unique<xenakios::GenericEditor>(*this);
         m_editor->setSize(500, 400);
         return true;
     }
-    void guiDestroy() noexcept override
-    {
-        m_editor = nullptr;
-    }
-    
+    void guiDestroy() noexcept override { m_editor = nullptr; }
+
     FilePlayerProcessor()
     {
         m_param_infos.push_back(
@@ -614,8 +639,8 @@ class FilePlayerProcessor : public XAPWithJuceGUI
         *info = m_param_infos[paramIndex];
         return true;
     }
-    bool paramsValue(clap_id paramId, double *value) noexcept override 
-    { 
+    bool paramsValue(clap_id paramId, double *value) noexcept override
+    {
         return false;
         std::optional<double> result;
         if (paramId == (clap_id)ParamIds::Volume)
@@ -634,7 +659,7 @@ class FilePlayerProcessor : public XAPWithJuceGUI
         {
             return true;
         }
-        return false; 
+        return false;
     }
     void importFile(juce::File f)
     {
@@ -791,7 +816,6 @@ class FilePlayerProcessor : public XAPWithJuceGUI
         return CLAP_PROCESS_CONTINUE;
     }
 };
-
 
 const size_t maxHolderDataSize = 128;
 

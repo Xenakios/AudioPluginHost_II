@@ -53,7 +53,7 @@ class ClapPluginFormatProcessor : public xenakios::XAudioProcessor
     {
         auto get_extension_lambda = [](const struct clap_host *host,
                                        const char *eid) -> const void * {
-            DBG("plugin requested host extension " << eid);
+            // DBG("plugin requested host extension " << eid);
             if (!strcmp(eid, CLAP_EXT_GUI))
             {
                 static clap_host_gui ext_gui;

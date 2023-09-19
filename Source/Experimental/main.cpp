@@ -703,7 +703,7 @@ class MainComponent : public juce::Component
         m_graph->addProcessorAsNode(
             std::make_unique<JucePluginWrapper>(pathprefix + R"(VST3\ValhallaVintageVerb.vst3)"),
             "Valhalla");
-        m_graph->addProcessorAsNode(std::make_unique<GainProcessorTest>(),"Main out");
+        m_graph->addProcessorAsNode(std::make_unique<GainProcessorTest>(), "Main out");
         // m_test_proc = std::make_unique<ClapPluginFormatProcessor>(
         //    R"(C:\Program Files\Common Files\CLAP\airwin-to-clap.clap)", 0);
         // m_test_proc = std::make_unique<FilePlayerProcessor>();
@@ -711,7 +711,7 @@ class MainComponent : public juce::Component
         //    R"(C:\NetDownloads\17022023\conduit-win32-x64-nightly-2023-09-19-15-42\conduit_products\Conduit.clap)",
         //    1);
 
-        m_graph->outputNodeId = "Valhalla";
+        m_graph->outputNodeId = "Main out";
         connectAudioBetweenNodes(findByName(m_graph->proc_nodes, "Chow"), 0, 0,
                                  findByName(m_graph->proc_nodes, "Valhalla"), 0, 0);
         connectAudioBetweenNodes(findByName(m_graph->proc_nodes, "Chow"), 0, 1,
