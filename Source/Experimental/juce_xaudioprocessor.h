@@ -32,19 +32,24 @@ class JucePluginWrapper : public xenakios::XAudioProcessor, public juce::AudioPl
         {
             juce::String err;
             m_internal = plugmana.createPluginInstance(*typesFound[0], 44100, 512, err);
-            std::cout << err << "\n";
+            if (!m_internal)
+            {
+                std::cout << err << "\n";
+            } else
+            {
+                m_desc = m_internal->getPluginDescription();
+            }
+                
         }
     }
-    mutable juce::String descVendor;
+    juce::PluginDescription m_desc;
     bool getDescriptor(clap_plugin_descriptor_t *dec) const override
     {
         memset(dec,0,sizeof(clap_plugin_descriptor));
         if (m_internal)
         {
             dec->name = m_internal->getName().getCharPointer();
-            auto jucedesc = m_internal->getPluginDescription();
-            descVendor = jucedesc.manufacturerName;
-            dec->vendor = descVendor.getCharPointer();
+            dec->vendor = m_desc.manufacturerName.getCharPointer();
             return true;
         }
         return false;
