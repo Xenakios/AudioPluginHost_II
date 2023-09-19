@@ -611,11 +611,16 @@ inline void test_graph_processor_offline()
 class MainComponent : public juce::Component
 {
   public:
+    juce::Component m_plug_area;
+    juce::Label m_info_label;
     juce::AudioDeviceManager m_aman;
     std::unique_ptr<XAPGraph> m_graph;
     std::unique_ptr<XAPPlayer> m_player;
+    int m_info_area_margin = 25;
     MainComponent()
     {
+        addAndMakeVisible(m_plug_area);
+        addAndMakeVisible(m_info_label);
         std::string pathprefix = R"(C:\Program Files\Common Files\)";
 
         m_graph = std::make_unique<XAPGraph>();
@@ -638,7 +643,6 @@ class MainComponent : public juce::Component
                                  findByName(m_graph->proc_nodes, "Valhalla"), 0, 0);
         connectAudioBetweenNodes(findByName(m_graph->proc_nodes, "Chow"), 0, 1,
                                  findByName(m_graph->proc_nodes, "Valhalla"), 0, 1);
-        m_graph->activate(44100.0, 512, 512);
 
         // for attaching plugin provided GUIs we need the native window handle
         // which might not exist yet, so init the GUI later in the message loop
@@ -653,6 +657,7 @@ class MainComponent : public juce::Component
             clap_window win;
             win.api = "JUCECOMPONENT";
             win.ptr = this;
+
             if (m_test_proc->guiSetParent(&win))
             {
                 // DBG("set clap plugin gui parent");
@@ -667,7 +672,7 @@ class MainComponent : public juce::Component
             m_test_proc->OnPluginRequestedResize = [this](uint32_t neww, uint32_t newh) {
                 // setSize is a synchronous call, so we can toggle the flag like this(?)
                 m_plugin_requested_resize = true;
-                setSize(neww, newh);
+                setSize(neww, newh + m_info_area_margin);
                 m_plugin_requested_resize = false;
             };
         });
@@ -675,6 +680,7 @@ class MainComponent : public juce::Component
         m_aman.initialiseWithDefaultDevices(0, 2);
         m_aman.addAudioCallback(m_player.get());
         setSize(100, 100);
+        m_info_label.setText("Info label", juce::dontSendNotification);
     }
     ~MainComponent() override
     {
@@ -686,13 +692,19 @@ class MainComponent : public juce::Component
     bool m_plugin_requested_resize = false;
     void resized() override
     {
+
         // if it was the plugin that requested the resize, don't
         // resize the plugin again!
-        if (m_plugin_requested_resize)
-            return;
+        //if (m_plugin_requested_resize)
+        //    return;
         auto m_test_proc = findByName(m_graph->proc_nodes, "Chow")->processor.get();
-        if (m_test_proc->guiCanResize())
-            m_test_proc->guiSetSize(getWidth(), getHeight());
+        uint32_t w = 0;
+        uint32_t h = 0;
+        m_test_proc->guiGetSize(&w, &h);
+        m_info_label.setBounds(0, getHeight() - m_info_area_margin, getWidth(), m_info_area_margin);
+        // m_plug_area.setBounds(0, 25, getWidth(), h);
+        if (!m_plugin_requested_resize && m_test_proc->guiCanResize())
+            m_test_proc->guiSetSize(getWidth(), getHeight() - m_info_area_margin);
     }
 };
 
