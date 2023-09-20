@@ -2,7 +2,7 @@
 #include "testprocessors.h"
 #include <memory>
 #include <vector>
-
+#include <format>
 #include <clap/helpers/event-list.hh>
 #include "clap_xaudioprocessor.h"
 #include "juce_xaudioprocessor.h"
@@ -197,29 +197,32 @@ inline XAPNode *findByName(std::vector<std::unique_ptr<XAPNode>> &nodes, std::st
 
 inline void printClapEvents(clap::helpers::EventList &elist)
 {
+    std::string line;
     for (int i = 0; i < elist.size(); ++i)
     {
         auto ev = elist.get(i);
+        line = std::format("{} UNKNOWN CLAP EVENT", ev->time);
         if (ev->type == CLAP_EVENT_NOTE_ON || ev->type == CLAP_EVENT_NOTE_OFF)
         {
             auto nev = reinterpret_cast<const clap_event_note *>(ev);
             if (ev->type == CLAP_EVENT_NOTE_ON)
-                std::cout << nev->header.time << " CLAP NOTE ON " << nev->key << "\n";
+                line = std::format("{:5} CLAP NOTE ON {}", nev->header.time, nev->key);
             else
-                std::cout << nev->header.time << " CLAP NOTE OFF " << nev->key << "\n";
+                line = std::format("{:5} CLAP NOTE OFF {}", nev->header.time, nev->key);
         }
         if (ev->type == CLAP_EVENT_PARAM_VALUE)
         {
             auto pev = reinterpret_cast<const clap_event_param_value *>(ev);
-            std::cout << pev->header.time << " CLAP PARAM VALUE " << pev->param_id << " "
-                      << pev->value << "\n";
+            line = std::format("{:5} CLAP PARAM VALUE {} {}", pev->header.time, pev->param_id,
+                               pev->value);
         }
         if (ev->type == CLAP_EVENT_PARAM_MOD)
         {
             auto pev = reinterpret_cast<const clap_event_param_mod *>(ev);
-            std::cout << pev->header.time << " CLAP PARAM MOD " << pev->param_id << " "
-                      << pev->amount << "\n";
+            line = std::format("{:5} CLAP PARAM MOD {} {}", pev->header.time, pev->param_id,
+                               pev->amount);
         }
+        std::cout << line << "\n";
     }
 }
 
@@ -839,7 +842,7 @@ class GuiAppApplication : public juce::JUCEApplication
     std::unique_ptr<MainWindow> mainWindow;
 };
 
-#define TESTJUCEGUI 1
+#define TESTJUCEGUI 0
 
 #if TESTJUCEGUI
 
@@ -850,7 +853,13 @@ int main()
 {
     juce::ScopedJuceInitialiser_GUI gui_init;
     // test_node_connecting();
-    test_graph_processor_realtime();
+    // test_graph_processor_realtime();
+    clap::helpers::EventList list;
+    auto ev = makeClapParameterValueEvent(1, 666, 0.987);
+    list.push((const clap_event_header *)&ev);
+    auto mev = makeClapParameterModEvent(46, 78, 0.444);
+    list.push((const clap_event_header *)&mev);
+    printClapEvents(list);
     return 0;
 }
 #endif
