@@ -730,6 +730,7 @@ class MainComponent : public juce::Component, public juce::Timer
         std::string pathprefix = R"(C:\Program Files\Common Files\)";
 
         m_graph = std::make_unique<XAPGraph>();
+        m_graph->addProcessorAsNode(std::make_unique<ModulatorSource>(1, 0.0), "LFO 1");
         m_graph->addProcessorAsNode(
             std::make_unique<ClapPluginFormatProcessor>(
                 R"(C:\Program Files\Common Files\CLAP\ChowMultiTool.clap)", 0),
@@ -755,6 +756,8 @@ class MainComponent : public juce::Component, public juce::Timer
                                  m_graph->findNodeByName("Main out"), 0, 0);
         connectAudioBetweenNodes(m_graph->findNodeByName("Valhalla"), 0, 1,
                                  m_graph->findNodeByName("Main out"), 0, 1);
+        connectModulation(m_graph->findNodeByName("LFO 1"), 0, m_graph->findNodeByName("Valhalla"),
+                          0, true, 0.0);
         juce::Random rng{7};
         for (auto &n : m_graph->proc_nodes)
         {

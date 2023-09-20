@@ -285,7 +285,7 @@ class ToneProcessorTest : public XAPWithJuceGUI
     int m_mod_out_counter = 0;
 };
 
-class ModulatorSource : public xenakios::XAudioProcessor
+class ModulatorSource : public XAPWithJuceGUI
 {
   public:
     std::vector<clap_param_info> m_param_infos;
@@ -326,7 +326,13 @@ class ModulatorSource : public xenakios::XAudioProcessor
         return (1 - a) * table_envrate_linear[e & 0x1ff] +
                a * table_envrate_linear[(e + 1) & 0x1ff];
     }
-
+    bool guiCreate(const char *api, bool isFloating) noexcept override
+    {
+        m_editor = std::make_unique<xenakios::GenericEditor>(*this);
+        m_editor->setSize(500, 120);
+        return true;
+    }
+    void guiDestroy() noexcept override { m_editor = nullptr; }
     ModulatorSource(int maxpolyphony, double initialRate)
     {
         m_rate = initialRate;
@@ -377,7 +383,8 @@ class ModulatorSource : public xenakios::XAudioProcessor
     }
     clap_process_status process(const clap_process *process) noexcept override
     {
-        auto inevents = process->in_events;
+        mergeParameterEvents(process);
+        auto inevents = m_merge_list.clapInputEvents();
         const clap_event_header *next_event = nullptr;
         auto esz = inevents->size(inevents);
         uint32_t nextEventIndex{0};
