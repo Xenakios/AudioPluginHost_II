@@ -153,7 +153,7 @@ class XAPWithJuceGUI : public xenakios::XAudioProcessor
         *height = m_editor->getHeight();
         return true;
     }
-    // virtual bool guiCanResize() const noexcept { return false; }
+    bool guiCanResize() const noexcept override { return true; }
     // virtual bool guiGetResizeHints(clap_gui_resize_hints_t *hints) noexcept { return false; }
     // virtual bool guiAdjustSize(uint32_t *width, uint32_t *height) noexcept
     //{
@@ -276,7 +276,8 @@ class ToneProcessorTest : public XAPWithJuceGUI
     bool guiCreate(const char *api, bool isFloating) noexcept override
     {
         m_editor = std::make_unique<xenakios::GenericEditor>(*this);
-        m_editor->setSize(500, 80);
+        if (OnPluginRequestedResize)
+            OnPluginRequestedResize(500, 90);
         return true;
     }
     void guiDestroy() noexcept override { m_editor = nullptr; }

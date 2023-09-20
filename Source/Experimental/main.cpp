@@ -608,18 +608,14 @@ inline void test_graph_processor_offline()
     delete writer;
 }
 
-class XapWindow : public juce::DocumentWindow
+struct PluginContentComponent : public juce::Component
 {
-  public:
     xenakios::XAudioProcessor &m_proc;
-    XapWindow(xenakios::XAudioProcessor &proc)
-        : juce::DocumentWindow("XAP", juce::Colours::darkgrey, 4, true), m_proc(proc)
+    juce::Label infoLabel;
+    PluginContentComponent(xenakios::XAudioProcessor &proc) : m_proc(proc)
     {
-        setUsingNativeTitleBar(true);
-        setVisible(true);
-        setAlwaysOnTop(true);
-        setWantsKeyboardFocus(true);
-
+        addAndMakeVisible(infoLabel);
+        infoLabel.setText("JUUUUUUUUUUUUUUUUUHHHHHHHHHHHHHH", juce::dontSendNotification);
         juce::MessageManager::callAsync([this]() {
             clap_plugin_descriptor desc;
             auto m_test_proc = &m_proc;
@@ -648,28 +644,46 @@ class XapWindow : public juce::DocumentWindow
                 m_plugin_requested_resize = false;
             };
         });
+        setSize(10, 10);
+    }
+    void resized() override
+    {
+        auto m_test_proc = &m_proc;
+        uint32_t w = 0;
+        uint32_t h = 0;
+        m_test_proc->guiGetSize(&w, &h);
+        infoLabel.setBounds(0, getHeight() - m_info_area_margin, getWidth(), m_info_area_margin);
+
+        if (!m_plugin_requested_resize && m_test_proc->guiCanResize())
+            m_test_proc->guiSetSize(getWidth(), getHeight() - m_info_area_margin);
+    }
+
+    int m_info_area_margin = 25;
+    bool m_plugin_requested_resize = false;
+};
+
+class XapWindow : public juce::DocumentWindow
+{
+  public:
+    xenakios::XAudioProcessor &m_proc;
+    PluginContentComponent m_content;
+    XapWindow(xenakios::XAudioProcessor &proc)
+        : juce::DocumentWindow("XAP", juce::Colours::darkgrey, 4, true), m_proc(proc),
+          m_content(proc)
+    {
+        setUsingNativeTitleBar(true);
+        setVisible(true);
+        setAlwaysOnTop(true);
+        setWantsKeyboardFocus(true);
+        setContentNonOwned(&m_content, true);
+        setResizable(true, false);
     }
     ~XapWindow() override
     {
         m_proc.guiHide();
         m_proc.guiDestroy();
     }
-    void resized() override
-    {
-        // if it was the plugin that requested the resize, don't
-        // resize the plugin again!
-        // if (m_plugin_requested_resize)
-        //    return;
-        auto m_test_proc = &m_proc;
-        uint32_t w = 0;
-        uint32_t h = 0;
-        m_test_proc->guiGetSize(&w, &h);
-        // m_info_label.setBounds(0, getHeight() - m_info_area_margin, getWidth(),
-        // m_info_area_margin);
-        //  m_plug_area.setBounds(0, 25, getWidth(), h);
-        if (!m_plugin_requested_resize && m_test_proc->guiCanResize())
-            m_test_proc->guiSetSize(getWidth(), getHeight() - m_info_area_margin);
-    }
+    void resized() override { m_content.setBounds(0, 0, getWidth(), getHeight()); }
     void closeButtonPressed() override
     {
         if (OnRequestDelete)
@@ -680,6 +694,7 @@ class XapWindow : public juce::DocumentWindow
     std::function<void(XapWindow *)> OnRequestDelete;
     bool m_plugin_requested_resize = false;
     int m_info_area_margin = 25;
+    juce::Label m_info_label;
 };
 
 class MainComponent : public juce::Component, public juce::Timer
@@ -755,10 +770,7 @@ class MainComponent : public juce::Component, public juce::Timer
         m_aman.removeAudioCallback(m_player.get());
     }
     bool m_plugin_requested_resize = false;
-    void resized() override 
-    {
-        m_infolabel.setBounds(0,0,getWidth(),25);
-    }
+    void resized() override { m_infolabel.setBounds(0, 0, getWidth(), 25); }
 };
 
 class GuiAppApplication : public juce::JUCEApplication
