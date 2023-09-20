@@ -198,6 +198,8 @@ inline XAPNode *findByName(std::vector<std::unique_ptr<XAPNode>> &nodes, std::st
 inline void printClapEvents(clap::helpers::EventList &elist)
 {
     std::string line;
+    std::cout << std::format("{:5}|{:20}|{:10}|{}\n", "Time", "Event type", "Param ID",
+                             "Value/Amt");
     for (int i = 0; i < elist.size(); ++i)
     {
         auto ev = elist.get(i);
@@ -213,14 +215,14 @@ inline void printClapEvents(clap::helpers::EventList &elist)
         if (ev->type == CLAP_EVENT_PARAM_VALUE)
         {
             auto pev = reinterpret_cast<const clap_event_param_value *>(ev);
-            line = std::format("{:5} CLAP PARAM VALUE {} {}", pev->header.time, pev->param_id,
-                               pev->value);
+            line = std::format("{:5}|{:20}|{:10}|{}", pev->header.time, "CLAP PARAM VALUE",
+                               pev->param_id, pev->value);
         }
         if (ev->type == CLAP_EVENT_PARAM_MOD)
         {
             auto pev = reinterpret_cast<const clap_event_param_mod *>(ev);
-            line = std::format("{:5} CLAP PARAM MOD {} {}", pev->header.time, pev->param_id,
-                               pev->amount);
+            line = std::format("{:5}|{:20}|{:10}|{}", pev->header.time, "CLAP PARAM MOD",
+                               pev->param_id, pev->amount);
         }
         std::cout << line << "\n";
     }
@@ -301,6 +303,13 @@ class XAPGraph : public xenakios::XAudioProcessor
     {
         proc_nodes.emplace_back(std::make_unique<XAPNode>(std::move(proc), id));
     }
+    XAPNode *findNodeByName(std::string name)
+    {
+        for (auto &n : proc_nodes)
+            if (n->displayName == name)
+                return n.get();
+        return nullptr;
+    }
     void addTestNodes()
     {
         std::string pathprefix = R"(C:\Program Files\Common Files\)";
@@ -376,7 +385,7 @@ class XAPGraph : public xenakios::XAudioProcessor
     {
         if (proc_nodes.size() == 0)
             return false;
-        runOrder = topoSort(findByName(proc_nodes, outputNodeId));
+        runOrder = topoSort(findNodeByName(outputNodeId));
         std::cout << "**** GRAPH RUN ORDER ****\n";
         for (auto &n : runOrder)
         {
@@ -637,7 +646,7 @@ struct PluginContentComponent : public juce::Component
             uint32_t h = 0;
             if (m_test_proc->guiGetSize(&w, &h))
             {
-                setSize(w, h);
+                setSize(w, h + m_info_area_margin);
             }
             m_test_proc->guiShow();
             m_test_proc->OnPluginRequestedResize = [this](uint32_t neww, uint32_t newh) {
@@ -738,14 +747,14 @@ class MainComponent : public juce::Component, public juce::Timer
         //    1);
 
         m_graph->outputNodeId = "Main out";
-        connectAudioBetweenNodes(findByName(m_graph->proc_nodes, "Tone generator"), 0, 0,
-                                 findByName(m_graph->proc_nodes, "Valhalla"), 0, 0);
-        connectAudioBetweenNodes(findByName(m_graph->proc_nodes, "Tone generator"), 0, 1,
-                                 findByName(m_graph->proc_nodes, "Valhalla"), 0, 1);
-        connectAudioBetweenNodes(findByName(m_graph->proc_nodes, "Valhalla"), 0, 0,
-                                 findByName(m_graph->proc_nodes, "Main out"), 0, 0);
-        connectAudioBetweenNodes(findByName(m_graph->proc_nodes, "Valhalla"), 0, 1,
-                                 findByName(m_graph->proc_nodes, "Main out"), 0, 1);
+        connectAudioBetweenNodes(m_graph->findNodeByName("Tone generator"), 0, 0,
+                                 m_graph->findNodeByName("Valhalla"), 0, 0);
+        connectAudioBetweenNodes(m_graph->findNodeByName("Tone generator"), 0, 1,
+                                 m_graph->findNodeByName("Valhalla"), 0, 1);
+        connectAudioBetweenNodes(m_graph->findNodeByName("Valhalla"), 0, 0,
+                                 m_graph->findNodeByName("Main out"), 0, 0);
+        connectAudioBetweenNodes(m_graph->findNodeByName("Valhalla"), 0, 1,
+                                 m_graph->findNodeByName("Main out"), 0, 1);
         juce::Random rng{7};
         for (auto &n : m_graph->proc_nodes)
         {
@@ -766,7 +775,7 @@ class MainComponent : public juce::Component, public juce::Timer
 
         m_player = std::make_unique<XAPPlayer>(*m_graph);
         m_aman.initialiseWithDefaultDevices(0, 2);
-        // m_aman.addAudioCallback(m_player.get());
+        m_aman.addAudioCallback(m_player.get());
         setSize(500, 100);
     }
     ~MainComponent() override
@@ -842,7 +851,7 @@ class GuiAppApplication : public juce::JUCEApplication
     std::unique_ptr<MainWindow> mainWindow;
 };
 
-#define TESTJUCEGUI 0
+#define TESTJUCEGUI 1
 
 #if TESTJUCEGUI
 
