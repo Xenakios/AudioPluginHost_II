@@ -633,7 +633,8 @@ struct PluginContentComponent : public juce::Component
             auto m_test_proc = &m_proc;
             if (m_test_proc->getDescriptor(&desc))
             {
-                setName(juce::String(desc.vendor) + " : " + desc.name);
+                if (getParentComponent())
+                    getParentComponent()->setName(juce::String(desc.vendor) + " : " + desc.name);
             }
             m_test_proc->guiCreate("", false);
             clap_window win;
@@ -718,6 +719,7 @@ class MainComponent : public juce::Component, public juce::Timer
     std::unique_ptr<XAPPlayer> m_player;
     int m_info_area_margin = 25;
     juce::Label m_infolabel;
+    juce::ComboBox m_mod_rout_combo;
     void timerCallback() override
     {
         int usage = m_aman.getCpuUsage() * 100.0;
@@ -726,11 +728,13 @@ class MainComponent : public juce::Component, public juce::Timer
     MainComponent()
     {
         addAndMakeVisible(m_infolabel);
+        addAndMakeVisible(m_mod_rout_combo);
+
         startTimerHz(10);
         std::string pathprefix = R"(C:\Program Files\Common Files\)";
 
         m_graph = std::make_unique<XAPGraph>();
-        m_graph->addProcessorAsNode(std::make_unique<ModulatorSource>(1, 0.0), "LFO 1");
+
         m_graph->addProcessorAsNode(
             std::make_unique<ClapPluginFormatProcessor>(
                 R"(C:\Program Files\Common Files\CLAP\ChowMultiTool.clap)", 0),
@@ -756,6 +760,7 @@ class MainComponent : public juce::Component, public juce::Timer
                                  m_graph->findNodeByName("Main out"), 0, 0);
         connectAudioBetweenNodes(m_graph->findNodeByName("Valhalla"), 0, 1,
                                  m_graph->findNodeByName("Main out"), 0, 1);
+        m_graph->addProcessorAsNode(std::make_unique<ModulatorSource>(1, 0.0), "LFO 1");
         connectModulation(m_graph->findNodeByName("LFO 1"), 0, m_graph->findNodeByName("Valhalla"),
                           0, true, 0.0);
         juce::Random rng{7};
@@ -779,6 +784,7 @@ class MainComponent : public juce::Component, public juce::Timer
         m_player = std::make_unique<XAPPlayer>(*m_graph);
         m_aman.initialiseWithDefaultDevices(0, 2);
         m_aman.addAudioCallback(m_player.get());
+        initModBox();
         setSize(500, 100);
     }
     ~MainComponent() override
@@ -786,8 +792,34 @@ class MainComponent : public juce::Component, public juce::Timer
         m_xap_windows.clear();
         m_aman.removeAudioCallback(m_player.get());
     }
+    void initModBox()
+    {
+
+        auto valhnode = m_graph->findNodeByName("Valhalla");
+        auto valh = valhnode->processor.get();
+        for (int i = 0; i < valh->paramsCount(); ++i)
+        {
+            m_mod_rout_combo.addItem(juce::String(i), i + 1);
+        }
+        m_mod_rout_combo.setSelectedItemIndex(0, false);
+        m_mod_rout_combo.onChange = [this, valhnode]() {
+            int destpar = m_mod_rout_combo.getSelectedItemIndex();
+            for (auto &conn : valhnode->inputConnections)
+            {
+                if (conn.type == XAPNode::ConnectionType::Modulation)
+                {
+                    conn.destinationParameter = destpar;
+                    break;
+                }
+            }
+        };
+    }
     bool m_plugin_requested_resize = false;
-    void resized() override { m_infolabel.setBounds(0, 0, getWidth(), 25); }
+    void resized() override
+    {
+        m_infolabel.setBounds(0, 0, getWidth(), 25);
+        m_mod_rout_combo.setBounds(0, m_infolabel.getBottom() + 1, 50, 25);
+    }
 };
 
 class GuiAppApplication : public juce::JUCEApplication
