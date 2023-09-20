@@ -180,13 +180,14 @@ class XAPWithJuceGUI : public xenakios::XAudioProcessor
     }
 };
 
-class ToneProcessorTest : public xenakios::XAudioProcessor
+class ToneProcessorTest : public XAPWithJuceGUI
 {
   public:
     std::vector<clap_param_info> m_param_infos;
     juce::dsp::Oscillator<float> m_osc;
     double m_pitch = 60.0;
     double m_pitch_mod = 0.0f;
+    double m_distortion_amt = 0.0;
     enum class ParamIds
     {
         Pitch = 5034,
@@ -231,7 +232,8 @@ class ToneProcessorTest : public xenakios::XAudioProcessor
     }
     clap_process_status process(const clap_process *process) noexcept override
     {
-        auto inEvents = process->in_events;
+        mergeParameterEvents(process);
+        auto inEvents = m_merge_list.clapInputEvents();
         for (int i = 0; i < inEvents->size(inEvents); ++i)
         {
             auto ev = inEvents->get(inEvents, i);
@@ -241,6 +243,10 @@ class ToneProcessorTest : public xenakios::XAudioProcessor
                 if (pvev->param_id == (clap_id)ParamIds::Pitch)
                 {
                     m_pitch = pvev->value;
+                }
+                if (pvev->param_id == (clap_id)ParamIds::Distortion)
+                {
+                    m_distortion_amt = pvev->value;
                 }
             }
             if (ev->type == CLAP_EVENT_PARAM_MOD)
@@ -255,45 +261,25 @@ class ToneProcessorTest : public xenakios::XAudioProcessor
         double finalpitch = m_pitch + m_pitch_mod;
         double hz = 440.0 * std::pow(2.0, 1.0 / 12 * (finalpitch - 69.0));
         m_osc.setFrequency(hz);
-        if (!m_outputs_modulation)
+        double distvolume = m_distortion_amt * 48.0;
+        double distgain = juce::Decibels::decibelsToGain(distvolume);
+        for (int i = 0; i < process->frames_count; ++i)
         {
-            for (int i = 0; i < process->frames_count; ++i)
-            {
-                float s = m_osc.processSample(0.0f);
-                s = std::tanh(s) * 0.5;
-                process->audio_outputs[0].data32[0][i] = s;
-                process->audio_outputs[0].data32[1][i] = s;
-            }
-        }
-        else
-        {
-            for (int i = 0; i < process->frames_count; ++i)
-            {
-                float s = m_osc.processSample(0.0f);
-                if (m_mod_out_counter == 0)
-                {
-                    clap_event_param_mod pv;
-                    pv.header.space_id = CLAP_CORE_EVENT_SPACE_ID;
-                    pv.header.size = sizeof(clap_event_param_mod);
-                    pv.header.flags = 0;
-                    pv.header.time = i;
-                    pv.header.type = CLAP_EVENT_PARAM_MOD;
-                    pv.cookie = nullptr;
-                    pv.param_id = m_mod_out_par_id;
-                    pv.amount = s;
-                    process->out_events->try_push(process->out_events,
-                                                  reinterpret_cast<const clap_event_header *>(&pv));
-                }
-                ++m_mod_out_counter;
-                if (m_mod_out_counter == m_mod_out_block_size)
-                {
-                    m_mod_out_counter = 0;
-                }
-            }
+            float s = m_osc.processSample(0.0f);
+            s = std::tanh(s * distgain) * 0.25;
+            process->audio_outputs[0].data32[0][i] = s;
+            process->audio_outputs[0].data32[1][i] = s;
         }
 
         return CLAP_PROCESS_CONTINUE;
     }
+    bool guiCreate(const char *api, bool isFloating) noexcept override
+    {
+        m_editor = std::make_unique<xenakios::GenericEditor>(*this);
+        m_editor->setSize(500, 80);
+        return true;
+    }
+    void guiDestroy() noexcept override { m_editor = nullptr; }
     int m_mod_out_block_size = 401;
     int m_mod_out_counter = 0;
 };
