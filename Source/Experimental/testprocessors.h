@@ -277,7 +277,7 @@ class ToneProcessorTest : public XAPWithJuceGUI
     {
         m_editor = std::make_unique<xenakios::GenericEditor>(*this);
         if (OnPluginRequestedResize)
-            OnPluginRequestedResize(500, 90);
+            OnPluginRequestedResize(500, 100);
         return true;
     }
     void guiDestroy() noexcept override { m_editor = nullptr; }
@@ -510,7 +510,7 @@ class GainProcessorTest : public XAPWithJuceGUI
     bool guiCreate(const char *api, bool isFloating) noexcept override
     {
         m_editor = std::make_unique<xenakios::GenericEditor>(*this);
-        m_editor->setSize(500, 80);
+        m_editor->setSize(500, 100);
         return true;
     }
     void guiDestroy() noexcept override { m_editor = nullptr; }

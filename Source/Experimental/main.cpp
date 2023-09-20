@@ -743,10 +743,12 @@ class MainComponent : public juce::Component, public juce::Timer
                                  findByName(m_graph->proc_nodes, "Main out"), 0, 0);
         connectAudioBetweenNodes(findByName(m_graph->proc_nodes, "Valhalla"), 0, 1,
                                  findByName(m_graph->proc_nodes, "Main out"), 0, 1);
+        juce::Random rng{7};
         for (auto &n : m_graph->proc_nodes)
         {
             m_xap_windows.emplace_back(std::make_unique<XapWindow>(*n->processor));
-            m_xap_windows.back()->setTopLeftPosition(50, 50);
+            m_xap_windows.back()->setTopLeftPosition(rng.nextInt({10, 600}),
+                                                     rng.nextInt({100, 400}));
             m_xap_windows.back()->OnRequestDelete = [this](XapWindow *w) {
                 for (int i = 0; i < m_xap_windows.size(); ++i)
                 {
@@ -761,7 +763,7 @@ class MainComponent : public juce::Component, public juce::Timer
 
         m_player = std::make_unique<XAPPlayer>(*m_graph);
         m_aman.initialiseWithDefaultDevices(0, 2);
-        m_aman.addAudioCallback(m_player.get());
+        // m_aman.addAudioCallback(m_player.get());
         setSize(500, 100);
     }
     ~MainComponent() override
