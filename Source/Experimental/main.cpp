@@ -682,7 +682,7 @@ class XapWindow : public juce::DocumentWindow
     int m_info_area_margin = 25;
 };
 
-class MainComponent : public juce::Component
+class MainComponent : public juce::Component, public juce::Timer
 {
   public:
     std::vector<std::unique_ptr<XapWindow>> m_xap_windows;
@@ -690,9 +690,16 @@ class MainComponent : public juce::Component
     std::unique_ptr<XAPGraph> m_graph;
     std::unique_ptr<XAPPlayer> m_player;
     int m_info_area_margin = 25;
+    juce::Label m_infolabel;
+    void timerCallback() override
+    {
+        int usage = m_aman.getCpuUsage() * 100.0;
+        m_infolabel.setText("CPU " + juce::String(usage) + "%", juce::dontSendNotification);
+    }
     MainComponent()
     {
-
+        addAndMakeVisible(m_infolabel);
+        startTimerHz(10);
         std::string pathprefix = R"(C:\Program Files\Common Files\)";
 
         m_graph = std::make_unique<XAPGraph>();
@@ -739,7 +746,7 @@ class MainComponent : public juce::Component
         m_player = std::make_unique<XAPPlayer>(*m_graph);
         m_aman.initialiseWithDefaultDevices(0, 2);
         m_aman.addAudioCallback(m_player.get());
-        setSize(100, 100);
+        setSize(500, 100);
     }
     ~MainComponent() override
     {
@@ -747,7 +754,10 @@ class MainComponent : public juce::Component
         m_aman.removeAudioCallback(m_player.get());
     }
     bool m_plugin_requested_resize = false;
-    void resized() override {}
+    void resized() override 
+    {
+        m_infolabel.setBounds(0,0,getWidth(),25);
+    }
 };
 
 class GuiAppApplication : public juce::JUCEApplication
