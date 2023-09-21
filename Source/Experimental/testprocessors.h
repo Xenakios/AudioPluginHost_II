@@ -77,7 +77,6 @@ inline clap_param_info makeParamInfo(clap_id paramId, juce::String name, double 
     return result;
 }
 
-
 class ToneProcessorTest : public XAPWithJuceGUI
 {
   public:
@@ -210,11 +209,13 @@ class ModulatorSource : public XAPWithJuceGUI
     {
         ModType = 4900,
         Rate = 665,
-        PolyShift = 5
+        PolyShift = 5,
+        Deform = 900
     };
     int m_mod_type = 0;
     double m_rate = 0.0;
     double m_poly_shift = 0.0;
+    double m_deform = 0.0;
     static constexpr int BLOCK_SIZE = 64;
     static constexpr int BLOCK_SIZE_OS = BLOCK_SIZE * 2;
     alignas(32) float table_envrate_linear[512];
@@ -246,7 +247,7 @@ class ModulatorSource : public XAPWithJuceGUI
     bool guiCreate(const char *api, bool isFloating) noexcept override
     {
         m_editor = std::make_unique<xenakios::GenericEditor>(*this);
-        m_editor->setSize(500, 120);
+        m_editor->setSize(500, 150);
         return true;
     }
     void guiDestroy() noexcept override { m_editor = nullptr; }
@@ -260,6 +261,9 @@ class ModulatorSource : public XAPWithJuceGUI
         m_param_infos.push_back(makeParamInfo((clap_id)ParamIds::ModType, "Modulation type", 0.0,
                                               6.0, 0.0,
                                               CLAP_PARAM_IS_AUTOMATABLE | CLAP_PARAM_IS_STEPPED));
+        m_param_infos.push_back(
+            makeParamInfo((clap_id)ParamIds::Deform, "Deform", -1.0, 1.0, 0.0,
+                          CLAP_PARAM_IS_AUTOMATABLE | CLAP_PARAM_IS_MODULATABLE));
         m_param_infos.push_back(
             makeParamInfo((clap_id)ParamIds::Rate, "Rate", -1.0, 3.0, 0.00,
                           CLAP_PARAM_IS_AUTOMATABLE | CLAP_PARAM_IS_MODULATABLE));
@@ -294,6 +298,8 @@ class ModulatorSource : public XAPWithJuceGUI
                 m_rate = pev->value;
             if (pev->param_id == to_clap_id(ParamIds::PolyShift))
                 m_poly_shift = pev->value;
+            if (pev->param_id == to_clap_id(ParamIds::Deform))
+                m_deform = pev->value;
             if (pev->param_id == to_clap_id(ParamIds::ModType))
                 m_mod_type = static_cast<int>(pev->value);
         }
@@ -325,10 +331,9 @@ class ModulatorSource : public XAPWithJuceGUI
             {
                 for (int j = 0; j < m_lfos.size(); ++j)
                 {
-                    // here should do the actual shift based on used LFO number
-                    double polyshift_to_use = m_poly_shift;
+                    double polyshift_to_use = juce::jmap<double>(j, 0, m_lfos.size(), 0.0, 1.0);
                     m_lfos[j]->applyPhaseOffset(polyshift_to_use);
-                    m_lfos[j]->process_block(m_rate, 0.0f, m_mod_type, false);
+                    m_lfos[j]->process_block(m_rate, m_deform, m_mod_type, false);
                     clap_event_param_mod ev;
                     ev.header.size = sizeof(clap_event_param_mod);
                     ev.header.space_id = CLAP_CORE_EVENT_SPACE_ID;
@@ -462,7 +467,6 @@ class GainProcessorTest : public XAPWithJuceGUI
     }
     void guiDestroy() noexcept override { m_editor = nullptr; }
 };
-
 
 const size_t maxHolderDataSize = 128;
 
