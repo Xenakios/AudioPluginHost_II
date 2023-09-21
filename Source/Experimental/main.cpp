@@ -45,6 +45,7 @@ class XAPNode
     struct Connection
     {
         XAPNode *source = nullptr;
+        XAPNode *destination = nullptr;
         ConnectionType type = ConnectionType::Audio;
         int sourcePort = 0;
         // we could use this for events but we probably want to do stuff like note channel
@@ -169,6 +170,7 @@ inline bool connectModulation(XAPNode *sourceNode, clap_id sourceParamId, XAPNod
     XAPNode::Connection conn;
     conn.type = XAPNode::ConnectionType::Modulation;
     conn.source = sourceNode;
+    conn.destination = destinationNode;
     conn.sourcePort = 0;
     conn.destinationPort = 0;
     conn.sourceParameter = sourceParamId;
@@ -322,6 +324,21 @@ class XAPGraph : public xenakios::XAudioProcessor
             if (n->displayName == name)
                 return n.get();
         return nullptr;
+    }
+    std::vector<XAPNode::Connection *> getModulationConnections()
+    {
+        std::vector<XAPNode::Connection *> result;
+        for (auto &n : proc_nodes)
+        {
+            for (auto &conn : n->inputConnections)
+            {
+                if (conn.type == XAPNode::ConnectionType::Modulation)
+                {
+                    result.push_back(&conn);
+                }
+            }
+        }
+        return result;
     }
     void addTestNodes()
     {
@@ -800,9 +817,19 @@ class MainComponent : public juce::Component, public juce::Timer
         connectAudioBetweenNodes(m_graph->findNodeByName("Valhalla"), 0, 1,
                                  m_graph->findNodeByName("Main out"), 0, 1);
         m_graph->addProcessorAsNode(std::make_unique<ModulatorSource>(1, 0.0), "LFO 1");
+        m_graph->addProcessorAsNode(std::make_unique<ModulatorSource>(1, 0.1), "LFO 2");
         connectModulation(m_graph->findNodeByName("LFO 1"), 0,
                           m_graph->findNodeByName("File player"),
                           (clap_id)FilePlayerProcessor::ParamIds::Pitch, false, 3.0);
+        connectModulation(m_graph->findNodeByName("LFO 2"), 0,
+                          m_graph->findNodeByName("File player"),
+                          (clap_id)FilePlayerProcessor::ParamIds::Playrate, false, 1.0);
+        auto modulations = m_graph->getModulationConnections();
+        for (auto &mc : modulations)
+        {
+            DBG(mc->source->displayName << " modulates " << mc->destination->displayName
+                                        << " param " << (int)mc->destinationParameter);
+        }
         juce::Random rng{7};
         for (auto &n : m_graph->proc_nodes)
         {

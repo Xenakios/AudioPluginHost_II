@@ -265,7 +265,7 @@ class ModulatorSource : public XAPWithJuceGUI
             makeParamInfo((clap_id)ParamIds::Deform, "Deform", -1.0, 1.0, 0.0,
                           CLAP_PARAM_IS_AUTOMATABLE | CLAP_PARAM_IS_MODULATABLE));
         m_param_infos.push_back(
-            makeParamInfo((clap_id)ParamIds::Rate, "Rate", -1.0, 3.0, 0.00,
+            makeParamInfo((clap_id)ParamIds::Rate, "Rate", -3.0, 3.0, 0.00,
                           CLAP_PARAM_IS_AUTOMATABLE | CLAP_PARAM_IS_MODULATABLE));
         m_param_infos.push_back(
             makeParamInfo((clap_id)ParamIds::PolyShift, "Phase shift", 0.0, 1.0, 0.00,
