@@ -6,6 +6,7 @@
 #include <clap/helpers/event-list.hh>
 #include "clap_xaudioprocessor.h"
 #include "juce_xaudioprocessor.h"
+#include "fileplayer_xaudioprocessor.h"
 #include "xap_utils.h"
 
 inline void mapModulationEvents(const clap::helpers::EventList &sourceList, clap_id sourceParId,
