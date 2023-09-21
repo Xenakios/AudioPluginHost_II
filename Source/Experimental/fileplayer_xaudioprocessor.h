@@ -20,10 +20,10 @@ class FilePlayerProcessor : public XAPWithJuceGUI
     juce::dsp::Gain<float> m_gain_proc;
     double m_volume = 0.0f;
     double m_volume_mod = 0.0f;
-    double m_rate = 0.0;     // time octaves!
-    double m_rate_mod = 0.0; // as above
-    double m_pitch = 0.0; // semitones
-    double m_pitch_mod = 0.0; // semitones
+    double m_rate = 0.0;       // time octaves!
+    double m_rate_mod = 0.0;   // as above
+    double m_pitch = 0.0;      // semitones
+    double m_pitch_mod = 0.0;  // semitones
     double m_loop_start = 0.0; // proportion of whole file
     double m_loop_end = 1.0;
     bool m_preserve_pitch = true;
@@ -275,8 +275,10 @@ class FilePlayerProcessor : public XAPWithJuceGUI
         int xfadelen = 4000;
         if (preserve_pitch)
         {
-            float pshift = m_pitch;
-            float pitchratio = std::pow(2.0, pshift / 12.0);
+            double pshift = m_pitch;
+            pshift += m_pitch_mod;
+            pshift = std::clamp(pshift, -12.0, 12.0);
+            double pitchratio = std::pow(2.0, pshift / 12.0);
             m_stretch.setTransposeFactor(pitchratio * compensrate);
             rate *= compensrate;
             int samplestopush = process->frames_count * rate;

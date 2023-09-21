@@ -1,5 +1,6 @@
 #pragma once
 
+#include "JuceHeader.h"
 #include "xaudioprocessor.h"
 #include "containers/choc_SingleReaderSingleWriterFIFO.h"
 

@@ -802,7 +802,7 @@ class MainComponent : public juce::Component, public juce::Timer
         m_graph->addProcessorAsNode(std::make_unique<ModulatorSource>(1, 0.0), "LFO 1");
         connectModulation(m_graph->findNodeByName("LFO 1"), 0,
                           m_graph->findNodeByName("File player"),
-                          (clap_id)FilePlayerProcessor::ParamIds::Playrate, false, 0.1);
+                          (clap_id)FilePlayerProcessor::ParamIds::Pitch, false, 3.0);
         juce::Random rng{7};
         for (auto &n : m_graph->proc_nodes)
         {

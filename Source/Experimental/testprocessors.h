@@ -10,8 +10,6 @@
 #include "xap_generic_editor.h"
 #include "xapwithjucegui.h"
 
-
-
 inline clap_event_param_mod makeClapParameterModEvent(int time, clap_id paramId, double value,
                                                       void *cookie = nullptr, int port = -1,
                                                       int channel = -1, int key = -1,
@@ -260,7 +258,7 @@ class ModulatorSource : public XAPWithJuceGUI
             m_lfos.push_back(std::make_unique<LFOType>(this));
         }
         m_param_infos.push_back(makeParamInfo((clap_id)ParamIds::ModType, "Modulation type", 0.0,
-                                              2.0, 0.0,
+                                              6.0, 0.0,
                                               CLAP_PARAM_IS_AUTOMATABLE | CLAP_PARAM_IS_STEPPED));
         m_param_infos.push_back(
             makeParamInfo((clap_id)ParamIds::Rate, "Rate", -1.0, 3.0, 0.00,
@@ -327,7 +325,9 @@ class ModulatorSource : public XAPWithJuceGUI
             {
                 for (int j = 0; j < m_lfos.size(); ++j)
                 {
-                    m_lfos[j]->applyPhaseOffset(m_poly_shift);
+                    // here should do the actual shift based on used LFO number
+                    double polyshift_to_use = m_poly_shift;
+                    m_lfos[j]->applyPhaseOffset(polyshift_to_use);
                     m_lfos[j]->process_block(m_rate, 0.0f, m_mod_type, false);
                     clap_event_param_mod ev;
                     ev.header.size = sizeof(clap_event_param_mod);
@@ -370,7 +370,7 @@ class GainProcessorTest : public XAPWithJuceGUI
     GainProcessorTest()
     {
         m_param_infos.push_back(
-            makeParamInfo((clap_id)ParamIds::Volume, "Gain", -96.0, 0.0, -6.0,
+            makeParamInfo((clap_id)ParamIds::Volume, "Gain", -96.0, 0.0, -12.0,
                           CLAP_PARAM_IS_AUTOMATABLE | CLAP_PARAM_IS_MODULATABLE));
         m_param_infos.push_back(makeParamInfo((clap_id)ParamIds::Smoothing, "Smoothing length", 0.0,
                                               1.0, 0.02, CLAP_PARAM_IS_AUTOMATABLE));
