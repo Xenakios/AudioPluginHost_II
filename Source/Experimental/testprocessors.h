@@ -636,7 +636,25 @@ class FilePlayerProcessor : public XAPWithJuceGUI
                           CLAP_PARAM_IS_AUTOMATABLE | CLAP_PARAM_IS_MODULATABLE));
         importFile(juce::File(R"(C:\MusicAudio\sourcesamples\there was a time .wav)"));
     }
-
+    uint32_t audioPortsCount(bool isInput) const noexcept override 
+    { 
+        if (isInput)
+            return 0; 
+        return 1;
+    }
+    bool audioPortsInfo(uint32_t index, bool isInput,
+                                clap_audio_port_info *info) const noexcept override
+    {
+        if (isInput)
+            return false;
+        info->channel_count = 2;
+        info->flags = 0;
+        info->id = 4400;
+        info->in_place_pair = false;
+        info->port_type = "";
+        strcpy_s(info->name,"File player output");
+        return true;
+    }
     bool renderSetMode(clap_plugin_render_mode mode) noexcept override
     {
         if (mode == CLAP_RENDER_OFFLINE)
@@ -739,7 +757,8 @@ class FilePlayerProcessor : public XAPWithJuceGUI
     }
     clap_process_status process(const clap_process *process) noexcept override
     {
-        auto inevts = process->in_events;
+        mergeParameterEvents(process);
+        auto inevts = m_merge_list.clapInputEvents();
         for (int i = 0; i < inevts->size(inevts); ++i)
         {
             auto ev = inevts->get(inevts, i);
@@ -773,7 +792,7 @@ class FilePlayerProcessor : public XAPWithJuceGUI
         auto wbuf = m_work_buf.getArrayOfWritePointers();
         int cachedpos = m_buf_playpos;
         float compensrate = m_file_sample_rate / m_sr;
-        bool preserve_pitch = true;
+        bool preserve_pitch = m_preserve_pitch;
         float rate = m_rate;
         auto getxfadedsample = [](const float *srcbuf, int index, int start, int end,
                                   int xfadelen) {

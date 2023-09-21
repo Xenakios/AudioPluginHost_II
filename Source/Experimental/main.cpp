@@ -786,15 +786,15 @@ class MainComponent : public juce::Component, public juce::Timer
         m_graph->addProcessorAsNode(std::make_unique<ToneProcessorTest>(), "Tone generator");
         // m_test_proc = std::make_unique<ClapPluginFormatProcessor>(
         //    R"(C:\Program Files\Common Files\CLAP\airwin-to-clap.clap)", 0);
-        // m_test_proc = std::make_unique<FilePlayerProcessor>();
+        m_graph->addProcessorAsNode(std::make_unique<FilePlayerProcessor>(), "File player");
         // m_test_proc = std::make_unique<ClapPluginFormatProcessor>(
         //    R"(C:\NetDownloads\17022023\conduit-win32-x64-nightly-2023-09-19-15-42\conduit_products\Conduit.clap)",
         //    1);
 
         m_graph->outputNodeId = "Main out";
-        connectAudioBetweenNodes(m_graph->findNodeByName("Tone generator"), 0, 0,
+        connectAudioBetweenNodes(m_graph->findNodeByName("File player"), 0, 0,
                                  m_graph->findNodeByName("Valhalla"), 0, 0);
-        connectAudioBetweenNodes(m_graph->findNodeByName("Tone generator"), 0, 0,
+        connectAudioBetweenNodes(m_graph->findNodeByName("File player"), 0, 0,
                                  m_graph->findNodeByName("Valhalla"), 0, 1);
         connectAudioBetweenNodes(m_graph->findNodeByName("Valhalla"), 0, 0,
                                  m_graph->findNodeByName("Main out"), 0, 0);
