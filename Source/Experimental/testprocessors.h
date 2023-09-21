@@ -477,21 +477,21 @@ class GainProcessorTest : public XAPWithJuceGUI
     }
     uint32_t audioPortsCount(bool isInput) const noexcept override { return 1; }
     bool audioPortsInfo(uint32_t index, bool isInput,
-                                clap_audio_port_info *info) const noexcept override
+                        clap_audio_port_info *info) const noexcept override
     {
         info->channel_count = 2;
         info->flags = 0;
         if (isInput)
         {
             info->id = 210;
-            strcpy_s(info->name,"Gain processor input");
+            strcpy_s(info->name, "Gain processor input");
         }
-        else 
+        else
         {
             info->id = 250;
-            strcpy_s(info->name,"Gain processor output");
+            strcpy_s(info->name, "Gain processor output");
         }
-        
+
         info->in_place_pair = false;
         info->port_type = "";
         return true;
@@ -580,11 +580,11 @@ class FilePlayerProcessor : public XAPWithJuceGUI
     juce::dsp::Gain<float> m_gain_proc;
     double m_volume = 0.0f;
     double m_volume_mod = 0.0f;
-    double m_rate = 1.0;
-    double m_rate_mod = 0.0;
-    double m_pitch = 0.0;
-    double m_pitch_mod = 0.0;
-    double m_loop_start = 0.0;
+    double m_rate = 0.0;     // time octaves!
+    double m_rate_mod = 0.0; // as above
+    double m_pitch = 0.0; // semitones
+    double m_pitch_mod = 0.0; // semitones
+    double m_loop_start = 0.0; // proportion of whole file
     double m_loop_end = 1.0;
     bool m_preserve_pitch = true;
     enum class ParamIds
@@ -613,14 +613,15 @@ class FilePlayerProcessor : public XAPWithJuceGUI
         return true;
     }
     void guiDestroy() noexcept override { m_editor = nullptr; }
-
+    static constexpr double minRate = -3.0;
+    static constexpr double maxRate = 2.0;
     FilePlayerProcessor()
     {
         m_param_infos.push_back(
             makeParamInfo((clap_id)ParamIds::Volume, "Volume", -36.0, 0.0, -6.0,
                           CLAP_PARAM_IS_AUTOMATABLE | CLAP_PARAM_IS_MODULATABLE));
         m_param_infos.push_back(
-            makeParamInfo((clap_id)ParamIds::Playrate, "Playrate", 0.1, 4.0, 1.0,
+            makeParamInfo((clap_id)ParamIds::Playrate, "Playrate", minRate, maxRate, 0.0,
                           CLAP_PARAM_IS_AUTOMATABLE | CLAP_PARAM_IS_MODULATABLE));
         m_param_infos.push_back(
             makeParamInfo((clap_id)ParamIds::Pitch, "Pitch", -12.0, 12.0, 0.0,
@@ -636,14 +637,14 @@ class FilePlayerProcessor : public XAPWithJuceGUI
                           CLAP_PARAM_IS_AUTOMATABLE | CLAP_PARAM_IS_MODULATABLE));
         importFile(juce::File(R"(C:\MusicAudio\sourcesamples\there was a time .wav)"));
     }
-    uint32_t audioPortsCount(bool isInput) const noexcept override 
-    { 
+    uint32_t audioPortsCount(bool isInput) const noexcept override
+    {
         if (isInput)
-            return 0; 
+            return 0;
         return 1;
     }
     bool audioPortsInfo(uint32_t index, bool isInput,
-                                clap_audio_port_info *info) const noexcept override
+                        clap_audio_port_info *info) const noexcept override
     {
         if (isInput)
             return false;
@@ -652,7 +653,7 @@ class FilePlayerProcessor : public XAPWithJuceGUI
         info->id = 4400;
         info->in_place_pair = false;
         info->port_type = "";
-        strcpy_s(info->name,"File player output");
+        strcpy_s(info->name, "File player output");
         return true;
     }
     bool renderSetMode(clap_plugin_render_mode mode) noexcept override
@@ -745,6 +746,20 @@ class FilePlayerProcessor : public XAPWithJuceGUI
             if (aev->param_id == to_clap_id(ParamIds::PreservePitch))
                 m_preserve_pitch = aev->value;
         }
+        if (ev->type == CLAP_EVENT_PARAM_MOD)
+        {
+            auto aev = reinterpret_cast<const clap_event_param_mod *>(ev);
+            if (aev->param_id == to_clap_id(ParamIds::Volume))
+                m_volume_mod = aev->amount;
+            if (aev->param_id == to_clap_id(ParamIds::Playrate))
+                m_rate_mod = aev->amount;
+            if (aev->param_id == to_clap_id(ParamIds::Pitch))
+                m_pitch_mod = aev->amount;
+            // if (aev->param_id == to_clap_id(ParamIds::LoopStart))
+            //     m_loop_start = aev->value;
+            // if (aev->param_id == to_clap_id(ParamIds::LoopEnd))
+            //     m_loop_end = aev->value;
+        }
         if (ev->space_id == XENAKIOS_CLAP_NAMESPACE && ev->type == XENAKIOS_EVENT_CHANGEFILE)
         {
             auto fch = reinterpret_cast<const xenakios_event_change_file *>(ev);
@@ -793,7 +808,13 @@ class FilePlayerProcessor : public XAPWithJuceGUI
         int cachedpos = m_buf_playpos;
         float compensrate = m_file_sample_rate / m_sr;
         bool preserve_pitch = m_preserve_pitch;
-        float rate = m_rate;
+        // time octaves
+        double rate = m_rate;
+        rate += m_rate_mod;
+        // we could allow modulation to make it go a bit over these limits...
+        rate = std::clamp(rate, -3.0, 2.0);
+        // then convert to actual playback ratio
+        rate = std::pow(2.0, rate);
         auto getxfadedsample = [](const float *srcbuf, int index, int start, int end,
                                   int xfadelen) {
             // not within xfade region so just return original sample

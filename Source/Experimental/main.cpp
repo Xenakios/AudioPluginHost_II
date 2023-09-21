@@ -118,7 +118,7 @@ class XAPNode
             }
         }
     }
-    
+
     std::unique_ptr<xenakios::XAudioProcessor> processor;
     std::vector<clap_audio_buffer> inPortBuffers;
     std::vector<clap_audio_buffer> outPortBuffers;
@@ -293,13 +293,17 @@ inline void handleNodeAudioInputs(XAPNode *n, XAPNode::Connection &conn, int pro
     }
 }
 
-inline void clearNodeAudioInput(XAPNode *n, XAPNode::Connection &conn, int procbufsize)
+inline void clearNodeAudioInputs(XAPNode *n, int procbufsize)
 {
-    int inport = conn.destinationPort;
-    int inchan = conn.destinationChannel;
-    for (int j = 0; j < procbufsize; ++j)
+    for (int i = 0; i < n->inPortBuffers.size(); ++i)
     {
-        n->inPortBuffers[inport].data32[inchan][j] = 0.0f;
+        for (int j = 0; j < n->inPortBuffers[i].channel_count; ++j)
+        {
+            for (int k = 0; k < procbufsize; ++k)
+            {
+                n->inPortBuffers[i].data32[j][k] = 0.0f;
+            }
+        }
     }
 }
 
@@ -454,13 +458,7 @@ class XAPGraph : public xenakios::XAudioProcessor
             eventMergeList.clear();
             accumModValues.clear();
             // clear node audio input buffers before summing into them
-            for (auto &conn : n->inputConnections)
-            {
-                if (conn.type == XAPNode::ConnectionType::Audio)
-                {
-                    clearNodeAudioInput(n, conn, procbufsize);
-                }
-            }
+            clearNodeAudioInputs(n, procbufsize);
             for (auto &conn : n->inputConnections)
             {
                 if (conn.type == XAPNode::ConnectionType::Audio)
@@ -801,8 +799,9 @@ class MainComponent : public juce::Component, public juce::Timer
         connectAudioBetweenNodes(m_graph->findNodeByName("Valhalla"), 0, 1,
                                  m_graph->findNodeByName("Main out"), 0, 1);
         m_graph->addProcessorAsNode(std::make_unique<ModulatorSource>(1, 0.0), "LFO 1");
-        connectModulation(m_graph->findNodeByName("LFO 1"), 0, m_graph->findNodeByName("Valhalla"),
-                          0, true, 0.0);
+        connectModulation(m_graph->findNodeByName("LFO 1"), 0,
+                          m_graph->findNodeByName("File player"),
+                          (clap_id)FilePlayerProcessor::ParamIds::Playrate, false, 0.1);
         juce::Random rng{7};
         for (auto &n : m_graph->proc_nodes)
         {
