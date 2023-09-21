@@ -187,7 +187,7 @@ class ToneProcessorTest : public XAPWithJuceGUI
     juce::dsp::Oscillator<float> m_osc;
     double m_pitch = 60.0;
     double m_pitch_mod = 0.0f;
-    double m_distortion_amt = 0.0;
+    double m_distortion_amt = 0.3;
     enum class ParamIds
     {
         Pitch = 5034,
@@ -268,11 +268,30 @@ class ToneProcessorTest : public XAPWithJuceGUI
             float s = m_osc.processSample(0.0f);
             s = std::tanh(s * distgain) * 0.25;
             process->audio_outputs[0].data32[0][i] = s;
-            process->audio_outputs[0].data32[1][i] = s;
         }
-
         return CLAP_PROCESS_CONTINUE;
     }
+
+    uint32_t audioPortsCount(bool isInput) const noexcept override
+    {
+        if (!isInput)
+            return 1;
+        return 0;
+    }
+    bool audioPortsInfo(uint32_t index, bool isInput,
+                        clap_audio_port_info *info) const noexcept override
+    {
+        if (isInput)
+            return false;
+        info->channel_count = 1;
+        info->flags = 0;
+        info->id = 1045;
+        info->in_place_pair = false;
+        strcpy_s(info->name, "Tone generator output");
+        info->port_type = "";
+        return true;
+    }
+
     bool guiCreate(const char *api, bool isFloating) noexcept override
     {
         m_editor = std::make_unique<xenakios::GenericEditor>(*this);
@@ -455,6 +474,27 @@ class GainProcessorTest : public XAPWithJuceGUI
                           CLAP_PARAM_IS_AUTOMATABLE | CLAP_PARAM_IS_MODULATABLE));
         m_param_infos.push_back(makeParamInfo((clap_id)ParamIds::Smoothing, "Smoothing length", 0.0,
                                               1.0, 0.02, CLAP_PARAM_IS_AUTOMATABLE));
+    }
+    uint32_t audioPortsCount(bool isInput) const noexcept override { return 1; }
+    bool audioPortsInfo(uint32_t index, bool isInput,
+                                clap_audio_port_info *info) const noexcept override
+    {
+        info->channel_count = 2;
+        info->flags = 0;
+        if (isInput)
+        {
+            info->id = 210;
+            strcpy_s(info->name,"Gain processor input");
+        }
+        else 
+        {
+            info->id = 250;
+            strcpy_s(info->name,"Gain processor output");
+        }
+        
+        info->in_place_pair = false;
+        info->port_type = "";
+        return true;
     }
     bool activate(double sampleRate, uint32_t minFrameCount,
                   uint32_t maxFrameCount) noexcept override

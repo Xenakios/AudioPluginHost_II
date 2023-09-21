@@ -61,35 +61,30 @@ class XAPNode
         : processor(std::move(nodeIn)), displayName(name)
     {
     }
+    ~XAPNode()
+    {
+        destroyBuffers(inPortBuffers);
+        destroyBuffers(outPortBuffers);
+    }
+    void destroyBuffers(std::vector<clap_audio_buffer_t> &buffers)
+    {
+        for (auto &buf : buffers)
+        {
+            for (int i = 0; i < buf.channel_count; ++i)
+            {
+                delete[] buf.data32[i];
+            }
+            delete[] buf.data32;
+        }
+        buffers.clear();
+    }
+
     void initAudioBuffersFromProcessorInfo(int maxFrames)
     {
-        int totalChans = 0;
-        allBuffers.clear();
-        for (int i = 0; i < processor->audioPortsCount(true); ++i)
-        {
-            clap_audio_port_info pinfo;
-            if (processor->audioPortsInfo(i, true, &pinfo))
-            {
-                totalChans += pinfo.channel_count;
-                std::vector<float> buf;
-                buf.resize(maxFrames);
-                allBuffers.push_back(buf);
-            }
-        }
-        for (int i = 0; i < processor->audioPortsCount(false); ++i)
-        {
-            clap_audio_port_info pinfo;
-            if (processor->audioPortsInfo(i, false, &pinfo))
-            {
-                totalChans += pinfo.channel_count;
-                std::vector<float> buf;
-                buf.resize(maxFrames);
-                allBuffers.push_back(buf);
-            }
-        }
+        destroyBuffers(inPortBuffers);
+        destroyBuffers(outPortBuffers);
         inPortBuffers.resize(processor->audioPortsCount(true));
         outPortBuffers.resize(processor->audioPortsCount(false));
-        size_t bufindex = 0;
         for (int i = 0; i < processor->audioPortsCount(true); ++i)
         {
             clap_audio_port_info pinfo;
@@ -99,10 +94,10 @@ class XAPNode
                 inPortBuffers[i].constant_mask = 0;
                 inPortBuffers[i].data64 = nullptr;
                 inPortBuffers[i].latency = 0;
+                inPortBuffers[i].data32 = new float *[pinfo.channel_count];
                 for (int j = 0; j < pinfo.channel_count; ++j)
                 {
-                    inPortBuffers[i].data32[j] = &allBuffers[bufindex][0];
-                    ++bufindex;
+                    inPortBuffers[i].data32[j] = new float[maxFrames];
                 }
             }
         }
@@ -115,52 +110,18 @@ class XAPNode
                 outPortBuffers[i].constant_mask = 0;
                 outPortBuffers[i].data64 = nullptr;
                 outPortBuffers[i].latency = 0;
+                outPortBuffers[i].data32 = new float *[pinfo.channel_count];
                 for (int j = 0; j < pinfo.channel_count; ++j)
                 {
-                    outPortBuffers[i].data32[j] = &allBuffers[bufindex][0];
-                    ++bufindex;
+                    outPortBuffers[i].data32[j] = new float[maxFrames];
                 }
             }
         }
     }
-    void initBuffers(int numInChans, int numOutChans, int maxFrames)
-    {
-        inPortBuffers.resize(1);
-        outPortBuffers.resize(1);
-        audioBuffer.resize(numInChans * maxFrames + numOutChans * maxFrames);
-        inChannels.clear();
-        for (int i = 0; i < numInChans; ++i)
-        {
-            inChannels.push_back(&audioBuffer[i * maxFrames]);
-        }
-        inPortBuffers[0].channel_count = numInChans;
-        inPortBuffers[0].constant_mask = 0;
-        inPortBuffers[0].latency = 0;
-        inPortBuffers[0].data64 = nullptr;
-        inPortBuffers[0].data32 = inChannels.data();
-
-        outChannels.clear();
-        for (int i = numInChans; i < numInChans + numOutChans; ++i)
-        {
-            outChannels.push_back(&audioBuffer[i * maxFrames]);
-        }
-        outPortBuffers[0].channel_count = numOutChans;
-        outPortBuffers[0].constant_mask = 0;
-        outPortBuffers[0].latency = 0;
-        outPortBuffers[0].data64 = nullptr;
-        outPortBuffers[0].data32 = outChannels.data();
-    }
+    
     std::unique_ptr<xenakios::XAudioProcessor> processor;
-    std::vector<float> audioBuffer;
-    std::vector<std::vector<float>> allBuffers;
-
-    std::vector<float *> inChannels;
     std::vector<clap_audio_buffer> inPortBuffers;
     std::vector<clap_audio_buffer> outPortBuffers;
-    // clap_audio_buffer inPortBuffers[1];
-
-    std::vector<float *> outChannels;
-    // clap_audio_buffer outPortBuffers[1];
     clap::helpers::EventList inEvents;
     clap::helpers::EventList outEvents;
     std::vector<Connection> inputConnections;
@@ -462,7 +423,8 @@ class XAPGraph : public xenakios::XAudioProcessor
                               << " channels\n";
                 }
             }
-            n->initBuffers(2, 2, procbufsize);
+            n->initAudioBuffersFromProcessorInfo(procbufsize);
+            // n->initBuffers(2, 2, procbufsize);
             // n->processor->renderSetMode(CLAP_RENDER_OFFLINE);
         }
         std::cout << "****                 ****\n";
@@ -503,7 +465,7 @@ class XAPGraph : public xenakios::XAudioProcessor
             {
                 if (conn.type == XAPNode::ConnectionType::Audio)
                 {
-                    // sum 
+                    // sum
                     handleNodeAudioInputs(n, conn, procbufsize);
                 }
                 else if (conn.type == XAPNode::ConnectionType::Events)
@@ -563,7 +525,7 @@ class XAPGraph : public xenakios::XAudioProcessor
             n->outEvents.clear();
         }
         modulationMergeList.clear();
-        auto outbufs = runOrder.back()->outChannels;
+        auto outbufs = runOrder.back()->outPortBuffers[0].data32;
         for (int i = 0; i < process->audio_outputs[0].channel_count; ++i)
         {
             for (int j = 0; j < process->frames_count; ++j)
@@ -619,6 +581,14 @@ class XAPPlayer : public juce::AudioIODeviceCallback
                 }
             }
         }
+        return;
+        for (int i = 0; i < numOutputChannels; ++i)
+        {
+            for (int j = 0; j < numSamples; ++j)
+            {
+                outputChannelData[i][j] *= 0.01;
+            }
+        }
     }
     void audioDeviceAboutToStart(AudioIODevice *device) override
     {
@@ -652,6 +622,11 @@ inline void test_graph_processor_realtime()
 inline void test_graph_processor_offline()
 {
     auto g = std::make_unique<XAPGraph>();
+    g->addProcessorAsNode(std::make_unique<ToneProcessorTest>(), "Tone");
+    g->addProcessorAsNode(std::make_unique<GainProcessorTest>(), "Gain");
+    connectAudioBetweenNodes(g->findNodeByName("Tone"), 0, 0, g->findNodeByName("Gain"), 0, 0);
+    connectAudioBetweenNodes(g->findNodeByName("Tone"), 0, 0, g->findNodeByName("Gain"), 0, 1);
+    g->outputNodeId = "Gain";
     double sr = 44100;
     int blocksize = 128;
     std::vector<float> procbuf(blocksize * 2);
@@ -670,7 +645,8 @@ inline void test_graph_processor_offline()
     g->activate(sr, blocksize, blocksize);
     int outlen = 10 * sr;
     int outcounter = 0;
-    juce::File outfile(R"(C:\develop\AudioPluginHost_mk2\Source\Experimental\graph_out_03.wav)");
+    juce::File outfile(
+        R"(C:\develop\AudioPluginHost_mk2\Source\Experimental\audio\graph_out_04.wav)");
     outfile.deleteFile();
     auto ostream = outfile.createOutputStream();
     WavAudioFormat wav;
@@ -818,7 +794,7 @@ class MainComponent : public juce::Component, public juce::Timer
         m_graph->outputNodeId = "Main out";
         connectAudioBetweenNodes(m_graph->findNodeByName("Tone generator"), 0, 0,
                                  m_graph->findNodeByName("Valhalla"), 0, 0);
-        connectAudioBetweenNodes(m_graph->findNodeByName("Tone generator"), 0, 1,
+        connectAudioBetweenNodes(m_graph->findNodeByName("Tone generator"), 0, 0,
                                  m_graph->findNodeByName("Valhalla"), 0, 1);
         connectAudioBetweenNodes(m_graph->findNodeByName("Valhalla"), 0, 0,
                                  m_graph->findNodeByName("Main out"), 0, 0);
@@ -830,6 +806,7 @@ class MainComponent : public juce::Component, public juce::Timer
         juce::Random rng{7};
         for (auto &n : m_graph->proc_nodes)
         {
+            // continue;
             m_xap_windows.emplace_back(std::make_unique<XapWindow>(*n->processor));
             m_xap_windows.back()->setTopLeftPosition(rng.nextInt({10, 600}),
                                                      rng.nextInt({100, 400}));
@@ -962,7 +939,8 @@ int main()
 {
     juce::ScopedJuceInitialiser_GUI gui_init;
     // test_node_connecting();
-    // test_graph_processor_realtime();
+    test_graph_processor_offline();
+    return 0;
     clap::helpers::EventList list;
     auto ev = makeClapParameterValueEvent(1, 666, 0.987);
     list.push((const clap_event_header *)&ev);
