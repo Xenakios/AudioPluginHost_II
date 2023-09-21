@@ -98,6 +98,7 @@ juce_generate_juce_header(ConsoleAppExample)
 target_sources(ConsoleAppExample
     PRIVATE
         Source/Experimental/main.cpp
+        Source/Experimental/xap_utils.cpp
         Source/Experimental/xaudioprocessor.cpp
         Source/Experimental/xaudiograph2.cpp)
     

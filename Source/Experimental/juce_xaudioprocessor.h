@@ -35,17 +35,17 @@ class JucePluginWrapper : public xenakios::XAudioProcessor, public juce::AudioPl
             if (!m_internal)
             {
                 std::cout << err << "\n";
-            } else
+            }
+            else
             {
                 m_desc = m_internal->getPluginDescription();
             }
-                
         }
     }
     juce::PluginDescription m_desc;
     bool getDescriptor(clap_plugin_descriptor_t *dec) const override
     {
-        memset(dec,0,sizeof(clap_plugin_descriptor));
+        memset(dec, 0, sizeof(clap_plugin_descriptor));
         if (m_internal)
         {
             dec->name = m_internal->getName().getCharPointer();
@@ -94,7 +94,7 @@ class JucePluginWrapper : public xenakios::XAudioProcessor, public juce::AudioPl
         *info = m_param_infos[paramIndex];
         return true;
     }
-    
+
     clap_process_status process(const clap_process *process) noexcept override
     {
         jassert(m_internal);
@@ -223,14 +223,48 @@ class JucePluginWrapper : public xenakios::XAudioProcessor, public juce::AudioPl
         }
         return false;
     }
+
+    uint32_t audioPortsCount(bool isInput) const noexcept override
+    {
+        if (m_internal)
+            return m_internal->getBusCount(isInput);
+        return 0;
+    }
+    bool audioPortsInfo(uint32_t index, bool isInput,
+                        clap_audio_port_info *info) const noexcept override
+    {
+        if (m_internal)
+        {
+            info->channel_count = m_internal->getBus(isInput, index)->getNumberOfChannels();
+            info->flags = 0;
+            info->in_place_pair = CLAP_INVALID_ID;
+            if (isInput)
+            {
+                info->id = 14387;
+                info->port_type = "";
+                strcpy_s(info->name, "Juce wrapper audio input");
+            }
+            else
+            {
+                info->id = 98765;
+                info->port_type = "";
+                strcpy_s(info->name, "Juce wrapper audio output");
+            }
+
+            return true;
+        }
+
+        return false;
+    }
+
     bool implementsGui() const noexcept override { return true; }
     // virtual bool guiIsApiSupported(const char *api, bool isFloating) noexcept { return false; }
     // virtual bool guiGetPreferredApi(const char **api, bool *is_floating) noexcept { return false;
     // }
-    
+
     // virtual bool guiSetScale(double scale) noexcept { return false; }
-    bool guiCreate(const char *api, bool isFloating) noexcept override 
-    { 
+    bool guiCreate(const char *api, bool isFloating) noexcept override
+    {
         if (m_internal->hasEditor())
         {
             m_editor = m_internal->createEditor();
@@ -238,7 +272,7 @@ class JucePluginWrapper : public xenakios::XAudioProcessor, public juce::AudioPl
         }
         return false;
     }
-    void guiDestroy() noexcept override 
+    void guiDestroy() noexcept override
     {
         delete m_editor;
         m_editor = nullptr;
@@ -280,5 +314,5 @@ class JucePluginWrapper : public xenakios::XAudioProcessor, public juce::AudioPl
         parent->addAndMakeVisible(*m_editor);
         return true;
     }
-    juce::AudioProcessorEditor* m_editor = nullptr;
+    juce::AudioProcessorEditor *m_editor = nullptr;
 };
