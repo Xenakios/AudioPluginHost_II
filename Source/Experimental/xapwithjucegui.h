@@ -4,14 +4,18 @@
 #include "xaudioprocessor.h"
 #include "containers/choc_SingleReaderSingleWriterFIFO.h"
 
+
+
+
 class XAPWithJuceGUI : public xenakios::XAudioProcessor
 {
   protected:
     std::unique_ptr<juce::Component> m_editor;
     choc::fifo::SingleReaderSingleWriterFIFO<xenakios::CrossThreadMessage> m_from_ui_fifo;
     clap::helpers::EventList m_merge_list;
-
+    
   public:
+    
     bool enqueueParameterChange(xenakios::CrossThreadMessage msg) noexcept override
     {
         return m_from_ui_fifo.push(msg);

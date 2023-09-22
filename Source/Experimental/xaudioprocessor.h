@@ -2,6 +2,7 @@
 
 #include <clap/clap.h>
 #include <clap/helpers/event-list.hh>
+#include "sst/basic-blocks/params/ParamMetadata.h"
 
 #define XENAKIOS_CLAP_NAMESPACE 11111
 
@@ -36,6 +37,8 @@ inline clap_event_param_value makeClapParameterValueEvent(int time, clap_id para
 
 namespace xenakios
 {
+
+using ParamDesc = sst::basic_blocks::params::ParamMetaData;
 
 struct CrossThreadMessage
 {
@@ -143,6 +146,7 @@ class XAudioProcessor
     {
         return false;
     }
+    std::vector<ParamDesc> paramDescriptions;
     // paramsFlush is intended to be used to set parameters even when the processing isn't
     // actively called. We might want to somehow abstract this, if possible...
     virtual void paramsFlush(const clap_input_events *in, const clap_output_events *out) noexcept {}

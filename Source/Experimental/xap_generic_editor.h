@@ -11,35 +11,69 @@ class GenericEditor : public juce::Component, public juce::Timer
   public:
     GenericEditor(xenakios::XAudioProcessor &proc) : m_proc(proc)
     {
-        for (int i = 0; i < m_proc.paramsCount(); ++i)
+        if (proc.paramDescriptions.size() == 0)
         {
-            clap_param_info pinfo;
-            m_proc.paramsInfo(i, &pinfo);
-            auto comps = std::make_unique<ParamComponents>();
-            comps->paramId = pinfo.id;
-            comps->label.setText(pinfo.name, juce::dontSendNotification);
-            if (pinfo.flags & CLAP_PARAM_IS_STEPPED)
-                comps->slider.setRange(pinfo.min_value, pinfo.max_value, 1.0);
-            else
-                comps->slider.setRange(pinfo.min_value, pinfo.max_value);
-            comps->slider.setDoubleClickReturnValue(true, pinfo.default_value);
-            comps->slider.setValue(pinfo.default_value, juce::dontSendNotification);
-            // comps->slider.setSliderStyle(juce::Slider::SliderStyle::RotaryVerticalDrag);
-            comps->slider.onDragStart = [this, pid = pinfo.id, &slid = comps->slider]() {
-                m_proc.enqueueParameterChange(
-                    {pid, CLAP_EVENT_PARAM_GESTURE_BEGIN, slid.getValue()});
-            };
-            comps->slider.onValueChange = [this, pid = pinfo.id, &slid = comps->slider]() {
-                m_proc.enqueueParameterChange({pid, CLAP_EVENT_PARAM_VALUE, slid.getValue()});
-            };
-            comps->slider.onDragEnd = [this, pid = pinfo.id, &slid = comps->slider]() {
-                m_proc.enqueueParameterChange({pid, CLAP_EVENT_PARAM_GESTURE_END, slid.getValue()});
-            };
+            for (int i = 0; i < m_proc.paramsCount(); ++i)
+            {
+                clap_param_info pinfo;
+                m_proc.paramsInfo(i, &pinfo);
+                auto comps = std::make_unique<ParamComponents>();
+                comps->paramId = pinfo.id;
+                comps->label.setText(pinfo.name, juce::dontSendNotification);
+                if (pinfo.flags & CLAP_PARAM_IS_STEPPED)
+                    comps->slider.setRange(pinfo.min_value, pinfo.max_value, 1.0);
+                else
+                    comps->slider.setRange(pinfo.min_value, pinfo.max_value);
+                comps->slider.setDoubleClickReturnValue(true, pinfo.default_value);
+                comps->slider.setValue(pinfo.default_value, juce::dontSendNotification);
+                comps->slider.onDragStart = [this, pid = pinfo.id, &slid = comps->slider]() {
+                    m_proc.enqueueParameterChange(
+                        {pid, CLAP_EVENT_PARAM_GESTURE_BEGIN, slid.getValue()});
+                };
+                comps->slider.onValueChange = [this, pid = pinfo.id, &slid = comps->slider]() {
+                    m_proc.enqueueParameterChange({pid, CLAP_EVENT_PARAM_VALUE, slid.getValue()});
+                };
+                comps->slider.onDragEnd = [this, pid = pinfo.id, &slid = comps->slider]() {
+                    m_proc.enqueueParameterChange(
+                        {pid, CLAP_EVENT_PARAM_GESTURE_END, slid.getValue()});
+                };
 
-            addAndMakeVisible(comps->label);
-            addAndMakeVisible(comps->slider);
-            m_param_comps.push_back(std::move(comps));
+                addAndMakeVisible(comps->label);
+                addAndMakeVisible(comps->slider);
+                m_param_comps.push_back(std::move(comps));
+            }
+        } else
+        {
+            for (int i = 0; i < m_proc.paramDescriptions.size(); ++i)
+            {
+                auto &pdesc = m_proc.paramDescriptions[i];
+                auto comps = std::make_unique<ParamComponents>();
+                comps->paramId = pdesc.id;
+                comps->label.setText(pdesc.name, juce::dontSendNotification);
+                if (pdesc.flags & CLAP_PARAM_IS_STEPPED)
+                    comps->slider.setRange(pdesc.minVal, pdesc.maxVal, 1.0);
+                else
+                    comps->slider.setRange(pdesc.minVal, pdesc.maxVal);
+                comps->slider.setDoubleClickReturnValue(true, pdesc.defaultVal);
+                comps->slider.setValue(pdesc.defaultVal, juce::dontSendNotification);
+                comps->slider.onDragStart = [this, pid = pdesc.id, &slid = comps->slider]() {
+                    m_proc.enqueueParameterChange(
+                        {pid, CLAP_EVENT_PARAM_GESTURE_BEGIN, slid.getValue()});
+                };
+                comps->slider.onValueChange = [this, pid = pdesc.id, &slid = comps->slider]() {
+                    m_proc.enqueueParameterChange({pid, CLAP_EVENT_PARAM_VALUE, slid.getValue()});
+                };
+                comps->slider.onDragEnd = [this, pid = pdesc.id, &slid = comps->slider]() {
+                    m_proc.enqueueParameterChange(
+                        {pid, CLAP_EVENT_PARAM_GESTURE_END, slid.getValue()});
+                };
+
+                addAndMakeVisible(comps->label);
+                addAndMakeVisible(comps->slider);
+                m_param_comps.push_back(std::move(comps));
+            }
         }
+
         int defaultH = m_proc.paramsCount() * 50;
         setSize(500, defaultH);
         startTimerHz(10);

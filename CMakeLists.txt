@@ -37,6 +37,7 @@ include_directories(
     libs/clap/include
     libs/clap-helpers/include
     libs/sst-basic-blocks/include
+    libs/fmt/include
 )
 
 juce_add_gui_app(AudioPluginHost2

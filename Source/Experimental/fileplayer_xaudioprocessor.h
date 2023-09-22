@@ -16,7 +16,7 @@ class FilePlayerProcessor : public XAPWithJuceGUI
     std::array<juce::LagrangeInterpolator, 2> m_resamplers;
     std::vector<float> m_resampler_work_buf;
     double m_file_sample_rate = 1.0;
-    std::vector<clap_param_info> m_param_infos;
+    
     juce::dsp::Gain<float> m_gain_proc;
     double m_volume = 0.0f;
     double m_volume_mod = 0.0f;
@@ -55,26 +55,56 @@ class FilePlayerProcessor : public XAPWithJuceGUI
     void guiDestroy() noexcept override { m_editor = nullptr; }
     static constexpr double minRate = -3.0;
     static constexpr double maxRate = 2.0;
+    using ParamDesc = xenakios::ParamDesc;
     FilePlayerProcessor()
     {
-        m_param_infos.push_back(
-            makeParamInfo((clap_id)ParamIds::Volume, "Volume", -36.0, 0.0, -6.0,
-                          CLAP_PARAM_IS_AUTOMATABLE | CLAP_PARAM_IS_MODULATABLE));
-        m_param_infos.push_back(
-            makeParamInfo((clap_id)ParamIds::Playrate, "Playrate", minRate, maxRate, 0.0,
-                          CLAP_PARAM_IS_AUTOMATABLE | CLAP_PARAM_IS_MODULATABLE));
-        m_param_infos.push_back(
-            makeParamInfo((clap_id)ParamIds::Pitch, "Pitch", -12.0, 12.0, 0.0,
-                          CLAP_PARAM_IS_AUTOMATABLE | CLAP_PARAM_IS_MODULATABLE));
-        m_param_infos.push_back(makeParamInfo((clap_id)ParamIds::PreservePitch, "Preserve pitch",
-                                              0.0, 1.0, 1.0,
-                                              CLAP_PARAM_IS_AUTOMATABLE | CLAP_PARAM_IS_STEPPED));
-        m_param_infos.push_back(
-            makeParamInfo((clap_id)ParamIds::LoopStart, "Loop start", 0.0, 1.0, 0.0,
-                          CLAP_PARAM_IS_AUTOMATABLE | CLAP_PARAM_IS_MODULATABLE));
-        m_param_infos.push_back(
-            makeParamInfo((clap_id)ParamIds::LoopEnd, "Loop end", 0.0, 1.0, 1.0,
-                          CLAP_PARAM_IS_AUTOMATABLE | CLAP_PARAM_IS_MODULATABLE));
+        paramDescriptions.push_back(
+            ParamDesc()
+                .asDecibel()
+                .withRange(-36.0, 6.0)
+                .withDefault(-6.0)
+                .withFlags(CLAP_PARAM_IS_AUTOMATABLE | CLAP_PARAM_IS_MODULATABLE)
+                .withName("Volume")
+                .withID((clap_id)ParamIds::Volume));
+        paramDescriptions.push_back(
+            ParamDesc()
+                .asFloat()
+                .withRange(-3.0f, 2.0f)
+                .withDefault(0.0)
+                .withFlags(CLAP_PARAM_IS_AUTOMATABLE | CLAP_PARAM_IS_MODULATABLE)
+                .withName("Playrate")
+                .withID((clap_id)ParamIds::Playrate));
+        paramDescriptions.push_back(
+            ParamDesc()
+                .asFloat()
+                .withRange(-12.0f, 12.0f)
+                .withDefault(0.0)
+                .withFlags(CLAP_PARAM_IS_AUTOMATABLE | CLAP_PARAM_IS_MODULATABLE)
+                .withName("Pitch")
+                .withID((clap_id)ParamIds::Pitch));
+        paramDescriptions.push_back(
+            ParamDesc()
+                .asBool()
+                .withDefault(1.0f)
+                .withFlags(CLAP_PARAM_IS_AUTOMATABLE | CLAP_PARAM_IS_STEPPED)
+                .withName("Preserve pitch")
+                .withID((clap_id)ParamIds::PreservePitch));
+        paramDescriptions.push_back(
+            ParamDesc()
+                .asFloat()
+                .withRange(0.0f, 1.0f)
+                .withDefault(0.0)
+                .withFlags(CLAP_PARAM_IS_AUTOMATABLE | CLAP_PARAM_IS_MODULATABLE)
+                .withName("Loop start")
+                .withID((clap_id)ParamIds::LoopStart));
+        paramDescriptions.push_back(
+            ParamDesc()
+                .asFloat()
+                .withRange(0.0f, 1.0f)
+                .withDefault(1.0)
+                .withFlags(CLAP_PARAM_IS_AUTOMATABLE | CLAP_PARAM_IS_MODULATABLE)
+                .withName("Loop end")
+                .withID((clap_id)ParamIds::LoopEnd));
         importFile(juce::File(R"(C:\MusicAudio\sourcesamples\there was a time .wav)"));
     }
     uint32_t audioPortsCount(bool isInput) const noexcept override
@@ -126,10 +156,13 @@ class FilePlayerProcessor : public XAPWithJuceGUI
 
         return true;
     }
-    uint32_t paramsCount() const noexcept override { return m_param_infos.size(); }
+    uint32_t paramsCount() const noexcept override { return paramDescriptions.size(); }
     bool paramsInfo(uint32_t paramIndex, clap_param_info *info) const noexcept override
     {
-        *info = m_param_infos[paramIndex];
+        if (paramIndex >= paramDescriptions.size())
+            return false;
+        const auto &pd = paramDescriptions[paramIndex];
+        pd.template toClapParamInfo<CLAP_NAME_SIZE>(info);
         return true;
     }
     bool paramsValue(clap_id paramId, double *value) noexcept override
