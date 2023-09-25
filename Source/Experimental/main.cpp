@@ -683,7 +683,7 @@ struct PluginContentComponent : public juce::Component
     PluginContentComponent(xenakios::XAudioProcessor &proc) : m_proc(proc)
     {
         addAndMakeVisible(infoLabel);
-        infoLabel.setText("JUUUUUUUUUUUUUUUUUHHHHHHHHHHHHHH", juce::dontSendNotification);
+        infoLabel.setText("Info label", juce::dontSendNotification);
         juce::MessageManager::callAsync([this]() {
             clap_plugin_descriptor desc;
             auto m_test_proc = &m_proc;

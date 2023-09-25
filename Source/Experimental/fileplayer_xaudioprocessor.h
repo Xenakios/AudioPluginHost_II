@@ -16,7 +16,7 @@ class FilePlayerProcessor : public XAPWithJuceGUI
     std::array<juce::LagrangeInterpolator, 2> m_resamplers;
     std::vector<float> m_resampler_work_buf;
     double m_file_sample_rate = 1.0;
-    
+
     juce::dsp::Gain<float> m_gain_proc;
     double m_volume = 0.0f;
     double m_volume_mod = 0.0f;
@@ -71,14 +71,18 @@ class FilePlayerProcessor : public XAPWithJuceGUI
                 .asFloat()
                 .withRange(-3.0f, 2.0f)
                 .withDefault(0.0)
+                .withATwoToTheBFormatting(1,1,"x")
                 .withFlags(CLAP_PARAM_IS_AUTOMATABLE | CLAP_PARAM_IS_MODULATABLE)
                 .withName("Playrate")
                 .withID((clap_id)ParamIds::Playrate));
         paramDescriptions.push_back(
             ParamDesc()
                 .asFloat()
+                .extendable()
                 .withRange(-12.0f, 12.0f)
                 .withDefault(0.0)
+                .withExtendFactors(4.0f, 4.0f)
+                .withLinearScaleFormatting("semitones")
                 .withFlags(CLAP_PARAM_IS_AUTOMATABLE | CLAP_PARAM_IS_MODULATABLE)
                 .withName("Pitch")
                 .withID((clap_id)ParamIds::Pitch));
@@ -94,6 +98,7 @@ class FilePlayerProcessor : public XAPWithJuceGUI
                 .asFloat()
                 .withRange(0.0f, 1.0f)
                 .withDefault(0.0)
+                .withLinearScaleFormatting("%")
                 .withFlags(CLAP_PARAM_IS_AUTOMATABLE | CLAP_PARAM_IS_MODULATABLE)
                 .withName("Loop start")
                 .withID((clap_id)ParamIds::LoopStart));
@@ -102,6 +107,7 @@ class FilePlayerProcessor : public XAPWithJuceGUI
                 .asFloat()
                 .withRange(0.0f, 1.0f)
                 .withDefault(1.0)
+                .withLinearScaleFormatting("%")
                 .withFlags(CLAP_PARAM_IS_AUTOMATABLE | CLAP_PARAM_IS_MODULATABLE)
                 .withName("Loop end")
                 .withID((clap_id)ParamIds::LoopEnd));

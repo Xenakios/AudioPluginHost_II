@@ -1,4 +1,5 @@
 #include "xap_utils.h"
+#ifdef FOOX
 #include <format>
 #include <iostream>
 
@@ -35,3 +36,9 @@ void printClapEvents(clap::helpers::EventList &elist)
         std::cout << line << "\n";
     }
 }
+#else
+void printClapEvents(clap::helpers::EventList &elist)
+{
+
+}
+#endif

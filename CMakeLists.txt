@@ -103,6 +103,9 @@ target_sources(ConsoleAppExample
         Source/Experimental/xaudioprocessor.cpp
         Source/Experimental/xaudiograph2.cpp)
     
+# add_subdirectory(libs/fmt EXCLUDE_FROM_ALL)
+add_subdirectory(libs/fmt)
+
 target_compile_definitions(ConsoleAppExample
 PRIVATE
     # JUCE_WEB_BROWSER and JUCE_USE_CURL would be on by default, but you might not need them.
@@ -118,6 +121,7 @@ target_link_libraries(ConsoleAppExample
         juce::juce_core
         juce::juce_audio_utils
         juce::juce_dsp
+        fmt
     PUBLIC
         # juce::juce_recommended_config_flags
         # juce::juce_recommended_warning_flags)
