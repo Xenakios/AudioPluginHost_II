@@ -209,7 +209,7 @@ class ClapPluginFormatProcessor : public xenakios::XAudioProcessor
         // is const
         clap_process processCtxCopy = *process;
         // shenanigans to get parameter changes from the GenericEditor
-        if (m_generic_editor)
+        //if (m_generic_editor)
         {
             m_eventMergeList.clear();
             processCtxCopy.in_events = m_eventMergeList.clapInputEvents();

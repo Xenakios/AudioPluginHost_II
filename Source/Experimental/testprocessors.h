@@ -113,6 +113,7 @@ class ToneProcessorTest : public XAPWithJuceGUI
     bool activate(double sampleRate, uint32_t minFrameCount,
                   uint32_t maxFrameCount) noexcept override
     {
+        m_from_ui_fifo.reset(2048);
         juce::dsp::ProcessSpec spec;
         spec.maximumBlockSize = maxFrameCount;
         spec.numChannels = 2;
@@ -160,10 +161,15 @@ class ToneProcessorTest : public XAPWithJuceGUI
         m_osc.setFrequency(hz);
         double distvolume = m_distortion_amt * 48.0;
         double distgain = juce::Decibels::decibelsToGain(distvolume);
+        double distmix = 1.0f;
+        if (m_distortion_amt < 0.001)
+            distmix = 0.0;
         for (int i = 0; i < process->frames_count; ++i)
         {
             float s = m_osc.processSample(0.0f);
-            s = std::tanh(s * distgain) * 0.25;
+            if (distmix > 0.0)
+                s = std::tanh(s * distgain);
+            s *= 0.25;
             process->audio_outputs[0].data32[0][i] = s;
         }
         return CLAP_PROCESS_CONTINUE;

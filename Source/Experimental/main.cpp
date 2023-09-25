@@ -638,11 +638,21 @@ inline void test_graph_processor_realtime()
 inline void test_graph_processor_offline()
 {
     auto g = std::make_unique<XAPGraph>();
-    g->addProcessorAsNode(std::make_unique<ToneProcessorTest>(), "Tone");
-    g->addProcessorAsNode(std::make_unique<GainProcessorTest>(), "Gain");
-    connectAudioBetweenNodes(g->findNodeByName("Tone"), 0, 0, g->findNodeByName("Gain"), 0, 0);
-    connectAudioBetweenNodes(g->findNodeByName("Tone"), 0, 0, g->findNodeByName("Gain"), 0, 1);
-    g->outputNodeId = "Gain";
+    g->addProcessorAsNode(std::make_unique<ToneProcessorTest>(), "Tone 1");
+    g->addProcessorAsNode(std::make_unique<ToneProcessorTest>(), "Tone 2");
+    g->addProcessorAsNode(std::make_unique<ClapPluginFormatProcessor>(
+                              R"(C:\Program Files\Common Files\CLAP\Conduit.clap)", 3),
+                          "Ring Mod");
+
+    connectAudioBetweenNodes(g->findNodeByName("Tone 1"), 0, 0, g->findNodeByName("Ring Mod"), 0,
+                             0);
+    connectAudioBetweenNodes(g->findNodeByName("Tone 1"), 0, 0, g->findNodeByName("Ring Mod"), 0,
+                             1);
+    connectAudioBetweenNodes(g->findNodeByName("Tone 2"), 0, 0, g->findNodeByName("Ring Mod"), 1,
+                             0);
+    connectAudioBetweenNodes(g->findNodeByName("Tone 2"), 0, 0, g->findNodeByName("Ring Mod"), 1,
+                             1);
+    g->outputNodeId = "Ring Mod";
     double sr = 44100;
     int blocksize = 128;
     std::vector<float> procbuf(blocksize * 2);
@@ -659,10 +669,23 @@ inline void test_graph_processor_offline()
     process.audio_outputs = cab;
     process.frames_count = blocksize;
     g->activate(sr, blocksize, blocksize);
+
+    g->findNodeByName("Tone 1")->processor->enqueueParameterChange(
+        {(clap_id)ToneProcessorTest::ParamIds::Pitch, CLAP_EVENT_PARAM_VALUE, 71.0});
+    g->findNodeByName("Tone 1")->processor->enqueueParameterChange(
+        {(clap_id)ToneProcessorTest::ParamIds::Distortion, CLAP_EVENT_PARAM_VALUE, 0.0});
+    g->findNodeByName("Tone 2")->processor->enqueueParameterChange(
+        {(clap_id)ToneProcessorTest::ParamIds::Pitch, CLAP_EVENT_PARAM_VALUE, 35.5});
+    g->findNodeByName("Tone 2")->processor->enqueueParameterChange(
+        {(clap_id)ToneProcessorTest::ParamIds::Distortion, CLAP_EVENT_PARAM_VALUE, 0.0});
+    g->findNodeByName("Ring Mod")->processor->enqueueParameterChange(
+        {(clap_id)842, CLAP_EVENT_PARAM_VALUE, 1.0});
+    g->findNodeByName("Ring Mod")->processor->enqueueParameterChange(
+        {(clap_id)712, CLAP_EVENT_PARAM_VALUE, 1.0});
     int outlen = 10 * sr;
     int outcounter = 0;
     juce::File outfile(
-        R"(C:\develop\AudioPluginHost_mk2\Source\Experimental\audio\graph_out_04.wav)");
+        R"(C:\develop\AudioPluginHost_mk2\Source\Experimental\audio\graph_out_05.wav)");
     outfile.deleteFile();
     auto ostream = outfile.createOutputStream();
     WavAudioFormat wav;
@@ -955,7 +978,7 @@ class GuiAppApplication : public juce::JUCEApplication
     std::unique_ptr<MainWindow> mainWindow;
 };
 
-#define TESTJUCEGUI 1
+#define TESTJUCEGUI 0
 
 #if TESTJUCEGUI
 

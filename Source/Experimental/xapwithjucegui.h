@@ -4,9 +4,6 @@
 #include "xaudioprocessor.h"
 #include "containers/choc_SingleReaderSingleWriterFIFO.h"
 
-
-
-
 class XAPWithJuceGUI : public xenakios::XAudioProcessor
 {
   protected:
@@ -52,7 +49,7 @@ class XAPWithJuceGUI : public xenakios::XAudioProcessor
         if (!m_editor)
             return false;
         // maybe not the best place to init this, but...
-        m_from_ui_fifo.reset(2048);
+        m_from_ui_fifo.reset(2048);        
         return true;
     }
     bool guiHide() noexcept override { return false; }
