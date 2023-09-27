@@ -325,6 +325,13 @@ class XAPGraph : public xenakios::XAudioProcessor
                 return n.get();
         return nullptr;
     }
+    xenakios::XAudioProcessor *findProcessor(const std::string &name)
+    {
+        for (auto &n : proc_nodes)
+            if (n->displayName == name)
+                return n->processor.get();
+        return nullptr;
+    }
     bool connectAudio(const std::string &sourceNodeName, int sourcePort, int sourceChannel,
                       const std::string &destinationNodeName, int destinationPort,
                       int destinationChannel)
@@ -653,10 +660,10 @@ inline void test_graph_processor_offline()
                               R"(C:\Program Files\Common Files\CLAP\Conduit.clap)", 3),
                           "Ring Mod");
 
-    g->connectAudio("Tone 1", 0, 0, "RingMod", 0, 0);
-    g->connectAudio("Tone 1", 0, 0, "RingMod", 0, 1);
-    g->connectAudio("Tone 2", 0, 0, "RingMod", 1, 0);
-    g->connectAudio("Tone 2", 0, 0, "RingMod", 1, 1);
+    g->connectAudio("Tone 1", 0, 0, "Ring Mod", 0, 0);
+    g->connectAudio("Tone 1", 0, 0, "Ring Mod", 0, 1);
+    g->connectAudio("Tone 2", 0, 0, "Ring Mod", 1, 0);
+    g->connectAudio("Tone 2", 0, 0, "Ring Mod", 1, 1);
 
     g->outputNodeId = "Ring Mod";
     double sr = 44100;
@@ -676,18 +683,16 @@ inline void test_graph_processor_offline()
     process.frames_count = blocksize;
     g->activate(sr, blocksize, blocksize);
 
-    g->findNodeByName("Tone 1")->processor->enqueueParameterChange(
+    g->findProcessor("Tone 1")->enqueueParameterChange(
         xenakios::CrossThreadMessage()
             .withParamId(ToneProcessorTest::ParamIds::Pitch)
             .withType(CLAP_EVENT_PARAM_VALUE)
             .withValue(72.0));
-    g->findNodeByName("Tone 1")->processor->enqueueParameterChange(
-        {(clap_id)ToneProcessorTest::ParamIds::Distortion, CLAP_EVENT_PARAM_VALUE, 0.0});
-    g->findNodeByName("Tone 2")->processor->enqueueParameterChange(
+    g->findProcessor("Tone 1")->enqueueParameterChange(
+        {(clap_id)ToneProcessorTest::ParamIds::Distortion, CLAP_EVENT_PARAM_VALUE, 0.1});
+    g->findProcessor("Tone 2")->enqueueParameterChange(
         {(clap_id)ToneProcessorTest::ParamIds::Pitch, CLAP_EVENT_PARAM_VALUE, 35.5});
-    // g->findNodeByName("Tone 2")->processor->enqueueParameterChange(
-    //     {(clap_id)ToneProcessorTest::ParamIds::Distortion, CLAP_EVENT_PARAM_VALUE, 0.0});
-    g->findNodeByName("Tone 2")->processor->enqueueParameterChange(
+    g->findProcessor("Tone 2")->enqueueParameterChange(
         xenakios::CrossThreadMessage().asParamChange(ToneProcessorTest::ParamIds::Distortion, 0.0));
     // ids taken from Conduit source, 842 ring mod mix level, 712 other source is internal
     // osc/sidechain
