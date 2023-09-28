@@ -659,13 +659,17 @@ inline void test_graph_processor_offline()
     g->addProcessorAsNode(std::make_unique<ClapPluginFormatProcessor>(
                               R"(C:\Program Files\Common Files\CLAP\Conduit.clap)", 3),
                           "Ring Mod");
-
-    g->connectAudio("Tone 1", 0, 0, "Ring Mod", 0, 0);
-    g->connectAudio("Tone 1", 0, 0, "Ring Mod", 0, 1);
-    g->connectAudio("Tone 2", 0, 0, "Ring Mod", 1, 0);
-    g->connectAudio("Tone 2", 0, 0, "Ring Mod", 1, 1);
-
-    g->outputNodeId = "Ring Mod";
+    std::string pathprefix = R"(C:\Program Files\Common Files\)";
+    g->addProcessorAsNode(std::make_unique<ClapPluginFormatProcessor>(
+                                          pathprefix + R"(CLAP\Surge Synth Team\Surge XT.clap)", 0),
+                                      "Surge XT 1");
+    // g->connectAudio("Tone 1", 0, 0, "Ring Mod", 0, 0);
+    // g->connectAudio("Tone 1", 0, 0, "Ring Mod", 0, 1);
+    // g->connectAudio("Tone 2", 0, 0, "Ring Mod", 1, 0);
+    // g->connectAudio("Tone 2", 0, 0, "Ring Mod", 1, 1);
+    g->addProcessorAsNode(std::make_unique<ClapEventSequencerProcessor>(1, 1.0), "Note Gen");
+    connectEventPorts(g->findNodeByName("Note Gen"), 0, g->findNodeByName("Surge XT 1"), 0);
+    g->outputNodeId = "Surge XT 1";
     double sr = 44100;
     int blocksize = 128;
     std::vector<float> procbuf(blocksize * 2);
@@ -697,7 +701,7 @@ inline void test_graph_processor_offline()
         ->processor->enqueueParameterChange({(clap_id)842, CLAP_EVENT_PARAM_VALUE, 1.0});
     g->findNodeByName("Ring Mod")
         ->processor->enqueueParameterChange({(clap_id)712, CLAP_EVENT_PARAM_VALUE, 1.0});
-    int outlen = 10 * sr;
+    int outlen = 120 * sr;
     int outcounter = 0;
     juce::File outfile(
         R"(C:\develop\AudioPluginHost_mk2\Source\Experimental\audio\graph_out_05.wav)");

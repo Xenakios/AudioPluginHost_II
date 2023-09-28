@@ -587,7 +587,7 @@ struct ClapEventIterator
     size_t nextIndex = 0;
 };
 
-class ClapEventSequencerProcessor : public xenakios::XAudioProcessor
+class ClapEventSequencerProcessor : public XAPWithJuceGUI
 {
     SequenceType m_events;
     ClapEventIterator m_event_iter;
@@ -595,20 +595,39 @@ class ClapEventSequencerProcessor : public xenakios::XAudioProcessor
     DejaVuRandom m_dvpitchrand;
     DejaVuRandom m_dvchordrand;
     DejaVuRandom m_dvvelorand;
-
+    std::uniform_real_distribution<float> pitchdist{36.0f, 72.0f};
+    std::uniform_int_distribution<int> chorddist{0, 4};
+    std::uniform_real_distribution<float> accentdist{0.0f, 1.0f};
+    struct SimpleNoteEvent
+    {
+        SimpleNoteEvent() {}
+        SimpleNoteEvent(double offtime_, int key_) : offtime(offtime_), key(key_) {}
+        double offtime = -1.0;
+        int port = -1;
+        int channel = -1;
+        int key = -1;
+        int noteid = -1;
+    };
+    std::vector<SimpleNoteEvent> m_active_notes;
+    double m_phase = 0.0; // samples
+    double m_next_note_time = 0.0;
+    double m_clock_rate = 5.0; // hz
   public:
+    enum class ParamIDs
+    {
+        ClockRate
+    };
+    using ParamDesc = xenakios::ParamDesc;
     ClapEventSequencerProcessor(int seed, double pulselen)
         : m_event_iter(m_events), m_dvpitchrand(seed), m_dvchordrand(seed + 13),
           m_dvvelorand(seed + 101)
     {
         m_events.reserve(4096);
-        std::uniform_real_distribution<float> pitchdist{48.0f, 72.0f};
-        std::uniform_int_distribution<int> chorddist{0, 4};
-        std::uniform_real_distribution<float> accentdist{0.0f, 1.0f};
+        m_active_notes.reserve(4096);
         // std::discrete_distribution<> d({40, 10, 10, 40});
 
         m_dvpitchrand.m_loop_len = 3;
-        m_dvpitchrand.m_deja_vu = 0.48;
+        m_dvpitchrand.m_deja_vu = 0.40;
         m_dvchordrand.m_loop_len = 3;
         m_dvchordrand.m_deja_vu = 0.4;
         m_dvvelorand.m_loop_len = 3;
@@ -646,6 +665,15 @@ class ClapEventSequencerProcessor : public xenakios::XAudioProcessor
             }
         }
         sortSequence(m_events);
+        paramDescriptions.push_back(
+            ParamDesc()
+                .asFloat()
+                .withRange(-3.0f, 3.0f)
+                .withDefault(0.0)
+                .withATwoToTheBFormatting(1, 1, "Hz")
+                .withFlags(CLAP_PARAM_IS_AUTOMATABLE | CLAP_PARAM_IS_MODULATABLE)
+                .withName("Clock rate")
+                .withID((clap_id)ParamIDs::ClockRate));
     }
     bool activate(double sampleRate, uint32_t minFrameCount,
                   uint32_t maxFrameCount) noexcept override
@@ -653,12 +681,17 @@ class ClapEventSequencerProcessor : public xenakios::XAudioProcessor
         m_sr = sampleRate;
         return true;
     }
-    uint32_t paramsCount() const noexcept override { return 0; }
+    uint32_t paramsCount() const noexcept override { return paramDescriptions.size(); }
     bool paramsInfo(uint32_t paramIndex, clap_param_info *info) const noexcept override
     {
-        return false;
+        if (paramIndex >= paramDescriptions.size())
+            return false;
+        const auto &pd = paramDescriptions[paramIndex];
+        pd.template toClapParamInfo<CLAP_NAME_SIZE>(info);
+        return true;
     }
     bool m_processing_started = false;
+    bool m_phase_resetted = true;
     clap_process_status process(const clap_process *process) noexcept override
     {
         if (!m_processing_started)
@@ -666,6 +699,60 @@ class ClapEventSequencerProcessor : public xenakios::XAudioProcessor
             m_processing_started = true;
             m_event_iter.setTime(0.0);
         }
+        if (process->transport)
+        {
+            double m_note_dur = (1.0 / m_clock_rate) * 1.50 * m_sr;
+            for (int i = 0; i < process->frames_count; ++i)
+            {
+                // this is stupid, need to figure out a better solution for this
+                for (int j = m_active_notes.size() - 1; j >= 0; --j)
+                {
+                    if (m_phase >= m_active_notes[j].offtime)
+                    {
+                        // std::cout << "note off " << m_active_notes[j].key << " at "
+                        //           << m_phase / m_sr << " seconds\n";
+                        clap_event_note cen;
+                        cen.header.flags = 0;
+                        cen.header.size = sizeof(clap_event_note);
+                        cen.header.space_id = CLAP_CORE_EVENT_SPACE_ID;
+                        cen.header.time = i;
+                        cen.header.type = CLAP_EVENT_NOTE_OFF;
+                        cen.key = m_active_notes[j].key;
+                        cen.note_id = -1;
+                        cen.channel = 0;
+                        cen.port_index = 0;
+                        cen.velocity = 0.0;
+                        process->out_events->try_push(process->out_events,
+                                                      (const clap_event_header *)&cen);
+                        m_active_notes.erase(m_active_notes.begin() + j);
+                    }
+                }
+                if (m_phase >= m_next_note_time)
+                {
+                    auto note = pitchdist(m_dvpitchrand);
+                    SimpleNoteEvent ne{m_next_note_time + m_note_dur, (int)note};
+                    // std::cout << "note on " << (int)note << " at " << m_phase / m_sr
+                    //           << " seconds\n";
+                    m_active_notes.push_back(ne);
+                    clap_event_note cen;
+                    cen.header.flags = 0;
+                    cen.header.size = sizeof(clap_event_note);
+                    cen.header.space_id = CLAP_CORE_EVENT_SPACE_ID;
+                    cen.header.time = i;
+                    cen.header.type = CLAP_EVENT_NOTE_ON;
+                    cen.key = (int)note;
+                    cen.note_id = -1;
+                    cen.channel = 0;
+                    cen.port_index = 0;
+                    cen.velocity = 0.8;
+                    process->out_events->try_push(process->out_events,
+                                                  (const clap_event_header *)&cen);
+                    m_next_note_time = m_phase + (1.0 / m_clock_rate * m_sr);
+                }
+                m_phase += 1.0;
+            }
+        }
+        return CLAP_PROCESS_CONTINUE;
         if (process->transport)
         {
             // note here the oddity that the clap transport doesn't contain floating point seconds!
@@ -699,4 +786,11 @@ class ClapEventSequencerProcessor : public xenakios::XAudioProcessor
 
         return CLAP_PROCESS_CONTINUE;
     }
+    bool guiCreate(const char *api, bool isFloating) noexcept override
+    {
+        m_editor = std::make_unique<xenakios::GenericEditor>(*this);
+        m_editor->setSize(500, 400);
+        return true;
+    }
+    void guiDestroy() noexcept override { m_editor = nullptr; }
 };
