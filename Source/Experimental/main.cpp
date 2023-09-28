@@ -684,10 +684,7 @@ inline void test_graph_processor_offline()
     g->activate(sr, blocksize, blocksize);
 
     g->findProcessor("Tone 1")->enqueueParameterChange(
-        xenakios::CrossThreadMessage()
-            .withParamId(ToneProcessorTest::ParamIds::Pitch)
-            .withType(CLAP_EVENT_PARAM_VALUE)
-            .withValue(72.0));
+        xenakios::CrossThreadMessage().asParamChange(ToneProcessorTest::ParamIds::Pitch, 72.0));
     g->findProcessor("Tone 1")->enqueueParameterChange(
         {(clap_id)ToneProcessorTest::ParamIds::Distortion, CLAP_EVENT_PARAM_VALUE, 0.1});
     g->findProcessor("Tone 2")->enqueueParameterChange(

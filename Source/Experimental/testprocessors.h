@@ -113,7 +113,6 @@ class ToneProcessorTest : public XAPWithJuceGUI
     bool activate(double sampleRate, uint32_t minFrameCount,
                   uint32_t maxFrameCount) noexcept override
     {
-        m_from_ui_fifo.reset(2048);
         juce::dsp::ProcessSpec spec;
         spec.maximumBlockSize = maxFrameCount;
         spec.numChannels = 2;

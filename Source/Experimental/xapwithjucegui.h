@@ -2,13 +2,15 @@
 
 #include "JuceHeader.h"
 #include "xaudioprocessor.h"
-#include "containers/choc_SingleReaderSingleWriterFIFO.h"
+#include "xap_utils.h"
+
 
 class XAPWithJuceGUI : public xenakios::XAudioProcessor
 {
   protected:
     std::unique_ptr<juce::Component> m_editor;
-    choc::fifo::SingleReaderSingleWriterFIFO<xenakios::CrossThreadMessage> m_from_ui_fifo;
+    // choc::fifo::SingleReaderSingleWriterFIFO<xenakios::CrossThreadMessage> m_from_ui_fifo;
+    SingleReaderSingleWriterFifoHelper<xenakios::CrossThreadMessage> m_from_ui_fifo;
     clap::helpers::EventList m_merge_list;
     
   public:
@@ -48,8 +50,6 @@ class XAPWithJuceGUI : public xenakios::XAudioProcessor
     {
         if (!m_editor)
             return false;
-        // maybe not the best place to init this, but...
-        m_from_ui_fifo.reset(2048);        
         return true;
     }
     bool guiHide() noexcept override { return false; }

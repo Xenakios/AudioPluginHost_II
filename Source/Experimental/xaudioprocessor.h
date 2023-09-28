@@ -47,8 +47,7 @@ struct CrossThreadMessage
         : paramId(parId), eventType(eType), value(val)
     {
     }
-    template<typename T>
-    CrossThreadMessage withParamId(T id)
+    template <typename T> CrossThreadMessage withParamId(T id)
     {
         auto result = *this;
         result.paramId = static_cast<clap_id>(id);
@@ -66,16 +65,15 @@ struct CrossThreadMessage
         result.value = v;
         return result;
     }
-    template<typename T>
-    CrossThreadMessage asParamChange(T parid, double v)
+    template <typename T> CrossThreadMessage asParamChange(T parid, double v)
     {
         auto result = *this;
         result.eventType = CLAP_EVENT_PARAM_VALUE;
-        result.paramId = (clap_id)parid;
+        result.paramId = static_cast<clap_id>(parid);
         result.value = v;
         return result;
     }
-    clap_id paramId = 0;
+    clap_id paramId = CLAP_INVALID_ID;
     int eventType = CLAP_EVENT_PARAM_VALUE;
     double value = 0.0;
 };
