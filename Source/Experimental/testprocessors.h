@@ -601,17 +601,22 @@ class ClapEventSequencerProcessor : public XAPWithJuceGUI
     struct SimpleNoteEvent
     {
         SimpleNoteEvent() {}
-        SimpleNoteEvent(double offtime_, int key_) : offtime(offtime_), key(key_) {}
+        SimpleNoteEvent(double ontime_, double offtime_, double key_)
+            : ontime(ontime_), offtime(offtime_), key(key_)
+        {
+        }
+        bool active = false;
+        double ontime = -1.0;
         double offtime = -1.0;
         int port = -1;
         int channel = -1;
-        int key = -1;
+        double key = -1;
         int noteid = -1;
     };
     std::vector<SimpleNoteEvent> m_active_notes;
     double m_phase = 0.0; // samples
     double m_next_note_time = 0.0;
-    double m_clock_rate = 5.0; // hz
+    double m_clock_rate = 1.0; // hz
   public:
     enum class ParamIDs
     {
@@ -701,13 +706,46 @@ class ClapEventSequencerProcessor : public XAPWithJuceGUI
         }
         if (process->transport)
         {
-            double m_note_dur = (1.0 / m_clock_rate) * 1.50 * m_sr;
+            double m_note_dur = (1.0 / m_clock_rate) * 0.50 * m_sr;
             for (int i = 0; i < process->frames_count; ++i)
             {
                 // this is stupid, need to figure out a better solution for this
                 for (int j = m_active_notes.size() - 1; j >= 0; --j)
                 {
-                    if (m_phase >= m_active_notes[j].offtime)
+                    auto &actnote = m_active_notes[j];
+                    if (m_phase >= actnote.ontime && !actnote.active)
+                    {
+                        actnote.active = true;
+                        clap_event_note cen;
+                        cen.header.flags = 0;
+                        cen.header.size = sizeof(clap_event_note);
+                        cen.header.space_id = CLAP_CORE_EVENT_SPACE_ID;
+                        cen.header.time = i;
+                        cen.header.type = CLAP_EVENT_NOTE_ON;
+                        cen.key = (int)actnote.key;
+                        cen.note_id = -1;
+                        cen.channel = 0;
+                        cen.port_index = 0;
+                        cen.velocity = 0.8;
+                        process->out_events->try_push(process->out_events,
+                                                      (const clap_event_header *)&cen);
+                        double pitchexp = actnote.key - (int)actnote.key;
+                        clap_event_note_expression cexp;
+                        cexp.header.size = sizeof(clap_event_note_expression);
+                        cexp.header.flags = 0;
+                        cexp.header.space_id = CLAP_CORE_EVENT_SPACE_ID;
+                        cexp.header.time = i;
+                        cexp.header.type = CLAP_EVENT_NOTE_EXPRESSION;
+                        cexp.channel = -1;
+                        cexp.note_id = -1;
+                        cexp.port_index = -1;
+                        cexp.key = (int)actnote.key;
+                        cexp.expression_id = CLAP_NOTE_EXPRESSION_TUNING;
+                        cexp.value = pitchexp;
+                        process->out_events->try_push(process->out_events,
+                                                      (const clap_event_header *)&cexp);
+                    }
+                    if (m_phase >= actnote.offtime)
                     {
                         // std::cout << "note off " << m_active_notes[j].key << " at "
                         //           << m_phase / m_sr << " seconds\n";
@@ -717,7 +755,7 @@ class ClapEventSequencerProcessor : public XAPWithJuceGUI
                         cen.header.space_id = CLAP_CORE_EVENT_SPACE_ID;
                         cen.header.time = i;
                         cen.header.type = CLAP_EVENT_NOTE_OFF;
-                        cen.key = m_active_notes[j].key;
+                        cen.key = (int)actnote.key;
                         cen.note_id = -1;
                         cen.channel = 0;
                         cen.port_index = 0;
@@ -729,24 +767,8 @@ class ClapEventSequencerProcessor : public XAPWithJuceGUI
                 }
                 if (m_phase >= m_next_note_time)
                 {
-                    auto note = pitchdist(m_dvpitchrand);
-                    SimpleNoteEvent ne{m_next_note_time + m_note_dur, (int)note};
-                    // std::cout << "note on " << (int)note << " at " << m_phase / m_sr
-                    //           << " seconds\n";
-                    m_active_notes.push_back(ne);
-                    clap_event_note cen;
-                    cen.header.flags = 0;
-                    cen.header.size = sizeof(clap_event_note);
-                    cen.header.space_id = CLAP_CORE_EVENT_SPACE_ID;
-                    cen.header.time = i;
-                    cen.header.type = CLAP_EVENT_NOTE_ON;
-                    cen.key = (int)note;
-                    cen.note_id = -1;
-                    cen.channel = 0;
-                    cen.port_index = 0;
-                    cen.velocity = 0.8;
-                    process->out_events->try_push(process->out_events,
-                                                  (const clap_event_header *)&cen);
+                    auto basenote = pitchdist(m_dvpitchrand);
+                    generateChordNotes(m_phase, basenote, m_note_dur);
                     m_next_note_time = m_phase + (1.0 / m_clock_rate * m_sr);
                 }
                 m_phase += 1.0;
@@ -786,6 +808,27 @@ class ClapEventSequencerProcessor : public XAPWithJuceGUI
 
         return CLAP_PROCESS_CONTINUE;
     }
+    void generateChordNotes(double baseonset, double basepitch, double notedur)
+    {
+        const float chord_notes[5][3] = {{0.0f, 3.1564f, 7.02f},
+                                         {0.0f, 3.8631f, 7.02f},
+                                         {-12.0f, 7.02f, 10.8827f},
+                                         {0.0f, 4.9804f, 10.1760f},
+                                         {-12.0f, 0.0f, 12.0f}};
+        int ctype = chorddist(m_dvchordrand);
+        std::uniform_real_distribution<double> stagdist{0.0, 0.25};
+        double stag = stagdist(m_def_rng);
+        for (int i = 0; i < 3; ++i)
+        {
+            double pitch = basepitch + chord_notes[ctype][i];
+            double tpos = baseonset + (i * stag * m_sr);
+            SimpleNoteEvent ne{tpos, tpos + notedur, pitch};
+            // std::cout << "note on " << (int)note << " at " << m_phase / m_sr
+            //           << " seconds\n";
+            m_active_notes.push_back(ne);
+        }
+    }
+    std::default_random_engine m_def_rng;
     bool guiCreate(const char *api, bool isFloating) noexcept override
     {
         m_editor = std::make_unique<xenakios::GenericEditor>(*this);

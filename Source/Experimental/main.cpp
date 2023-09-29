@@ -667,7 +667,7 @@ inline void test_graph_processor_offline()
     // g->connectAudio("Tone 1", 0, 0, "Ring Mod", 0, 1);
     // g->connectAudio("Tone 2", 0, 0, "Ring Mod", 1, 0);
     // g->connectAudio("Tone 2", 0, 0, "Ring Mod", 1, 1);
-    g->addProcessorAsNode(std::make_unique<ClapEventSequencerProcessor>(1, 1.0), "Note Gen");
+    g->addProcessorAsNode(std::make_unique<ClapEventSequencerProcessor>(3, 1.0), "Note Gen");
     connectEventPorts(g->findNodeByName("Note Gen"), 0, g->findNodeByName("Surge XT 1"), 0);
     g->outputNodeId = "Surge XT 1";
     double sr = 44100;
