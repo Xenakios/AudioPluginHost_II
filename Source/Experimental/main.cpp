@@ -279,11 +279,38 @@ inline void handleNodeEvents(XAPNode::Connection &conn,
     auto &oevents = conn.source->outEvents;
     for (int j = 0; j < oevents.size(); ++j)
     {
-        if (conn.sourcePort == conn.destinationPort)
+        eventMergeList.push_back(oevents.get(j));
+    }
+}
+
+inline void handleNodeEventsAlt(XAPNode::Connection &conn, clap::helpers::EventList &eventMergeList)
+{
+    // this is wayyyy too messy to handle like this, but we have to live with this for now
+    auto &oevents = conn.source->outEvents;
+    for (int j = 0; j < oevents.size(); ++j)
+    {
+        auto ev = oevents.get(j);
+        if (ev->type == CLAP_EVENT_NOTE_ON || ev->type == CLAP_EVENT_NOTE_OFF ||
+            ev->type == CLAP_EVENT_NOTE_CHOKE)
         {
-            eventMergeList.push_back(oevents.get(j));
+            auto tev = (clap_event_note *)ev;
+            if (tev->port_index == conn.sourcePort)
+            {
+                clap_event_note nev = *tev;
+                nev.port_index = conn.destinationPort;
+                eventMergeList.tryPush((const clap_event_header *)&nev);
+            }
         }
-        
+        if (ev->type == CLAP_EVENT_NOTE_EXPRESSION)
+        {
+            auto expev = (clap_event_note_expression *)ev;
+            if (expev->port_index == conn.sourcePort)
+            {
+                clap_event_note_expression nev = *expev;
+                nev.port_index = conn.destinationPort;
+                eventMergeList.tryPush((const clap_event_header *)&nev);
+            }
+        }
     }
 }
 
@@ -496,6 +523,7 @@ class XAPGraph : public xenakios::XAudioProcessor
         {
             eventMergeList.clear();
             accumModValues.clear();
+            noteMergeList.clear();
             // clear node audio input buffers before summing into them
             clearNodeAudioInputs(n, procbufsize);
             for (auto &conn : n->inputConnections)
@@ -507,7 +535,7 @@ class XAPGraph : public xenakios::XAudioProcessor
                 }
                 else if (conn.type == XAPNode::ConnectionType::Events)
                 {
-                    handleNodeEvents(conn, eventMergeList);
+                    handleNodeEventsAlt(conn, noteMergeList);
                 }
                 else
                 {
@@ -516,7 +544,8 @@ class XAPGraph : public xenakios::XAudioProcessor
             }
 
             n->inEvents.clear();
-            if (eventMergeList.size() > 0 || modulationMergeList.size() > 0)
+            if (eventMergeList.size() > 0 || modulationMergeList.size() > 0 ||
+                noteMergeList.size() > 0)
             {
                 xenakios::CrossThreadMessage ctmsg;
                 while (n->processor->dequeueParameterChange(ctmsg))
@@ -530,7 +559,8 @@ class XAPGraph : public xenakios::XAudioProcessor
                 }
                 for (int i = 0; i < modulationMergeList.size(); ++i)
                     eventMergeList.push_back(modulationMergeList.get(i));
-
+                for (int i = 0; i < noteMergeList.size(); ++i)
+                    eventMergeList.push_back(noteMergeList.get(i));
                 choc::sorting::stable_sort(
                     eventMergeList.begin(), eventMergeList.end(),
                     [](auto &lhs, auto &rhs) { return lhs->time < rhs->time; });
@@ -550,10 +580,7 @@ class XAPGraph : public xenakios::XAudioProcessor
             {
                 n->PreProcessFunc(n);
             }
-            if (n->displayName == "Surge XT 2")
-            {
-                // printClapEvents(n->inEvents);
-            }
+
             n->processor->process(&ctx);
         }
         for (auto &n : runOrder)
@@ -562,6 +589,7 @@ class XAPGraph : public xenakios::XAudioProcessor
             n->outEvents.clear();
         }
         modulationMergeList.clear();
+        noteMergeList.clear();
         auto outbufs = runOrder.back()->outPortBuffers[0].data32;
         for (int i = 0; i < process->audio_outputs[0].channel_count; ++i)
         {
@@ -583,6 +611,7 @@ class XAPGraph : public xenakios::XAudioProcessor
 
     std::vector<clap_event_header *> eventMergeList;
     clap::helpers::EventList modulationMergeList;
+    clap::helpers::EventList noteMergeList;
     std::unordered_map<clap_id, double> accumModValues;
     double m_sr = 0.0;
 };
