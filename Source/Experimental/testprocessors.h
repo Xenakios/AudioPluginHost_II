@@ -589,8 +589,6 @@ struct ClapEventIterator
 
 class ClapEventSequencerProcessor : public XAPWithJuceGUI
 {
-    SequenceType m_events;
-    ClapEventIterator m_event_iter;
     double m_sr = 1.0;
     DejaVuRandom m_dvpitchrand;
     DejaVuRandom m_dvchordrand;
@@ -620,14 +618,13 @@ class ClapEventSequencerProcessor : public XAPWithJuceGUI
   public:
     enum class ParamIDs
     {
-        ClockRate
+        ClockRate,
+        NoteDurationMultiplier
     };
     using ParamDesc = xenakios::ParamDesc;
     ClapEventSequencerProcessor(int seed, double pulselen)
-        : m_event_iter(m_events), m_dvpitchrand(seed), m_dvchordrand(seed + 13),
-          m_dvvelorand(seed + 101)
+        : m_dvpitchrand(seed), m_dvchordrand(seed + 13), m_dvvelorand(seed + 101)
     {
-        m_events.reserve(4096);
         m_active_notes.reserve(4096);
         // std::discrete_distribution<> d({40, 10, 10, 40});
 
@@ -638,38 +635,6 @@ class ClapEventSequencerProcessor : public XAPWithJuceGUI
         m_dvvelorand.m_loop_len = 3;
         m_dvvelorand.m_deja_vu = 0.3;
 
-        float chord_notes[5][3] = {{0.0f, 3.1564f, 7.02f},
-                                   {0.0f, 3.8631f, 7.02f},
-                                   {-12.0f, 7.02f, 10.8827f},
-                                   {0.0f, 4.9804f, 10.1760f},
-                                   {-12.0f, 0.0f, 12.0f}};
-        for (int i = 0; i < 480; ++i)
-        {
-            int key = pitchdist(m_dvpitchrand);
-            float root = key;
-            int chordtype = chorddist(m_dvchordrand);
-
-            double velo = 0.5;
-            if (accentdist(m_dvvelorand) > 0.75)
-                velo = 1.0;
-            double tpos = i * pulselen;
-            for (int j = 0; j < 3; ++j)
-            {
-                double offtpos = tpos + j * 0.07;
-                float pitch = key + chord_notes[chordtype][j];
-                m_events.push_back(ClapEventHolder::makeNoteEvent(CLAP_EVENT_NOTE_ON, offtpos, 0, 0,
-                                                                  pitch, -1, velo));
-                float fracpitch = pitch - (int)pitch;
-                m_events.push_back(ClapEventHolder::makeNoteExpressionEvent(
-                    CLAP_NOTE_EXPRESSION_TUNING, offtpos, 0, 0, pitch, -1, fracpitch));
-                double pan = juce::jmap<double>(j, 0, 2, 0.05, 0.95);
-                m_events.push_back(ClapEventHolder::makeNoteExpressionEvent(
-                    CLAP_NOTE_EXPRESSION_PAN, offtpos, 0, 0, pitch, -1, pan));
-                m_events.push_back(ClapEventHolder::makeNoteEvent(
-                    CLAP_EVENT_NOTE_OFF, offtpos + pulselen * 0.90, 0, 0, pitch, -1, 0.0));
-            }
-        }
-        sortSequence(m_events);
         paramDescriptions.push_back(
             ParamDesc()
                 .asFloat()
@@ -679,6 +644,15 @@ class ClapEventSequencerProcessor : public XAPWithJuceGUI
                 .withFlags(CLAP_PARAM_IS_AUTOMATABLE | CLAP_PARAM_IS_MODULATABLE)
                 .withName("Clock rate")
                 .withID((clap_id)ParamIDs::ClockRate));
+        paramDescriptions.push_back(
+            ParamDesc()
+                .asFloat()
+                .withRange(0.1f, 4.0f)
+                .withDefault(1.0)
+                .withLinearScaleFormatting("%",100.0)
+                .withFlags(CLAP_PARAM_IS_AUTOMATABLE | CLAP_PARAM_IS_MODULATABLE)
+                .withName("Note duration")
+                .withID((clap_id)ParamIDs::NoteDurationMultiplier));
     }
     bool activate(double sampleRate, uint32_t minFrameCount,
                   uint32_t maxFrameCount) noexcept override
@@ -697,18 +671,49 @@ class ClapEventSequencerProcessor : public XAPWithJuceGUI
     }
     bool m_processing_started = false;
     bool m_phase_resetted = true;
+    void handleInboundEvent(const clap_event_header *ev)
+    {
+        if (ev->space_id != CLAP_CORE_EVENT_SPACE_ID)
+            return;
+        if (ev->type == CLAP_EVENT_PARAM_VALUE)
+        {
+            auto pev = (const clap_event_param_value *)ev;
+            if (pev->param_id == (clap_id)ParamIDs::ClockRate)
+                m_clock_rate = pev->value;
+            if (pev->param_id == (clap_id)ParamIDs::NoteDurationMultiplier)
+                m_note_dur_mult = pev->value;
+        }
+    }
+    double m_note_dur_mult = 1.0;
     clap_process_status process(const clap_process *process) noexcept override
     {
         if (!m_processing_started)
         {
             m_processing_started = true;
-            m_event_iter.setTime(0.0);
         }
+        mergeParameterEvents(process);
+        auto inevents = m_merge_list.clapInputEvents();
+        const clap_event_header *next_event = nullptr;
+        auto esz = inevents->size(inevents);
+        uint32_t nextEventIndex{0};
+        if (esz > 0)
+            next_event = inevents->get(inevents, nextEventIndex);
         if (process->transport)
         {
-            double m_note_dur = (1.0 / m_clock_rate) * 0.50 * m_sr;
+            // note here the oddity that the clap transport doesn't contain floating point seconds!
+            auto curtime = process->transport->song_pos_seconds / (double)CLAP_SECTIME_FACTOR;
+
             for (int i = 0; i < process->frames_count; ++i)
             {
+                while (next_event && next_event->time == i)
+                {
+                    handleInboundEvent(next_event);
+                    nextEventIndex++;
+                    if (nextEventIndex >= esz)
+                        next_event = nullptr;
+                    else
+                        next_event = inevents->get(inevents, nextEventIndex);
+                }
                 // this is stupid, need to figure out a better solution for this
                 for (int j = m_active_notes.size() - 1; j >= 0; --j)
                 {
@@ -768,44 +773,14 @@ class ClapEventSequencerProcessor : public XAPWithJuceGUI
                 if (m_phase >= m_next_note_time)
                 {
                     auto basenote = pitchdist(m_dvpitchrand);
-                    generateChordNotes(m_phase, basenote, m_note_dur);
-                    m_next_note_time = m_phase + (1.0 / m_clock_rate * m_sr);
+                    double hz = std::pow(2.0, m_clock_rate);
+                    double notedur = (1.0 / hz) * m_note_dur_mult * m_sr;
+                    generateChordNotes(m_phase, basenote, notedur);
+                    m_next_note_time = m_phase + (1.0 / hz * m_sr);
                 }
                 m_phase += 1.0;
             }
         }
-        return CLAP_PROCESS_CONTINUE;
-        if (process->transport)
-        {
-            // note here the oddity that the clap transport doesn't contain floating point seconds!
-            auto curtime = process->transport->song_pos_seconds / (double)CLAP_SECTIME_FACTOR;
-            // m_event_iter.setTime(curtime);
-            auto events = m_event_iter.readNextEvents(process->frames_count / m_sr);
-            if (events.first != events.second)
-            {
-                for (int i = events.first; i < events.second; ++i)
-                {
-                    auto etype = m_events[i].m_eventType;
-                    if (etype == CLAP_EVENT_NOTE_ON || etype == CLAP_EVENT_NOTE_OFF)
-                    {
-                        auto ev = m_events[i].dataAsEvent<clap_event_note>();
-                        // std::cout << "GENERATED NOTE EVENT " << ev->header.type << " "
-                        //           << m_events[i].m_time_stamp << "\n";
-                        process->out_events->try_push(process->out_events,
-                                                      reinterpret_cast<clap_event_header *>(ev));
-                    }
-                    if (etype == CLAP_EVENT_NOTE_EXPRESSION)
-                    {
-                        auto ev = m_events[i].dataAsEvent<clap_event_note_expression>();
-                        // std::cout << "GENERATED NOTE EXP EVENT " << ev->header.type << " "
-                        //           << m_events[i].m_time_stamp << " " << ev->value << "\n";
-                        process->out_events->try_push(process->out_events,
-                                                      reinterpret_cast<clap_event_header *>(ev));
-                    }
-                }
-            }
-        }
-
         return CLAP_PROCESS_CONTINUE;
     }
     void generateChordNotes(double baseonset, double basepitch, double notedur)
@@ -832,7 +807,7 @@ class ClapEventSequencerProcessor : public XAPWithJuceGUI
     bool guiCreate(const char *api, bool isFloating) noexcept override
     {
         m_editor = std::make_unique<xenakios::GenericEditor>(*this);
-        m_editor->setSize(500, 400);
+        m_editor->setSize(500, 100);
         return true;
     }
     void guiDestroy() noexcept override { m_editor = nullptr; }

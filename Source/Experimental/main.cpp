@@ -426,6 +426,7 @@ class XAPGraph : public xenakios::XAudioProcessor
     }
     std::string outputNodeId = "Valhalla";
     bool m_activated = false;
+    void deactivate() noexcept override { m_activated = false; }
     bool activate(double sampleRate, uint32_t minFrameCount,
                   uint32_t maxFrameCount) noexcept override
     {
@@ -661,8 +662,8 @@ inline void test_graph_processor_offline()
                           "Ring Mod");
     std::string pathprefix = R"(C:\Program Files\Common Files\)";
     g->addProcessorAsNode(std::make_unique<ClapPluginFormatProcessor>(
-                                          pathprefix + R"(CLAP\Surge Synth Team\Surge XT.clap)", 0),
-                                      "Surge XT 1");
+                              pathprefix + R"(CLAP\Surge Synth Team\Surge XT.clap)", 0),
+                          "Surge XT 1");
     // g->connectAudio("Tone 1", 0, 0, "Ring Mod", 0, 0);
     // g->connectAudio("Tone 1", 0, 0, "Ring Mod", 0, 1);
     // g->connectAudio("Tone 2", 0, 0, "Ring Mod", 1, 0);
@@ -832,40 +833,15 @@ class MainComponent : public juce::Component, public juce::Timer
         std::string pathprefix = R"(C:\Program Files\Common Files\)";
 
         m_graph = std::make_unique<XAPGraph>();
+        m_graph->addProcessorAsNode(std::make_unique<ClapEventSequencerProcessor>(2, 1.0),
+                                    "Note Gen");
+        m_graph->addProcessorAsNode(std::make_unique<ClapPluginFormatProcessor>(
+                                        pathprefix + R"(CLAP\Surge Synth Team\Surge XT.clap)", 0),
+                                    "Surge XT 1");
+        connectEventPorts(m_graph->findNodeByName("Note Gen"), 0,
+                          m_graph->findNodeByName("Surge XT 1"), 0);
+        m_graph->outputNodeId = "Surge XT 1";
 
-        m_graph->addProcessorAsNode(
-            std::make_unique<ClapPluginFormatProcessor>(
-                R"(C:\Program Files\Common Files\CLAP\ChowMultiTool.clap)", 0),
-            "Chow");
-        m_graph->addProcessorAsNode(
-            std::make_unique<JucePluginWrapper>(pathprefix + R"(VST3\ValhallaVintageVerb.vst3)"),
-            "Valhalla");
-        m_graph->addProcessorAsNode(std::make_unique<GainProcessorTest>(), "Main out");
-        m_graph->addProcessorAsNode(std::make_unique<ToneProcessorTest>(), "Tone generator");
-        // m_test_proc = std::make_unique<ClapPluginFormatProcessor>(
-        //    R"(C:\Program Files\Common Files\CLAP\airwin-to-clap.clap)", 0);
-        m_graph->addProcessorAsNode(std::make_unique<FilePlayerProcessor>(), "File player");
-        // m_test_proc = std::make_unique<ClapPluginFormatProcessor>(
-        //    R"(C:\NetDownloads\17022023\conduit-win32-x64-nightly-2023-09-19-15-42\conduit_products\Conduit.clap)",
-        //    1);
-
-        m_graph->outputNodeId = "Main out";
-        connectAudioBetweenNodes(m_graph->findNodeByName("File player"), 0, 0,
-                                 m_graph->findNodeByName("Valhalla"), 0, 0);
-        connectAudioBetweenNodes(m_graph->findNodeByName("File player"), 0, 0,
-                                 m_graph->findNodeByName("Valhalla"), 0, 1);
-        connectAudioBetweenNodes(m_graph->findNodeByName("Valhalla"), 0, 0,
-                                 m_graph->findNodeByName("Main out"), 0, 0);
-        connectAudioBetweenNodes(m_graph->findNodeByName("Valhalla"), 0, 1,
-                                 m_graph->findNodeByName("Main out"), 0, 1);
-        m_graph->addProcessorAsNode(std::make_unique<ModulatorSource>(1, 0.0), "LFO 1");
-        m_graph->addProcessorAsNode(std::make_unique<ModulatorSource>(1, 0.1), "LFO 2");
-        connectModulation(m_graph->findNodeByName("LFO 1"), 0,
-                          m_graph->findNodeByName("File player"),
-                          (clap_id)FilePlayerProcessor::ParamIds::Pitch, false, 3.0);
-        connectModulation(m_graph->findNodeByName("LFO 2"), 0,
-                          m_graph->findNodeByName("File player"),
-                          (clap_id)FilePlayerProcessor::ParamIds::Playrate, false, 1.0);
         auto modulations = m_graph->getModulationConnections();
         for (auto &mc : modulations)
         {
@@ -997,7 +973,7 @@ class GuiAppApplication : public juce::JUCEApplication
     std::unique_ptr<MainWindow> mainWindow;
 };
 
-#define TESTJUCEGUI 0
+#define TESTJUCEGUI 1
 
 #if TESTJUCEGUI
 
