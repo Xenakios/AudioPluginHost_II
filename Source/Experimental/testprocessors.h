@@ -614,12 +614,16 @@ class ClapEventSequencerProcessor : public XAPWithJuceGUI
     std::vector<SimpleNoteEvent> m_active_notes;
     double m_phase = 0.0; // samples
     double m_next_note_time = 0.0;
-    double m_clock_rate = 1.0; // hz
+    double m_clock_rate = 0.0; // time octave
+    double m_note_dur_mult = 1.0;
+    double m_arp_time_range = 0.1;
+
   public:
     enum class ParamIDs
     {
-        ClockRate,
-        NoteDurationMultiplier
+        ClockRate = 2000,
+        NoteDurationMultiplier = 3000,
+        ArpeggioSpeed = 4000
     };
     using ParamDesc = xenakios::ParamDesc;
     ClapEventSequencerProcessor(int seed, double pulselen)
@@ -649,10 +653,19 @@ class ClapEventSequencerProcessor : public XAPWithJuceGUI
                 .asFloat()
                 .withRange(0.1f, 4.0f)
                 .withDefault(1.0)
-                .withLinearScaleFormatting("%",100.0)
+                .withLinearScaleFormatting("%", 100.0)
                 .withFlags(CLAP_PARAM_IS_AUTOMATABLE | CLAP_PARAM_IS_MODULATABLE)
                 .withName("Note duration")
                 .withID((clap_id)ParamIDs::NoteDurationMultiplier));
+        paramDescriptions.push_back(
+            ParamDesc()
+                .asFloat()
+                .withRange(0.0f, 1.0f)
+                .withDefault(0.0)
+                .withLinearScaleFormatting("%", 100.0)
+                .withFlags(CLAP_PARAM_IS_AUTOMATABLE | CLAP_PARAM_IS_MODULATABLE)
+                .withName("Arpeggio speed")
+                .withID((clap_id)ParamIDs::ArpeggioSpeed));
     }
     bool activate(double sampleRate, uint32_t minFrameCount,
                   uint32_t maxFrameCount) noexcept override
@@ -682,9 +695,11 @@ class ClapEventSequencerProcessor : public XAPWithJuceGUI
                 m_clock_rate = pev->value;
             if (pev->param_id == (clap_id)ParamIDs::NoteDurationMultiplier)
                 m_note_dur_mult = pev->value;
+            if (pev->param_id == (clap_id)ParamIDs::ArpeggioSpeed)
+                m_arp_time_range = pev->value;
         }
     }
-    double m_note_dur_mult = 1.0;
+
     clap_process_status process(const clap_process *process) noexcept override
     {
         if (!m_processing_started)
@@ -775,7 +790,7 @@ class ClapEventSequencerProcessor : public XAPWithJuceGUI
                     auto basenote = pitchdist(m_dvpitchrand);
                     double hz = std::pow(2.0, m_clock_rate);
                     double notedur = (1.0 / hz) * m_note_dur_mult * m_sr;
-                    generateChordNotes(m_phase, basenote, notedur);
+                    generateChordNotes(m_phase, basenote, notedur, hz);
                     m_next_note_time = m_phase + (1.0 / hz * m_sr);
                 }
                 m_phase += 1.0;
@@ -783,7 +798,7 @@ class ClapEventSequencerProcessor : public XAPWithJuceGUI
         }
         return CLAP_PROCESS_CONTINUE;
     }
-    void generateChordNotes(double baseonset, double basepitch, double notedur)
+    void generateChordNotes(double baseonset, double basepitch, double notedur, double hz)
     {
         const float chord_notes[5][3] = {{0.0f, 3.1564f, 7.02f},
                                          {0.0f, 3.8631f, 7.02f},
@@ -791,7 +806,9 @@ class ClapEventSequencerProcessor : public XAPWithJuceGUI
                                          {0.0f, 4.9804f, 10.1760f},
                                          {-12.0f, 0.0f, 12.0f}};
         int ctype = chorddist(m_dvchordrand);
-        std::uniform_real_distribution<double> stagdist{0.0, 0.25};
+        double tdelta = 1.0 / hz;
+        tdelta *= m_arp_time_range;
+        std::uniform_real_distribution<double> stagdist{0.0, tdelta / 3.0};
         double stag = stagdist(m_def_rng);
         for (int i = 0; i < 3; ++i)
         {
@@ -807,7 +824,7 @@ class ClapEventSequencerProcessor : public XAPWithJuceGUI
     bool guiCreate(const char *api, bool isFloating) noexcept override
     {
         m_editor = std::make_unique<xenakios::GenericEditor>(*this);
-        m_editor->setSize(500, 100);
+        m_editor->setSize(500, 140);
         return true;
     }
     void guiDestroy() noexcept override { m_editor = nullptr; }
