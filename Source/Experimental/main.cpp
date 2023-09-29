@@ -500,7 +500,7 @@ class XAPGraph : public xenakios::XAudioProcessor
         std::cout << "****                 ****\n";
         int outlen = 30 * sr;
 
-        eventMergeList.reserve(1024);
+        eventMergeVector.reserve(1024);
 
         transport.flags = CLAP_TRANSPORT_HAS_SECONDS_TIMELINE | CLAP_TRANSPORT_IS_PLAYING;
         m_activated = true;
@@ -521,7 +521,7 @@ class XAPGraph : public xenakios::XAudioProcessor
         ctx.transport = &transport;
         for (auto &n : runOrder)
         {
-            eventMergeList.clear();
+            eventMergeVector.clear();
             accumModValues.clear();
             noteMergeList.clear();
             // clear node audio input buffers before summing into them
@@ -544,9 +544,10 @@ class XAPGraph : public xenakios::XAudioProcessor
             }
 
             n->inEvents.clear();
-            if (eventMergeList.size() > 0 || modulationMergeList.size() > 0 ||
+            if (eventMergeVector.size() > 0 || modulationMergeList.size() > 0 ||
                 noteMergeList.size() > 0)
             {
+                // i've forgotten why this cross thread message stuff is here...?
                 xenakios::CrossThreadMessage ctmsg;
                 while (n->processor->dequeueParameterChange(ctmsg))
                 {
@@ -558,13 +559,13 @@ class XAPGraph : public xenakios::XAudioProcessor
                     }
                 }
                 for (int i = 0; i < modulationMergeList.size(); ++i)
-                    eventMergeList.push_back(modulationMergeList.get(i));
+                    eventMergeVector.push_back(modulationMergeList.get(i));
                 for (int i = 0; i < noteMergeList.size(); ++i)
-                    eventMergeList.push_back(noteMergeList.get(i));
+                    eventMergeVector.push_back(noteMergeList.get(i));
                 choc::sorting::stable_sort(
-                    eventMergeList.begin(), eventMergeList.end(),
+                    eventMergeVector.begin(), eventMergeVector.end(),
                     [](auto &lhs, auto &rhs) { return lhs->time < rhs->time; });
-                for (auto &e : eventMergeList)
+                for (auto &e : eventMergeVector)
                 {
                     n->inEvents.push(e);
                 }
@@ -609,7 +610,7 @@ class XAPGraph : public xenakios::XAudioProcessor
     clap_event_transport transport;
     int outcounter = 0;
 
-    std::vector<clap_event_header *> eventMergeList;
+    std::vector<clap_event_header *> eventMergeVector;
     clap::helpers::EventList modulationMergeList;
     clap::helpers::EventList noteMergeList;
     std::unordered_map<clap_id, double> accumModValues;
