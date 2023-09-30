@@ -8,16 +8,18 @@ class ClapEventSequencerProcessor : public XAPWithJuceGUI
 {
     double m_sr = 1.0;
     DejaVuRandom m_dvpitchrand;
+    DejaVuRandom m_dvtimerand;
     DejaVuRandom m_dvchordrand;
     DejaVuRandom m_dvvelorand;
     std::uniform_real_distribution<float> pitchdist{36.0f, 72.0f};
     std::uniform_int_distribution<int> chorddist{0, 4};
     std::uniform_real_distribution<float> accentdist{0.0f, 1.0f};
+    std::uniform_real_distribution<double> unidist{0.0, 1.0};
     struct SimpleNoteEvent
     {
         SimpleNoteEvent() {}
-        SimpleNoteEvent(double ontime_, double offtime_, double key_, int port_)
-            : ontime(ontime_), offtime(offtime_), key(key_), port(port_)
+        SimpleNoteEvent(double ontime_, double offtime_, double key_, int port_, double velo_)
+            : ontime(ontime_), offtime(offtime_), key(key_), port(port_), velo(velo_)
         {
         }
         bool active = false;
@@ -27,6 +29,7 @@ class ClapEventSequencerProcessor : public XAPWithJuceGUI
         int channel = -1;
         double key = -1;
         int noteid = -1;
+        double velo = 0.0;
     };
     std::vector<SimpleNoteEvent> m_active_notes;
     double m_phase = 0.0; // samples
@@ -35,6 +38,8 @@ class ClapEventSequencerProcessor : public XAPWithJuceGUI
     double m_note_dur_mult = 1.0;
     double m_arp_time_range = 0.1;
     double m_outport_bias = 0.5;
+    double m_shared_deja_vu = 0.0;
+    int m_shared_loop_len = 1;
 
   public:
     enum class ParamIDs
@@ -42,22 +47,24 @@ class ClapEventSequencerProcessor : public XAPWithJuceGUI
         ClockRate = 2000,
         NoteDurationMultiplier = 3000,
         ArpeggioSpeed = 4000,
-        OutPortBias = 5000
+        OutPortBias = 5000,
+        SharedDejaVu = 6000,
+        SharedLoopLen = 7000
     };
     using ParamDesc = xenakios::ParamDesc;
     ClapEventSequencerProcessor(int seed, double pulselen)
-        : m_dvpitchrand(seed), m_dvchordrand(seed + 13), m_dvvelorand(seed + 101)
+        : m_dvpitchrand(seed), m_dvtimerand(seed + 9001), m_dvchordrand(seed + 13),
+          m_dvvelorand(seed + 101)
     {
         m_active_notes.reserve(4096);
-        // std::discrete_distribution<> d({40, 10, 10, 40});
-
-        m_dvpitchrand.m_loop_len = 3;
-        m_dvpitchrand.m_deja_vu = 0.40;
-        m_dvchordrand.m_loop_len = 3;
-        m_dvchordrand.m_deja_vu = 0.4;
-        m_dvvelorand.m_loop_len = 3;
-        m_dvvelorand.m_deja_vu = 0.3;
-
+        m_dvpitchrand.m_loop_len = m_shared_loop_len;
+        m_dvpitchrand.m_deja_vu = m_shared_deja_vu;
+        m_dvchordrand.m_loop_len = m_shared_loop_len;
+        m_dvchordrand.m_deja_vu = m_shared_deja_vu;
+        m_dvvelorand.m_loop_len = m_shared_loop_len;
+        m_dvvelorand.m_deja_vu = m_shared_deja_vu;
+        m_dvtimerand.m_loop_len = m_shared_loop_len;
+        m_dvtimerand.m_deja_vu = m_shared_deja_vu;
         paramDescriptions.push_back(
             ParamDesc()
                 .asFloat()
@@ -94,6 +101,24 @@ class ClapEventSequencerProcessor : public XAPWithJuceGUI
                 .withFlags(CLAP_PARAM_IS_AUTOMATABLE | CLAP_PARAM_IS_MODULATABLE)
                 .withName("Output select bias")
                 .withID((clap_id)ParamIDs::OutPortBias));
+        paramDescriptions.push_back(
+            ParamDesc()
+                .asFloat()
+                .withRange(0.0f, 1.0f)
+                .withDefault(0.0)
+                .withLinearScaleFormatting("", 1.0)
+                .withFlags(CLAP_PARAM_IS_AUTOMATABLE | CLAP_PARAM_IS_MODULATABLE)
+                .withName("Deja Vu")
+                .withID((clap_id)ParamIDs::SharedDejaVu));
+        paramDescriptions.push_back(
+            ParamDesc()
+                .asInt()
+                .withRange(1.0f, 16.0f)
+                .withDefault(1.0)
+                .withLinearScaleFormatting("", 1.0)
+                .withFlags(CLAP_PARAM_IS_AUTOMATABLE | CLAP_PARAM_IS_STEPPED)
+                .withName("Num Loop Steps")
+                .withID((clap_id)ParamIDs::SharedLoopLen));
     }
     bool activate(double sampleRate, uint32_t minFrameCount,
                   uint32_t maxFrameCount) noexcept override
@@ -127,13 +152,29 @@ class ClapEventSequencerProcessor : public XAPWithJuceGUI
                 m_arp_time_range = pev->value;
             if (pev->param_id == (clap_id)ParamIDs::OutPortBias)
                 m_outport_bias = pev->value;
+            if (pev->param_id == (clap_id)ParamIDs::SharedDejaVu)
+            {
+                m_shared_deja_vu = pev->value;
+                m_dvtimerand.m_deja_vu = m_shared_deja_vu;
+                m_dvpitchrand.m_deja_vu = m_shared_deja_vu;
+                m_dvvelorand.m_deja_vu = m_shared_deja_vu;
+                m_dvchordrand.m_deja_vu = m_shared_deja_vu;
+            }
+            if (pev->param_id == (clap_id)ParamIDs::SharedLoopLen)
+            {
+                m_shared_loop_len = (int)pev->value;
+                m_dvtimerand.m_loop_len = m_shared_loop_len;
+                m_dvpitchrand.m_loop_len = m_shared_loop_len;
+                m_dvvelorand.m_loop_len = m_shared_loop_len;
+                m_dvchordrand.m_loop_len = m_shared_loop_len;
+            }
         }
     }
 
     clap_process_status process(const clap_process *process) noexcept override;
-    
-    std::uniform_real_distribution<double> portdist{0.0, 1.0};
-    void generateChordNotes(double baseonset, double basepitch, double notedur, double hz, int port)
+
+    void generateChordNotes(double baseonset, double basepitch, double notedur, double hz, int port,
+                            double velo)
     {
         const float chord_notes[5][3] = {{0.0f, 3.1564f, 7.02f},
                                          {0.0f, 3.8631f, 7.02f},
@@ -149,7 +190,7 @@ class ClapEventSequencerProcessor : public XAPWithJuceGUI
         {
             double pitch = basepitch + chord_notes[ctype][i];
             double tpos = baseonset + (i * stag * m_sr);
-            SimpleNoteEvent ne{tpos, tpos + notedur, pitch, port};
+            SimpleNoteEvent ne{tpos, tpos + notedur, pitch, port, velo};
             // std::cout << "note on " << (int)note << " at " << m_phase / m_sr
             //           << " seconds\n";
             m_active_notes.push_back(ne);
@@ -159,9 +200,8 @@ class ClapEventSequencerProcessor : public XAPWithJuceGUI
     bool guiCreate(const char *api, bool isFloating) noexcept override
     {
         m_editor = std::make_unique<xenakios::GenericEditor>(*this);
-        m_editor->setSize(500, 180);
+        m_editor->setSize(500, paramsCount() * 40);
         return true;
     }
     void guiDestroy() noexcept override { m_editor = nullptr; }
 };
-

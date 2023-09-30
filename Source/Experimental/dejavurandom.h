@@ -14,7 +14,7 @@ inline Type maprange(Type sourceValue, Type sourceRangeMin, Type sourceRangeMax,
 
 struct DejaVuRandom
 {
-    std::array<unsigned int, 256> m_state;
+    std::array<unsigned int, 32> m_state;
     using UnderlyingEngine = std::minstd_rand0;
     UnderlyingEngine m_rng;
     int m_loop_index = 0;

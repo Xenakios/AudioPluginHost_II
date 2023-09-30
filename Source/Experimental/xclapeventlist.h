@@ -13,14 +13,28 @@ namespace xenakios
 class ClapEventList
 {
   public:
-    static constexpr size_t maxEventSize =
-        std::max({sizeof(clap_event_note), sizeof(clap_event_note_expression),
-                  sizeof(clap_event_param_value), sizeof(clap_event_param_mod),
-                  sizeof(clap_event_midi), sizeof(clap_event_transport)});
+    static constexpr size_t maxEventSize = std::max(
+        {sizeof(clap_event_note), sizeof(clap_event_note_expression),
+         sizeof(clap_event_param_value), sizeof(clap_event_param_mod), sizeof(clap_event_trigger),
+         sizeof(clap_event_midi), sizeof(clap_event_transport), sizeof(clap_event_midi2)});
     ClapEventList()
     {
         m_data.resize(m_max_events * maxEventSize);
         m_entries.resize(m_max_events);
+        m_clap_in_events.ctx = this;
+        m_clap_in_events.get = inEventsGetFunc;
+        m_clap_in_events.size = inEventsSizeFunc;
+    }
+    static const clap_event_header_t *inEventsGetFunc(const struct clap_input_events *list,
+                                                      uint32_t index)
+    {
+        ClapEventList *impl = (ClapEventList *)list->ctx;
+        return impl->get(index);
+    }
+    static uint32_t inEventsSizeFunc(const struct clap_input_events *list)
+    {
+        ClapEventList *impl = (ClapEventList *)list->ctx;
+        return impl->size();
     }
     bool tryPush(const clap_event_header *evin)
     {
@@ -38,7 +52,7 @@ class ClapEventList
     {
         return tryPush(reinterpret_cast<const clap_event_header *>(evin));
     }
-    size_t size() const { return m_write_index; }
+    uint32_t size() const { return m_write_index; }
     clap_event_header *get(size_t index) const
     {
         return reinterpret_cast<clap_event_header *>(m_entries[index].dataPtr);
@@ -73,6 +87,7 @@ class ClapEventList
             m_entries.begin(), m_entries.begin() + m_write_index,
             [](const Entry &a, const Entry &b) { return a.eventTime < b.eventTime; });
     }
+    clap_input_events m_clap_in_events;
 
   private:
     struct Entry

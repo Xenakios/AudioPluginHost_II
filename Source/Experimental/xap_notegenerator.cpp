@@ -46,7 +46,7 @@ clap_process_status ClapEventSequencerProcessor::process(const clap_process *pro
                     cen.note_id = -1;
                     cen.channel = 0;
                     cen.port_index = actnote.port;
-                    cen.velocity = 0.8;
+                    cen.velocity = actnote.velo;
                     process->out_events->try_push(process->out_events,
                                                   (const clap_event_header *)&cen);
                     double pitchexp = actnote.key - (int)actnote.key;
@@ -90,12 +90,15 @@ clap_process_status ClapEventSequencerProcessor::process(const clap_process *pro
                 auto basenote = pitchdist(m_dvpitchrand);
                 double hz = std::pow(2.0, m_clock_rate);
                 double notedur = (1.0 / hz) * m_note_dur_mult * m_sr;
-
-                double z = portdist(m_def_rng);
+                double velo = unidist(m_dvvelorand);
+                if (velo<0.5)
+                    velo = 0.7;
+                else velo = 1.0;
+                double z = unidist(m_dvtimerand);
                 int port = 0;
                 if (z > m_outport_bias)
                     port = 1;
-                generateChordNotes(m_phase, basenote, notedur, hz, port);
+                generateChordNotes(m_phase, basenote, notedur, hz, port, velo);
                 m_next_note_time = m_phase + (1.0 / hz * m_sr);
             }
             m_phase += 1.0;

@@ -1014,7 +1014,7 @@ class GuiAppApplication : public juce::JUCEApplication
     std::unique_ptr<MainWindow> mainWindow;
 };
 
-#define TESTJUCEGUI 0
+#define TESTJUCEGUI 1
 
 #if TESTJUCEGUI
 
@@ -1133,6 +1133,7 @@ inline void printXList(const xenakios::ClapEventList &elist)
 inline void testNewEventList()
 {
     xenakios::ClapEventList elist;
+    clap_process process;
     auto en = makeClapNote(500, CLAP_EVENT_NOTE_ON, 0, 0, 60, -1, 1.0);
     elist.tryPushAs(&en);
     en = makeClapNote(0, CLAP_EVENT_NOTE_ON, 0, 0, 67, -1, 1.0);
