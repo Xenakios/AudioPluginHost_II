@@ -99,7 +99,7 @@ clap_process_status ClapEventSequencerProcessor::process(const clap_process *pro
                 int port = 0;
                 if (z > m_outport_bias)
                     port = 1;
-                generateChordNotes(m_phase, basenote, notedur, hz, port, velo);
+                generateChordNotes(1, m_phase, basenote, notedur, hz, port, velo);
                 m_next_note_time = m_phase + (1.0 / hz * m_sr);
             }
             m_phase += 1.0;

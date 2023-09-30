@@ -173,7 +173,7 @@ class ClapEventSequencerProcessor : public XAPWithJuceGUI
 
     clap_process_status process(const clap_process *process) noexcept override;
 
-    void generateChordNotes(double baseonset, double basepitch, double notedur, double hz, int port,
+    void generateChordNotes(int numnotes, double baseonset, double basepitch, double notedur, double hz, int port,
                             double velo)
     {
         const float chord_notes[5][3] = {{0.0f, 3.1564f, 7.02f},
@@ -186,13 +186,17 @@ class ClapEventSequencerProcessor : public XAPWithJuceGUI
         tdelta *= m_arp_time_range;
         std::uniform_real_distribution<double> stagdist{0.0, tdelta / 3.0};
         double stag = stagdist(m_def_rng);
-        for (int i = 0; i < 3; ++i)
+        if (numnotes == 1)
+        {
+            SimpleNoteEvent ne{baseonset, baseonset + notedur, basepitch, port, velo};
+            m_active_notes.push_back(ne);
+            return;
+        }
+        for (int i = 0; i < numnotes; ++i)
         {
             double pitch = basepitch + chord_notes[ctype][i];
             double tpos = baseonset + (i * stag * m_sr);
             SimpleNoteEvent ne{tpos, tpos + notedur, pitch, port, velo};
-            // std::cout << "note on " << (int)note << " at " << m_phase / m_sr
-            //           << " seconds\n";
             m_active_notes.push_back(ne);
         }
     }
