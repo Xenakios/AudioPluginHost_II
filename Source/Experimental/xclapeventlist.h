@@ -24,7 +24,8 @@ class ClapEventList
     }
     bool tryPush(const clap_event_header *evin)
     {
-        if (evin == nullptr || evin->size > maxEventSize || m_write_index >= m_max_events)
+        if (evin == nullptr || evin->type == CLAP_EVENT_MIDI_SYSEX || evin->size > maxEventSize ||
+            m_write_index >= m_max_events)
             return false;
         auto ptr = &m_data[m_write_index * maxEventSize];
         memcpy(ptr, evin, maxEventSize);
@@ -35,15 +36,7 @@ class ClapEventList
     }
     template <typename EventType> bool tryPushAs(const EventType *evin)
     {
-        if (evin == nullptr || evin->header.size > maxEventSize || m_write_index >= m_max_events)
-            return false;
-        return tryPush(reinterpret_cast<const clap_event_header*>(evin));
-        auto ptr = &m_data[m_write_index * maxEventSize];
-        memcpy(ptr, evin, maxEventSize);
-        m_entries[m_write_index].dataPtr = ptr;
-        m_entries[m_write_index].eventTime = evin->header.time;
-        ++m_write_index;
-        return true;
+        return tryPush(reinterpret_cast<const clap_event_header *>(evin));
     }
     size_t size() const { return m_write_index; }
     clap_event_header *get(size_t index) const
