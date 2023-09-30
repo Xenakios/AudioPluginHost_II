@@ -91,9 +91,10 @@ clap_process_status ClapEventSequencerProcessor::process(const clap_process *pro
                 double hz = std::pow(2.0, m_clock_rate);
                 double notedur = (1.0 / hz) * m_note_dur_mult * m_sr;
                 double velo = unidist(m_dvvelorand);
-                if (velo<0.5)
+                if (velo < 0.5)
                     velo = 0.7;
-                else velo = 1.0;
+                else
+                    velo = 1.0;
                 double z = unidist(m_dvtimerand);
                 int port = 0;
                 if (z > m_outport_bias)

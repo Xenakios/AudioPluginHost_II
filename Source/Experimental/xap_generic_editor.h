@@ -26,7 +26,7 @@ class XapSlider : public juce::Slider
         auto r = m_pardesc.valueFromString(text.toStdString(), err);
         if (r)
             return *r;
-        
+        std::cout << "slider valueFromText error : " << err << "\n";
         return text.getDoubleValue();
     }
 };
@@ -52,14 +52,14 @@ class GenericEditor : public juce::Component, public juce::Timer
                     comps->slider->setRange(pinfo.min_value, pinfo.max_value);
                 comps->slider->setDoubleClickReturnValue(true, pinfo.default_value);
                 comps->slider->setValue(pinfo.default_value, juce::dontSendNotification);
-                comps->slider->onDragStart = [this, pid = pinfo.id, &slid = comps->slider]() {
+                comps->slider->onDragStart = [this, pid = pinfo.id, slid = comps->slider.get()]() {
                     m_proc.enqueueParameterChange(
                         {pid, CLAP_EVENT_PARAM_GESTURE_BEGIN, slid->getValue()});
                 };
-                comps->slider->onValueChange = [this, pid = pinfo.id, &slid = comps->slider]() {
+                comps->slider->onValueChange = [this, pid = pinfo.id, slid = comps->slider.get()]() {
                     m_proc.enqueueParameterChange({pid, CLAP_EVENT_PARAM_VALUE, slid->getValue()});
                 };
-                comps->slider->onDragEnd = [this, pid = pinfo.id, &slid = comps->slider]() {
+                comps->slider->onDragEnd = [this, pid = pinfo.id, slid = comps->slider.get()]() {
                     m_proc.enqueueParameterChange(
                         {pid, CLAP_EVENT_PARAM_GESTURE_END, slid->getValue()});
                 };
@@ -84,14 +84,14 @@ class GenericEditor : public juce::Component, public juce::Timer
                     comps->slider->setRange(pdesc.minVal, pdesc.maxVal);
                 comps->slider->setDoubleClickReturnValue(true, pdesc.defaultVal);
                 comps->slider->setValue(pdesc.defaultVal, juce::dontSendNotification);
-                comps->slider->onDragStart = [this, pid = pdesc.id, &slid = comps->slider]() {
+                comps->slider->onDragStart = [this, pid = pdesc.id, slid = comps->slider.get()]() {
                     m_proc.enqueueParameterChange(
                         {pid, CLAP_EVENT_PARAM_GESTURE_BEGIN, slid->getValue()});
                 };
-                comps->slider->onValueChange = [this, pid = pdesc.id, &slid = comps->slider]() {
+                comps->slider->onValueChange = [this, pid = pdesc.id, slid = comps->slider.get()]() {
                     m_proc.enqueueParameterChange({pid, CLAP_EVENT_PARAM_VALUE, slid->getValue()});
                 };
-                comps->slider->onDragEnd = [this, pid = pdesc.id, &slid = comps->slider]() {
+                comps->slider->onDragEnd = [this, pid = pdesc.id, slid = comps->slider.get()]() {
                     m_proc.enqueueParameterChange(
                         {pid, CLAP_EVENT_PARAM_GESTURE_END, slid->getValue()});
                 };

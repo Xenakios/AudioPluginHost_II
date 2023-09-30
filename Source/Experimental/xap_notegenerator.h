@@ -53,7 +53,7 @@ class ClapEventSequencerProcessor : public XAPWithJuceGUI
     };
     using ParamDesc = xenakios::ParamDesc;
     ClapEventSequencerProcessor(int seed, double pulselen)
-        : m_dvpitchrand(seed), m_dvtimerand(seed + 9001), m_dvchordrand(seed + 13),
+        : m_dvpitchrand(seed), m_dvtimerand(seed + 9003), m_dvchordrand(seed + 13),
           m_dvvelorand(seed + 101)
     {
         m_active_notes.reserve(4096);
