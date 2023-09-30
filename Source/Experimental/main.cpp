@@ -1044,79 +1044,77 @@ inline bool isClapNoteEventType(uint16_t et)
     return et >= CLAP_EVENT_NOTE_ON && et <= CLAP_EVENT_NOTE_END;
 }
 
-inline bool isClapParameterEventType(uint16_t et)
-{
-    return et >= CLAP_EVENT_PARAM_VALUE && et <= CLAP_EVENT_PARAM_GESTURE_END;
-}
-
 // just a raw unchecked cast, use at your own peril
 template <typename EventType> inline const EventType *clapCast(const clap_event_header *e)
 {
     return reinterpret_cast<const EventType *>(e);
 }
 
-// This has not been benchmarked etc, so depending on intended use pattern, 
+// This has not been benchmarked etc, so depending on intended use pattern,
 // might not want to always use this because of the runtime
-// conditional checking involved. If new event types are added to Clap, this needs to 
+// conditional checking involved. If new event types are added to Clap, this needs to
 // be updated...
 // Should probably also use switch case in this instead of the ifs...
 
 template <typename EventType> inline const EventType *clapDynCast(const clap_event_header *e)
 {
-    if (e->type >= CLAP_EVENT_NOTE_ON && e->type <= CLAP_EVENT_NOTE_END)
+    if (e->space_id == CLAP_CORE_EVENT_SPACE_ID)
     {
-        if constexpr (std::is_same_v<EventType, clap_event_note>)
-            return reinterpret_cast<const clap_event_note *>(e);
-    }
-    if (e->type == CLAP_EVENT_NOTE_EXPRESSION)
-    {
-        if constexpr (std::is_same_v<EventType, clap_event_note_expression>)
-            return reinterpret_cast<const clap_event_note_expression *>(e);
-    }
-    if (e->type == CLAP_EVENT_PARAM_VALUE)
-    {
-        if constexpr (std::is_same_v<EventType, clap_event_param_value>)
-            return reinterpret_cast<const clap_event_param_value *>(e);
-    }
-    if (e->type == CLAP_EVENT_PARAM_MOD)
-    {
-        if constexpr (std::is_same_v<EventType, clap_event_param_mod>)
-            return reinterpret_cast<const clap_event_param_mod *>(e);
-    }
-    if (e->type == CLAP_EVENT_PARAM_GESTURE_BEGIN || e->type == CLAP_EVENT_PARAM_GESTURE_END)
-    {
-        if constexpr (std::is_same_v<EventType, clap_event_param_gesture>)
-            return reinterpret_cast<const clap_event_param_gesture *>(e);
-    }
-    if (e->type == CLAP_EVENT_MIDI)
-    {
-        if constexpr (std::is_same_v<EventType, clap_event_midi>)
-            return reinterpret_cast<const clap_event_midi *>(e);
-    }
-    if (e->type == CLAP_EVENT_TRIGGER)
-    {
-        if constexpr (std::is_same_v<EventType, clap_event_trigger>)
-            return reinterpret_cast<const clap_event_trigger *>(e);
-    }
-    if (e->type == CLAP_EVENT_TRANSPORT)
-    {
-        if constexpr (std::is_same_v<EventType, clap_event_transport>)
-            return reinterpret_cast<const clap_event_transport *>(e);
-    }
-    if (e->type == CLAP_EVENT_MIDI2)
-    {
-        if constexpr (std::is_same_v<EventType, clap_event_midi2>)
-            return reinterpret_cast<const clap_event_midi2 *>(e);
-    }
-    if (e->type == CLAP_EVENT_MIDI_SYSEX)
-    {
-        if constexpr (std::is_same_v<EventType, clap_event_midi_sysex>)
-            return reinterpret_cast<const clap_event_midi_sysex *>(e);
+        if (e->type >= CLAP_EVENT_NOTE_ON && e->type <= CLAP_EVENT_NOTE_END)
+        {
+            if constexpr (std::is_same_v<EventType, clap_event_note>)
+                return reinterpret_cast<const clap_event_note *>(e);
+        }
+        if (e->type == CLAP_EVENT_NOTE_EXPRESSION)
+        {
+            if constexpr (std::is_same_v<EventType, clap_event_note_expression>)
+                return reinterpret_cast<const clap_event_note_expression *>(e);
+        }
+        if (e->type == CLAP_EVENT_PARAM_VALUE)
+        {
+            if constexpr (std::is_same_v<EventType, clap_event_param_value>)
+                return reinterpret_cast<const clap_event_param_value *>(e);
+        }
+        if (e->type == CLAP_EVENT_PARAM_MOD)
+        {
+            if constexpr (std::is_same_v<EventType, clap_event_param_mod>)
+                return reinterpret_cast<const clap_event_param_mod *>(e);
+        }
+        if (e->type == CLAP_EVENT_PARAM_GESTURE_BEGIN || e->type == CLAP_EVENT_PARAM_GESTURE_END)
+        {
+            if constexpr (std::is_same_v<EventType, clap_event_param_gesture>)
+                return reinterpret_cast<const clap_event_param_gesture *>(e);
+        }
+        if (e->type == CLAP_EVENT_MIDI)
+        {
+            if constexpr (std::is_same_v<EventType, clap_event_midi>)
+                return reinterpret_cast<const clap_event_midi *>(e);
+        }
+        if (e->type == CLAP_EVENT_TRIGGER)
+        {
+            if constexpr (std::is_same_v<EventType, clap_event_trigger>)
+                return reinterpret_cast<const clap_event_trigger *>(e);
+        }
+        if (e->type == CLAP_EVENT_TRANSPORT)
+        {
+            if constexpr (std::is_same_v<EventType, clap_event_transport>)
+                return reinterpret_cast<const clap_event_transport *>(e);
+        }
+        if (e->type == CLAP_EVENT_MIDI2)
+        {
+            if constexpr (std::is_same_v<EventType, clap_event_midi2>)
+                return reinterpret_cast<const clap_event_midi2 *>(e);
+        }
+        if (e->type == CLAP_EVENT_MIDI_SYSEX)
+        {
+            if constexpr (std::is_same_v<EventType, clap_event_midi_sysex>)
+                return reinterpret_cast<const clap_event_midi_sysex *>(e);
+        }
     }
     return nullptr;
 }
 
-inline void printXList(const xenakios::ClapEventList& elist)
+inline void printXList(const xenakios::ClapEventList &elist)
 {
     for (int i = 0; i < elist.size(); ++i)
     {
@@ -1126,7 +1124,8 @@ inline void printXList(const xenakios::ClapEventList& elist)
         else if (auto pe = clapDynCast<clap_event_param_value>(e))
         {
             std::cout << e->time << "\tPAR VALUE  " << pe->param_id << " " << pe->value << "\n";
-        } else
+        }
+        else
             std::cout << e->time << "\tUNHANDLED FOR PRINTING\n";
     }
 }
@@ -1144,7 +1143,7 @@ inline void testNewEventList()
     elist.tryPushAs(&en);
     elist.getLastAs<clap_event_note>()->key = 49;
     auto parev = makeClapParameterValueEvent(333, 42, 0.666, nullptr);
-    
+
     elist.tryPushAs(&parev);
     clap_event_midi midiev;
     midiev.header.type = CLAP_EVENT_MIDI;
