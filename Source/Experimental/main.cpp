@@ -821,7 +821,7 @@ class XapWindow : public juce::DocumentWindow
     {
         setUsingNativeTitleBar(true);
         setVisible(true);
-        setAlwaysOnTop(true);
+        //setAlwaysOnTop(true);
         setWantsKeyboardFocus(true);
         setContentNonOwned(&m_content, true);
         setResizable(true, false);
