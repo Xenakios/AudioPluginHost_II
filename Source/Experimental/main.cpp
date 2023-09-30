@@ -9,7 +9,7 @@
 #include "fileplayer_xaudioprocessor.h"
 #include "xap_utils.h"
 #include "xap_notegenerator.h"
-// #include "xclapeventlist.h"
+#include "xclapeventlist.h"
 
 inline void mapModulationEvents(const clap::helpers::EventList &sourceList, clap_id sourceParId,
                                 clap::helpers::EventList &destList, clap_id destParId,
@@ -1014,15 +1014,121 @@ class GuiAppApplication : public juce::JUCEApplication
     std::unique_ptr<MainWindow> mainWindow;
 };
 
-#define TESTJUCEGUI 1
+#define TESTJUCEGUI 0
 
 #if TESTJUCEGUI
 
 START_JUCE_APPLICATION(GuiAppApplication)
 
 #else
+
+inline clap_event_note makeClapNote(int samplepos, int etype, int port, int chan, int key,
+                                    int noteid, double velo)
+{
+    clap_event_note en;
+    en.header.flags = 0;
+    en.header.size = sizeof(clap_event_note);
+    en.header.space_id = CLAP_CORE_EVENT_SPACE_ID;
+    en.header.time = samplepos;
+    en.header.type = etype;
+    en.channel = chan;
+    en.key = key;
+    en.note_id = noteid;
+    en.port_index = port;
+    en.velocity = velo;
+    return en;
+}
+
+inline bool isClapNoteEventType(uint16_t et)
+{
+    return et >= CLAP_EVENT_NOTE_ON && et <= CLAP_EVENT_NOTE_END;
+}
+
+inline bool isClapParameterEventType(uint16_t et)
+{
+    return et >= CLAP_EVENT_PARAM_VALUE && et <= CLAP_EVENT_PARAM_GESTURE_END;
+}
+
+template <typename EventType> inline const EventType *clapCast(const clap_event_header *e)
+{
+    if (e->type >= CLAP_EVENT_NOTE_ON && e->type <= CLAP_EVENT_NOTE_END)
+    {
+        if constexpr (std::is_same_v<EventType, clap_event_note>)
+            return reinterpret_cast<const clap_event_note *>(e);
+    }
+    if (e->type == CLAP_EVENT_NOTE_EXPRESSION)
+    {
+        if constexpr (std::is_same_v<EventType, clap_event_note_expression>)
+            return reinterpret_cast<const clap_event_note_expression *>(e);
+    }
+    if (e->type == CLAP_EVENT_PARAM_VALUE)
+    {
+        if constexpr (std::is_same_v<EventType, clap_event_param_value>)
+            return reinterpret_cast<const clap_event_param_value *>(e);
+    }
+    if (e->type == CLAP_EVENT_PARAM_MOD)
+    {
+        if constexpr (std::is_same_v<EventType, clap_event_param_mod>)
+            return reinterpret_cast<const clap_event_param_mod *>(e);
+    }
+    if (e->type == CLAP_EVENT_PARAM_GESTURE_BEGIN || e->type == CLAP_EVENT_PARAM_GESTURE_END)
+    {
+        if constexpr (std::is_same_v<EventType, clap_event_param_gesture>)
+            return reinterpret_cast<const clap_event_param_gesture *>(e);
+    }
+    if (e->type == CLAP_EVENT_MIDI)
+    {
+        if constexpr (std::is_same_v<EventType, clap_event_midi>)
+            return reinterpret_cast<const clap_event_midi *>(e);
+    }
+    return nullptr;
+}
+
+inline void printXList(const xenakios::ClapEventList& elist)
+{
+    for (int i = 0; i < elist.size(); ++i)
+    {
+        auto e = elist.get(i);
+        if (auto ne = clapCast<clap_event_note>(e))
+            std::cout << e->time << "\tNOTE EVENT " << ne->key << "\n";
+        else if (auto pe = clapCast<clap_event_param_value>(e))
+        {
+            std::cout << e->time << "\tPAR VALUE  " << pe->param_id << " " << pe->value << "\n";
+        } else
+            std::cout << e->time << "\tUNHANDLED\n";
+    }
+}
+
+inline void testNewEventList()
+{
+    xenakios::ClapEventList elist;
+    auto en = makeClapNote(500, CLAP_EVENT_NOTE_ON, 0, 0, 60, -1, 1.0);
+    elist.tryPushAs(&en);
+    en = makeClapNote(0, CLAP_EVENT_NOTE_ON, 0, 0, 67, -1, 1.0);
+    elist.tryPushAs(&en);
+    en = makeClapNote(400, CLAP_EVENT_NOTE_OFF, 0, 0, 67, -1, 1.0);
+    elist.tryPushAs(&en);
+    en = makeClapNote(100, CLAP_EVENT_NOTE_ON, 0, 0, 48, -1, 1.0);
+    elist.tryPushAs(&en);
+    elist.getLastAs<clap_event_note>()->key = 49;
+    auto parev = makeClapParameterValueEvent(333, 42, 0.666, nullptr);
+    
+    elist.tryPushAs(&parev);
+    clap_event_midi midiev;
+    midiev.header.type = CLAP_EVENT_MIDI;
+    midiev.header.size = sizeof(CLAP_EVENT_MIDI);
+    midiev.header.time = 3;
+    elist.tryPushAs(&midiev);
+    printXList(elist);
+    elist.sort();
+    std::cout << "sorted\n";
+    printXList(elist);
+}
+
 int main()
 {
+    testNewEventList();
+    return 0;
     juce::ScopedJuceInitialiser_GUI gui_init;
     // test_node_connecting();
     test_graph_processor_offline();

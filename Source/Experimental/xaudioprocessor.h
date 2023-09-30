@@ -35,6 +35,27 @@ inline clap_event_param_value makeClapParameterValueEvent(int time, clap_id para
     return pv;
 }
 
+inline clap_event_param_mod makeClapParameterModEvent(int time, clap_id paramId, double value,
+                                                      void *cookie = nullptr, int port = -1,
+                                                      int channel = -1, int key = -1,
+                                                      int noteid = -1)
+{
+    clap_event_param_mod pv;
+    pv.header.time = time;
+    pv.header.size = sizeof(clap_event_param_mod);
+    pv.header.space_id = CLAP_CORE_EVENT_SPACE_ID;
+    pv.header.flags = 0;
+    pv.header.type = CLAP_EVENT_PARAM_MOD;
+    pv.channel = channel;
+    pv.cookie = cookie;
+    pv.key = key;
+    pv.note_id = noteid;
+    pv.param_id = paramId;
+    pv.port_index = port;
+    pv.amount = value;
+    return pv;
+}
+
 namespace xenakios
 {
 
