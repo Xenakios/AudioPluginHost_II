@@ -11,12 +11,14 @@ class ClapEventSequencerProcessor : public XAPWithJuceGUI
     DejaVuRandom m_dvtimerand;
     DejaVuRandom m_dvchordrand;
     DejaVuRandom m_dvvelorand;
-    
+
     struct SimpleNoteEvent
     {
         SimpleNoteEvent() {}
-        SimpleNoteEvent(double ontime_, double offtime_, double key_, int port_, double velo_)
-            : ontime(ontime_), offtime(offtime_), key(key_), port(port_), velo(velo_)
+        SimpleNoteEvent(double ontime_, double offtime_, double key_, int port_, int chan_,
+                        double velo_)
+            : ontime(ontime_), offtime(offtime_), key(key_), port(port_), channel(chan_),
+              velo(velo_)
         {
         }
         bool active = false;
@@ -39,6 +41,12 @@ class ClapEventSequencerProcessor : public XAPWithJuceGUI
     int m_shared_loop_len = 1;
 
   public:
+    enum class OutputMode
+    {
+        Channels,
+        Ports
+    };
+    OutputMode m_output_mode = OutputMode::Channels;
     enum class ParamIDs
     {
         ClockRate = 2000,
@@ -46,7 +54,8 @@ class ClapEventSequencerProcessor : public XAPWithJuceGUI
         ArpeggioSpeed = 4000,
         OutPortBias = 5000,
         SharedDejaVu = 6000,
-        SharedLoopLen = 7000
+        SharedLoopLen = 7000,
+        OutputMode = 8000
     };
     using ParamDesc = xenakios::ParamDesc;
     ClapEventSequencerProcessor(int seed, double pulselen)
@@ -98,6 +107,16 @@ class ClapEventSequencerProcessor : public XAPWithJuceGUI
                 .withFlags(CLAP_PARAM_IS_AUTOMATABLE | CLAP_PARAM_IS_MODULATABLE)
                 .withName("Output select bias")
                 .withID((clap_id)ParamIDs::OutPortBias));
+        std::unordered_map<int, std::string> outChoices;
+        outChoices[0] = "MIDI Channel 0 / 1";
+        outChoices[1] = "Clap Port 0 / 1";
+        paramDescriptions.push_back(ParamDesc()
+                                        .asInt()
+                                        .withUnorderedMapFormatting(outChoices)
+                                        .withFlags(CLAP_PARAM_IS_STEPPED)
+                                        .withDefault(1)
+                                        .withID((clap_id)ParamIDs::OutputMode)
+                                        .withName("Output Mode"));
         paramDescriptions.push_back(
             ParamDesc()
                 .asFloat()
@@ -165,38 +184,18 @@ class ClapEventSequencerProcessor : public XAPWithJuceGUI
                 m_dvvelorand.m_loop_len = m_shared_loop_len;
                 m_dvchordrand.m_loop_len = m_shared_loop_len;
             }
+            if (pev->param_id == (clap_id)ParamIDs::OutputMode)
+            {
+                m_output_mode = (OutputMode)pev->value;
+            }
         }
     }
 
     clap_process_status process(const clap_process *process) noexcept override;
 
     void generateChordNotes(int numnotes, double baseonset, double basepitch, double notedur,
-                            double hz, int port, double velo)
-    {
-        const float chord_notes[5][3] = {{0.0f, 3.1564f, 7.02f},
-                                         {0.0f, 3.8631f, 7.02f},
-                                         {-12.0f, 7.02f, 10.8827f},
-                                         {0.0f, 4.9804f, 10.1760f},
-                                         {-12.0f, 0.0f, 12.0f}};
-        int ctype = m_dvchordrand.nextIntInRange(0, 4);
-        double tdelta = 1.0 / hz;
-        tdelta *= m_arp_time_range;
-        std::uniform_real_distribution<double> stagdist{0.0, tdelta / 3.0};
-        double stag = stagdist(m_def_rng);
-        if (numnotes == 1)
-        {
-            SimpleNoteEvent ne{baseonset, baseonset + notedur, basepitch, port, velo};
-            m_active_notes.push_back(ne);
-            return;
-        }
-        for (int i = 0; i < numnotes; ++i)
-        {
-            double pitch = basepitch + chord_notes[ctype][i];
-            double tpos = baseonset + (i * stag * m_sr);
-            SimpleNoteEvent ne{tpos, tpos + notedur, pitch, port, velo};
-            m_active_notes.push_back(ne);
-        }
-    }
+                            double hz, int port, double velo);
+
     std::default_random_engine m_def_rng;
     bool guiCreate(const char *api, bool isFloating) noexcept override
     {

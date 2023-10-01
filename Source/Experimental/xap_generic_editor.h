@@ -21,7 +21,7 @@ class XapSlider : public juce::Slider
     }
     double getValueFromText(const juce::String &text) override
     {
-        
+
         std::string err;
         auto r = m_pardesc.valueFromString(text.toStdString(), err);
         if (r)
@@ -56,7 +56,8 @@ class GenericEditor : public juce::Component, public juce::Timer
                     m_proc.enqueueParameterChange(
                         {pid, CLAP_EVENT_PARAM_GESTURE_BEGIN, slid->getValue()});
                 };
-                comps->slider->onValueChange = [this, pid = pinfo.id, slid = comps->slider.get()]() {
+                comps->slider->onValueChange = [this, pid = pinfo.id,
+                                                slid = comps->slider.get()]() {
                     m_proc.enqueueParameterChange({pid, CLAP_EVENT_PARAM_VALUE, slid->getValue()});
                 };
                 comps->slider->onDragEnd = [this, pid = pinfo.id, slid = comps->slider.get()]() {
@@ -75,29 +76,48 @@ class GenericEditor : public juce::Component, public juce::Timer
             {
                 auto &pdesc = m_proc.paramDescriptions[i];
                 auto comps = std::make_unique<ParamComponents>();
-                comps->slider = std::make_unique<XapSlider>(pdesc);
-                comps->paramId = pdesc.id;
                 comps->label.setText(pdesc.name, juce::dontSendNotification);
-                if (pdesc.flags & CLAP_PARAM_IS_STEPPED)
-                    comps->slider->setRange(pdesc.minVal, pdesc.maxVal, 1.0);
-                else
-                    comps->slider->setRange(pdesc.minVal, pdesc.maxVal);
-                comps->slider->setDoubleClickReturnValue(true, pdesc.defaultVal);
-                comps->slider->setValue(pdesc.defaultVal, juce::dontSendNotification);
-                comps->slider->onDragStart = [this, pid = pdesc.id, slid = comps->slider.get()]() {
-                    m_proc.enqueueParameterChange(
-                        {pid, CLAP_EVENT_PARAM_GESTURE_BEGIN, slid->getValue()});
-                };
-                comps->slider->onValueChange = [this, pid = pdesc.id, slid = comps->slider.get()]() {
-                    m_proc.enqueueParameterChange({pid, CLAP_EVENT_PARAM_VALUE, slid->getValue()});
-                };
-                comps->slider->onDragEnd = [this, pid = pdesc.id, slid = comps->slider.get()]() {
-                    m_proc.enqueueParameterChange(
-                        {pid, CLAP_EVENT_PARAM_GESTURE_END, slid->getValue()});
-                };
+                if (pdesc.displayScale != ParamDesc::DisplayScale::UNORDERED_MAP)
+                {
+                    comps->slider = std::make_unique<XapSlider>(pdesc);
+                    comps->paramId = pdesc.id;
 
+                    if (pdesc.flags & CLAP_PARAM_IS_STEPPED)
+                        comps->slider->setRange(pdesc.minVal, pdesc.maxVal, 1.0);
+                    else
+                        comps->slider->setRange(pdesc.minVal, pdesc.maxVal);
+                    comps->slider->setDoubleClickReturnValue(true, pdesc.defaultVal);
+                    comps->slider->setValue(pdesc.defaultVal, juce::dontSendNotification);
+                    comps->slider->onDragStart = [this, pid = pdesc.id,
+                                                  slid = comps->slider.get()]() {
+                        m_proc.enqueueParameterChange(
+                            {pid, CLAP_EVENT_PARAM_GESTURE_BEGIN, slid->getValue()});
+                    };
+                    comps->slider->onValueChange = [this, pid = pdesc.id,
+                                                    slid = comps->slider.get()]() {
+                        m_proc.enqueueParameterChange(
+                            {pid, CLAP_EVENT_PARAM_VALUE, slid->getValue()});
+                    };
+                    comps->slider->onDragEnd = [this, pid = pdesc.id,
+                                                slid = comps->slider.get()]() {
+                        m_proc.enqueueParameterChange(
+                            {pid, CLAP_EVENT_PARAM_GESTURE_END, slid->getValue()});
+                    };
+                }
+                if (pdesc.displayScale == ParamDesc::DisplayScale::UNORDERED_MAP)
+                {
+                    comps->combo = std::make_unique<juce::ComboBox>();
+                    for (auto &e : pdesc.discreteValues)
+                    {
+                        comps->combo->addItem(e.second, e.first + 1);
+                    }
+                    comps->paramId = pdesc.id;
+                }
                 addAndMakeVisible(comps->label);
-                addAndMakeVisible(*comps->slider);
+                if (comps->slider)
+                    addAndMakeVisible(*comps->slider);
+                if (comps->combo)
+                    addAndMakeVisible(*comps->combo);
                 m_param_comps.push_back(std::move(comps));
             }
         }
@@ -114,12 +134,16 @@ class GenericEditor : public juce::Component, public juce::Timer
         for (int i = 0; i < m_param_comps.size(); ++i)
         {
             mainflex.items.add(juce::FlexItem(m_param_comps[i]->label).withFlex(1.0));
-            mainflex.items.add(juce::FlexItem(*m_param_comps[i]->slider).withFlex(1.0));
+            if (m_param_comps[i]->slider)
+                mainflex.items.add(juce::FlexItem(*m_param_comps[i]->slider).withFlex(1.0));
+            if (m_param_comps[i]->combo)
+                mainflex.items.add(juce::FlexItem(*m_param_comps[i]->combo).withFlex(1.0));
         }
         mainflex.performLayout(getLocalBounds());
     }
     void timerCallback() override
     {
+        return;
         for (int i = 0; i < m_param_comps.size(); ++i)
         {
             auto &c = m_param_comps[i];
@@ -139,6 +163,7 @@ class GenericEditor : public juce::Component, public juce::Timer
     struct ParamComponents
     {
         std::unique_ptr<juce::Slider> slider;
+        std::unique_ptr<juce::ComboBox> combo;
         juce::Label label;
         clap_id paramId = 0;
     };
