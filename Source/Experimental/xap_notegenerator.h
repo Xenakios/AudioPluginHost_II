@@ -11,7 +11,6 @@ class ClapEventSequencerProcessor : public XAPWithJuceGUI
     DejaVuRandom m_dvtimerand;
     DejaVuRandom m_dvchordrand;
     DejaVuRandom m_dvvelorand;
-
     struct SimpleNoteEvent
     {
         SimpleNoteEvent() {}
@@ -33,12 +32,12 @@ class ClapEventSequencerProcessor : public XAPWithJuceGUI
     std::vector<SimpleNoteEvent> m_active_notes;
     double m_phase = 0.0; // clock phase from 0 to 1
     // when clock phase jumps back, generate new note/chord
-    bool m_phase_was_reset = true; 
+    bool m_phase_was_reset = true;
     // ever increasing for now, used for timing the outputted notes
     uint64_t m_sample_pos = 0;
-    
+
     double m_clock_hz = 1.0; // cached for efficiency
-    
+
     double m_clock_rate = 0.0; // time octave
     double m_note_dur_mult = 1.0;
     double m_arp_time_range = 0.1;
@@ -47,6 +46,7 @@ class ClapEventSequencerProcessor : public XAPWithJuceGUI
     int m_shared_loop_len = 1;
     double m_pitch_center = 60.0f;
     double m_pitch_spread = 7.0f;
+
   public:
     enum class OutputMode
     {
@@ -72,14 +72,14 @@ class ClapEventSequencerProcessor : public XAPWithJuceGUI
           m_dvvelorand(seed + 101)
     {
         m_active_notes.reserve(4096);
-        m_dvpitchrand.m_loop_len = m_shared_loop_len;
-        m_dvpitchrand.m_deja_vu = m_shared_deja_vu;
-        m_dvchordrand.m_loop_len = m_shared_loop_len;
-        m_dvchordrand.m_deja_vu = m_shared_deja_vu;
-        m_dvvelorand.m_loop_len = m_shared_loop_len;
-        m_dvvelorand.m_deja_vu = m_shared_deja_vu;
-        m_dvtimerand.m_loop_len = m_shared_loop_len;
-        m_dvtimerand.m_deja_vu = m_shared_deja_vu;
+        m_dvpitchrand.setLoopLength(m_shared_loop_len);
+        m_dvpitchrand.setDejaVu(m_shared_deja_vu);
+        m_dvchordrand.setLoopLength(m_shared_loop_len);
+        m_dvchordrand.setDejaVu(m_shared_deja_vu);
+        m_dvvelorand.setLoopLength(m_shared_loop_len);
+        m_dvvelorand.setDejaVu(m_shared_deja_vu);
+        m_dvtimerand.setLoopLength(m_shared_loop_len);
+        m_dvtimerand.setDejaVu(m_shared_deja_vu);
         paramDescriptions.push_back(
             ParamDesc()
                 .asFloat()
@@ -202,18 +202,18 @@ class ClapEventSequencerProcessor : public XAPWithJuceGUI
             if (pev->param_id == (clap_id)ParamIDs::SharedDejaVu)
             {
                 m_shared_deja_vu = pev->value;
-                m_dvtimerand.m_deja_vu = m_shared_deja_vu;
-                m_dvpitchrand.m_deja_vu = m_shared_deja_vu;
-                m_dvvelorand.m_deja_vu = m_shared_deja_vu;
-                m_dvchordrand.m_deja_vu = m_shared_deja_vu;
+                m_dvtimerand.setDejaVu(m_shared_deja_vu);
+                m_dvpitchrand.setDejaVu(m_shared_deja_vu);
+                m_dvvelorand.setDejaVu(m_shared_deja_vu);
+                m_dvchordrand.setDejaVu(m_shared_deja_vu);
             }
             if (pev->param_id == (clap_id)ParamIDs::SharedLoopLen)
             {
                 m_shared_loop_len = (int)pev->value;
-                m_dvtimerand.m_loop_len = m_shared_loop_len;
-                m_dvpitchrand.m_loop_len = m_shared_loop_len;
-                m_dvvelorand.m_loop_len = m_shared_loop_len;
-                m_dvchordrand.m_loop_len = m_shared_loop_len;
+                m_dvtimerand.setLoopLength(m_shared_loop_len);
+                m_dvpitchrand.setLoopLength(m_shared_loop_len);
+                m_dvvelorand.setLoopLength(m_shared_loop_len);
+                m_dvchordrand.setLoopLength(m_shared_loop_len);
             }
             if (pev->param_id == (clap_id)ParamIDs::OutputMode)
             {

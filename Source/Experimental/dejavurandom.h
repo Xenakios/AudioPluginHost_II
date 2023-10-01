@@ -12,8 +12,9 @@ inline Type maprange(Type sourceValue, Type sourceRangeMin, Type sourceRangeMax,
                                 (sourceRangeMax - sourceRangeMin);
 }
 
-struct DejaVuRandom
+class DejaVuRandom
 {
+  private:
     std::array<float, 32> m_state;
     using UnderlyingEngine = std::minstd_rand0;
     UnderlyingEngine m_rng;
@@ -21,11 +22,15 @@ struct DejaVuRandom
     int m_loop_len = 8;
     float m_deja_vu = 0.0;
     std::uniform_real_distribution<float> m_dist{0.0f, 1.0f};
+
+  public:
     DejaVuRandom(unsigned int seed) : m_rng(seed)
     {
         for (int i = 0; i < m_state.size(); ++i)
             m_state[i] = m_dist(m_rng);
     }
+    void setLoopLength(int len) { m_loop_len = std::clamp(len, 1, 32); }
+    void setDejaVu(float dv) { m_deja_vu = std::clamp(dv, 0.0f, 1.0f); }
     float nextFloatInRange(float minv, float maxv)
     {
         return maprange(nextFloat(), 0.0f, 1.0f, minv, maxv);
@@ -33,7 +38,7 @@ struct DejaVuRandom
     int nextIntInRange(int minv, int maxv)
     {
         int r = std::round(maprange<float>(nextFloat(), 0.0, 1.0f, minv, maxv));
-        jassert(r>=minv && r<=maxv);
+        jassert(r >= minv && r <= maxv);
         return r;
     }
     float nextFloat()
