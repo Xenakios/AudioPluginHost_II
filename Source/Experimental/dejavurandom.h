@@ -14,7 +14,7 @@ inline Type maprange(Type sourceValue, Type sourceRangeMin, Type sourceRangeMax,
 
 struct DejaVuRandom
 {
-    std::array<unsigned int, 32> m_state;
+    std::array<float, 32> m_state;
     using UnderlyingEngine = std::minstd_rand0;
     UnderlyingEngine m_rng;
     int m_loop_index = 0;
@@ -24,12 +24,19 @@ struct DejaVuRandom
     DejaVuRandom(unsigned int seed) : m_rng(seed)
     {
         for (int i = 0; i < m_state.size(); ++i)
-            m_state[i] = m_rng();
+            m_state[i] = m_dist(m_rng);
     }
-    static constexpr unsigned int max() { return UnderlyingEngine::max(); }
-    static constexpr unsigned int min() { return UnderlyingEngine::min(); }
-    unsigned int operator()() { return next(); }
-    unsigned int next()
+    float nextFloatInRange(float minv, float maxv)
+    {
+        return maprange(nextFloat(), 0.0f, 1.0f, minv, maxv);
+    }
+    int nextIntInRange(int minv, int maxv)
+    {
+        int r = std::round(maprange<float>(nextFloat(), 0.0, 1.0f, minv, maxv));
+        jassert(r>=minv && r<=maxv);
+        return r;
+    }
+    float nextFloat()
     {
         auto next = m_state[m_loop_index];
         bool rewinded = false;
@@ -48,8 +55,8 @@ struct DejaVuRandom
                 {
                     // rotate state left and generate new random number to end of loop
                     std::rotate(m_state.begin(), m_state.begin() + 1, m_state.begin() + m_loop_len);
-                    jassert((m_loop_len -1) >= 0);
-                    m_state[m_loop_len - 1] = m_rng();
+                    jassert((m_loop_len - 1) >= 0);
+                    m_state[m_loop_len - 1] = m_dist(m_rng);
                     --m_loop_index;
                     if (m_loop_index < 0)
                         m_loop_index = m_loop_len - 1;

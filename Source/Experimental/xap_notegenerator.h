@@ -11,10 +11,7 @@ class ClapEventSequencerProcessor : public XAPWithJuceGUI
     DejaVuRandom m_dvtimerand;
     DejaVuRandom m_dvchordrand;
     DejaVuRandom m_dvvelorand;
-    std::uniform_real_distribution<float> pitchdist{36.0f, 72.0f};
-    std::uniform_int_distribution<int> chorddist{0, 4};
-    std::uniform_real_distribution<float> accentdist{0.0f, 1.0f};
-    std::uniform_real_distribution<double> unidist{0.0, 1.0};
+    
     struct SimpleNoteEvent
     {
         SimpleNoteEvent() {}
@@ -173,15 +170,15 @@ class ClapEventSequencerProcessor : public XAPWithJuceGUI
 
     clap_process_status process(const clap_process *process) noexcept override;
 
-    void generateChordNotes(int numnotes, double baseonset, double basepitch, double notedur, double hz, int port,
-                            double velo)
+    void generateChordNotes(int numnotes, double baseonset, double basepitch, double notedur,
+                            double hz, int port, double velo)
     {
         const float chord_notes[5][3] = {{0.0f, 3.1564f, 7.02f},
                                          {0.0f, 3.8631f, 7.02f},
                                          {-12.0f, 7.02f, 10.8827f},
                                          {0.0f, 4.9804f, 10.1760f},
                                          {-12.0f, 0.0f, 12.0f}};
-        int ctype = chorddist(m_dvchordrand);
+        int ctype = m_dvchordrand.nextIntInRange(0, 4);
         double tdelta = 1.0 / hz;
         tdelta *= m_arp_time_range;
         std::uniform_real_distribution<double> stagdist{0.0, tdelta / 3.0};
