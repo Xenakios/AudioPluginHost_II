@@ -45,7 +45,8 @@ class ClapEventSequencerProcessor : public XAPWithJuceGUI
     double m_outport_bias = 0.5;
     double m_shared_deja_vu = 0.0;
     int m_shared_loop_len = 1;
-
+    double m_pitch_center = 60.0f;
+    double m_pitch_spread = 7.0f;
   public:
     enum class OutputMode
     {
@@ -61,7 +62,9 @@ class ClapEventSequencerProcessor : public XAPWithJuceGUI
         OutPortBias = 5000,
         SharedDejaVu = 6000,
         SharedLoopLen = 7000,
-        OutputMode = 8000
+        OutputMode = 8000,
+        PitchCenter = 9000,
+        PitchSpread = 10000
     };
     using ParamDesc = xenakios::ParamDesc;
     ClapEventSequencerProcessor(int seed, double pulselen)
@@ -113,6 +116,24 @@ class ClapEventSequencerProcessor : public XAPWithJuceGUI
                 .withFlags(CLAP_PARAM_IS_AUTOMATABLE | CLAP_PARAM_IS_MODULATABLE)
                 .withName("Output select bias")
                 .withID((clap_id)ParamIDs::OutPortBias));
+        paramDescriptions.push_back(
+            ParamDesc()
+                .asFloat()
+                .withRange(24.0f, 84.0f)
+                .withDefault(60.0)
+                .withLinearScaleFormatting("semitones/keys", 1.0)
+                .withFlags(CLAP_PARAM_IS_AUTOMATABLE | CLAP_PARAM_IS_MODULATABLE)
+                .withName("Pitch center")
+                .withID((clap_id)ParamIDs::PitchCenter));
+        paramDescriptions.push_back(
+            ParamDesc()
+                .asFloat()
+                .withRange(0.0f, 48.0f)
+                .withDefault(7.0)
+                .withLinearScaleFormatting("semitones/keys", 1.0)
+                .withFlags(CLAP_PARAM_IS_AUTOMATABLE | CLAP_PARAM_IS_MODULATABLE)
+                .withName("Pitch spread")
+                .withID((clap_id)ParamIDs::PitchSpread));
         std::unordered_map<int, std::string> outChoices;
         outChoices[0] = "MIDI Channel 0 / 1";
         outChoices[1] = "Clap Port 0 / 1";
@@ -197,6 +218,14 @@ class ClapEventSequencerProcessor : public XAPWithJuceGUI
             if (pev->param_id == (clap_id)ParamIDs::OutputMode)
             {
                 m_output_mode = (OutputMode)pev->value;
+            }
+            if (pev->param_id == (clap_id)ParamIDs::PitchCenter)
+            {
+                m_pitch_center = pev->value;
+            }
+            if (pev->param_id == (clap_id)ParamIDs::PitchSpread)
+            {
+                m_pitch_spread = pev->value;
             }
         }
     }

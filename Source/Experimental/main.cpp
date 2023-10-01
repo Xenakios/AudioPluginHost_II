@@ -874,19 +874,19 @@ class MainComponent : public juce::Component, public juce::Timer
         m_graph->addProcessorAsNode(std::make_unique<ClapPluginFormatProcessor>(
                                         pathprefix + R"(CLAP\Surge Synth Team\Surge XT.clap)", 0),
                                     "Surge XT 1");
-        m_graph->addProcessorAsNode(std::make_unique<ClapPluginFormatProcessor>(
-                                        pathprefix + R"(CLAP\Surge Synth Team\Surge XT.clap)", 0),
-                                    "Surge XT 2");
+        // m_graph->addProcessorAsNode(std::make_unique<ClapPluginFormatProcessor>(
+        //                                pathprefix + R"(CLAP\Surge Synth Team\Surge XT.clap)", 0),
+        //                            "Surge XT 2");
         m_graph->addProcessorAsNode(std::make_unique<GainProcessorTest>(), "Main");
         connectEventPorts(m_graph->findNodeByName("Note Gen"), 0,
                           m_graph->findNodeByName("Surge XT 1"), 0);
-        connectEventPorts(m_graph->findNodeByName("Note Gen"), 1,
-                          m_graph->findNodeByName("Surge XT 2"), 0);
+        // connectEventPorts(m_graph->findNodeByName("Note Gen"), 1,
+        //                  m_graph->findNodeByName("Surge XT 2"), 0);
 
         m_graph->connectAudio("Surge XT 1", 0, 0, "Main", 0, 0);
         m_graph->connectAudio("Surge XT 1", 0, 1, "Main", 0, 1);
-        m_graph->connectAudio("Surge XT 2", 0, 0, "Main", 0, 0);
-        m_graph->connectAudio("Surge XT 2", 0, 1, "Main", 0, 1);
+        //m_graph->connectAudio("Surge XT 2", 0, 0, "Main", 0, 0);
+        //m_graph->connectAudio("Surge XT 2", 0, 1, "Main", 0, 1);
         m_graph->outputNodeId = "Main";
 
         juce::Random rng{7};

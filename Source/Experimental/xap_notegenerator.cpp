@@ -86,11 +86,12 @@ clap_process_status ClapEventSequencerProcessor::process(const clap_process *pro
                 }
             }
             if (m_phase_was_reset)
-            // if (m_phase >= m_next_note_time)
             {
                 m_phase_was_reset = false;
-                auto basenote = std::round(m_dvpitchrand.nextFloatInRange(52.0f, 68.0f));
-
+                double minpitch = m_pitch_center - m_pitch_spread;
+                double maxpitch = m_pitch_center + m_pitch_spread;
+                auto basenote = std::round(m_dvpitchrand.nextFloatInRange(minpitch, maxpitch));
+                basenote = std::clamp(basenote, 24.0f, 84.0f);
                 double notedur = (1.0 / m_clock_hz) * m_note_dur_mult * m_sr;
                 double velo = m_dvvelorand.nextFloat();
                 if (velo < 0.5)
@@ -127,8 +128,8 @@ void ClapEventSequencerProcessor::generateChordNotes(int numnotes, double baseon
                                      {-12.0f, 0.0f, 12.0f}};
     */
     const float chord_notes[8][4] = {
-        {0.0f, 2.0f, 4.0f, 7.0f}, {0.0f, 2.0f, 4.0f, 6.0f}, {-2.0, 0.0f, 2.0f, 5.0f},
-        {0.0, 3.0f, 4.0f, 7.0f},  {0.0, 1.0f, 4.0f, 7.0f},  {0.0, 3.0f, 6.0f, 9.0f},
+        {0.0f, 2.0f, 4.0f, 7.0f}, {0.0f, 2.0f, 4.0f, 6.0f},  {-2.0, 0.0f, 2.0f, 5.0f},
+        {0.0, 3.0f, 4.0f, 7.0f},  {-7.0f, 1.0f, 4.0f, 7.0f}, {0.0, 3.0f, 6.0f, 9.0f},
         {-3.0, 0.0f, 2.0f, 8.0f}, {-3.0, 0.0f, 4.0f, 8.0f},
     };
     int ctype = m_dvchordrand.nextIntInRange(0, 7);
