@@ -17,7 +17,7 @@ clap_process_status ClapEventSequencerProcessor::process(const clap_process *pro
     {
         // note here the oddity that the clap transport doesn't contain floating point seconds!
         auto curtime = process->transport->song_pos_seconds / (double)CLAP_SECTIME_FACTOR;
-        
+
         for (int i = 0; i < process->frames_count; ++i)
         {
             while (next_event && next_event->time == i)
@@ -33,7 +33,7 @@ clap_process_status ClapEventSequencerProcessor::process(const clap_process *pro
             for (int j = m_active_notes.size() - 1; j >= 0; --j)
             {
                 auto &actnote = m_active_notes[j];
-                if (m_phase >= actnote.ontime && !actnote.active)
+                if (m_sample_pos >= actnote.ontime && !actnote.active)
                 {
                     actnote.active = true;
                     clap_event_note cen;
@@ -65,7 +65,7 @@ clap_process_status ClapEventSequencerProcessor::process(const clap_process *pro
                     process->out_events->try_push(process->out_events,
                                                   (const clap_event_header *)&cexp);
                 }
-                if (m_phase >= actnote.offtime)
+                if (m_sample_pos >= actnote.offtime)
                 {
                     // std::cout << "note off " << m_active_notes[j].key << " at "
                     //           << m_phase / m_sr << " seconds\n";
@@ -85,11 +85,13 @@ clap_process_status ClapEventSequencerProcessor::process(const clap_process *pro
                     m_active_notes.erase(m_active_notes.begin() + j);
                 }
             }
-            if (m_phase >= m_next_note_time)
+            if (m_phase_was_reset)
+            // if (m_phase >= m_next_note_time)
             {
+                m_phase_was_reset = false;
                 auto basenote = std::round(m_dvpitchrand.nextFloatInRange(52.0f, 68.0f));
-                double hz = std::pow(2.0, m_clock_rate);
-                double notedur = (1.0 / hz) * m_note_dur_mult * m_sr;
+
+                double notedur = (1.0 / m_clock_hz) * m_note_dur_mult * m_sr;
                 double velo = m_dvvelorand.nextFloat();
                 if (velo < 0.5)
                     velo = 0.7;
@@ -99,10 +101,15 @@ clap_process_status ClapEventSequencerProcessor::process(const clap_process *pro
                 int port = 0;
                 if (z > m_outport_bias)
                     port = 1;
-                generateChordNotes(4, m_phase, basenote, notedur, hz, port, velo);
-                m_next_note_time = m_phase + (1.0 / hz * m_sr);
+                generateChordNotes(4, m_sample_pos, basenote, notedur, m_clock_hz, port, velo);
             }
-            m_phase += 1.0;
+            m_phase += (1.0 / m_sr) * m_clock_hz;
+            if (m_phase >= 1.0)
+            {
+                m_phase -= 1.0;
+                m_phase_was_reset = true;
+            }
+            ++m_sample_pos;
         }
     }
     return CLAP_PROCESS_CONTINUE;

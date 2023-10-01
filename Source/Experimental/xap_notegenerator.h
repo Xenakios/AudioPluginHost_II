@@ -31,8 +31,14 @@ class ClapEventSequencerProcessor : public XAPWithJuceGUI
         double velo = 0.0;
     };
     std::vector<SimpleNoteEvent> m_active_notes;
-    double m_phase = 0.0; // samples
-    double m_next_note_time = 0.0;
+    double m_phase = 0.0; // clock phase from 0 to 1
+    // when clock phase jumps back, generate new note/chord
+    bool m_phase_was_reset = true; 
+    // ever increasing for now, used for timing the outputted notes
+    uint64_t m_sample_pos = 0;
+    
+    double m_clock_hz = 1.0; // cached for efficiency
+    
     double m_clock_rate = 0.0; // time octave
     double m_note_dur_mult = 1.0;
     double m_arp_time_range = 0.1;
@@ -152,7 +158,7 @@ class ClapEventSequencerProcessor : public XAPWithJuceGUI
         return true;
     }
     bool m_processing_started = false;
-    bool m_phase_resetted = true;
+
     void handleInboundEvent(const clap_event_header *ev)
     {
         if (ev->space_id != CLAP_CORE_EVENT_SPACE_ID)
@@ -161,7 +167,11 @@ class ClapEventSequencerProcessor : public XAPWithJuceGUI
         {
             auto pev = (const clap_event_param_value *)ev;
             if (pev->param_id == (clap_id)ParamIDs::ClockRate)
+            {
                 m_clock_rate = pev->value;
+                m_clock_hz = std::pow(2.0, m_clock_rate);
+            }
+
             if (pev->param_id == (clap_id)ParamIDs::NoteDurationMultiplier)
                 m_note_dur_mult = pev->value;
             if (pev->param_id == (clap_id)ParamIDs::ArpeggioSpeed)
