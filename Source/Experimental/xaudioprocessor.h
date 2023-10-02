@@ -221,7 +221,7 @@ class XAudioProcessor
     // CLAP_EVENT_PARAM_VALUE
     virtual bool enqueueParameterChange(CrossThreadMessage msg) noexcept { return false; }
     virtual bool dequeueParameterChange(CrossThreadMessage &msg) noexcept { return false; }
-
+    virtual bool dequeueEventForGUI(CrossThreadMessage &msg) noexcept { return false; }
     // the original Clap C++ helper methods for GUI.
     // We really might not want to handle *all* this, but I wonder
     // if we are kind of forced when hosting actual Clap plugins?

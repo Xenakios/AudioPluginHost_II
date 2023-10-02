@@ -6,8 +6,8 @@ clap_process_status ClapEventSequencerProcessor::process(const clap_process *pro
     {
         m_processing_started = true;
     }
-    mergeParameterEvents(process);
-    auto inevents = m_merge_list.clapInputEvents();
+    handleGUIEvents();
+    auto inevents = process->in_events;
     const clap_event_header *next_event = nullptr;
     auto esz = inevents->size(inevents);
     uint32_t nextEventIndex{0};
@@ -22,7 +22,7 @@ clap_process_status ClapEventSequencerProcessor::process(const clap_process *pro
         {
             while (next_event && next_event->time == i)
             {
-                handleInboundEvent(next_event);
+                handleInboundEvent(next_event, false);
                 nextEventIndex++;
                 if (nextEventIndex >= esz)
                     next_event = nullptr;

@@ -76,10 +76,12 @@ class GenericEditor : public juce::Component, public juce::Timer
             {
                 auto &pdesc = m_proc.paramDescriptions[i];
                 auto comps = std::make_unique<ParamComponents>();
+                m_id_to_comps[pdesc.id] = comps.get();
                 comps->label.setText(pdesc.name, juce::dontSendNotification);
                 if (pdesc.displayScale != ParamDesc::DisplayScale::UNORDERED_MAP)
                 {
                     comps->slider = std::make_unique<XapSlider>(pdesc);
+                    addAndMakeVisible(*comps->slider);
                     comps->paramId = pdesc.id;
 
                     if (pdesc.flags & CLAP_PARAM_IS_STEPPED)
@@ -87,7 +89,7 @@ class GenericEditor : public juce::Component, public juce::Timer
                     else
                         comps->slider->setRange(pdesc.minVal, pdesc.maxVal);
                     comps->slider->setDoubleClickReturnValue(true, pdesc.defaultVal);
-                    comps->slider->setValue(pdesc.defaultVal, juce::dontSendNotification);
+                    // comps->slider->setValue(pdesc.defaultVal, juce::dontSendNotification);
                     comps->slider->onDragStart = [this, pid = pdesc.id,
                                                   slid = comps->slider.get()]() {
                         m_proc.enqueueParameterChange(
@@ -111,20 +113,20 @@ class GenericEditor : public juce::Component, public juce::Timer
                     {
                         comps->combo->addItem(e.second, e.first + 1);
                     }
+                    // comps->combo->setSelectedId((int)pdesc.defaultVal + 1,
+                    //                             juce::dontSendNotification);
+                    addAndMakeVisible(*comps->combo);
                     comps->paramId = pdesc.id;
                 }
                 addAndMakeVisible(comps->label);
-                if (comps->slider)
-                    addAndMakeVisible(*comps->slider);
-                if (comps->combo)
-                    addAndMakeVisible(*comps->combo);
+
                 m_param_comps.push_back(std::move(comps));
             }
         }
 
         int defaultH = m_proc.paramsCount() * 50;
         setSize(500, defaultH);
-        startTimerHz(10);
+        startTimer(3000);
     }
     void resized() override
     {
@@ -143,17 +145,16 @@ class GenericEditor : public juce::Component, public juce::Timer
     }
     void timerCallback() override
     {
-        return;
-        for (int i = 0; i < m_param_comps.size(); ++i)
+        xenakios::CrossThreadMessage msg;
+        while (m_proc.dequeueEventForGUI(msg))
         {
-            auto &c = m_param_comps[i];
-            double val = 0.0;
-            if (m_proc.paramsValue(c->paramId, &val))
+            if (m_id_to_comps.contains(msg.paramId))
             {
-                if (val != c->slider->getValue())
-                {
-                    c->slider->setValue(val, juce::dontSendNotification);
-                }
+                auto comps = m_id_to_comps[msg.paramId];
+                if (comps->slider)
+                    comps->slider->setValue(msg.value, juce::dontSendNotification);
+                if (comps->combo)
+                    comps->combo->setSelectedId((int)msg.value + 1, juce::dontSendNotification);
             }
         }
     }
@@ -168,5 +169,6 @@ class GenericEditor : public juce::Component, public juce::Timer
         clap_id paramId = 0;
     };
     std::vector<std::unique_ptr<ParamComponents>> m_param_comps;
+    std::unordered_map<clap_id, ParamComponents *> m_id_to_comps;
 };
 } // namespace xenakios

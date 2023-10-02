@@ -4,22 +4,21 @@
 #include "xaudioprocessor.h"
 #include "xap_utils.h"
 
-
 class XAPWithJuceGUI : public xenakios::XAudioProcessor
 {
   protected:
     std::unique_ptr<juce::Component> m_editor;
-    // choc::fifo::SingleReaderSingleWriterFIFO<xenakios::CrossThreadMessage> m_from_ui_fifo;
+    std::atomic<bool> m_editor_attached{false};
     SingleReaderSingleWriterFifoHelper<xenakios::CrossThreadMessage> m_from_ui_fifo;
+    SingleReaderSingleWriterFifoHelper<xenakios::CrossThreadMessage> m_to_ui_fifo;
     clap::helpers::EventList m_merge_list;
-    
+
   public:
-    
     bool enqueueParameterChange(xenakios::CrossThreadMessage msg) noexcept override
     {
         return m_from_ui_fifo.push(msg);
     }
-
+    bool enqueueToUI(xenakios::CrossThreadMessage msg) noexcept { return m_to_ui_fifo.push(msg); }
     void mergeParameterEvents(const clap_process *process_ctx)
     {
         m_merge_list.clear();
@@ -40,6 +39,24 @@ class XAPWithJuceGUI : public xenakios::XAudioProcessor
             m_merge_list.push(ev);
         }
     }
+
+    void handleGUIEvents()
+    {
+        xenakios::CrossThreadMessage msg;
+        while (m_from_ui_fifo.pop(msg))
+        {
+            if (msg.eventType == CLAP_EVENT_PARAM_VALUE)
+            {
+                auto pev = makeClapParameterValueEvent(0, msg.paramId, msg.value);
+                handleInboundEvent((const clap_event_header *)&pev, true);
+            }
+        }
+    }
+    bool dequeueEventForGUI(xenakios::CrossThreadMessage &msg) noexcept override
+    {
+        return m_to_ui_fifo.pop(msg);
+    }
+    virtual void handleInboundEvent(const clap_event_header *e, bool is_from_ui) noexcept {}
     bool implementsGui() const noexcept override { return true; }
     // virtual bool guiIsApiSupported(const char *api, bool isFloating) noexcept { return false; }
     // virtual bool guiGetPreferredApi(const char **api, bool *is_floating) noexcept { return false;

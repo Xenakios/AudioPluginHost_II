@@ -66,6 +66,7 @@ class ClapEventSequencerProcessor : public XAPWithJuceGUI
         PitchCenter = 9000,
         PitchSpread = 10000
     };
+    std::unordered_map<ParamIDs, double *> parid_to_floatptr_map;
     using ParamDesc = xenakios::ParamDesc;
     ClapEventSequencerProcessor(int seed, double pulselen)
         : m_dvpitchrand(seed), m_dvtimerand(seed + 9003), m_dvchordrand(seed + 13),
@@ -135,15 +136,15 @@ class ClapEventSequencerProcessor : public XAPWithJuceGUI
                 .withName("Pitch spread")
                 .withID((clap_id)ParamIDs::PitchSpread));
         std::unordered_map<int, std::string> outChoices;
-        outChoices[0] = "MIDI Channel 0 / 1";
+        outChoices[0] = "Clap Note Channel 0 / 1";
         outChoices[1] = "Clap Port 0 / 1";
         paramDescriptions.push_back(ParamDesc()
                                         .asInt()
                                         .withUnorderedMapFormatting(outChoices)
                                         .withFlags(CLAP_PARAM_IS_STEPPED)
-                                        .withDefault(1)
+                                        .withDefault(0)
                                         .withID((clap_id)ParamIDs::OutputMode)
-                                        .withName("Output Mode"));
+                                        .withName("Output Destination Mode"));
         paramDescriptions.push_back(
             ParamDesc()
                 .asFloat()
@@ -162,6 +163,7 @@ class ClapEventSequencerProcessor : public XAPWithJuceGUI
                 .withFlags(CLAP_PARAM_IS_AUTOMATABLE | CLAP_PARAM_IS_STEPPED)
                 .withName("Num Loop Steps")
                 .withID((clap_id)ParamIDs::SharedLoopLen));
+        parid_to_floatptr_map[ParamIDs::ArpeggioSpeed] = &m_arp_time_range;
     }
     bool activate(double sampleRate, uint32_t minFrameCount,
                   uint32_t maxFrameCount) noexcept override
@@ -179,8 +181,30 @@ class ClapEventSequencerProcessor : public XAPWithJuceGUI
         return true;
     }
     bool m_processing_started = false;
-
-    void handleInboundEvent(const clap_event_header *ev)
+    void pushAllParamsToGUI()
+    {
+        if (!m_editor_attached)
+            return;
+        m_to_ui_fifo.push(xenakios::CrossThreadMessage{(clap_id)ParamIDs::ArpeggioSpeed,
+                                                       CLAP_EVENT_PARAM_VALUE, m_arp_time_range});
+        m_to_ui_fifo.push(xenakios::CrossThreadMessage{(clap_id)ParamIDs::ClockRate,
+                                                       CLAP_EVENT_PARAM_VALUE, m_clock_rate});
+        m_to_ui_fifo.push(xenakios::CrossThreadMessage{(clap_id)ParamIDs::NoteDurationMultiplier,
+                                                       CLAP_EVENT_PARAM_VALUE, m_note_dur_mult});
+        m_to_ui_fifo.push(xenakios::CrossThreadMessage{(clap_id)ParamIDs::OutPortBias,
+                                                       CLAP_EVENT_PARAM_VALUE, m_outport_bias});
+        m_to_ui_fifo.push(xenakios::CrossThreadMessage{
+            (clap_id)ParamIDs::OutputMode, CLAP_EVENT_PARAM_VALUE, (double)m_output_mode});
+        m_to_ui_fifo.push(xenakios::CrossThreadMessage{(clap_id)ParamIDs::PitchCenter,
+                                                       CLAP_EVENT_PARAM_VALUE, m_pitch_center});
+        m_to_ui_fifo.push(xenakios::CrossThreadMessage{(clap_id)ParamIDs::PitchSpread,
+                                                       CLAP_EVENT_PARAM_VALUE, m_pitch_spread});
+        m_to_ui_fifo.push(xenakios::CrossThreadMessage{(clap_id)ParamIDs::SharedDejaVu,
+                                                       CLAP_EVENT_PARAM_VALUE, m_shared_deja_vu});
+        m_to_ui_fifo.push(xenakios::CrossThreadMessage{
+            (clap_id)ParamIDs::SharedLoopLen, CLAP_EVENT_PARAM_VALUE, (double)m_shared_loop_len});
+    }
+    void handleInboundEvent(const clap_event_header *ev, bool is_from_ui) override
     {
         if (ev->space_id != CLAP_CORE_EVENT_SPACE_ID)
             return;
@@ -227,6 +251,11 @@ class ClapEventSequencerProcessor : public XAPWithJuceGUI
             {
                 m_pitch_spread = pev->value;
             }
+            if (!is_from_ui)
+            {
+                m_to_ui_fifo.push(xenakios::CrossThreadMessage{pev->param_id,
+                                                               CLAP_EVENT_PARAM_VALUE, pev->value});
+            }
         }
     }
 
@@ -240,6 +269,8 @@ class ClapEventSequencerProcessor : public XAPWithJuceGUI
     {
         m_editor = std::make_unique<xenakios::GenericEditor>(*this);
         m_editor->setSize(500, paramsCount() * 40);
+        m_editor_attached = true;
+        pushAllParamsToGUI();
         return true;
     }
     void guiDestroy() noexcept override { m_editor = nullptr; }
