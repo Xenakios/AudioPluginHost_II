@@ -17,7 +17,7 @@ clap_process_status ClapEventSequencerProcessor::process(const clap_process *pro
     {
         // note here the oddity that the clap transport doesn't contain floating point seconds!
         auto curtime = process->transport->song_pos_seconds / (double)CLAP_SECTIME_FACTOR;
-
+        auto clockrate = paramToValue[(clap_id)ParamIDs::ClockRate];
         for (int i = 0; i < process->frames_count; ++i)
         {
             while (next_event && next_event->time == i)
@@ -29,6 +29,7 @@ clap_process_status ClapEventSequencerProcessor::process(const clap_process *pro
                 else
                     next_event = inevents->get(inevents, nextEventIndex);
             }
+            m_clock_hz = std::pow(2.0, *clockrate);
             // this is stupid, need to figure out a better solution for this
             for (int j = m_active_notes.size() - 1; j >= 0; --j)
             {
@@ -88,10 +89,19 @@ clap_process_status ClapEventSequencerProcessor::process(const clap_process *pro
             if (m_phase_was_reset)
             {
                 m_phase_was_reset = false;
+                // we can do these look ups probably just fine here because this runs
+                // only when notes are generated
+                updateDejaVuGeneratorInstances();
+                double m_pitch_center =
+                    patch.params[paramToPatchIndex[(clap_id)ParamIDs::PitchCenter]];
+                double m_pitch_spread =
+                    patch.params[paramToPatchIndex[(clap_id)ParamIDs::PitchSpread]];
                 double minpitch = m_pitch_center - m_pitch_spread;
                 double maxpitch = m_pitch_center + m_pitch_spread;
                 auto basenote = std::round(m_dvpitchrand.nextFloatInRange(minpitch, maxpitch));
                 basenote = std::clamp(basenote, 24.0f, 84.0f);
+                double m_note_dur_mult =
+                    patch.params[paramToPatchIndex[(clap_id)ParamIDs::NoteDurationMultiplier]];
                 double notedur = (1.0 / m_clock_hz) * m_note_dur_mult * m_sr;
                 double velo = m_dvvelorand.nextFloat();
                 if (velo < 0.5)
@@ -100,6 +110,8 @@ clap_process_status ClapEventSequencerProcessor::process(const clap_process *pro
                     velo = 1.0;
                 double z = m_dvtimerand.nextFloat();
                 int port = 0;
+                double m_outport_bias =
+                    patch.params[paramToPatchIndex[(clap_id)ParamIDs::OutPortBias]];
                 if (z > m_outport_bias)
                     port = 1;
                 generateChordNotes(4, m_sample_pos, basenote, notedur, m_clock_hz, port, velo);
@@ -134,6 +146,7 @@ void ClapEventSequencerProcessor::generateChordNotes(int numnotes, double baseon
     };
     int ctype = m_dvchordrand.nextIntInRange(0, 7);
     double tdelta = 1.0 / hz;
+    double m_arp_time_range = patch.params[paramToPatchIndex[(clap_id)ParamIDs::ArpeggioSpeed]];
     tdelta *= m_arp_time_range;
     std::uniform_real_distribution<double> stagdist{0.0, tdelta / 4.0};
     double stag = stagdist(m_def_rng);

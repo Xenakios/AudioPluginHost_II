@@ -12,7 +12,7 @@ class XAPWithJuceGUI : public xenakios::XAudioProcessor
     SingleReaderSingleWriterFifoHelper<xenakios::CrossThreadMessage> m_from_ui_fifo;
     SingleReaderSingleWriterFifoHelper<xenakios::CrossThreadMessage> m_to_ui_fifo;
     clap::helpers::EventList m_merge_list;
-
+    
   public:
     bool enqueueParameterChange(xenakios::CrossThreadMessage msg) noexcept override
     {

@@ -38,6 +38,7 @@ class ClapEventSequencerProcessor : public XAPWithJuceGUI
 
     double m_clock_hz = 1.0; // cached for efficiency
 
+    /*
     double m_clock_rate = 0.0; // time octave
     double m_note_dur_mult = 1.0;
     double m_arp_time_range = 0.1;
@@ -46,6 +47,15 @@ class ClapEventSequencerProcessor : public XAPWithJuceGUI
     int m_shared_loop_len = 1;
     double m_pitch_center = 60.0f;
     double m_pitch_spread = 7.0f;
+    */
+    struct Patch
+    {
+        float params[9];
+        // typename TConfig::PatchExtension extension;
+    } patch;
+
+    std::unordered_map<clap_id, float *> paramToValue;
+    std::unordered_map<clap_id, int> paramToPatchIndex;
 
   public:
     enum class OutputMode
@@ -66,21 +76,14 @@ class ClapEventSequencerProcessor : public XAPWithJuceGUI
         PitchCenter = 9000,
         PitchSpread = 10000
     };
-    std::unordered_map<ParamIDs, double *> parid_to_floatptr_map;
+
     using ParamDesc = xenakios::ParamDesc;
     ClapEventSequencerProcessor(int seed, double pulselen)
         : m_dvpitchrand(seed), m_dvtimerand(seed + 9003), m_dvchordrand(seed + 13),
           m_dvvelorand(seed + 101)
     {
         m_active_notes.reserve(4096);
-        m_dvpitchrand.setLoopLength(m_shared_loop_len);
-        m_dvpitchrand.setDejaVu(m_shared_deja_vu);
-        m_dvchordrand.setLoopLength(m_shared_loop_len);
-        m_dvchordrand.setDejaVu(m_shared_deja_vu);
-        m_dvvelorand.setLoopLength(m_shared_loop_len);
-        m_dvvelorand.setDejaVu(m_shared_deja_vu);
-        m_dvtimerand.setLoopLength(m_shared_loop_len);
-        m_dvtimerand.setDejaVu(m_shared_deja_vu);
+
         paramDescriptions.push_back(
             ParamDesc()
                 .asFloat()
@@ -106,7 +109,7 @@ class ClapEventSequencerProcessor : public XAPWithJuceGUI
                 .withDefault(0.0)
                 .withLinearScaleFormatting("%", 100.0)
                 .withFlags(CLAP_PARAM_IS_AUTOMATABLE | CLAP_PARAM_IS_MODULATABLE)
-                .withName("Arpeggio speed")
+                .withName("Arpeggio time scatter")
                 .withID((clap_id)ParamIDs::ArpeggioSpeed));
         paramDescriptions.push_back(
             ParamDesc()
@@ -163,7 +166,16 @@ class ClapEventSequencerProcessor : public XAPWithJuceGUI
                 .withFlags(CLAP_PARAM_IS_AUTOMATABLE | CLAP_PARAM_IS_STEPPED)
                 .withName("Num Loop Steps")
                 .withID((clap_id)ParamIDs::SharedLoopLen));
-        parid_to_floatptr_map[ParamIDs::ArpeggioSpeed] = &m_arp_time_range;
+
+        int i = 0;
+        for (auto &p : paramDescriptions)
+        {
+            patch.params[i] = p.defaultVal;
+            paramToPatchIndex[p.id] = i;
+            paramToValue[p.id] = &patch.params[i];
+            ++i;
+        }
+        updateDejaVuGeneratorInstances();
     }
     bool activate(double sampleRate, uint32_t minFrameCount,
                   uint32_t maxFrameCount) noexcept override
@@ -185,24 +197,11 @@ class ClapEventSequencerProcessor : public XAPWithJuceGUI
     {
         if (!m_editor_attached)
             return;
-        m_to_ui_fifo.push(xenakios::CrossThreadMessage{(clap_id)ParamIDs::ArpeggioSpeed,
-                                                       CLAP_EVENT_PARAM_VALUE, m_arp_time_range});
-        m_to_ui_fifo.push(xenakios::CrossThreadMessage{(clap_id)ParamIDs::ClockRate,
-                                                       CLAP_EVENT_PARAM_VALUE, m_clock_rate});
-        m_to_ui_fifo.push(xenakios::CrossThreadMessage{(clap_id)ParamIDs::NoteDurationMultiplier,
-                                                       CLAP_EVENT_PARAM_VALUE, m_note_dur_mult});
-        m_to_ui_fifo.push(xenakios::CrossThreadMessage{(clap_id)ParamIDs::OutPortBias,
-                                                       CLAP_EVENT_PARAM_VALUE, m_outport_bias});
-        m_to_ui_fifo.push(xenakios::CrossThreadMessage{
-            (clap_id)ParamIDs::OutputMode, CLAP_EVENT_PARAM_VALUE, (double)m_output_mode});
-        m_to_ui_fifo.push(xenakios::CrossThreadMessage{(clap_id)ParamIDs::PitchCenter,
-                                                       CLAP_EVENT_PARAM_VALUE, m_pitch_center});
-        m_to_ui_fifo.push(xenakios::CrossThreadMessage{(clap_id)ParamIDs::PitchSpread,
-                                                       CLAP_EVENT_PARAM_VALUE, m_pitch_spread});
-        m_to_ui_fifo.push(xenakios::CrossThreadMessage{(clap_id)ParamIDs::SharedDejaVu,
-                                                       CLAP_EVENT_PARAM_VALUE, m_shared_deja_vu});
-        m_to_ui_fifo.push(xenakios::CrossThreadMessage{
-            (clap_id)ParamIDs::SharedLoopLen, CLAP_EVENT_PARAM_VALUE, (double)m_shared_loop_len});
+        for (auto &p : paramToPatchIndex)
+        {
+            float val = patch.params[p.second];
+            m_to_ui_fifo.push(xenakios::CrossThreadMessage{p.first, CLAP_EVENT_PARAM_VALUE, val});
+        }
     }
     void handleInboundEvent(const clap_event_header *ev, bool is_from_ui) override
     {
@@ -211,46 +210,12 @@ class ClapEventSequencerProcessor : public XAPWithJuceGUI
         if (ev->type == CLAP_EVENT_PARAM_VALUE)
         {
             auto pev = (const clap_event_param_value *)ev;
-            if (pev->param_id == (clap_id)ParamIDs::ClockRate)
+            auto it = paramToValue.find(pev->param_id);
+            if (it != paramToValue.end())
             {
-                m_clock_rate = pev->value;
-                m_clock_hz = std::pow(2.0, m_clock_rate);
+                *(it->second) = pev->value;
             }
 
-            if (pev->param_id == (clap_id)ParamIDs::NoteDurationMultiplier)
-                m_note_dur_mult = pev->value;
-            if (pev->param_id == (clap_id)ParamIDs::ArpeggioSpeed)
-                m_arp_time_range = pev->value;
-            if (pev->param_id == (clap_id)ParamIDs::OutPortBias)
-                m_outport_bias = pev->value;
-            if (pev->param_id == (clap_id)ParamIDs::SharedDejaVu)
-            {
-                m_shared_deja_vu = pev->value;
-                m_dvtimerand.setDejaVu(m_shared_deja_vu);
-                m_dvpitchrand.setDejaVu(m_shared_deja_vu);
-                m_dvvelorand.setDejaVu(m_shared_deja_vu);
-                m_dvchordrand.setDejaVu(m_shared_deja_vu);
-            }
-            if (pev->param_id == (clap_id)ParamIDs::SharedLoopLen)
-            {
-                m_shared_loop_len = (int)pev->value;
-                m_dvtimerand.setLoopLength(m_shared_loop_len);
-                m_dvpitchrand.setLoopLength(m_shared_loop_len);
-                m_dvvelorand.setLoopLength(m_shared_loop_len);
-                m_dvchordrand.setLoopLength(m_shared_loop_len);
-            }
-            if (pev->param_id == (clap_id)ParamIDs::OutputMode)
-            {
-                m_output_mode = (OutputMode)pev->value;
-            }
-            if (pev->param_id == (clap_id)ParamIDs::PitchCenter)
-            {
-                m_pitch_center = pev->value;
-            }
-            if (pev->param_id == (clap_id)ParamIDs::PitchSpread)
-            {
-                m_pitch_spread = pev->value;
-            }
             if (!is_from_ui)
             {
                 m_to_ui_fifo.push(xenakios::CrossThreadMessage{pev->param_id,
@@ -258,7 +223,19 @@ class ClapEventSequencerProcessor : public XAPWithJuceGUI
             }
         }
     }
-
+    void updateDejaVuGeneratorInstances()
+    {
+        float m_shared_deja_vu = patch.params[paramToPatchIndex[(clap_id)ParamIDs::SharedDejaVu]];
+        m_dvtimerand.setDejaVu(m_shared_deja_vu);
+        m_dvpitchrand.setDejaVu(m_shared_deja_vu);
+        m_dvvelorand.setDejaVu(m_shared_deja_vu);
+        m_dvchordrand.setDejaVu(m_shared_deja_vu);
+        float m_shared_loop_len = patch.params[paramToPatchIndex[(clap_id)ParamIDs::SharedLoopLen]];
+        m_dvtimerand.setLoopLength(m_shared_loop_len);
+        m_dvpitchrand.setLoopLength(m_shared_loop_len);
+        m_dvvelorand.setLoopLength(m_shared_loop_len);
+        m_dvchordrand.setLoopLength(m_shared_loop_len);
+    }
     clap_process_status process(const clap_process *process) noexcept override;
 
     void generateChordNotes(int numnotes, double baseonset, double basepitch, double notedur,
