@@ -115,7 +115,9 @@ clap_process_status ClapEventSequencerProcessor::process(const clap_process *pro
                     patch.params[paramToPatchIndex[(clap_id)ParamIDs::OutPortBias]];
                 if (z > m_outport_bias)
                     port = 1;
-                generateChordNotes(4, m_sample_pos, basenote, notedur, m_clock_hz, port, velo);
+                int arpdiv = patch.params[paramToPatchIndex[(clap_id)ParamIDs::ArpeggioDivision]];
+                generateChordNotes(4, arpdiv, m_sample_pos, basenote, notedur, m_clock_hz, port,
+                                   velo);
             }
             m_phase += (1.0 / m_sr) * m_clock_hz;
             if (m_phase >= 1.0)
@@ -129,7 +131,7 @@ clap_process_status ClapEventSequencerProcessor::process(const clap_process *pro
     return CLAP_PROCESS_CONTINUE;
 }
 
-void ClapEventSequencerProcessor::generateChordNotes(int numnotes, double baseonset,
+void ClapEventSequencerProcessor::generateChordNotes(int numchordnotes, int arpdiv, double baseonset,
                                                      double basepitch, double notedur, double hz,
                                                      int port, double velo)
 {
@@ -147,7 +149,7 @@ void ClapEventSequencerProcessor::generateChordNotes(int numnotes, double baseon
     };
     int ctype = m_dvchordrand.nextIntInRange(0, 7);
     double tdelta = 1.0 / hz;
-    double m_arp_time_range = patch.params[paramToPatchIndex[(clap_id)ParamIDs::ArpeggioSpeed]];
+    double m_arp_time_range = patch.params[paramToPatchIndex[(clap_id)ParamIDs::ArpeggioScatter]];
     tdelta *= m_arp_time_range;
     std::uniform_real_distribution<double> stagdist{0.0, tdelta / 4.0};
     double stag = stagdist(m_def_rng);
@@ -157,6 +159,7 @@ void ClapEventSequencerProcessor::generateChordNotes(int numnotes, double baseon
         chan_to_use = port;
     if (m_output_mode == OutputMode::Ports)
         port_to_use = port;
+    /*
     if (numnotes == 1)
     {
         SimpleNoteEvent ne{baseonset,   baseonset + notedur, basepitch,
@@ -164,16 +167,24 @@ void ClapEventSequencerProcessor::generateChordNotes(int numnotes, double baseon
         m_active_notes.push_back(ne);
         return;
     }
+    */
     std::uniform_real_distribution<double> arpdirdist{0.0, 1.0};
-    bool up = arpdirdist(m_def_rng) < 0.5;
-
-    for (int i = 0; i < numnotes; ++i)
+    bool up = true; // arpdirdist(m_def_rng) < 0.5;
+    double time_interval = (1.0 / hz) / arpdiv;
+    int notes_to_generate = arpdiv;
+    if (arpdiv == 1)
     {
-        int noteindex = i;
-        if (!up)
-            noteindex = 3 - i;
+        notes_to_generate = numchordnotes;
+        time_interval = 0.0;
+    }
+        
+    for (int i = 0; i < notes_to_generate; ++i)
+    {
+        int noteindex = i % numchordnotes;
+        //if (!up)
+        //    noteindex = 3 - i;
         double pitch = basepitch + chord_notes[ctype][noteindex];
-        double tpos = baseonset + (i * stag * m_sr);
+        double tpos = baseonset + (i * time_interval * m_sr);
         SimpleNoteEvent ne{tpos, tpos + notedur, pitch, port_to_use, chan_to_use, velo};
         m_active_notes.push_back(ne);
     }

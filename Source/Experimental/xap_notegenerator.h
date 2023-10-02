@@ -6,7 +6,7 @@
 
 class ClapEventSequencerProcessor : public XAPWithJuceGUI
 {
-    static constexpr size_t numNoteGeneratorParams = 9;
+    static constexpr size_t numNoteGeneratorParams = 10;
     double m_sr = 1.0;
     DejaVuRandom m_dvpitchrand;
     DejaVuRandom m_dvtimerand;
@@ -57,7 +57,8 @@ class ClapEventSequencerProcessor : public XAPWithJuceGUI
     {
         ClockRate = 2000,
         NoteDurationMultiplier = 3000,
-        ArpeggioSpeed = 4000,
+        ArpeggioDivision = 4000,
+        ArpeggioScatter = 4500,
         OutPortBias = 5000,
         SharedDejaVu = 6000,
         SharedLoopLen = 7000,
@@ -100,13 +101,22 @@ class ClapEventSequencerProcessor : public XAPWithJuceGUI
                 .withID((clap_id)ParamIDs::NoteDurationMultiplier));
         paramDescriptions.push_back(
             ParamDesc()
+                .asInt()
+                .withRange(1.0f, 8.0f)
+                .withDefault(1.0)
+                .withLinearScaleFormatting("/", 1.0)
+                .withFlags(CLAP_PARAM_IS_AUTOMATABLE | CLAP_PARAM_IS_STEPPED)
+                .withName("Arpeggio pulse division")
+                .withID((clap_id)ParamIDs::ArpeggioDivision));
+        paramDescriptions.push_back(
+            ParamDesc()
                 .asFloat()
                 .withRange(0.0f, 1.0f)
                 .withDefault(0.0)
                 .withLinearScaleFormatting("%", 100.0)
                 .withFlags(CLAP_PARAM_IS_AUTOMATABLE | CLAP_PARAM_IS_MODULATABLE)
                 .withName("Arpeggio time scatter")
-                .withID((clap_id)ParamIDs::ArpeggioSpeed));
+                .withID((clap_id)ParamIDs::ArpeggioScatter));
         paramDescriptions.push_back(
             ParamDesc()
                 .asFloat()
@@ -233,7 +243,7 @@ class ClapEventSequencerProcessor : public XAPWithJuceGUI
     }
     clap_process_status process(const clap_process *process) noexcept override;
 
-    void generateChordNotes(int numnotes, double baseonset, double basepitch, double notedur,
+    void generateChordNotes(int numnotes, int arpdiv, double baseonset, double basepitch, double notedur,
                             double hz, int port, double velo);
 
     std::default_random_engine m_def_rng;
