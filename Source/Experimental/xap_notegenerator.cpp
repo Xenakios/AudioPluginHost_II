@@ -29,7 +29,7 @@ clap_process_status ClapEventSequencerProcessor::process(const clap_process *pro
                 else
                     next_event = inevents->get(inevents, nextEventIndex);
             }
-            m_clock_hz = std::pow(2.0, *clockrate);
+            double m_clock_hz = std::pow(2.0, *clockrate);
             // this is stupid, need to figure out a better solution for this
             for (int j = m_active_notes.size() - 1; j >= 0; --j)
             {

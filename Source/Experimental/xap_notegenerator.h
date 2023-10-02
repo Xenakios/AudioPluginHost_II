@@ -4,8 +4,11 @@
 #include "dejavurandom.h"
 #include "xap_generic_editor.h"
 
+
+
 class ClapEventSequencerProcessor : public XAPWithJuceGUI
 {
+    static constexpr size_t numNoteGeneratorParams = 9;
     double m_sr = 1.0;
     DejaVuRandom m_dvpitchrand;
     DejaVuRandom m_dvtimerand;
@@ -36,21 +39,9 @@ class ClapEventSequencerProcessor : public XAPWithJuceGUI
     // ever increasing for now, used for timing the outputted notes
     uint64_t m_sample_pos = 0;
 
-    double m_clock_hz = 1.0; // cached for efficiency
-
-    /*
-    double m_clock_rate = 0.0; // time octave
-    double m_note_dur_mult = 1.0;
-    double m_arp_time_range = 0.1;
-    double m_outport_bias = 0.5;
-    double m_shared_deja_vu = 0.0;
-    int m_shared_loop_len = 1;
-    double m_pitch_center = 60.0f;
-    double m_pitch_spread = 7.0f;
-    */
     struct Patch
     {
-        float params[9];
+        float params[numNoteGeneratorParams];
         // typename TConfig::PatchExtension extension;
     } patch;
 
@@ -166,7 +157,7 @@ class ClapEventSequencerProcessor : public XAPWithJuceGUI
                 .withFlags(CLAP_PARAM_IS_AUTOMATABLE | CLAP_PARAM_IS_STEPPED)
                 .withName("Num Loop Steps")
                 .withID((clap_id)ParamIDs::SharedLoopLen));
-
+        jassert(numNoteGeneratorParams == paramDescriptions.size());
         int i = 0;
         for (auto &p : paramDescriptions)
         {

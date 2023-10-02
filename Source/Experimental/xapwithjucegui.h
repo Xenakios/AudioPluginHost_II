@@ -12,7 +12,7 @@ class XAPWithJuceGUI : public xenakios::XAudioProcessor
     SingleReaderSingleWriterFifoHelper<xenakios::CrossThreadMessage> m_from_ui_fifo;
     SingleReaderSingleWriterFifoHelper<xenakios::CrossThreadMessage> m_to_ui_fifo;
     clap::helpers::EventList m_merge_list;
-    
+
   public:
     bool enqueueParameterChange(xenakios::CrossThreadMessage msg) noexcept override
     {
@@ -42,6 +42,9 @@ class XAPWithJuceGUI : public xenakios::XAudioProcessor
 
     void handleGUIEvents()
     {
+        // we should also push the messages out of the processor
+        // so that host can do automation recording, detect last touched parameter etc,
+        // but our host does not yet handle those anyway...
         xenakios::CrossThreadMessage msg;
         while (m_from_ui_fifo.pop(msg))
         {
