@@ -4,8 +4,6 @@
 #include "dejavurandom.h"
 #include "xap_generic_editor.h"
 
-
-
 class ClapEventSequencerProcessor : public XAPWithJuceGUI
 {
     static constexpr size_t numNoteGeneratorParams = 9;
@@ -69,7 +67,14 @@ class ClapEventSequencerProcessor : public XAPWithJuceGUI
     };
 
     using ParamDesc = xenakios::ParamDesc;
-    ClapEventSequencerProcessor(int seed, double pulselen)
+    bool getDescriptor(clap_plugin_descriptor *desc) const override
+    {
+        memset(desc,0,sizeof(clap_plugin_descriptor));
+        desc->name = "XAP Entropic Sequencer";
+        desc->vendor = "Xenakios";
+        return true;
+    }
+    ClapEventSequencerProcessor(int seed)
         : m_dvpitchrand(seed), m_dvtimerand(seed + 9003), m_dvchordrand(seed + 13),
           m_dvvelorand(seed + 101)
     {
@@ -158,13 +163,12 @@ class ClapEventSequencerProcessor : public XAPWithJuceGUI
                 .withName("Num Loop Steps")
                 .withID((clap_id)ParamIDs::SharedLoopLen));
         jassert(numNoteGeneratorParams == paramDescriptions.size());
-        int i = 0;
-        for (auto &p : paramDescriptions)
+        for (size_t i = 0; i < paramDescriptions.size(); ++i)
         {
+            auto &p = paramDescriptions[i];
             patch.params[i] = p.defaultVal;
             paramToPatchIndex[p.id] = i;
             paramToValue[p.id] = &patch.params[i];
-            ++i;
         }
         updateDejaVuGeneratorInstances();
     }
@@ -194,7 +198,7 @@ class ClapEventSequencerProcessor : public XAPWithJuceGUI
             m_to_ui_fifo.push(xenakios::CrossThreadMessage{p.first, CLAP_EVENT_PARAM_VALUE, val});
         }
     }
-    void handleInboundEvent(const clap_event_header *ev, bool is_from_ui) override
+    void handleInboundEvent(const clap_event_header *ev, bool is_from_ui) noexcept override
     {
         if (ev->space_id != CLAP_CORE_EVENT_SPACE_ID)
             return;

@@ -394,9 +394,9 @@ class XAPGraph : public xenakios::XAudioProcessor
         std::string pathprefix = R"(C:\Program Files\Common Files\)";
         proc_nodes.clear();
         proc_nodes.emplace_back(std::make_unique<XAPNode>(
-            std::make_unique<ClapEventSequencerProcessor>(444, 0.25), "Event Gen 1"));
+            std::make_unique<ClapEventSequencerProcessor>(444), "Event Gen 1"));
         proc_nodes.emplace_back(std::make_unique<XAPNode>(
-            std::make_unique<ClapEventSequencerProcessor>(2349, 0.5), "Event Gen 2"));
+            std::make_unique<ClapEventSequencerProcessor>(2349), "Event Gen 2"));
         proc_nodes.emplace_back(
             std::make_unique<XAPNode>(std::make_unique<ClapPluginFormatProcessor>(
                                           pathprefix + R"(CLAP\Surge Synth Team\Surge XT.clap)", 0),
@@ -704,7 +704,7 @@ inline void test_graph_processor_offline()
     // g->connectAudio("Tone 1", 0, 0, "Ring Mod", 0, 1);
     // g->connectAudio("Tone 2", 0, 0, "Ring Mod", 1, 0);
     // g->connectAudio("Tone 2", 0, 0, "Ring Mod", 1, 1);
-    g->addProcessorAsNode(std::make_unique<ClapEventSequencerProcessor>(3, 1.0), "Note Gen");
+    g->addProcessorAsNode(std::make_unique<ClapEventSequencerProcessor>(3), "Note Gen");
     connectEventPorts(g->findNodeByName("Note Gen"), 0, g->findNodeByName("Surge XT 1"), 0);
     g->outputNodeId = "Surge XT 1";
     double sr = 44100;
@@ -869,7 +869,7 @@ class MainComponent : public juce::Component, public juce::Timer
         std::string pathprefix = R"(C:\Program Files\Common Files\)";
 
         m_graph = std::make_unique<XAPGraph>();
-        m_graph->addProcessorAsNode(std::make_unique<ClapEventSequencerProcessor>(2, 1.0),
+        m_graph->addProcessorAsNode(std::make_unique<ClapEventSequencerProcessor>(2),
                                     "Note Gen");
         m_graph->addProcessorAsNode(std::make_unique<ClapPluginFormatProcessor>(
                                         pathprefix + R"(CLAP\Surge Synth Team\Surge XT.clap)", 0),

@@ -17,6 +17,7 @@ clap_process_status ClapEventSequencerProcessor::process(const clap_process *pro
     {
         // note here the oddity that the clap transport doesn't contain floating point seconds!
         auto curtime = process->transport->song_pos_seconds / (double)CLAP_SECTIME_FACTOR;
+        // cache the pointer here because we use the value per-sample!
         auto clockrate = paramToValue[(clap_id)ParamIDs::ClockRate];
         for (int i = 0; i < process->frames_count; ++i)
         {
@@ -91,7 +92,7 @@ clap_process_status ClapEventSequencerProcessor::process(const clap_process *pro
                 m_phase_was_reset = false;
                 // we can do these look ups probably just fine here because this runs
                 // only when notes are generated
-                updateDejaVuGeneratorInstances();
+                updateDejaVuGeneratorInstances(); // also does the lookups
                 double m_pitch_center =
                     patch.params[paramToPatchIndex[(clap_id)ParamIDs::PitchCenter]];
                 double m_pitch_spread =
