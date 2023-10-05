@@ -6,7 +6,7 @@
 
 class ClapEventSequencerProcessor : public XAPWithJuceGUI
 {
-    static constexpr size_t numNoteGeneratorParams = 10;
+    static constexpr size_t numNoteGeneratorParams = 11;
     double m_sr = 1.0;
     DejaVuRandom m_dvpitchrand;
     DejaVuRandom m_dvtimerand;
@@ -57,6 +57,7 @@ class ClapEventSequencerProcessor : public XAPWithJuceGUI
     {
         ClockRate = 2000,
         NoteDurationMultiplier = 3000,
+        ChordPolyphony = 3500,
         ArpeggioDivision = 4000,
         ArpeggioScatter = 4500,
         OutPortBias = 5000,
@@ -99,6 +100,15 @@ class ClapEventSequencerProcessor : public XAPWithJuceGUI
                 .withFlags(CLAP_PARAM_IS_AUTOMATABLE | CLAP_PARAM_IS_MODULATABLE)
                 .withName("Note duration")
                 .withID((clap_id)ParamIDs::NoteDurationMultiplier));
+        paramDescriptions.push_back(
+            ParamDesc()
+                .asInt()
+                .withRange(1.0f, 4.0f)
+                .withDefault(1.0)
+                .withLinearScaleFormatting("", 1.0)
+                .withFlags(CLAP_PARAM_IS_AUTOMATABLE | CLAP_PARAM_IS_STEPPED)
+                .withName("Chord polyphony")
+                .withID((clap_id)ParamIDs::ChordPolyphony));
         paramDescriptions.push_back(
             ParamDesc()
                 .asInt()

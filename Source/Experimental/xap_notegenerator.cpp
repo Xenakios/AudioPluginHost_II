@@ -116,8 +116,10 @@ clap_process_status ClapEventSequencerProcessor::process(const clap_process *pro
                 if (z > m_outport_bias)
                     port = 1;
                 int arpdiv = patch.params[paramToPatchIndex[(clap_id)ParamIDs::ArpeggioDivision]];
-                generateChordNotes(4, arpdiv, m_sample_pos, basenote, notedur, m_clock_hz, port,
-                                   velo);
+                int numchordnotes =
+                    patch.params[paramToPatchIndex[(clap_id)ParamIDs::ChordPolyphony]];
+                generateChordNotes(numchordnotes, arpdiv, m_sample_pos, basenote, notedur,
+                                   m_clock_hz, port, velo);
             }
             m_phase += (1.0 / m_sr) * m_clock_hz;
             if (m_phase >= 1.0)
