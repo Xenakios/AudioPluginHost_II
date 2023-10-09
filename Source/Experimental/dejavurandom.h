@@ -22,6 +22,7 @@ class DejaVuRandom
     int m_loop_len = 8;
     float m_deja_vu = 0.0;
     std::uniform_real_distribution<float> m_dist{0.0f, 1.0f};
+    bool m_deja_vu_enabled = false;
 
   public:
     DejaVuRandom(unsigned int seed) : m_rng(seed)
@@ -31,6 +32,7 @@ class DejaVuRandom
     }
     void setLoopLength(int len) { m_loop_len = std::clamp(len, 1, 32); }
     void setDejaVu(float dv) { m_deja_vu = std::clamp(dv, 0.0f, 1.0f); }
+    void setDejaVuEnabled(bool b) { m_deja_vu_enabled = b; }
     float nextFloatInRange(float minv, float maxv)
     {
         return maprange(nextFloat(), 0.0f, 1.0f, minv, maxv);
@@ -43,6 +45,10 @@ class DejaVuRandom
     }
     float nextFloat()
     {
+        if (!m_deja_vu_enabled)
+        {
+            return m_dist(m_rng);
+        }
         auto next = m_state[m_loop_index];
         bool rewinded = false;
         ++m_loop_index;

@@ -6,12 +6,16 @@
 
 class ClapEventSequencerProcessor : public XAPWithJuceGUI
 {
-    static constexpr size_t numNoteGeneratorParams = 11;
+    static constexpr size_t numNoteGeneratorParams = 22;
     double m_sr = 1.0;
     DejaVuRandom m_dvpitchrand;
     DejaVuRandom m_dvtimerand;
     DejaVuRandom m_dvchordrand;
     DejaVuRandom m_dvvelorand;
+    DejaVuRandom m_dvexpr1rand;
+    DejaVuRandom m_dvexpr2rand;
+    static constexpr size_t numDejaVuGenerators = 6;
+    DejaVuRandom *m_dv_array[numDejaVuGenerators];
     struct SimpleNoteEvent
     {
         SimpleNoteEvent() {}
@@ -61,7 +65,19 @@ class ClapEventSequencerProcessor : public XAPWithJuceGUI
         ArpeggioDivision = 4000,
         ArpeggioScatter = 4500,
         OutPortBias = 5000,
-        SharedDejaVu = 6000,
+        // SharedDejaVu = 6000,
+        DejavuTime = 6010,
+        DejavuTimeEnabled = 6011,
+        DejavuPitch = 6020,
+        DejavuPitchEnabled = 6021,
+        DejavuChord = 6030,
+        DejavuChordEnabled = 6031,
+        DejavuVelocity = 6040,
+        DejavuVelocityEnabled = 6041,
+        DejavuExpression1 = 6050,
+        DejavuExpression1Enabled = 6051,
+        DejavuExpression2 = 6060,
+        DejavuExpression2Enabled = 6061,
         SharedLoopLen = 7000,
         OutputMode = 8000,
         PitchCenter = 9000,
@@ -71,15 +87,22 @@ class ClapEventSequencerProcessor : public XAPWithJuceGUI
     using ParamDesc = xenakios::ParamDesc;
     bool getDescriptor(clap_plugin_descriptor *desc) const override
     {
-        memset(desc,0,sizeof(clap_plugin_descriptor));
+        memset(desc, 0, sizeof(clap_plugin_descriptor));
         desc->name = "XAP Entropic Sequencer";
         desc->vendor = "Xenakios";
         return true;
     }
     ClapEventSequencerProcessor(int seed)
         : m_dvpitchrand(seed), m_dvtimerand(seed + 9003), m_dvchordrand(seed + 13),
-          m_dvvelorand(seed + 101)
+          m_dvvelorand(seed + 101), m_dvexpr1rand(seed + 247), m_dvexpr2rand(seed + 31)
     {
+        m_dv_array[0] = &m_dvtimerand;
+        m_dv_array[1] = &m_dvpitchrand;
+        m_dv_array[2] = &m_dvchordrand;
+        m_dv_array[3] = &m_dvvelorand;
+        m_dv_array[4] = &m_dvexpr1rand;
+        m_dv_array[5] = &m_dvexpr2rand;
+
         m_active_notes.reserve(4096);
 
         paramDescriptions.push_back(
@@ -164,15 +187,30 @@ class ClapEventSequencerProcessor : public XAPWithJuceGUI
                                         .withDefault(0)
                                         .withID((clap_id)ParamIDs::OutputMode)
                                         .withName("Output Destination Mode"));
-        paramDescriptions.push_back(
-            ParamDesc()
-                .asFloat()
-                .withRange(0.0f, 1.0f)
-                .withDefault(0.0)
-                .withLinearScaleFormatting("", 1.0)
-                .withFlags(CLAP_PARAM_IS_AUTOMATABLE | CLAP_PARAM_IS_MODULATABLE)
-                .withName("Deja Vu")
-                .withID((clap_id)ParamIDs::SharedDejaVu));
+        const char *dvgennames[numDejaVuGenerators] = {"Time",     "Pitch",        "Chord type",
+                                                       "Velocity", "Expression 1", "Expression 2"};
+        for (int i = 0; i < numDejaVuGenerators; ++i)
+        {
+            clap_id cid = ((clap_id)ParamIDs::DejavuTime) + i * 10;
+            paramDescriptions.push_back(
+                ParamDesc()
+                    .asFloat()
+                    .withRange(0.0f, 1.0f)
+                    .withDefault(0.0)
+                    .withLinearScaleFormatting("", 1.0)
+                    .withFlags(CLAP_PARAM_IS_AUTOMATABLE | CLAP_PARAM_IS_MODULATABLE)
+                    .withName("Deja Vu " + std::string(dvgennames[i]))
+                    .withID(cid));
+            cid = ((clap_id)ParamIDs::DejavuTime) + i * 10 + 1;
+            paramDescriptions.push_back(
+                ParamDesc()
+                    .asBool()
+                    .withDefault(0.0)
+                    .withFlags(CLAP_PARAM_IS_AUTOMATABLE | CLAP_PARAM_IS_STEPPED)
+                    .withName("Deja Vu " + std::string(dvgennames[i]) + " enabled")
+                    .withID(cid));
+        }
+
         paramDescriptions.push_back(
             ParamDesc()
                 .asInt()
@@ -240,21 +278,22 @@ class ClapEventSequencerProcessor : public XAPWithJuceGUI
     }
     void updateDejaVuGeneratorInstances()
     {
-        float m_shared_deja_vu = patch.params[paramToPatchIndex[(clap_id)ParamIDs::SharedDejaVu]];
-        m_dvtimerand.setDejaVu(m_shared_deja_vu);
-        m_dvpitchrand.setDejaVu(m_shared_deja_vu);
-        m_dvvelorand.setDejaVu(m_shared_deja_vu);
-        m_dvchordrand.setDejaVu(m_shared_deja_vu);
-        float m_shared_loop_len = patch.params[paramToPatchIndex[(clap_id)ParamIDs::SharedLoopLen]];
-        m_dvtimerand.setLoopLength(m_shared_loop_len);
-        m_dvpitchrand.setLoopLength(m_shared_loop_len);
-        m_dvvelorand.setLoopLength(m_shared_loop_len);
-        m_dvchordrand.setLoopLength(m_shared_loop_len);
+        float shared_loop_len = patch.params[paramToPatchIndex[(clap_id)ParamIDs::SharedLoopLen]];
+        for (int i = 0; i < numDejaVuGenerators; ++i)
+        {
+            m_dv_array[i]->setLoopLength(shared_loop_len);
+            clap_id cid = (clap_id)ParamIDs::DejavuTime + i * 10;
+            float v = patch.params[paramToPatchIndex[cid]];
+            m_dv_array[i]->setDejaVu(v);
+            cid = (clap_id)ParamIDs::DejavuTime + i * 10 + 1;
+            v = patch.params[paramToPatchIndex[cid]];
+            m_dv_array[i]->setDejaVuEnabled(v > 0.5f);
+        }
     }
     clap_process_status process(const clap_process *process) noexcept override;
 
-    void generateChordNotes(int numnotes, int arpdiv, double baseonset, double basepitch, double notedur,
-                            double hz, int port, double velo);
+    void generateChordNotes(int numnotes, int arpdiv, double baseonset, double basepitch,
+                            double notedur, double hz, int port, double velo);
 
     std::default_random_engine m_def_rng;
     bool guiCreate(const char *api, bool isFloating) noexcept override
