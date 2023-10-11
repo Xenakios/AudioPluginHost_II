@@ -109,8 +109,7 @@ class ToneProcessorTest : public XAPWithJuceGUI
     }
     clap_process_status process(const clap_process *process) noexcept override
     {
-        mergeParameterEvents(process);
-        auto inEvents = m_merge_list.clapInputEvents();
+        auto inEvents = process->in_events;
         for (int i = 0; i < inEvents->size(inEvents); ++i)
         {
             auto ev = inEvents->get(inEvents, i);
@@ -291,8 +290,7 @@ class ModulatorSource : public XAPWithJuceGUI
     }
     clap_process_status process(const clap_process *process) noexcept override
     {
-        mergeParameterEvents(process);
-        auto inevents = m_merge_list.clapInputEvents();
+        auto inevents = process->in_events;
         const clap_event_header *next_event = nullptr;
         auto esz = inevents->size(inevents);
         uint32_t nextEventIndex{0};
@@ -408,8 +406,8 @@ class GainProcessorTest : public XAPWithJuceGUI
         auto numInChans = process->audio_inputs->channel_count;
         auto numOutChans = process->audio_outputs->channel_count;
         int frames = process->frames_count;
-        mergeParameterEvents(process);
-        auto inEvents = m_merge_list.clapInputEvents();
+        
+        auto inEvents = process->in_events;
         for (int i = 0; i < inEvents->size(inEvents); ++i)
         {
             auto ev = inEvents->get(inEvents, i);

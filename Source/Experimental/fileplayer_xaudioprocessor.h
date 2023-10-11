@@ -251,8 +251,16 @@ class FilePlayerProcessor : public XAPWithJuceGUI
     }
     clap_process_status process(const clap_process *process) noexcept override
     {
-        mergeParameterEvents(process);
-        auto inevts = m_merge_list.clapInputEvents();
+        xenakios::CrossThreadMessage msg;
+        while (m_from_ui_fifo.pop(msg))
+        {
+            if (msg.eventType == CLAP_EVENT_PARAM_VALUE)
+            {
+                auto pev = makeClapParameterValueEvent(0, msg.paramId, msg.value);
+                handleEvent((const clap_event_header *)&pev);
+            }
+        }
+        auto inevts = process->in_events;
         for (int i = 0; i < inevts->size(inevts); ++i)
         {
             auto ev = inevts->get(inevts, i);

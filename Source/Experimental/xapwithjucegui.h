@@ -11,7 +11,7 @@ class XAPWithJuceGUI : public xenakios::XAudioProcessor
     std::atomic<bool> m_editor_attached{false};
     SingleReaderSingleWriterFifoHelper<xenakios::CrossThreadMessage> m_from_ui_fifo;
     SingleReaderSingleWriterFifoHelper<xenakios::CrossThreadMessage> m_to_ui_fifo;
-    clap::helpers::EventList m_merge_list;
+    // clap::helpers::EventList m_merge_list;
     std::unordered_map<clap_id, float *> paramToValue;
     std::unordered_map<clap_id, int> paramToPatchIndex;
     struct Patch
@@ -55,26 +55,7 @@ class XAPWithJuceGUI : public xenakios::XAudioProcessor
             }
         }
     }
-    void mergeParameterEvents(const clap_process *process_ctx)
-    {
-        m_merge_list.clear();
-        xenakios::CrossThreadMessage msg;
-        while (m_from_ui_fifo.pop(msg))
-        {
-            if (msg.eventType == CLAP_EVENT_PARAM_VALUE)
-            {
-                auto pev = makeClapParameterValueEvent(0, msg.paramId, msg.value);
-                m_merge_list.push((const clap_event_header *)&pev);
-            }
-        }
-        auto in_evts = process_ctx->in_events;
-        auto sz = in_evts->size(in_evts);
-        for (uint32_t i = 0; i < sz; ++i)
-        {
-            auto ev = in_evts->get(in_evts, i);
-            m_merge_list.push(ev);
-        }
-    }
+    
 
     void handleGUIEvents()
     {
