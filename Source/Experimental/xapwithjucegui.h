@@ -12,6 +12,12 @@ class XAPWithJuceGUI : public xenakios::XAudioProcessor
     SingleReaderSingleWriterFifoHelper<xenakios::CrossThreadMessage> m_from_ui_fifo;
     SingleReaderSingleWriterFifoHelper<xenakios::CrossThreadMessage> m_to_ui_fifo;
     clap::helpers::EventList m_merge_list;
+    std::unordered_map<clap_id, float *> paramToValue;
+    std::unordered_map<clap_id, int> paramToPatchIndex;
+    struct Patch
+    {
+        std::vector<float> params;
+    } patch;
 
   public:
     bool enqueueParameterChange(xenakios::CrossThreadMessage msg) noexcept override
@@ -19,6 +25,36 @@ class XAPWithJuceGUI : public xenakios::XAudioProcessor
         return m_from_ui_fifo.push(msg);
     }
     bool enqueueToUI(xenakios::CrossThreadMessage msg) noexcept { return m_to_ui_fifo.push(msg); }
+    void pushAllParamsToGUI()
+    {
+        if (!m_editor_attached)
+            return;
+        for (auto &p : paramToPatchIndex)
+        {
+            float val = patch.params[p.second];
+            m_to_ui_fifo.push(xenakios::CrossThreadMessage{p.first, CLAP_EVENT_PARAM_VALUE, val});
+        }
+    }
+    virtual void handleInboundEvent(const clap_event_header *ev, bool is_from_ui) noexcept
+    {
+        if (ev->space_id != CLAP_CORE_EVENT_SPACE_ID)
+            return;
+        if (ev->type == CLAP_EVENT_PARAM_VALUE)
+        {
+            auto pev = (const clap_event_param_value *)ev;
+            auto it = paramToValue.find(pev->param_id);
+            if (it != paramToValue.end())
+            {
+                *(it->second) = pev->value;
+            }
+
+            if (!is_from_ui)
+            {
+                m_to_ui_fifo.push(xenakios::CrossThreadMessage{pev->param_id,
+                                                               CLAP_EVENT_PARAM_VALUE, pev->value});
+            }
+        }
+    }
     void mergeParameterEvents(const clap_process *process_ctx)
     {
         m_merge_list.clear();
@@ -59,7 +95,7 @@ class XAPWithJuceGUI : public xenakios::XAudioProcessor
     {
         return m_to_ui_fifo.pop(msg);
     }
-    virtual void handleInboundEvent(const clap_event_header *e, bool is_from_ui) noexcept {}
+
     bool implementsGui() const noexcept override { return true; }
     // virtual bool guiIsApiSupported(const char *api, bool isFloating) noexcept { return false; }
     // virtual bool guiGetPreferredApi(const char **api, bool *is_floating) noexcept { return false;

@@ -41,15 +41,6 @@ class ClapEventSequencerProcessor : public XAPWithJuceGUI
     // ever increasing for now, used for timing the outputted notes
     uint64_t m_sample_pos = 0;
 
-    struct Patch
-    {
-        float params[numNoteGeneratorParams];
-        // typename TConfig::PatchExtension extension;
-    } patch;
-
-    std::unordered_map<clap_id, float *> paramToValue;
-    std::unordered_map<clap_id, int> paramToPatchIndex;
-
   public:
     enum class OutputMode
     {
@@ -96,6 +87,8 @@ class ClapEventSequencerProcessor : public XAPWithJuceGUI
         : m_dvpitchrand(seed), m_dvtimerand(seed + 9003), m_dvchordrand(seed + 13),
           m_dvvelorand(seed + 101), m_dvexpr1rand(seed + 247), m_dvexpr2rand(seed + 31)
     {
+        patch.params.resize(numNoteGeneratorParams);
+
         m_dv_array[0] = &m_dvtimerand;
         m_dv_array[1] = &m_dvpitchrand;
         m_dv_array[2] = &m_dvchordrand;
@@ -220,7 +213,7 @@ class ClapEventSequencerProcessor : public XAPWithJuceGUI
                 .withFlags(CLAP_PARAM_IS_AUTOMATABLE | CLAP_PARAM_IS_STEPPED)
                 .withName("Num Loop Steps")
                 .withID((clap_id)ParamIDs::SharedLoopLen));
-        jassert(numNoteGeneratorParams == paramDescriptions.size());
+        jassert(patch.params.size() == paramDescriptions.size());
         for (size_t i = 0; i < paramDescriptions.size(); ++i)
         {
             auto &p = paramDescriptions[i];
@@ -246,36 +239,7 @@ class ClapEventSequencerProcessor : public XAPWithJuceGUI
         return true;
     }
     bool m_processing_started = false;
-    void pushAllParamsToGUI()
-    {
-        if (!m_editor_attached)
-            return;
-        for (auto &p : paramToPatchIndex)
-        {
-            float val = patch.params[p.second];
-            m_to_ui_fifo.push(xenakios::CrossThreadMessage{p.first, CLAP_EVENT_PARAM_VALUE, val});
-        }
-    }
-    void handleInboundEvent(const clap_event_header *ev, bool is_from_ui) noexcept override
-    {
-        if (ev->space_id != CLAP_CORE_EVENT_SPACE_ID)
-            return;
-        if (ev->type == CLAP_EVENT_PARAM_VALUE)
-        {
-            auto pev = (const clap_event_param_value *)ev;
-            auto it = paramToValue.find(pev->param_id);
-            if (it != paramToValue.end())
-            {
-                *(it->second) = pev->value;
-            }
 
-            if (!is_from_ui)
-            {
-                m_to_ui_fifo.push(xenakios::CrossThreadMessage{pev->param_id,
-                                                               CLAP_EVENT_PARAM_VALUE, pev->value});
-            }
-        }
-    }
     void updateDejaVuGeneratorInstances()
     {
         float shared_loop_len = patch.params[paramToPatchIndex[(clap_id)ParamIDs::SharedLoopLen]];

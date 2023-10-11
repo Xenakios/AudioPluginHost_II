@@ -126,7 +126,7 @@ class GenericEditor : public juce::Component, public juce::Timer
 
         int defaultH = m_proc.paramsCount() * 50;
         setSize(500, defaultH);
-        startTimer(3000);
+        startTimer(100);
     }
     void resized() override
     {
