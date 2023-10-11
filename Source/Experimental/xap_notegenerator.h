@@ -103,7 +103,7 @@ class ClapEventSequencerProcessor : public XAPWithJuceGUI
         m_dv_array[4] = &m_dvexpr1rand;
         m_dv_array[5] = &m_dvexpr2rand;
 
-        m_active_notes.reserve(4096);
+        m_active_notes.reserve(256);
 
         paramDescriptions.push_back(
             ParamDesc()

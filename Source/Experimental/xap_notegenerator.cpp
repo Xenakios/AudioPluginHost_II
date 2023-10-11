@@ -130,6 +130,7 @@ clap_process_status ClapEventSequencerProcessor::process(const clap_process *pro
             ++m_sample_pos;
         }
     }
+    jassert(m_active_notes.size() <= 256);
     return CLAP_PROCESS_CONTINUE;
 }
 
@@ -188,6 +189,7 @@ void ClapEventSequencerProcessor::generateChordNotes(int numchordnotes, int arpd
         double stag = stagdist(m_def_rng);
         double tpos = baseonset + ((pulsepos * time_interval + stag) * m_sr);
         SimpleNoteEvent ne{tpos, tpos + notedur, pitch, port_to_use, chan_to_use, velo};
-        m_active_notes.push_back(ne);
+        if (m_active_notes.size() < m_active_notes.capacity())
+            m_active_notes.push_back(ne);
     }
 }
