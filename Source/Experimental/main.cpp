@@ -293,8 +293,6 @@ inline void handleNodeEventsAlt(XAPNode::Connection &conn, clap::helpers::EventL
     {
         auto ev = oevents.get(j);
         if (equalsToAny(ev->type, CLAP_EVENT_NOTE_ON, CLAP_EVENT_NOTE_OFF, CLAP_EVENT_NOTE_CHOKE))
-        // if (ev->type == CLAP_EVENT_NOTE_ON || ev->type == CLAP_EVENT_NOTE_OFF ||
-        //     ev->type == CLAP_EVENT_NOTE_CHOKE)
         {
             auto tev = (clap_event_note *)ev;
             if (tev->port_index == conn.sourcePort)
@@ -861,15 +859,9 @@ class MainComponent : public juce::Component, public juce::Timer
         int usage = m_aman.getCpuUsage() * 100.0;
         m_infolabel.setText("CPU " + juce::String(usage) + "%", juce::dontSendNotification);
     }
-    MainComponent()
+    std::string pathprefix = R"(C:\Program Files\Common Files\)";
+    void addNoteGeneratorTestNodes()
     {
-        addAndMakeVisible(m_infolabel);
-        addAndMakeVisible(m_mod_rout_combo);
-
-        startTimerHz(10);
-        std::string pathprefix = R"(C:\Program Files\Common Files\)";
-
-        m_graph = std::make_unique<XAPGraph>();
         m_graph->addProcessorAsNode(std::make_unique<ClapEventSequencerProcessor>(2), "Note Gen");
         m_graph->addProcessorAsNode(std::make_unique<ClapPluginFormatProcessor>(
                                         pathprefix + R"(CLAP\Surge Synth Team\Surge XT.clap)", 0),
@@ -888,7 +880,25 @@ class MainComponent : public juce::Component, public juce::Timer
         // m_graph->connectAudio("Surge XT 2", 0, 0, "Main", 0, 0);
         // m_graph->connectAudio("Surge XT 2", 0, 1, "Main", 0, 1);
         m_graph->outputNodeId = "Main";
+    }
+    void addFilePlayerTestNodes()
+    {
+        m_graph->addProcessorAsNode(std::make_unique<FilePlayerProcessor>(), "File 1");
+        m_graph->addProcessorAsNode(std::make_unique<GainProcessorTest>(), "Main");
+        m_graph->connectAudio("File 1", 0, 0, "Main", 0, 0);
+        m_graph->connectAudio("File 1", 0, 1, "Main", 0, 1);
+        m_graph->outputNodeId = "Main";
+    }
+    MainComponent()
+    {
+        addAndMakeVisible(m_infolabel);
+        addAndMakeVisible(m_mod_rout_combo);
 
+        startTimerHz(10);
+
+        m_graph = std::make_unique<XAPGraph>();
+        // addNoteGeneratorTestNodes();
+        addFilePlayerTestNodes();
         juce::Random rng{7};
         for (auto &n : m_graph->proc_nodes)
         {
