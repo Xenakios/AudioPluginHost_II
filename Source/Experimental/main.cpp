@@ -292,8 +292,9 @@ inline void handleNodeEventsAlt(XAPNode::Connection &conn, clap::helpers::EventL
     for (int j = 0; j < oevents.size(); ++j)
     {
         auto ev = oevents.get(j);
-        if (ev->type == CLAP_EVENT_NOTE_ON || ev->type == CLAP_EVENT_NOTE_OFF ||
-            ev->type == CLAP_EVENT_NOTE_CHOKE)
+        if (equalsToAny(ev->type, CLAP_EVENT_NOTE_ON, CLAP_EVENT_NOTE_OFF, CLAP_EVENT_NOTE_CHOKE))
+        // if (ev->type == CLAP_EVENT_NOTE_ON || ev->type == CLAP_EVENT_NOTE_OFF ||
+        //     ev->type == CLAP_EVENT_NOTE_CHOKE)
         {
             auto tev = (clap_event_note *)ev;
             if (tev->port_index == conn.sourcePort)
@@ -821,7 +822,7 @@ class XapWindow : public juce::DocumentWindow
     {
         setUsingNativeTitleBar(true);
         setVisible(true);
-        //setAlwaysOnTop(true);
+        // setAlwaysOnTop(true);
         setWantsKeyboardFocus(true);
         setContentNonOwned(&m_content, true);
         setResizable(true, false);
@@ -869,8 +870,7 @@ class MainComponent : public juce::Component, public juce::Timer
         std::string pathprefix = R"(C:\Program Files\Common Files\)";
 
         m_graph = std::make_unique<XAPGraph>();
-        m_graph->addProcessorAsNode(std::make_unique<ClapEventSequencerProcessor>(2),
-                                    "Note Gen");
+        m_graph->addProcessorAsNode(std::make_unique<ClapEventSequencerProcessor>(2), "Note Gen");
         m_graph->addProcessorAsNode(std::make_unique<ClapPluginFormatProcessor>(
                                         pathprefix + R"(CLAP\Surge Synth Team\Surge XT.clap)", 0),
                                     "Surge XT 1");
@@ -885,8 +885,8 @@ class MainComponent : public juce::Component, public juce::Timer
 
         m_graph->connectAudio("Surge XT 1", 0, 0, "Main", 0, 0);
         m_graph->connectAudio("Surge XT 1", 0, 1, "Main", 0, 1);
-        //m_graph->connectAudio("Surge XT 2", 0, 0, "Main", 0, 0);
-        //m_graph->connectAudio("Surge XT 2", 0, 1, "Main", 0, 1);
+        // m_graph->connectAudio("Surge XT 2", 0, 0, "Main", 0, 0);
+        // m_graph->connectAudio("Surge XT 2", 0, 1, "Main", 0, 1);
         m_graph->outputNodeId = "Main";
 
         juce::Random rng{7};

@@ -3,6 +3,11 @@
 #include <clap/helpers/event-list.hh>
 #include "containers/choc_SingleReaderSingleWriterFIFO.h"
 
+template <typename T, typename... Args> inline bool equalsToAny(const T &a, Args &&...args)
+{
+    return ((a == args) || ...);
+}
+
 void printClapEvents(clap::helpers::EventList &elist);
 
 template<typename T>
