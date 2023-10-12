@@ -364,6 +364,10 @@ class XAPGraph : public xenakios::XAudioProcessor
                 return n->processor.get();
         return nullptr;
     }
+    template <typename T> T *findProcessorAndCast(const std::string &name)
+    {
+        return dynamic_cast<T *>(findProcessor(name));
+    }
     bool connectAudio(const std::string &sourceNodeName, int sourcePort, int sourceChannel,
                       const std::string &destinationNodeName, int destinationPort,
                       int destinationChannel)
@@ -884,6 +888,7 @@ class MainComponent : public juce::Component, public juce::Timer
     void addFilePlayerTestNodes()
     {
         m_graph->addProcessorAsNode(std::make_unique<FilePlayerProcessor>(), "File 1");
+        auto fp = m_graph->findProcessorAndCast<FilePlayerProcessor>("File 1");
         m_graph->addProcessorAsNode(std::make_unique<GainProcessorTest>(), "Main");
         m_graph->connectAudio("File 1", 0, 0, "Main", 0, 0);
         m_graph->connectAudio("File 1", 0, 1, "Main", 0, 1);
