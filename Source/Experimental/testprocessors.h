@@ -9,8 +9,6 @@
 #include "xap_generic_editor.h"
 #include "xapwithjucegui.h"
 
-
-
 inline void insertToEndOfEventListFromFIFO(
     choc::fifo::SingleReaderSingleWriterFIFO<xenakios::CrossThreadMessage> &source,
     clap_input_events *processDestination, clap_output_events *outputList = nullptr)
@@ -387,11 +385,7 @@ class GainProcessorTest : public XAPWithJuceGUI
     bool activate(double sampleRate, uint32_t minFrameCount,
                   uint32_t maxFrameCount) noexcept override
     {
-        juce::dsp::ProcessSpec spec;
-        spec.maximumBlockSize = maxFrameCount;
-        spec.numChannels = 2;
-        spec.sampleRate = sampleRate;
-        m_gain_proc.prepare(spec);
+        m_gain_proc.prepare({sampleRate, maxFrameCount, 2});
         m_gain_proc.setRampDurationSeconds(0.01);
         return true;
     }
@@ -401,36 +395,50 @@ class GainProcessorTest : public XAPWithJuceGUI
         *info = m_param_infos[paramIndex];
         return true;
     }
+    void handleEvent(const clap_event_header *ev)
+    {
+        if (ev->type == CLAP_EVENT_PARAM_VALUE)
+        {
+            auto pvev = reinterpret_cast<const clap_event_param_value *>(ev);
+            if (pvev->param_id == (clap_id)ParamIds::Volume)
+            {
+                m_volume = pvev->value;
+            }
+            else if (pvev->param_id == (clap_id)ParamIds::Smoothing)
+            {
+                m_gain_proc.setRampDurationSeconds(pvev->value);
+            }
+        }
+        if (ev->type == CLAP_EVENT_PARAM_MOD)
+        {
+            auto pvev = reinterpret_cast<const clap_event_param_mod *>(ev);
+            if (pvev->param_id == (clap_id)ParamIds::Volume)
+            {
+                m_volume_mod = pvev->amount;
+            }
+        }
+    }
     clap_process_status process(const clap_process *process) noexcept override
     {
         auto numInChans = process->audio_inputs->channel_count;
         auto numOutChans = process->audio_outputs->channel_count;
         int frames = process->frames_count;
-        
+        xenakios::CrossThreadMessage msg;
+        while (m_from_ui_fifo.pop(msg))
+        {
+            if (msg.eventType == CLAP_EVENT_PARAM_VALUE)
+            {
+                auto pev = makeClapParameterValueEvent(0, msg.paramId, msg.value);
+                handleEvent((const clap_event_header *)&pev);
+                // should also add these into output events, but since we don't
+                // have automation recording yet in the host...
+            }
+        }
         auto inEvents = process->in_events;
         for (int i = 0; i < inEvents->size(inEvents); ++i)
         {
             auto ev = inEvents->get(inEvents, i);
-            if (ev->type == CLAP_EVENT_PARAM_VALUE)
-            {
-                auto pvev = reinterpret_cast<const clap_event_param_value *>(ev);
-                if (pvev->param_id == (clap_id)ParamIds::Volume)
-                {
-                    m_volume = pvev->value;
-                }
-                else if (pvev->param_id == (clap_id)ParamIds::Smoothing)
-                {
-                    m_gain_proc.setRampDurationSeconds(pvev->value);
-                }
-            }
-            if (ev->type == CLAP_EVENT_PARAM_MOD)
-            {
-                auto pvev = reinterpret_cast<const clap_event_param_mod *>(ev);
-                if (pvev->param_id == (clap_id)ParamIds::Volume)
-                {
-                    m_volume_mod = pvev->amount;
-                }
-            }
+            handleEvent(ev);
         }
         double finalvolume = m_volume + m_volume_mod;
         m_gain_proc.setGainDecibels(finalvolume);
@@ -564,4 +572,3 @@ struct ClapEventIterator
     double currentTime = 0;
     size_t nextIndex = 0;
 };
-
