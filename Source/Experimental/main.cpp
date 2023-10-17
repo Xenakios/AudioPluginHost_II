@@ -36,7 +36,7 @@ class XAPNode
     typically musical notes
     Modulation : the source node sends Clap parameter modulation messages with values between
     -1 and 1 that are mapped by the graph playback system into suitable parameter mod/value
-    messages for the desination node
+    messages for the destination node
     */
     enum ConnectionType
     {
@@ -131,6 +131,8 @@ class XAPNode
     std::vector<Connection> inputConnections;
     std::string displayName;
     std::function<void(XAPNode *)> PreProcessFunc;
+    std::unordered_map<clap_id, double> modulationSums;
+    bool modulationWasApplied = false;
 };
 
 inline bool connectAudioBetweenNodes(XAPNode *sourceNode, int sourcePort, int sourceChannel,
@@ -179,6 +181,10 @@ inline bool connectModulation(XAPNode *sourceNode, clap_id sourceParamId, XAPNod
     conn.destinationParameter = destinationParamId;
     conn.modulationDepth = initialModDepth;
     conn.isDestructiveModulation = destructive;
+    if (!conn.isDestructiveModulation)
+    {
+        destinationNode->modulationSums[destinationParamId] = 0.0;
+    }
     destinationNode->inputConnections.push_back(conn);
     return true;
 }
@@ -261,14 +267,17 @@ inline void handleNodeModulationEvents(XAPNode::Connection &conn,
                 if (conn.isDestructiveModulation)
                 {
                     val = 0.5 + 0.5 * sourcemev->amount;
+                    // for now, we don't sum destructive modulations
                     xenakios::pushParamEvent(modulationMergeList, false, sourcemev->header.time,
                                              conn.destinationParameter, val);
                 }
                 else
                 {
                     val *= conn.modulationDepth;
-                    xenakios::pushParamEvent(modulationMergeList, true, sourcemev->header.time,
-                                             conn.destinationParameter, val);
+                    conn.destination->modulationSums[conn.destinationParameter] += val;
+                    conn.destination->modulationWasApplied = true;
+                    // xenakios::pushParamEvent(modulationMergeList, true, sourcemev->header.time,
+                    //                          conn.destinationParameter, val);
                 }
             }
         }
@@ -376,6 +385,16 @@ class XAPGraph : public xenakios::XAudioProcessor
         auto destNode = findNodeByName(destinationNodeName);
         return connectAudioBetweenNodes(srcNode, sourcePort, sourceChannel, destNode,
                                         destinationPort, destinationChannel);
+    }
+    bool connectModulationByNames(const std::string &sourceNodeName, clap_id sourceParamId,
+                                  const std::string &destinationNodeName,
+                                  clap_id destinationParamId, bool destructive,
+                                  double initialModDepth)
+    {
+        auto srcNode = findNodeByName(sourceNodeName);
+        auto destNode = findNodeByName(destinationNodeName);
+        return connectModulation(srcNode, sourceParamId, destNode, destinationParamId, destructive,
+                                 initialModDepth);
     }
     std::vector<XAPNode::Connection *> getModulationConnections()
     {
@@ -531,6 +550,11 @@ class XAPGraph : public xenakios::XAudioProcessor
             noteMergeList.clear();
             // clear node audio input buffers before summing into them
             clearNodeAudioInputs(n, procbufsize);
+            n->modulationWasApplied = false;
+            for (auto &summod : n->modulationSums)
+            {
+                summod.second = 0.0;
+            }
             for (auto &conn : n->inputConnections)
             {
                 if (conn.type == XAPNode::ConnectionType::Audio)
@@ -550,9 +574,10 @@ class XAPGraph : public xenakios::XAudioProcessor
 
             n->inEvents.clear();
             if (eventMergeVector.size() > 0 || modulationMergeList.size() > 0 ||
-                noteMergeList.size() > 0)
+                noteMergeList.size() > 0 || n->modulationWasApplied)
             {
                 // i've forgotten why this cross thread message stuff is here...?
+                /*
                 xenakios::CrossThreadMessage ctmsg;
                 while (n->processor->dequeueParameterChange(ctmsg))
                 {
@@ -563,10 +588,32 @@ class XAPGraph : public xenakios::XAudioProcessor
                         modulationMergeList.push((clap_event_header *)&from_ui_ev);
                     }
                 }
+                */
                 for (int i = 0; i < modulationMergeList.size(); ++i)
                     eventMergeVector.push_back(modulationMergeList.get(i));
                 for (int i = 0; i < noteMergeList.size(); ++i)
                     eventMergeVector.push_back(noteMergeList.get(i));
+                // we can't easily retain the timestamps of summed modulations
+                // so we just put all the summed modulations at timestamp 0.
+                // there might be ways around this, but it would complicate things too much
+                // at this point
+                for (const auto &modsum : n->modulationSums)
+                {
+                    // could perhaps be done more robustly, as float comparisons
+                    // are not that nice, but this should work
+                    if (modsum.second != 0.0)
+                    {
+                        // we should probably clamp the summed modulation to fit into
+                        // the parameter's declared range here, but there's no caching of the
+                        // parameter infos implemented here in the host yet, so we just trust
+                        // the destination processor somehow handles it correctly
+                        // DBG(transport.song_pos_seconds
+                        //    << " " << n->displayName << " Applied summed modulation for par "
+                        //    << (int64_t)modsum.first << " with amount " << modsum.second);
+                        auto modev = makeClapParameterModEvent(0, modsum.first, modsum.second);
+                        n->inEvents.push((clap_event_header *)&modev);
+                    }
+                }
                 choc::sorting::stable_sort(
                     eventMergeVector.begin(), eventMergeVector.end(),
                     [](auto &lhs, auto &rhs) { return lhs->time < rhs->time; });
@@ -575,7 +622,7 @@ class XAPGraph : public xenakios::XAudioProcessor
                     n->inEvents.push(e);
                 }
             }
-
+            // printClapEvents(n->inEvents);
             ctx.audio_inputs_count = 1;
             ctx.audio_inputs = n->inPortBuffers.data();
             ctx.audio_outputs_count = 1;
@@ -894,6 +941,17 @@ class MainComponent : public juce::Component, public juce::Timer
         m_graph->connectAudio("File 1", 0, 1, "Main", 0, 1);
         m_graph->outputNodeId = "Main";
     }
+    void addToneGeneratorTestNodes()
+    {
+        m_graph->addProcessorAsNode(std::make_unique<ToneProcessorTest>(), "Tone 1");
+        m_graph->addProcessorAsNode(std::make_unique<GainProcessorTest>(), "Main");
+        m_graph->addProcessorAsNode(std::make_unique<ModulatorSource>(1, 1.0), "LFO 1");
+        m_graph->connectAudio("Tone 1", 0, 0, "Main", 0, 0);
+        m_graph->connectAudio("Tone 1", 0, 0, "Main", 0, 1);
+        m_graph->connectModulationByNames("LFO 1", 0, "Tone 1",
+                                          (clap_id)ToneProcessorTest::ParamIds::Pitch, false, 1.0);
+        m_graph->outputNodeId = "Main";
+    }
     MainComponent()
     {
         addAndMakeVisible(m_infolabel);
@@ -903,7 +961,8 @@ class MainComponent : public juce::Component, public juce::Timer
 
         m_graph = std::make_unique<XAPGraph>();
         // addNoteGeneratorTestNodes();
-        addFilePlayerTestNodes();
+        // addFilePlayerTestNodes();
+        addToneGeneratorTestNodes();
         juce::Random rng{7};
         for (auto &n : m_graph->proc_nodes)
         {

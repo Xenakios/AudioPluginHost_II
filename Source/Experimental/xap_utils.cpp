@@ -1,4 +1,5 @@
 #include "xap_utils.h"
+#define FOOX
 #ifdef FOOX
 #include <format>
 #include <iostream>

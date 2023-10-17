@@ -63,30 +63,24 @@ class ToneProcessorTest : public XAPWithJuceGUI
     double m_pitch = 60.0;
     double m_pitch_mod = 0.0f;
     double m_distortion_amt = 0.3;
+    double m_distortion_mod = 0.0;
     enum class ParamIds
     {
         Pitch = 5034,
         Distortion = 9
 
     };
-    bool m_outputs_modulation = false;
-    clap_id m_mod_out_par_id = 0;
-    ToneProcessorTest(bool outputsmodulation = false, clap_id destid = 0)
+
+    ToneProcessorTest()
     {
-        m_outputs_modulation = outputsmodulation;
-        m_mod_out_par_id = destid;
         m_osc.initialise([](float x) { return std::sin(x); }, 1024);
         m_param_infos.push_back(
             makeParamInfo((clap_id)ParamIds::Pitch, "Pitch", 0.0, 127.0, 60.0,
                           CLAP_PARAM_IS_AUTOMATABLE | CLAP_PARAM_IS_MODULATABLE));
-        if (!outputsmodulation)
-            m_param_infos.push_back(
-                makeParamInfo((clap_id)ParamIds::Distortion, "Distortion", 0.0, 1.0, 0.3,
-                              CLAP_PARAM_IS_AUTOMATABLE | CLAP_PARAM_IS_MODULATABLE));
-        if (outputsmodulation)
-        {
-            m_pitch = 0.0; // about 8hz
-        }
+
+        m_param_infos.push_back(
+            makeParamInfo((clap_id)ParamIds::Distortion, "Distortion", 0.0, 1.0, 0.3,
+                          CLAP_PARAM_IS_AUTOMATABLE | CLAP_PARAM_IS_MODULATABLE));
     }
     bool activate(double sampleRate, uint32_t minFrameCount,
                   uint32_t maxFrameCount) noexcept override
@@ -105,40 +99,63 @@ class ToneProcessorTest : public XAPWithJuceGUI
         *info = m_param_infos[paramIndex];
         return true;
     }
+    void handleEvent(const clap_event_header *ev)
+    {
+        // if (ev->space_id != CLAP_CORE_EVENT_SPACE_ID)
+        //     return;
+        if (ev->type == CLAP_EVENT_PARAM_VALUE)
+        {
+            auto pvev = reinterpret_cast<const clap_event_param_value *>(ev);
+            if (pvev->param_id == (clap_id)ParamIds::Pitch)
+            {
+                m_pitch = pvev->value;
+            }
+            if (pvev->param_id == (clap_id)ParamIds::Distortion)
+            {
+                m_distortion_amt = pvev->value;
+            }
+        }
+        if (ev->type == CLAP_EVENT_PARAM_MOD)
+        {
+            auto pvev = reinterpret_cast<const clap_event_param_mod *>(ev);
+            if (pvev->param_id == (clap_id)ParamIds::Pitch)
+            {
+                m_pitch_mod = pvev->amount;
+            }
+            if (pvev->param_id == (clap_id)ParamIds::Distortion)
+            {
+                m_distortion_mod = pvev->amount;
+            }
+        }
+    }
     clap_process_status process(const clap_process *process) noexcept override
     {
+        xenakios::CrossThreadMessage msg;
+        while (m_from_ui_fifo.pop(msg))
+        {
+            if (msg.eventType == CLAP_EVENT_PARAM_VALUE)
+            {
+                auto pev = makeClapParameterValueEvent(0, msg.paramId, msg.value);
+                handleEvent(reinterpret_cast<const clap_event_header *>(&pev));
+            }
+        }
+
         auto inEvents = process->in_events;
         for (int i = 0; i < inEvents->size(inEvents); ++i)
         {
             auto ev = inEvents->get(inEvents, i);
-            if (ev->type == CLAP_EVENT_PARAM_VALUE)
-            {
-                auto pvev = reinterpret_cast<const clap_event_param_value *>(ev);
-                if (pvev->param_id == (clap_id)ParamIds::Pitch)
-                {
-                    m_pitch = pvev->value;
-                }
-                if (pvev->param_id == (clap_id)ParamIds::Distortion)
-                {
-                    m_distortion_amt = pvev->value;
-                }
-            }
-            if (ev->type == CLAP_EVENT_PARAM_MOD)
-            {
-                auto pvev = reinterpret_cast<const clap_event_param_mod *>(ev);
-                if (pvev->param_id == (clap_id)ParamIds::Pitch)
-                {
-                    m_pitch_mod = pvev->amount;
-                }
-            }
+            handleEvent(ev);
         }
         double finalpitch = m_pitch + m_pitch_mod;
+        finalpitch = std::clamp(finalpitch, 0.0, 127.0);
         double hz = 440.0 * std::pow(2.0, 1.0 / 12 * (finalpitch - 69.0));
         m_osc.setFrequency(hz);
-        double distvolume = m_distortion_amt * 48.0;
+        double finaldistamount = (m_distortion_amt + m_distortion_mod);
+        finaldistamount = std::clamp(finaldistamount, 0.0, 1.0);
+        double distvolume = finaldistamount * 48.0;
         double distgain = juce::Decibels::decibelsToGain(distvolume);
         double distmix = 1.0f;
-        if (m_distortion_amt < 0.001)
+        if (finaldistamount < 0.001)
             distmix = 0.0;
         for (int i = 0; i < process->frames_count; ++i)
         {
@@ -333,7 +350,7 @@ class ModulatorSource : public XAPWithJuceGUI
                 }
             }
             ++m_update_counter;
-            if (m_update_counter == BLOCK_SIZE)
+            if (m_update_counter == process->frames_count)
                 m_update_counter = 0;
         }
 
