@@ -9,6 +9,7 @@
 #include "fileplayer_xaudioprocessor.h"
 #include "xap_utils.h"
 #include "xap_notegenerator.h"
+#include "xap_modulator.h"
 #include "xclapeventlist.h"
 
 inline void mapModulationEvents(const clap::helpers::EventList &sourceList, clap_id sourceParId,
