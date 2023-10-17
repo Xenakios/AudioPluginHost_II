@@ -684,6 +684,7 @@ class XAPPlayer : public juce::AudioIODeviceCallback
                                           int numOutputChannels, int numSamples,
                                           const AudioIODeviceCallbackContext &context) override
     {
+        jassert(m_ring_buf.size() >= numSamples * numOutputChannels);
         clap_process process;
         juce::zerostruct(process);
         clap_audio_buffer cab[1];

@@ -47,7 +47,7 @@ template <typename T, size_t Size> class SimpleRingBuffer
         return result;
     }
     int available() const { return m_available; }
-
+    int size() const { return Size; }
   private:
     std::array<T, Size> m_buffer;
     int m_write_index = 0;
