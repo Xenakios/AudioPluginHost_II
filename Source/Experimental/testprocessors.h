@@ -150,7 +150,7 @@ class ToneProcessorTest : public XAPWithJuceGUI
         double finalpitch = m_pitch + m_pitch_mod;
         finalpitch = std::clamp(finalpitch, 0.0, 127.0);
         double hz = 440.0 * std::pow(2.0, 1.0 / 12 * (finalpitch - 69.0));
-        m_osc.setFrequency(hz);
+        m_osc.setFrequency(hz, true);
         double finaldistamount = (m_distortion_amt + m_distortion_mod);
         finaldistamount = std::clamp(finaldistamount, 0.0, 1.0);
         double distvolume = finaldistamount * 48.0;
