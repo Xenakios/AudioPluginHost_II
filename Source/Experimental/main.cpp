@@ -675,7 +675,10 @@ class XAPGraph : public xenakios::XAudioProcessor
 class XAPPlayer : public juce::AudioIODeviceCallback
 {
   public:
-    XAPPlayer(xenakios::XAudioProcessor &procToPlay) : m_proc(procToPlay) {}
+    XAPPlayer(xenakios::XAudioProcessor &procToPlay, int subblocksize = 64)
+        : m_proc(procToPlay), m_subblocksize(subblocksize)
+    {
+    }
     void audioDeviceIOCallbackWithContext(const float *const *inputChannelData,
                                           int numInputChannels, float *const *outputChannelData,
                                           int numOutputChannels, int numSamples,
@@ -691,16 +694,37 @@ class XAPPlayer : public juce::AudioIODeviceCallback
         cab[0].data32 = (float **)outputChannelData;
         process.audio_outputs_count = 1;
         process.audio_outputs = cab;
-        process.frames_count = numSamples;
-        auto err = m_proc.process(&process);
-        if (err == CLAP_PROCESS_ERROR)
+        process.frames_count = m_subblocksize;
+        while (m_ring_buf.available() < numSamples * numOutputChannels)
+        {
+            auto err = m_proc.process(&process);
+            if (err == CLAP_PROCESS_ERROR)
+            {
+                for (int i = 0; i < numOutputChannels; ++i)
+                {
+                    for (int j = 0; j < m_subblocksize; ++j)
+                    {
+                        // outputChannelData[i][j] = 0.0f;
+                        m_ring_buf.push(0.0f);
+                    }
+                }
+            }
+            else
+            {
+                for (int j = 0; j < m_subblocksize; ++j)
+                {
+                    for (int i = 0; i < numOutputChannels; ++i)
+                    {
+                        m_ring_buf.push(outputChannelData[i][j]);
+                    }
+                }
+            }
+        }
+        for (int j = 0; j < numSamples; ++j)
         {
             for (int i = 0; i < numOutputChannels; ++i)
             {
-                for (int j = 0; j < numSamples; ++j)
-                {
-                    outputChannelData[i][j] = 0.0f;
-                }
+                outputChannelData[i][j] = m_ring_buf.pop();
             }
         }
         return;
@@ -721,6 +745,8 @@ class XAPPlayer : public juce::AudioIODeviceCallback
 
   private:
     xenakios::XAudioProcessor &m_proc;
+    SimpleRingBuffer<float, 2048> m_ring_buf;
+    int m_subblocksize = 0;
 };
 
 inline void test_graph_processor_realtime()
