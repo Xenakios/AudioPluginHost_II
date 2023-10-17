@@ -56,8 +56,29 @@ class ModulatorSource : public XAPWithJuceGUI
     }
     void guiDestroy() noexcept override { m_editor = nullptr; }
     bool m_is_audio_rate = false;
+    uint32_t audioPortsCount(bool isInput) const noexcept override
+    {
+        if (isInput)
+            return 0;
+        if (!m_is_audio_rate)
+            return 0;
+        return 1;
+    }
+    bool audioPortsInfo(uint32_t index, bool isInput, clap_audio_port_info *info) const noexcept
+    {
+        if (isInput || !m_is_audio_rate)
+            return false;
+        info->channel_count = m_lfos.size();
+        info->flags = 0;
+        info->id = 49137;
+        info->in_place_pair = 0;
+        strcpy_s(info->name, "XAP Modulator output");
+        info->port_type = nullptr;
+        return true;
+    }
     ModulatorSource(int maxpolyphony, double initialRate, bool audiorate = false)
     {
+        jassert(maxpolyphony > 0);
         m_is_audio_rate = audiorate;
         m_rate = initialRate;
         for (int i = 0; i < maxpolyphony; ++i)
@@ -82,7 +103,8 @@ class ModulatorSource : public XAPWithJuceGUI
     {
         samplerate = sampleRate;
         initTables();
-
+        for (int i = 0; i < BLOCK_SIZE; ++i)
+            m_ring_buf[i] = 0.0f;
         return true;
     }
     uint32_t paramsCount() const noexcept override { return m_param_infos.size(); }
@@ -112,6 +134,15 @@ class ModulatorSource : public XAPWithJuceGUI
     }
     clap_process_status process(const clap_process *process) noexcept override
     {
+        xenakios::CrossThreadMessage msg;
+        while (m_from_ui_fifo.pop(msg))
+        {
+            if (msg.eventType == CLAP_EVENT_PARAM_VALUE)
+            {
+                auto pev = makeClapParameterValueEvent(0, msg.paramId, msg.value);
+                handleInboundEvent(reinterpret_cast<const clap_event_header *>(&pev));
+            }
+        }
         auto inevents = process->in_events;
         const clap_event_header *next_event = nullptr;
         auto esz = inevents->size(inevents);
@@ -157,10 +188,11 @@ class ModulatorSource : public XAPWithJuceGUI
                 }
             }
             ++m_update_counter;
-            if (m_update_counter == process->frames_count)
+            if (m_update_counter == BLOCK_SIZE)
                 m_update_counter = 0;
         }
 
         return CLAP_PROCESS_CONTINUE;
     }
+    std::array<float, BLOCK_SIZE> m_ring_buf;
 };

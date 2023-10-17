@@ -256,9 +256,11 @@ inline void handleNodeModulationEvents(XAPNode::Connection &conn,
                                        clap::helpers::EventList &modulationMergeList)
 {
     auto &oevents = conn.source->outEvents;
-    for (int j = 0; j < oevents.size(); ++j)
+    // for (int j = 0; j < oevents.size(); ++j)
+    if (oevents.size() > 0)
     {
-        auto ev = oevents.get(j);
+        // auto ev = oevents.get(j);
+        auto ev = oevents.get(oevents.size() - 1);
         if (ev->type == CLAP_EVENT_PARAM_MOD)
         {
             auto sourcemev = (const clap_event_param_mod *)ev;
@@ -947,9 +949,12 @@ class MainComponent : public juce::Component, public juce::Timer
         m_graph->addProcessorAsNode(std::make_unique<ToneProcessorTest>(), "Tone 1");
         m_graph->addProcessorAsNode(std::make_unique<GainProcessorTest>(), "Main");
         m_graph->addProcessorAsNode(std::make_unique<ModulatorSource>(1, 1.0), "LFO 1");
+        m_graph->addProcessorAsNode(std::make_unique<ModulatorSource>(1, 4.0), "LFO 2");
         m_graph->connectAudio("Tone 1", 0, 0, "Main", 0, 0);
         m_graph->connectAudio("Tone 1", 0, 0, "Main", 0, 1);
         m_graph->connectModulationByNames("LFO 1", 0, "Tone 1",
+                                          (clap_id)ToneProcessorTest::ParamIds::Pitch, false, 6.0);
+        m_graph->connectModulationByNames("LFO 2", 0, "Tone 1",
                                           (clap_id)ToneProcessorTest::ParamIds::Pitch, false, 1.0);
         m_graph->outputNodeId = "Main";
     }
