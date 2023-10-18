@@ -87,6 +87,8 @@ class ClapPluginFormatProcessor : public xenakios::XAudioProcessor
         xen_host_info.get_extension = get_extension_lambda;
         xen_host_info.request_callback = [](const struct clap_host *host_) {
             auto claphost = (ClapPluginFormatProcessor *)host_->host_data;
+            // note that this is risky because the processor could be 
+            // destroyed before the callback happens...
             juce::MessageManager::callAsync(
                 [claphost]() { claphost->m_plug->on_main_thread(claphost->m_plug); });
         };
