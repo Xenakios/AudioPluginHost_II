@@ -4,6 +4,7 @@
 #include <vector>
 #include "containers/choc_NonAllocatingStableSort.h"
 #include <algorithm>
+#include <cassert>>
 
 namespace xenakios
 {
@@ -24,17 +25,22 @@ class ClapEventList
         m_clap_in_events.ctx = this;
         m_clap_in_events.get = inEventsGetFunc;
         m_clap_in_events.size = inEventsSizeFunc;
+        m_clap_out_events.ctx = this;
+        m_clap_out_events.try_push = outEventsPushFunc;
+    }
+    static bool outEventsPushFunc(const struct clap_output_events *list,
+                                  const clap_event_header_t *event)
+    {
+        return static_cast<ClapEventList *>(list->ctx)->tryPush(event);
     }
     static const clap_event_header_t *inEventsGetFunc(const struct clap_input_events *list,
                                                       uint32_t index)
     {
-        ClapEventList *impl = (ClapEventList *)list->ctx;
-        return impl->get(index);
+        return static_cast<ClapEventList *>(list->ctx)->get(index);
     }
     static uint32_t inEventsSizeFunc(const struct clap_input_events *list)
     {
-        ClapEventList *impl = (ClapEventList *)list->ctx;
-        return impl->size();
+        return static_cast<ClapEventList *>(list->ctx)->size();
     }
     bool tryPush(const clap_event_header *evin)
     {
@@ -46,6 +52,7 @@ class ClapEventList
         m_entries[m_write_index].dataPtr = ptr;
         m_entries[m_write_index].eventTime = evin->time;
         ++m_write_index;
+        m_is_sorted = false;
         return true;
     }
     template <typename EventType> bool tryPushAs(const EventType *evin)
@@ -55,6 +62,7 @@ class ClapEventList
     uint32_t size() const { return m_write_index; }
     clap_event_header *get(size_t index) const
     {
+        assert(m_is_sorted);
         return reinterpret_cast<clap_event_header *>(m_entries[index].dataPtr);
     }
     template <typename EventType> EventType *getAs(size_t index)
@@ -80,14 +88,17 @@ class ClapEventList
                 e = 0;
         }
         m_write_index = 0;
+        m_is_sorted = false;
     }
     void sort()
     {
         choc::sorting::stable_sort(
             m_entries.begin(), m_entries.begin() + m_write_index,
             [](const Entry &a, const Entry &b) { return a.eventTime < b.eventTime; });
+        m_is_sorted = true;
     }
     clap_input_events m_clap_in_events;
+    clap_output_events m_clap_out_events;
 
   private:
     struct Entry
@@ -99,5 +110,6 @@ class ClapEventList
     std::vector<Entry> m_entries;
     size_t m_max_events = 512;
     size_t m_write_index = 0;
+    bool m_is_sorted = false;
 };
 } // namespace xenakios
