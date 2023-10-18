@@ -64,6 +64,19 @@ class XAPNode
     XAPNode(std::unique_ptr<xenakios::XAudioProcessor> nodeIn, std::string name = "")
         : processor(std::move(nodeIn)), displayName(name)
     {
+        scanParameters();
+        // we may get a double scan of the parameters at init time, but such is life...
+        processor->OnPluginRequestedParameterRescan = [this](auto) { scanParameters(); };
+    }
+    ~XAPNode()
+    {
+        destroyBuffers(inPortBuffers);
+        destroyBuffers(outPortBuffers);
+    }
+    void scanParameters()
+    {
+        DBG("scanning parameters for " << displayName);
+        parameterInfos.clear();
         for (int i = 0; i < processor->paramsCount(); ++i)
         {
             clap_param_info info;
@@ -72,14 +85,6 @@ class XAPNode
                 parameterInfos[info.id] = info;
             }
         }
-        processor->OnPluginRequestedParameterRescan = [this](auto) {
-            DBG(displayName << " requested parameter rescan");
-        };
-    }
-    ~XAPNode()
-    {
-        destroyBuffers(inPortBuffers);
-        destroyBuffers(outPortBuffers);
     }
     void destroyBuffers(std::vector<clap_audio_buffer_t> &buffers)
     {
