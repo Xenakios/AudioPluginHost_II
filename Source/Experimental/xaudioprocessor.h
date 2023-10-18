@@ -197,6 +197,8 @@ class XAudioProcessor
     // paramsFlush is intended to be used to set parameters even when the processing isn't
     // actively called. We might want to somehow abstract this, if possible...
     virtual void paramsFlush(const clap_input_events *in, const clap_output_events *out) noexcept {}
+    std::function<void(clap_param_rescan_flags)> OnPluginRequestedParameterRescan{
+        [](clap_param_rescan_flags) {}};
 
     virtual uint32_t audioPortsCount(bool isInput) const noexcept { return 0; }
     virtual bool audioPortsInfo(uint32_t index, bool isInput,

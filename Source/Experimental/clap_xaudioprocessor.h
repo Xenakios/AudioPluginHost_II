@@ -24,7 +24,7 @@ inline void request_process(const struct clap_host *) {}
 
 inline void request_callback_nop(const struct clap_host *)
 {
-    std::cout << "nop request_callback\n";
+    // DBG("nop request_callback";
 }
 
 class ClapPluginFormatProcessor : public xenakios::XAudioProcessor
@@ -68,14 +68,31 @@ class ClapPluginFormatProcessor : public xenakios::XAudioProcessor
                 };
                 return &ext_gui;
             }
+            if (!strcmp(eid, CLAP_EXT_PARAMS))
+            {
+                static clap_host_params ext_pars;
+                ext_pars.clear = [](const clap_host_t *host, clap_id param_id,
+                                    clap_param_clear_flags flags) {};
+                ext_pars.request_flush = [](const clap_host_t *host) {};
+                ext_pars.rescan = [](const clap_host_t *host_, clap_param_rescan_flags flags) {
+                    auto claphost = (ClapPluginFormatProcessor *)host_->host_data;
+                    claphost->OnPluginRequestedParameterRescan(flags);
+                };
+                return &ext_pars;
+            }
             return nullptr;
         };
 
         xen_host_info.host_data = this;
         xen_host_info.get_extension = get_extension_lambda;
-        xen_host_info.request_callback = request_callback_nop;
+        xen_host_info.request_callback = [](const struct clap_host *host_) {
+            auto claphost = (ClapPluginFormatProcessor *)host_->host_data;
+            juce::MessageManager::callAsync(
+                [claphost]() { claphost->m_plug->on_main_thread(claphost->m_plug); });
+        };
         xen_host_info.request_process = request_process;
         xen_host_info.request_restart = request_restart;
+
         if (m_plugdll.handle)
         {
             // entry is not really a function but a struct, but luckily the choc
@@ -209,7 +226,7 @@ class ClapPluginFormatProcessor : public xenakios::XAudioProcessor
         // is const
         clap_process processCtxCopy = *process;
         // shenanigans to get parameter changes from the GenericEditor
-        //if (m_generic_editor)
+        // if (m_generic_editor)
         {
             m_eventMergeList.clear();
             processCtxCopy.in_events = m_eventMergeList.clapInputEvents();

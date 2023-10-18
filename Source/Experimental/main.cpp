@@ -60,11 +60,21 @@ class XAPNode
         clap_id sourceParameter = 0;
         double modulationDepth = 0.0;
         clap_id destinationParameter = 0;
-        double modulationValue = 0.0;
     };
     XAPNode(std::unique_ptr<xenakios::XAudioProcessor> nodeIn, std::string name = "")
         : processor(std::move(nodeIn)), displayName(name)
     {
+        for (int i = 0; i < processor->paramsCount(); ++i)
+        {
+            clap_param_info info;
+            if (processor->paramsInfo(i, &info))
+            {
+                parameterInfos[info.id] = info;
+            }
+        }
+        processor->OnPluginRequestedParameterRescan = [this](auto) {
+            DBG(displayName << " requested parameter rescan");
+        };
     }
     ~XAPNode()
     {
@@ -134,6 +144,7 @@ class XAPNode
     std::function<void(XAPNode *)> PreProcessFunc;
     std::unordered_map<clap_id, double> modulationSums;
     bool modulationWasApplied = false;
+    std::unordered_map<clap_id, clap_param_info> parameterInfos;
 };
 
 inline bool connectAudioBetweenNodes(XAPNode *sourceNode, int sourcePort, int sourceChannel,
@@ -994,9 +1005,9 @@ class MainComponent : public juce::Component, public juce::Timer
         startTimerHz(10);
 
         m_graph = std::make_unique<XAPGraph>();
-        // addNoteGeneratorTestNodes();
+        addNoteGeneratorTestNodes();
         // addFilePlayerTestNodes();
-        addToneGeneratorTestNodes();
+        // addToneGeneratorTestNodes();
         juce::Random rng{7};
         for (auto &n : m_graph->proc_nodes)
         {
