@@ -403,75 +403,8 @@ class XAPGraph : public xenakios::XAudioProcessor
         }
         return result;
     }
-    void addTestNodes()
-    {
-        std::string pathprefix = R"(C:\Program Files\Common Files\)";
-        proc_nodes.clear();
-        proc_nodes.emplace_back(std::make_unique<XAPNode>(
-            std::make_unique<ClapEventSequencerProcessor>(444), "Event Gen 1"));
-        proc_nodes.emplace_back(std::make_unique<XAPNode>(
-            std::make_unique<ClapEventSequencerProcessor>(2349), "Event Gen 2"));
-        proc_nodes.emplace_back(
-            std::make_unique<XAPNode>(std::make_unique<ClapPluginFormatProcessor>(
-                                          pathprefix + R"(CLAP\Surge Synth Team\Surge XT.clap)", 0),
-                                      "Surge XT 1"));
-
-        proc_nodes.emplace_back(std::make_unique<XAPNode>(
-            std::make_unique<JucePluginWrapper>(pathprefix + R"(VST3\ValhallaVintageVerb.vst3)"),
-            "Valhalla"));
-        proc_nodes.emplace_back(
-            std::make_unique<XAPNode>(std::make_unique<ClapPluginFormatProcessor>(
-                                          pathprefix + R"(CLAP\Surge Synth Team\Surge XT.clap)", 0),
-                                      "Surge XT 2"));
-        proc_nodes.emplace_back(
-            std::make_unique<XAPNode>(std::make_unique<ModulatorSource>(1, 0.0), "LFO 1"));
-        proc_nodes.emplace_back(
-            std::make_unique<XAPNode>(std::make_unique<ModulatorSource>(1, 2.0), "LFO 2"));
-        proc_nodes.emplace_back(
-            std::make_unique<XAPNode>(std::make_unique<ModulatorSource>(1, 1.03), "LFO 3"));
-
-        connectEventPorts(findByName(proc_nodes, "Event Gen 1"), 0,
-                          findByName(proc_nodes, "Surge XT 1"), 0);
-        connectEventPorts(findByName(proc_nodes, "Event Gen 2"), 0,
-                          findByName(proc_nodes, "Surge XT 2"), 0);
-        // connectAudioBetweenNodes(findByName(proc_nodes, "Surge XT 1"), 0, 0,
-        //                          findByName(proc_nodes, "Valhalla"), 0, 0);
-        // connectAudioBetweenNodes(findByName(proc_nodes, "Surge XT 1"), 0, 1,
-        //                           findByName(proc_nodes, "Valhalla"), 0, 1);
-        connectAudioBetweenNodes(findByName(proc_nodes, "Surge XT 2"), 0, 0,
-                                 findByName(proc_nodes, "Valhalla"), 0, 0);
-        connectAudioBetweenNodes(findByName(proc_nodes, "Surge XT 2"), 0, 1,
-                                 findByName(proc_nodes, "Valhalla"), 0, 1);
-
-        // connectModulation(findByName(proc_nodes, "LFO 1"), 0, findByName(proc_nodes, "Valhalla"),
-        // 0,
-        //                   true, 1.0);
-        connectModulation(
-            findByName(proc_nodes, "LFO 2"), 0, findByName(proc_nodes, "Surge XT 2"),
-            *findParameterFromName(findByName(proc_nodes, "Surge XT 2")->processor.get(),
-                                   "B Osc 1 Pitch"),
-            false, 0.1);
-        connectModulation(
-            findByName(proc_nodes, "LFO 3"), 0, findByName(proc_nodes, "Surge XT 2"),
-            *findParameterFromName(findByName(proc_nodes, "Surge XT 2")->processor.get(),
-                                   "B Osc 1 Pitch"),
-            false, 0.00);
-
-        findByName(proc_nodes, "Valhalla")->PreProcessFunc = [](XAPNode *node) {
-            // set reverb mix
-            xenakios::pushParamEvent(node->inEvents, false, 0, 0, 0.0);
-        };
-        auto surge2 = findByName(proc_nodes, "Surge XT 2")->processor.get();
-        auto parid = findParameterFromName(surge2, "Active Scene");
-        if (parid)
-        {
-            findByName(proc_nodes, "Surge XT 2")->PreProcessFunc = [parid](XAPNode *node) {
-                // set surge param
-                xenakios::pushParamEvent(node->inEvents, false, 0, *parid, 1.0);
-            };
-        }
-    }
-    std::string outputNodeId = "Valhalla";
+    
+    std::string outputNodeId = "";
     bool m_activated = false;
     void deactivate() noexcept override { m_activated = false; }
     bool activate(double sampleRate, uint32_t minFrameCount,

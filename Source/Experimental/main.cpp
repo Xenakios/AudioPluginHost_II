@@ -12,7 +12,6 @@
 #include "xap_modulator.h"
 #include "xclapeventlist.h"
 #include "noise-plethora/plugins/NoisePlethoraPlugin.hpp"
-#include "noise-plethora/plugins/P_satanWorkout.hpp"
 #include "noise-plethora/plugins/Banks.hpp"
 #include "xaudiograph.h"
 
