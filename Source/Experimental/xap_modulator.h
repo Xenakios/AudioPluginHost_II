@@ -64,7 +64,7 @@ class ModulatorSource : public XAPWithJuceGUI
             return 0;
         return 1;
     }
-    bool audioPortsInfo(uint32_t index, bool isInput, clap_audio_port_info *info) const noexcept
+    bool audioPortsInfo(uint32_t index, bool isInput, clap_audio_port_info *info) const noexcept override
     {
         if (isInput || !m_is_audio_rate)
             return false;

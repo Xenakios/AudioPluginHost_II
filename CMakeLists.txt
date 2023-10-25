@@ -32,6 +32,7 @@ add_subdirectory(JUCE)
 
 include_directories(
     Source/AudioGraph
+    Source/Experimental/noise-plethora/rack/include
     libs/signalsmith-stretch
     libs/choc
     libs/clap/include
@@ -102,7 +103,21 @@ target_sources(ConsoleAppExample
         Source/Experimental/xap_utils.cpp
         Source/Experimental/xap_notegenerator.cpp
         Source/Experimental/xaudioprocessor.cpp
-        Source/Experimental/xaudiograph2.cpp)
+        Source/Experimental/xaudiograph2.cpp
+        Source/Experimental/noise-plethora/random.cpp
+        Source/Experimental/noise-plethora/teensy/effect_freeverb.cpp
+        Source/Experimental/noise-plethora/teensy/effect_bitcrusher.cpp
+        Source/Experimental/noise-plethora/teensy/effect_granular.cpp
+        Source/Experimental/noise-plethora/teensy/effect_combine.cpp
+        Source/Experimental/noise-plethora/teensy/effect_multiply.cpp
+        Source/Experimental/noise-plethora/teensy/effect_flange.cpp
+        Source/Experimental/noise-plethora/teensy/effect_wavefolder.cpp
+        Source/Experimental/noise-plethora/teensy/filter_variable.cpp
+        Source/Experimental/noise-plethora/teensy/synth_pwm.cpp
+        Source/Experimental/noise-plethora/teensy/synth_pinknoise.cpp
+        Source/Experimental/noise-plethora/teensy/synth_whitenoise.cpp
+        Source/Experimental/noise-plethora/plugins/Banks.cpp
+        )
     
 # add_subdirectory(libs/fmt EXCLUDE_FROM_ALL)
 add_subdirectory(libs/fmt)

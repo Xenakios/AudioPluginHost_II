@@ -4,7 +4,7 @@
 #include <vector>
 #include "containers/choc_NonAllocatingStableSort.h"
 #include <algorithm>
-#include <cassert>>
+#include <cassert>
 
 namespace xenakios
 {
