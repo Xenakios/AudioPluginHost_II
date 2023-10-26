@@ -103,7 +103,7 @@ target_sources(ConsoleAppExample
         Source/Experimental/xap_utils.cpp
         Source/Experimental/xap_notegenerator.cpp
         Source/Experimental/xaudioprocessor.cpp
-        Source/Experimental/xaudiograph2.cpp
+        
         Source/Experimental/noise-plethora/random.cpp
         Source/Experimental/noise-plethora/teensy/effect_freeverb.cpp
         Source/Experimental/noise-plethora/teensy/effect_bitcrusher.cpp

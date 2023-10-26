@@ -1,5 +1,8 @@
 #pragma once
 #include "xaudioprocessor.h"
+#include "JuceHeader.h"
+#include "xap_utils.h"
+#include "containers/choc_NonAllocatingStableSort.h"
 
 class XAPNode
 {
