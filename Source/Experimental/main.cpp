@@ -15,6 +15,7 @@
 #include "noise-plethora/plugins/Banks.hpp"
 #include "xaudiograph.h"
 #include <sst/basic-blocks/dsp/FastMath.h>
+#include <sst/jucegui/components/Knob.h>
 
 inline void mapModulationEvents(const clap::helpers::EventList &sourceList, clap_id sourceParId,
                                 clap::helpers::EventList &destList, clap_id destParId,
@@ -286,6 +287,17 @@ class XapWindow : public juce::DocumentWindow
     juce::Label m_info_label;
 };
 
+class MyContinuous : public sst::jucegui::data::Continuous
+{
+  public:
+    float m_value = 0.0;
+    float getValue() const override { return m_value; };
+    void setValueFromGUI(const float &f) override { m_value = f; };
+    void setValueFromModel(const float &f) override { m_value = f; };
+    float getDefaultValue() const override { return 0.0f; };
+    std::string getLabel() const override { return "Test Parameter"; };
+};
+
 class MainComponent : public juce::Component, public juce::Timer
 {
   public:
@@ -296,6 +308,8 @@ class MainComponent : public juce::Component, public juce::Timer
     int m_info_area_margin = 25;
     juce::Label m_infolabel;
     juce::ComboBox m_mod_rout_combo;
+    MyContinuous m_knob_data_source;
+    sst::jucegui::components::Knob m_sst_knob;
     void timerCallback() override
     {
         int usage = m_aman.getCpuUsage() * 100.0;
@@ -367,7 +381,15 @@ class MainComponent : public juce::Component, public juce::Timer
     {
         addAndMakeVisible(m_infolabel);
         addAndMakeVisible(m_mod_rout_combo);
+        sst::jucegui::style::StyleSheet::initializeStyleSheets([]() {});
+        auto style = sst::jucegui::style::StyleSheet::getBuiltInStyleSheet(
+            sst::jucegui::style::StyleSheet::BuiltInTypes::DARK);
+        m_sst_knob.setDrawLabel(true);
+        // m_sst_knob.setS
+        m_sst_knob.setStyle(style);
+        m_sst_knob.setSource(&m_knob_data_source);
 
+        addAndMakeVisible(m_sst_knob);
         startTimerHz(10);
 
         m_graph = std::make_unique<XAPGraph>();
@@ -396,9 +418,9 @@ class MainComponent : public juce::Component, public juce::Timer
 
         m_player = std::make_unique<XAPPlayer>(*m_graph);
         m_aman.initialiseWithDefaultDevices(0, 2);
-        m_aman.addAudioCallback(m_player.get());
+        // m_aman.addAudioCallback(m_player.get());
         initModBox();
-        setSize(500, 100);
+        setSize(500, 200);
     }
     ~MainComponent() override
     {
@@ -428,11 +450,12 @@ class MainComponent : public juce::Component, public juce::Timer
             }
         };
     }
-    bool m_plugin_requested_resize = false;
+    
     void resized() override
     {
         m_infolabel.setBounds(0, 0, getWidth(), 25);
         m_mod_rout_combo.setBounds(0, m_infolabel.getBottom() + 1, 50, 25);
+        m_sst_knob.setBounds(200, 10, 150, 170);
     }
 };
 
@@ -500,7 +523,7 @@ class GuiAppApplication : public juce::JUCEApplication
     std::unique_ptr<MainWindow> mainWindow;
 };
 
-#define TESTJUCEGUI 0
+#define TESTJUCEGUI 1
 
 #if TESTJUCEGUI
 
@@ -810,28 +833,42 @@ void test_np_code()
     delete writer;
 }
 
-template <typename ContType> inline void test_keyvaluemap(int iters)
+template <typename ContType> inline void test_keyvaluemap(int iters, std::string benchname)
 {
     ContType pinfos;
     std::minstd_rand0 rng;
     std::uniform_real_distribution<double> dist{-1.0, 1.0};
-    for (int i = 0; i < 1000; ++i)
+    std::vector<clap_id> valid_ids;
+    int paridcount = 1000;
+    for (int i = 0; i < paridcount; ++i)
     {
         clap_param_info pinfo;
         pinfo.id = std::hash<int>()(i);
         pinfo.default_value = dist(rng);
         pinfos[pinfo.id] = pinfo;
+        valid_ids.push_back(pinfo.id);
     }
+    std::uniform_int_distribution<int> disti{0, paridcount - 1};
+    std::vector<clap_id> ids_to_look_for;
+    for (int i = 0; i < iters; ++i)
+        ids_to_look_for.push_back(valid_ids[disti(rng)]);
+    double t0 = juce::Time::getMillisecondCounterHiRes();
     double accum = 0.0;
-    for (int i=0;i<iters;++i)
+    for (int i = 0; i < iters; ++i)
     {
-        // accum += 
+        auto id = ids_to_look_for[i];
+        auto &parinfo = pinfos[id];
+        accum += parinfo.default_value;
     }
+    double t1 = juce::Time::getMillisecondCounterHiRes();
+    std::cout << benchname << " took " << (t1 - t0) / 1000.0 << " seconds\n";
+    std::cout << accum << "\n";
 }
 
 int main()
 {
-    test_keyvaluemap<KeyValueTable<clap_id, clap_param_info>>(10000000);
+    test_keyvaluemap<KeyValueTable<clap_id, clap_param_info>>(1000000, "custom kvmap");
+    test_keyvaluemap<std::unordered_map<clap_id, clap_param_info>>(1000000, "std::unordered_map");
     // test_np_code();
     //  testNewEventList();
     return 0;

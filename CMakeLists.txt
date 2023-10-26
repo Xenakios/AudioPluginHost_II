@@ -39,6 +39,8 @@ include_directories(
     libs/clap-helpers/include
     libs/sst-basic-blocks/include
     libs/fmt/include
+    libs/sst-jucegui/include
+
 )
 
 juce_add_gui_app(AudioPluginHost2
@@ -117,6 +119,11 @@ target_sources(ConsoleAppExample
         Source/Experimental/noise-plethora/teensy/synth_pinknoise.cpp
         Source/Experimental/noise-plethora/teensy/synth_whitenoise.cpp
         Source/Experimental/noise-plethora/plugins/Banks.cpp
+        libs/sst-jucegui/src/sst/jucegui/components/Knob.cpp
+        libs/sst-jucegui/src/sst/jucegui/components/ContinuousParamEditor.cpp
+        libs/sst-jucegui/src/sst/jucegui/components/ComponentBase.cpp
+        libs/sst-jucegui/src/sst/jucegui/style/StyleSheet.cpp
+        libs/sst-jucegui/src/sst/jucegui/style/StyleAndSettingsComsumer.cpp
         )
     
 # add_subdirectory(libs/fmt EXCLUDE_FROM_ALL)
