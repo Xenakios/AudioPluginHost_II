@@ -48,9 +48,39 @@ template <typename T, size_t Size> class SimpleRingBuffer
     }
     int available() const { return m_available; }
     int size() const { return Size; }
+
   private:
     std::array<T, Size> m_buffer;
     int m_write_index = 0;
     int m_read_index = 0;
     int m_available = 0;
+};
+
+template <typename Key, typename Value> class KeyValueTable
+{
+  public:
+    KeyValueTable() { entries.reserve(64); }
+    Value &operator[](const Key &k)
+    {
+        for (auto &e : entries)
+        {
+            if (e.key == k)
+                return e.value;
+        }
+        Entry entry;
+        entry.key = k;
+        entry.value = Value{};
+        entries.push_back(entry);
+        return entries.back().value;
+    }
+    struct Entry
+    {
+        Key key;
+        Value value;
+    };
+    auto begin() { return entries.begin(); }
+    auto end() { return entries.end(); }
+
+  private:
+    std::vector<Entry> entries;
 };

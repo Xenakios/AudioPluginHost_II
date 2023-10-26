@@ -810,10 +810,30 @@ void test_np_code()
     delete writer;
 }
 
+template <typename ContType> inline void test_keyvaluemap(int iters)
+{
+    ContType pinfos;
+    std::minstd_rand0 rng;
+    std::uniform_real_distribution<double> dist{-1.0, 1.0};
+    for (int i = 0; i < 1000; ++i)
+    {
+        clap_param_info pinfo;
+        pinfo.id = std::hash<int>()(i);
+        pinfo.default_value = dist(rng);
+        pinfos[pinfo.id] = pinfo;
+    }
+    double accum = 0.0;
+    for (int i=0;i<iters;++i)
+    {
+        // accum += 
+    }
+}
+
 int main()
 {
-    test_np_code();
-    // testNewEventList();
+    test_keyvaluemap<KeyValueTable<clap_id, clap_param_info>>(10000000);
+    // test_np_code();
+    //  testNewEventList();
     return 0;
     juce::ScopedJuceInitialiser_GUI gui_init;
     // test_node_connecting();
