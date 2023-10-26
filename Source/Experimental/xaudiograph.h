@@ -406,7 +406,7 @@ class XAPGraph : public xenakios::XAudioProcessor
         }
         return result;
     }
-    
+
     std::string outputNodeId = "";
     bool m_activated = false;
     void deactivate() noexcept override { m_activated = false; }
@@ -531,15 +531,14 @@ class XAPGraph : public xenakios::XAudioProcessor
                     // are not that nice, but this should work
                     if (modsum.second != 0.0)
                     {
-                        // we should probably clamp the summed modulation to fit into
-                        // the parameter's declared range here, but there's no caching of the
-                        // parameter infos implemented here in the host yet, so we just trust
-                        // the destination processor somehow handles it correctly
+                        double moda = modsum.second;
+                        const auto &pinfo = n->parameterInfos[modsum.first];
+                        moda = std::clamp(moda, pinfo.min_value, pinfo.max_value);
+                        auto modev = makeClapParameterModEvent(0, modsum.first, moda);
+                        n->inEvents.push((clap_event_header *)&modev);
                         // DBG(transport.song_pos_seconds
                         //    << " " << n->displayName << " Applied summed modulation for par "
-                        //    << (int64_t)modsum.first << " with amount " << modsum.second);
-                        auto modev = makeClapParameterModEvent(0, modsum.first, modsum.second);
-                        n->inEvents.push((clap_event_header *)&modev);
+                        //    << (int64_t)modsum.first << " with amount " << moda);
                     }
                 }
                 choc::sorting::stable_sort(
