@@ -450,7 +450,7 @@ class MainComponent : public juce::Component, public juce::Timer
             }
         };
     }
-    
+
     void resized() override
     {
         m_infolabel.setBounds(0, 0, getWidth(), 25);
@@ -523,7 +523,7 @@ class GuiAppApplication : public juce::JUCEApplication
     std::unique_ptr<MainWindow> mainWindow;
 };
 
-#define TESTJUCEGUI 1
+#define TESTJUCEGUI 0
 
 #if TESTJUCEGUI
 
@@ -865,11 +865,14 @@ template <typename ContType> inline void test_keyvaluemap(int iters, std::string
     std::cout << accum << "\n";
 }
 
+
+
 int main()
 {
-    test_keyvaluemap<KeyValueTable<clap_id, clap_param_info>>(1000000, "custom kvmap");
-    test_keyvaluemap<std::unordered_map<clap_id, clap_param_info>>(1000000, "std::unordered_map");
-    // test_np_code();
+    // test_polym();
+    // test_keyvaluemap<KeyValueTable<clap_id, clap_param_info>>(1000000, "custom kvmap");
+    // test_keyvaluemap<std::unordered_map<clap_id, clap_param_info>>(1000000,
+    // "std::unordered_map"); test_np_code();
     //  testNewEventList();
     return 0;
     juce::ScopedJuceInitialiser_GUI gui_init;

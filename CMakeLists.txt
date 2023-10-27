@@ -123,11 +123,13 @@ target_sources(ConsoleAppExample
         libs/sst-jucegui/src/sst/jucegui/components/ContinuousParamEditor.cpp
         libs/sst-jucegui/src/sst/jucegui/components/ComponentBase.cpp
         libs/sst-jucegui/src/sst/jucegui/style/StyleSheet.cpp
-        libs/sst-jucegui/src/sst/jucegui/style/StyleAndSettingsComsumer.cpp
+        libs/sst-jucegui/src/sst/jucegui/style/StyleAndSettingsConsumer.cpp
         )
     
 # add_subdirectory(libs/fmt EXCLUDE_FROM_ALL)
 add_subdirectory(libs/fmt)
+
+add_executable(TestingProgram Source/Experimental/misctest.cpp)
 
 target_compile_definitions(ConsoleAppExample
 PRIVATE
