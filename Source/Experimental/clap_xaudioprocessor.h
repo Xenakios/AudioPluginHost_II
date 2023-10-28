@@ -152,6 +152,19 @@ class ClapPluginFormatProcessor : public xenakios::XAudioProcessor
             m_entry->deinit();
         }
     }
+    uint32_t notePortsCount(bool isInput) const noexcept override
+    {
+        if (!m_ext_note_ports)
+            return 0;
+        return m_ext_note_ports->count(m_plug, isInput);
+    }
+    bool notePortsInfo(uint32_t index, bool isInput,
+                       clap_note_port_info *info) const noexcept override
+    {
+        if (!m_ext_note_ports)
+            return false;
+        return m_ext_note_ports->get(m_plug, index, isInput, info);
+    }
     void onPluginRequestedResizeInternal(uint32_t w, uint32_t h)
     {
         // DBG("Plugin requested to be resized to " << (int)w << " " << (int)h);
@@ -170,6 +183,8 @@ class ClapPluginFormatProcessor : public xenakios::XAudioProcessor
                 initParamsExtension();
                 m_ext_audio_ports =
                     (clap_plugin_audio_ports *)m_plug->get_extension(m_plug, CLAP_EXT_AUDIO_PORTS);
+                m_ext_note_ports =
+                    (clap_plugin_note_ports *)m_plug->get_extension(m_plug, CLAP_EXT_NOTE_PORTS);
                 return true;
             }
         }
@@ -198,6 +213,7 @@ class ClapPluginFormatProcessor : public xenakios::XAudioProcessor
         return false;
     }
     clap_plugin_audio_ports *m_ext_audio_ports = nullptr;
+    clap_plugin_note_ports *m_ext_note_ports = nullptr;
     uint32_t audioPortsCount(bool isInput) const noexcept override
     {
         if (!m_ext_audio_ports)

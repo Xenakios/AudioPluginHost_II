@@ -83,6 +83,23 @@ class ClapEventSequencerProcessor : public XAPWithJuceGUI
         desc->vendor = "Xenakios";
         return true;
     }
+    uint32_t notePortsCount(bool isInput) const noexcept override
+    {
+        if (!isInput)
+            return 1;
+        return 0;
+    }
+    bool notePortsInfo(uint32_t index, bool isInput,
+                       clap_note_port_info *info) const noexcept override
+    {
+        if (isInput)
+            return false;
+        info->id = 8008;
+        info->preferred_dialect = CLAP_NOTE_DIALECT_CLAP;
+        info->supported_dialects = CLAP_NOTE_DIALECT_CLAP;
+        strcpy_s(info->name,"Entropic Sequencer Output");
+        return true;
+    }
     ClapEventSequencerProcessor(int seed)
         : m_dvpitchrand(seed), m_dvtimerand(seed + 9003), m_dvchordrand(seed + 13),
           m_dvvelorand(seed + 101), m_dvexpr1rand(seed + 247), m_dvexpr2rand(seed + 31)

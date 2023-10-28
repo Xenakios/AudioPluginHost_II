@@ -312,6 +312,15 @@ class NodeListComponent : public juce::Component, public juce::ListBoxModel
         g.setColour(juce::Colours::white);
         g.drawText(node->processorName, 0, 0, width, height, juce::Justification::left);
     }
+    void listBoxItemClicked(int row, const juce::MouseEvent &) override
+    {
+        if (row >= 0 && row < m_graph->proc_nodes.size())
+        {
+            if (OnListRowClicked)
+                OnListRowClicked(row);
+        }
+    }
+    std::function<void(int)> OnListRowClicked;
 };
 
 class MyContinuous : public sst::jucegui::data::Continuous
@@ -338,6 +347,7 @@ class MainComponent : public juce::Component, public juce::Timer
     MyContinuous m_knob_data_source;
     sst::jucegui::components::HSlider m_sst_knob;
     std::unique_ptr<NodeListComponent> m_node_list;
+    juce::TextEditor m_node_info_ed;
     void timerCallback() override
     {
         int usage = m_aman.getCpuUsage() * 100.0;
@@ -405,9 +415,9 @@ class MainComponent : public juce::Component, public juce::Timer
                                           (clap_id)ToneProcessorTest::ParamIds::Pitch, false, 1.0);
         m_graph->outputNodeId = "Main";
     }
-    MainComponent() 
+    MainComponent()
     {
-        
+
         addAndMakeVisible(m_infolabel);
         addAndMakeVisible(m_mod_rout_combo);
         sst::jucegui::style::StyleSheet::initializeStyleSheets([]() {});
@@ -428,6 +438,13 @@ class MainComponent : public juce::Component, public juce::Timer
         // addConduitTestNodes();
         m_node_list = std::make_unique<NodeListComponent>(m_graph.get());
         addAndMakeVisible(m_node_list.get());
+        addAndMakeVisible(m_node_info_ed);
+        m_node_list->OnListRowClicked = [this](int row) {
+            populateNodeInfoBox(m_graph->proc_nodes[row].get());
+        };
+        m_node_info_ed.setMultiLine(true);
+        m_node_info_ed.setReadOnly(true);
+
         juce::Random rng{7};
         for (auto &n : m_graph->proc_nodes)
         {
@@ -449,45 +466,49 @@ class MainComponent : public juce::Component, public juce::Timer
 
         m_player = std::make_unique<XAPPlayer>(*m_graph);
         m_aman.initialiseWithDefaultDevices(0, 2);
-        // m_aman.addAudioCallback(m_player.get());
-        initModBox();
+        m_aman.addAudioCallback(m_player.get());
+
         setSize(1000, 600);
+    }
+    void populateNodeInfoBox(XAPNode *node)
+    {
+        juce::String txt;
+        txt << node->displayName << "\n";
+        txt << node->processorName << "\n";
+        auto note_in_ports = node->processor->notePortsCount(true);
+        if (note_in_ports)
+        {
+            txt << "Note input ports\n";
+            clap_note_port_info pinfo;
+            if (node->processor->notePortsInfo(0, true, &pinfo))
+            {
+                txt << "  " << (int64_t)pinfo.id << " " << pinfo.name << "\n";
+            }
+        }
+        auto note_out_ports = node->processor->notePortsCount(false);
+        if (note_out_ports)
+        {
+            txt << "Note output ports\n";
+            clap_note_port_info pinfo;
+            if (node->processor->notePortsInfo(0, false, &pinfo))
+            {
+                txt << "  " << (int64_t)pinfo.id << " " << pinfo.name << "\n";
+            }
+        }
+        m_node_info_ed.setText(txt, false);
     }
     ~MainComponent() override
     {
         m_xap_windows.clear();
         m_aman.removeAudioCallback(m_player.get());
     }
-    void initModBox()
-    {
-        auto valhnode = m_graph->findNodeByName("Valhalla");
-        if (!valhnode)
-            return;
-        auto valh = valhnode->processor.get();
-        for (int i = 0; i < valh->paramsCount(); ++i)
-        {
-            m_mod_rout_combo.addItem(juce::String(i), i + 1);
-        }
-        m_mod_rout_combo.setSelectedItemIndex(0, juce::dontSendNotification);
-        m_mod_rout_combo.onChange = [this, valhnode]() {
-            int destpar = m_mod_rout_combo.getSelectedItemIndex();
-            for (auto &conn : valhnode->inputConnections)
-            {
-                if (conn.type == XAPNode::ConnectionType::Modulation)
-                {
-                    conn.destinationParameter = destpar;
-                    break;
-                }
-            }
-        };
-    }
-
     void resized() override
     {
-        
-        //m_mod_rout_combo.setBounds(0, m_infolabel.getBottom() + 1, 50, 25);
-        //m_sst_knob.setBounds(200, 10, 400, 50);
-        m_node_list->setBounds(0,0,200,getHeight()-25);
+
+        // m_mod_rout_combo.setBounds(0, m_infolabel.getBottom() + 1, 50, 25);
+        // m_sst_knob.setBounds(200, 10, 400, 50);
+        m_node_list->setBounds(0, 0, 300, getHeight() - 25);
+        m_node_info_ed.setBounds(m_node_list->getRight() + 1, 0, 300, 200);
         m_infolabel.setBounds(0, m_node_list->getBottom(), getWidth(), 25);
     }
 };
