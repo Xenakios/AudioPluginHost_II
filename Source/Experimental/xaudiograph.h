@@ -37,9 +37,15 @@ class XAPNode
         double modulationDepth = 0.0;
         clap_id destinationParameter = 0;
     };
+    std::string processorName;
     XAPNode(std::unique_ptr<xenakios::XAudioProcessor> nodeIn, std::string name = "")
         : processor(std::move(nodeIn)), displayName(name)
     {
+        clap_plugin_descriptor desc;
+        if (processor->getDescriptor(&desc))
+        {
+            processorName = desc.name;
+        }
         scanParameters();
         // we may get a double scan of the parameters at init time, but such is life...
         processor->OnPluginRequestedParameterRescan = [this](auto) { scanParameters(); };

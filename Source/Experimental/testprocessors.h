@@ -128,7 +128,7 @@ class ToneProcessorTest : public XAPWithJuceGUI
             }
         }
     }
-    
+
     clap_process_status process(const clap_process *process) noexcept override
     {
         xenakios::CrossThreadMessage msg;
@@ -220,6 +220,13 @@ class GainProcessorTest : public XAPWithJuceGUI
                           CLAP_PARAM_IS_AUTOMATABLE | CLAP_PARAM_IS_MODULATABLE));
         m_param_infos.push_back(makeParamInfo((clap_id)ParamIds::Smoothing, "Smoothing length", 0.0,
                                               1.0, 0.02, CLAP_PARAM_IS_AUTOMATABLE));
+    }
+    bool getDescriptor(clap_plugin_descriptor *desc) const override
+    {
+        memset(desc, 0, sizeof(clap_plugin_descriptor));
+        desc->name = "Volume";
+        desc->vendor = "Xenakios";
+        return true;
     }
     uint32_t audioPortsCount(bool isInput) const noexcept override { return 1; }
     bool audioPortsInfo(uint32_t index, bool isInput,

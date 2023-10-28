@@ -288,6 +288,32 @@ class XapWindow : public juce::DocumentWindow
     juce::Label m_info_label;
 };
 
+class NodeListComponent : public juce::Component, public juce::ListBoxModel
+{
+  public:
+    XAPGraph *m_graph = nullptr;
+    juce::ListBox m_node_listbox;
+    NodeListComponent(XAPGraph *xg) : m_graph(xg)
+    {
+        m_node_listbox.setModel(this);
+        m_node_listbox.updateContent();
+        addAndMakeVisible(m_node_listbox);
+    }
+    void resized() override { m_node_listbox.setBounds(0, 0, getWidth(), getHeight()); }
+    int getNumRows() override { return m_graph->proc_nodes.size(); }
+    void paintListBoxItem(int rowNumber, Graphics &g, int width, int height,
+                          bool rowIsSelected) override
+    {
+        if (rowNumber < 0 || rowNumber >= m_graph->proc_nodes.size())
+            return;
+        auto &node = m_graph->proc_nodes[rowNumber];
+        if (rowIsSelected)
+            g.fillAll(juce::Colours::darkgrey);
+        g.setColour(juce::Colours::white);
+        g.drawText(node->processorName, 0, 0, width, height, juce::Justification::left);
+    }
+};
+
 class MyContinuous : public sst::jucegui::data::Continuous
 {
   public:
@@ -311,6 +337,7 @@ class MainComponent : public juce::Component, public juce::Timer
     juce::ComboBox m_mod_rout_combo;
     MyContinuous m_knob_data_source;
     sst::jucegui::components::HSlider m_sst_knob;
+    std::unique_ptr<NodeListComponent> m_node_list;
     void timerCallback() override
     {
         int usage = m_aman.getCpuUsage() * 100.0;
@@ -378,8 +405,9 @@ class MainComponent : public juce::Component, public juce::Timer
                                           (clap_id)ToneProcessorTest::ParamIds::Pitch, false, 1.0);
         m_graph->outputNodeId = "Main";
     }
-    MainComponent()
+    MainComponent() 
     {
+        
         addAndMakeVisible(m_infolabel);
         addAndMakeVisible(m_mod_rout_combo);
         sst::jucegui::style::StyleSheet::initializeStyleSheets([]() {});
@@ -394,10 +422,12 @@ class MainComponent : public juce::Component, public juce::Timer
         startTimerHz(10);
 
         m_graph = std::make_unique<XAPGraph>();
-        // addNoteGeneratorTestNodes();
+        addNoteGeneratorTestNodes();
         // addFilePlayerTestNodes();
         // addToneGeneratorTestNodes();
-        addConduitTestNodes();
+        // addConduitTestNodes();
+        m_node_list = std::make_unique<NodeListComponent>(m_graph.get());
+        addAndMakeVisible(m_node_list.get());
         juce::Random rng{7};
         for (auto &n : m_graph->proc_nodes)
         {
@@ -421,7 +451,7 @@ class MainComponent : public juce::Component, public juce::Timer
         m_aman.initialiseWithDefaultDevices(0, 2);
         // m_aman.addAudioCallback(m_player.get());
         initModBox();
-        setSize(500, 200);
+        setSize(1000, 600);
     }
     ~MainComponent() override
     {
@@ -454,9 +484,11 @@ class MainComponent : public juce::Component, public juce::Timer
 
     void resized() override
     {
-        m_infolabel.setBounds(0, 0, getWidth(), 25);
-        m_mod_rout_combo.setBounds(0, m_infolabel.getBottom() + 1, 50, 25);
-        m_sst_knob.setBounds(200, 10, 400, 50);
+        
+        //m_mod_rout_combo.setBounds(0, m_infolabel.getBottom() + 1, 50, 25);
+        //m_sst_knob.setBounds(200, 10, 400, 50);
+        m_node_list->setBounds(0,0,200,getHeight()-25);
+        m_infolabel.setBounds(0, m_node_list->getBottom(), getWidth(), 25);
     }
 };
 
@@ -667,7 +699,6 @@ inline void testNewEventList()
     printXList(elist);
 }
 
-
 void test_np_code()
 {
     std::shared_ptr<NoisePlethoraPlugin> plug;
@@ -761,8 +792,6 @@ template <typename ContType> inline void test_keyvaluemap(int iters, std::string
     std::cout << benchname << " took " << (t1 - t0) / 1000.0 << " seconds\n";
     std::cout << accum << "\n";
 }
-
-
 
 int main()
 {
