@@ -293,13 +293,27 @@ class NodeListComponent : public juce::Component, public juce::ListBoxModel
   public:
     XAPGraph *m_graph = nullptr;
     juce::ListBox m_node_listbox;
+    juce::TextButton m_node_add_but;
+    juce::TextButton m_node_remove_but;
     NodeListComponent(XAPGraph *xg) : m_graph(xg)
     {
         m_node_listbox.setModel(this);
         m_node_listbox.updateContent();
         addAndMakeVisible(m_node_listbox);
+        addAndMakeVisible(m_node_add_but);
+        addAndMakeVisible(m_node_remove_but);
+        m_node_add_but.setButtonText("Add...");
+
+        m_node_remove_but.setButtonText("Remove");
     }
-    void resized() override { m_node_listbox.setBounds(0, 0, getWidth(), getHeight()); }
+
+    void resized() override
+    {
+        m_node_listbox.setBounds(0, 0, getWidth(), getHeight() - 25);
+        m_node_add_but.setBounds(0, m_node_listbox.getBottom() + 1, getWidth() / 2 - 2, 25);
+        m_node_remove_but.setBounds(m_node_add_but.getRight() + 2, m_node_listbox.getBottom() + 1,
+                                    getWidth() / 2 - 2, 25);
+    }
     int getNumRows() override { return m_graph->proc_nodes.size(); }
     void paintListBoxItem(int rowNumber, Graphics &g, int width, int height,
                           bool rowIsSelected) override
@@ -437,6 +451,7 @@ class MainComponent : public juce::Component, public juce::Timer
         // addToneGeneratorTestNodes();
         // addConduitTestNodes();
         m_node_list = std::make_unique<NodeListComponent>(m_graph.get());
+        m_node_list->m_node_add_but.onClick = [this]() { showNodeAddMenu(); };
         addAndMakeVisible(m_node_list.get());
         addAndMakeVisible(m_node_info_ed);
         m_node_list->OnListRowClicked = [this](int row) {
@@ -469,6 +484,45 @@ class MainComponent : public juce::Component, public juce::Timer
         m_aman.addAudioCallback(m_player.get());
 
         setSize(1000, 600);
+    }
+    void createAndAddNode(std::string name)
+    {
+        DBG("Should create : " << name);
+        auto newproc = xenakios::XapFactory::getInstance().createFromName(name);
+        clap_plugin_descriptor desc;
+        if (newproc && newproc->getDescriptor(&desc))
+        {
+            DBG("Created : " << desc.name);
+        }
+    }
+    void showNodeAddMenu()
+    {
+        juce::PopupMenu menu;
+        juce::PopupMenu menuInternals;
+        juce::PopupMenu menuClaps;
+        juce::PopupMenu menuVST;
+        for(auto& e : xenakios::XapFactory::getInstance().m_entries)
+        {
+            if (e.name.starts_with("Internal/"))
+            {
+                menuInternals.addItem(e.name,[this,name=e.name]()
+                {
+                    createAndAddNode(name);
+                });
+            }
+        }
+        
+        
+        menuClaps.addItem("Surge XT", []() {});
+        menuClaps.addItem("Conduit Ring Modulator", []() {});
+        menuClaps.addItem("Conduit Polysynth", []() {});
+        
+        menuVST.addItem("Valhalla VintageVerb", []() {});
+        menuVST.addItem("Valhalla Room", []() {});
+        menu.addSubMenu("Internal", menuInternals);
+        menu.addSubMenu("CLAP", menuClaps);
+        menu.addSubMenu("VST3", menuVST);
+        menu.showMenuAsync(juce::PopupMenu::Options());
     }
     void populateNodeInfoBox(XAPNode *node)
     {

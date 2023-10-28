@@ -93,6 +93,15 @@ class ToneProcessorTest : public XAPWithJuceGUI
 
         return true;
     }
+    bool getDescriptor(clap_plugin_descriptor *desc) const override
+    {
+        memset(desc, 0, sizeof(clap_plugin_descriptor));
+        desc->clap_version = CLAP_VERSION;
+        desc->id = "com.xenakios.tonegenerator";
+        desc->name = "Tone Generator";
+        desc->vendor = "Xenakios";
+        return true;
+    }
     uint32_t paramsCount() const noexcept override { return m_param_infos.size(); }
     bool paramsInfo(uint32_t paramIndex, clap_param_info *info) const noexcept override
     {
@@ -200,6 +209,10 @@ class ToneProcessorTest : public XAPWithJuceGUI
     int m_mod_out_block_size = 401;
     int m_mod_out_counter = 0;
 };
+
+static xenakios::RegisterXap reg_tonegen{"Internal/Tone Generator",[](){
+    return std::make_unique<ToneProcessorTest>();
+}};
 
 class GainProcessorTest : public XAPWithJuceGUI
 {
@@ -325,6 +338,10 @@ class GainProcessorTest : public XAPWithJuceGUI
     }
     void guiDestroy() noexcept override { m_editor = nullptr; }
 };
+
+static xenakios::RegisterXap reg_volume{"Internal/Volume",[](){
+    return std::make_unique<GainProcessorTest>();
+}};
 
 const size_t maxHolderDataSize = 128;
 

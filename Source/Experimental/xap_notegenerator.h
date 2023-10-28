@@ -287,3 +287,6 @@ class ClapEventSequencerProcessor : public XAPWithJuceGUI
     }
     void guiDestroy() noexcept override { m_editor = nullptr; }
 };
+inline xenakios::RegisterXap reg_notegen{"Internal/Entropic Sequencer",[](){
+    return std::make_unique<ClapEventSequencerProcessor>(400);
+}};
