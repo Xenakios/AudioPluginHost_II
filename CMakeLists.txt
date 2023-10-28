@@ -120,6 +120,7 @@ target_sources(ConsoleAppExample
         Source/Experimental/noise-plethora/teensy/synth_whitenoise.cpp
         Source/Experimental/noise-plethora/plugins/Banks.cpp
         libs/sst-jucegui/src/sst/jucegui/components/Knob.cpp
+        libs/sst-jucegui/src/sst/jucegui/components/HSlider.cpp
         libs/sst-jucegui/src/sst/jucegui/components/ContinuousParamEditor.cpp
         libs/sst-jucegui/src/sst/jucegui/components/ComponentBase.cpp
         libs/sst-jucegui/src/sst/jucegui/style/StyleSheet.cpp

@@ -16,6 +16,7 @@
 #include "xaudiograph.h"
 #include "xapdsp.h"
 #include <sst/jucegui/components/Knob.h>
+#include <sst/jucegui/components/HSlider.h>
 
 inline void mapModulationEvents(const clap::helpers::EventList &sourceList, clap_id sourceParId,
                                 clap::helpers::EventList &destList, clap_id destParId,
@@ -309,7 +310,7 @@ class MainComponent : public juce::Component, public juce::Timer
     juce::Label m_infolabel;
     juce::ComboBox m_mod_rout_combo;
     MyContinuous m_knob_data_source;
-    sst::jucegui::components::Knob m_sst_knob;
+    sst::jucegui::components::HSlider m_sst_knob;
     void timerCallback() override
     {
         int usage = m_aman.getCpuUsage() * 100.0;
@@ -384,7 +385,7 @@ class MainComponent : public juce::Component, public juce::Timer
         sst::jucegui::style::StyleSheet::initializeStyleSheets([]() {});
         auto style = sst::jucegui::style::StyleSheet::getBuiltInStyleSheet(
             sst::jucegui::style::StyleSheet::BuiltInTypes::DARK);
-        m_sst_knob.setDrawLabel(true);
+        m_sst_knob.setShowLabel(true);
         // m_sst_knob.setS
         m_sst_knob.setStyle(style);
         m_sst_knob.setSource(&m_knob_data_source);
@@ -455,7 +456,7 @@ class MainComponent : public juce::Component, public juce::Timer
     {
         m_infolabel.setBounds(0, 0, getWidth(), 25);
         m_mod_rout_combo.setBounds(0, m_infolabel.getBottom() + 1, 50, 25);
-        m_sst_knob.setBounds(200, 10, 150, 170);
+        m_sst_knob.setBounds(200, 10, 400, 50);
     }
 };
 
@@ -523,7 +524,7 @@ class GuiAppApplication : public juce::JUCEApplication
     std::unique_ptr<MainWindow> mainWindow;
 };
 
-#define TESTJUCEGUI 0
+#define TESTJUCEGUI 1
 
 #if TESTJUCEGUI
 
