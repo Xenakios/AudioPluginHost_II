@@ -36,6 +36,8 @@ class XAPNode
         clap_id sourceParameter = 0;
         double modulationDepth = 0.0;
         clap_id destinationParameter = 0;
+        int sourcePinIndex = -1;
+        int destinationPinIndex = -1;
     };
     struct Pin
     {
@@ -146,7 +148,6 @@ class XAPNode
             outputPins.emplace_back(false, XAPNode::ConnectionType::Events, i, 0);
         }
         inputPins.emplace_back(true, XAPNode::ConnectionType::Modulation, 0, 0);
-        
     }
 
     std::unique_ptr<xenakios::XAudioProcessor> processor;
@@ -163,6 +164,23 @@ class XAPNode
     juce::Rectangle<int> nodeSceneBounds;
 };
 
+inline int findPinIndex(XAPNode *node, XAPNode::ConnectionType type, bool isInput, int port,
+                        int channel)
+{
+    auto pins = &node->inputPins;
+    if (!isInput)
+        pins = &node->outputPins;
+    for (int i = 0; i < pins->size(); ++i)
+    {
+        auto &pin = (*pins)[i];
+        if (pin.type == type && pin.port == port && pin.channel == channel)
+        {
+            return i;
+        }
+    }
+    return -1;
+}
+
 inline bool connectAudioBetweenNodes(XAPNode *sourceNode, int sourcePort, int sourceChannel,
                                      XAPNode *destinationNode, int destinationPort,
                                      int destinationChannel)
@@ -174,6 +192,11 @@ inline bool connectAudioBetweenNodes(XAPNode *sourceNode, int sourcePort, int so
     conn.source = sourceNode;
     conn.sourceChannel = sourceChannel;
     conn.sourcePort = sourcePort;
+    conn.sourcePinIndex =
+        findPinIndex(sourceNode, XAPNode::ConnectionType::Audio, false, sourcePort, sourceChannel);
+    conn.destinationPinIndex = findPinIndex(destinationNode, XAPNode::ConnectionType::Audio, true,
+                                            destinationPort, destinationChannel);
+
     conn.destination = destinationNode;
     conn.destinationPort = destinationPort;
     conn.destinationChannel = destinationChannel;
@@ -192,6 +215,12 @@ inline bool connectEventPorts(XAPNode *sourceNode, int sourcePort, XAPNode *dest
     conn.sourcePort = sourcePort;
     conn.destination = destinationNode;
     conn.destinationPort = destinationPort;
+    
+    conn.sourcePinIndex =
+        findPinIndex(sourceNode, XAPNode::ConnectionType::Events, false, sourcePort, 0);
+    conn.destinationPinIndex = findPinIndex(destinationNode, XAPNode::ConnectionType::Events, true,
+                                            destinationPort, 0);
+
     destinationNode->inputConnections.push_back(conn);
     return true;
 }

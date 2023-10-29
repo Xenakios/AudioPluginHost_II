@@ -431,12 +431,11 @@ class NodeGraphComponent : public juce::Component
             for (auto &conn : n->inputConnections)
             {
                 int type = (int)conn.type;
-                auto destpinpos = getNodePinPosition(n.get(), type, true, conn.destinationPort,
-                                                     conn.destinationChannel);
-                auto sourcepinpos = getNodePinPosition(
-                    conn.source, type, false, conn.destinationPort, conn.destinationChannel);
-                g.drawLine(sourcepinpos.getX() + 5.0f, sourcepinpos.getY(),
-                           destpinpos.getX() + 5.0f, destpinpos.getY(), 2.0f);
+                float x0 = getPinXPos(n.get(), conn.destinationPinIndex, false);
+                float x1 = getPinXPos(conn.source, conn.sourcePinIndex, true);
+                float y0 = n->nodeSceneBounds.getY();
+                float y1 = conn.source->nodeSceneBounds.getBottom();
+                g.drawLine(x0,y0,x1,y1,2.0f);
             }
         }
     }
