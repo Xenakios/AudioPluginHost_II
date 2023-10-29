@@ -341,6 +341,70 @@ class NodeListComponent : public juce::Component, public juce::ListBoxModel
     std::function<void(int)> OnListRowClicked;
 };
 
+class NodeGraphComponent : public juce::Component
+{
+  public:
+    NodeGraphComponent(XAPGraph *g) : m_graph(g) {}
+    void paint(juce::Graphics &g) override
+    {
+        g.fillAll(juce::Colours::black);
+        g.setColour(juce::Colours::white);
+        for (auto &n : m_graph->proc_nodes)
+        {
+            auto nodebounds = n->nodeSceneBounds;
+            g.drawRect(nodebounds);
+            g.drawText(n->displayName, nodebounds, juce::Justification::centredLeft);
+            for (auto &conn : n->inputConnections)
+            {
+                int x0 = nodebounds.getCentreX();
+                int x1 = conn.source->nodeSceneBounds.getCentreX();
+                int y0 = nodebounds.getY();
+                int y1 = conn.source->nodeSceneBounds.getBottom();
+                g.drawLine(x0, y0, x1, y1);
+            }
+        }
+    }
+    void mouseDown(const juce::MouseEvent &ev) override
+    {
+        m_dragging_node = findFromPosition(ev.x, ev.y);
+        if (m_dragging_node)
+        {
+            m_drag_start_bounds = m_dragging_node->nodeSceneBounds;
+        }
+    }
+    void mouseDrag(const juce::MouseEvent &ev) override
+    {
+        if (m_dragging_node)
+        {
+            auto newbounds = m_drag_start_bounds.translated(ev.getDistanceFromDragStartX(),
+                                                            ev.getDistanceFromDragStartY());
+            m_dragging_node->nodeSceneBounds = newbounds;
+            repaint();
+        }
+    }
+    void mouseUp(const juce::MouseEvent &ev) override
+    {
+        m_dragging_node = nullptr;
+        m_drag_start_bounds = {};
+    }
+    XAPNode *findFromPosition(int x, int y)
+    {
+        for (auto &n : m_graph->proc_nodes)
+        {
+            if (n->nodeSceneBounds.contains(x, y))
+            {
+                return n.get();
+            }
+        }
+        return nullptr;
+    }
+
+  private:
+    XAPGraph *m_graph = nullptr;
+    XAPNode *m_dragging_node = nullptr;
+    juce::Rectangle<int> m_drag_start_bounds;
+};
+
 class MyContinuous : public sst::jucegui::data::Continuous
 {
   public:
@@ -366,6 +430,7 @@ class MainComponent : public juce::Component, public juce::Timer
     sst::jucegui::components::HSlider m_sst_knob;
     std::unique_ptr<NodeListComponent> m_node_list;
     juce::TextEditor m_node_info_ed;
+    std::unique_ptr<NodeGraphComponent> m_graph_component;
     void timerCallback() override
     {
         int usage = m_aman.getCpuUsage() * 100.0;
@@ -488,9 +553,13 @@ class MainComponent : public juce::Component, public juce::Timer
         m_player = std::make_unique<XAPPlayer>(*m_graph);
         m_aman.initialiseWithDefaultDevices(0, 2);
         m_aman.addAudioCallback(m_player.get());
-
+        m_graph_component = std::make_unique<NodeGraphComponent>(m_graph.get());
+        addAndMakeVisible(m_graph_component.get());
         setSize(1000, 600);
-        juce::MessageManager::callAsync([this]() { loadState(juce::File()); });
+        juce::MessageManager::callAsync([this]() {
+            loadState(juce::File());
+            m_graph_component->repaint();
+        });
     }
     void saveState(juce::File file)
     {
@@ -667,7 +736,9 @@ class MainComponent : public juce::Component, public juce::Timer
         // m_mod_rout_combo.setBounds(0, m_infolabel.getBottom() + 1, 50, 25);
         // m_sst_knob.setBounds(200, 10, 400, 50);
         m_node_list->setBounds(0, 0, 300, getHeight() - 25);
-        m_node_info_ed.setBounds(m_node_list->getRight() + 1, 0, 300, 200);
+        m_graph_component->setBounds(m_node_list->getRight() + 1, 0, getWidth() - 298,
+                                     getHeight() - 25);
+        // m_node_info_ed.setBounds(m_node_list->getRight() + 1, 0, 300, 200);
         m_infolabel.setBounds(0, m_node_list->getBottom(), getWidth(), 25);
     }
 };
