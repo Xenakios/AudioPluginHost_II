@@ -387,10 +387,7 @@ class NodeGraphComponent : public juce::Component
             */
             for (int i = 0; i < n->inputPins.size(); ++i)
             {
-                float xpos = nodebounds.getCentreX();
-                if (n->inputPins.size() > 1)
-                    xpos = jmap<float>(i, 0, n->inputPins.size()-1, nodebounds.getX() + 5,
-                                       nodebounds.getRight() - 10);
+                float xpos = getPinXPos(n.get(), i, true);
                 if (n->inputPins[i].type == XAPNode::ConnectionType::Audio)
                     g.setColour(juce::Colours::green);
                 else if (n->inputPins[i].type == XAPNode::ConnectionType::Events)
@@ -402,10 +399,7 @@ class NodeGraphComponent : public juce::Component
 
             for (int i = 0; i < n->outputPins.size(); ++i)
             {
-                float xpos = nodebounds.getCentreX();
-                if (n->outputPins.size() > 1)
-                    xpos = jmap<float>(i, 0, n->outputPins.size()-1, (float)nodebounds.getX() + 5,
-                                       nodebounds.getRight() - 10);
+                float xpos = getPinXPos(n.get(), i, false);
                 if (n->outputPins[i].type == XAPNode::ConnectionType::Audio)
                     g.setColour(juce::Colours::green);
                 else if (n->outputPins[i].type == XAPNode::ConnectionType::Events)
@@ -521,6 +515,14 @@ class NodeGraphComponent : public juce::Component
         m_dragging_node = nullptr;
         m_drag_start_bounds = {};
     }
+    void mouseMove(const juce::MouseEvent &ev) override
+    {
+        auto pin = findPinFromPosition(ev.x, ev.y);
+        if (pin)
+            setMouseCursor(juce::MouseCursor::CrosshairCursor);
+        else
+            setMouseCursor(juce::MouseCursor::NormalCursor);
+    }
     XAPNode *findFromPosition(int x, int y)
     {
         for (auto &n : m_graph->proc_nodes)
@@ -528,6 +530,49 @@ class NodeGraphComponent : public juce::Component
             if (n->nodeSceneBounds.contains(x, y))
             {
                 return n.get();
+            }
+        }
+        return nullptr;
+    }
+    float getPinXPos(XAPNode *node, int index, bool isInput)
+    {
+        auto nbounds = node->nodeSceneBounds;
+        float xpos = nbounds.getCentreX();
+        if (isInput && node->inputPins.size() > 1)
+        {
+            xpos = juce::jmap<float>(index, 0, node->inputPins.size() - 1, nbounds.getX() + 5,
+                                     nbounds.getRight() - 10);
+        }
+        if (!isInput && node->outputPins.size() > 1)
+        {
+            xpos = juce::jmap<float>(index, 0, node->outputPins.size() - 1, nbounds.getX() + 5,
+                                     nbounds.getRight() - 10);
+        }
+        return xpos;
+    }
+    XAPNode::Pin *findPinFromPosition(int x, int y)
+    {
+
+        for (auto &n : m_graph->proc_nodes)
+        {
+            auto nbounds = n->nodeSceneBounds;
+            for (int i = 0; i < n->inputPins.size(); ++i)
+            {
+                float xpos = getPinXPos(n.get(), i, true);
+                juce::Rectangle<float> rect{xpos - 10, nbounds.getY() - 10.0f, 20.0f, 20.0f};
+                if (rect.contains(x, y))
+                {
+                    return &n->inputPins[i];
+                }
+            }
+            for (int i = 0; i < n->outputPins.size(); ++i)
+            {
+                float xpos = getPinXPos(n.get(), i, false);
+                juce::Rectangle<float> rect(xpos - 10, nbounds.getBottom() - 10, 20, 20);
+                if (rect.contains(x, y))
+                {
+                    return &n->outputPins[i];
+                }
             }
         }
         return nullptr;
