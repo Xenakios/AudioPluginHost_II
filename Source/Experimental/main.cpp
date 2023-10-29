@@ -17,6 +17,9 @@
 #include "xapdsp.h"
 #include <sst/jucegui/components/Knob.h>
 #include <sst/jucegui/components/HSlider.h>
+#include "text/choc_JSON.h"
+#include "text/choc_Files.h"
+#include <fstream>
 
 inline void mapModulationEvents(const clap::helpers::EventList &sourceList, clap_id sourceParId,
                                 clap::helpers::EventList &destList, clap_id destParId,
@@ -285,6 +288,7 @@ class XapWindow : public juce::DocumentWindow
     std::function<void(XapWindow *)> OnRequestDelete;
     bool m_plugin_requested_resize = false;
     int m_info_area_margin = 25;
+    std::string nodeID;
     juce::Label m_info_label;
 };
 
@@ -465,6 +469,7 @@ class MainComponent : public juce::Component, public juce::Timer
         {
             // continue;
             m_xap_windows.emplace_back(std::make_unique<XapWindow>(*n->processor));
+            m_xap_windows.back()->nodeID = n->displayName;
             m_xap_windows.back()->setTopLeftPosition(rng.nextInt({10, 600}),
                                                      rng.nextInt({100, 400}));
             m_xap_windows.back()->OnRequestDelete = [this](XapWindow *w) {
@@ -484,6 +489,81 @@ class MainComponent : public juce::Component, public juce::Timer
         m_aman.addAudioCallback(m_player.get());
 
         setSize(1000, 600);
+        juce::MessageManager::callAsync([this]() { loadState(juce::File()); });
+    }
+    void saveState(juce::File file)
+    {
+        auto root = choc::value::createObject("");
+        auto wstate = choc::value::createObject("");
+        wstate.addMember("win_bounds", getScreenBounds().toString().toStdString());
+        root.addMember("mainwindowstate", wstate);
+        std::vector<choc::value::Value> nodestates;
+        for (auto &n : m_graph->proc_nodes)
+        {
+            auto nodestate = choc::value::createObject("");
+            nodestate.addMember("id", n->displayName);
+            juce::Rectangle<int> bounds;
+            for (auto &w : m_xap_windows)
+            {
+                if (&w->m_proc == n->processor.get())
+                {
+                    bounds = w->getScreenBounds();
+                    break;
+                }
+            }
+            if (!bounds.isEmpty())
+            {
+                nodestate.addMember("plugwinbounds", bounds.toString().toStdString());
+            }
+            nodestates.push_back(nodestate);
+        }
+        root.addMember("nodestates", choc::value::createArray(nodestates));
+        std::ofstream outfile("C:/develop/AudioPluginHost_mk2/Source/Experimental/state.json");
+        choc::json::writeAsJSON(outfile, root, true);
+    }
+    void loadState(juce::File file)
+    {
+        try
+        {
+            auto jsontxt = choc::file::loadFileAsString(
+                "C:/develop/AudioPluginHost_mk2/Source/Experimental/state.json");
+            auto jroot = choc::json::parse(jsontxt);
+            auto jwstate = jroot["mainwindowstate"];
+            auto jbounds = jwstate["win_bounds"];
+            auto str = jbounds.toString();
+            auto boundsrect = juce::Rectangle<int>::fromString(str);
+            if (!boundsrect.isEmpty())
+            {
+                getParentComponent()->setBounds(boundsrect);
+            }
+            auto jnodesarr = jroot["nodestates"];
+            auto sz = jnodesarr.size();
+            if (sz > 0)
+            {
+                for (uint32 i = 0; i < sz; ++i)
+                {
+                    auto jnodestate = jnodesarr[i];
+                    auto jid = jnodestate["id"];
+                    for (auto &w : m_xap_windows)
+                    {
+                        if (w->nodeID == jid.toString())
+                        {
+                            auto jbounds = jnodestate["plugwinbounds"].toString();
+                            auto bounds = juce::Rectangle<int>::fromString(jbounds);
+                            if (!bounds.isEmpty())
+                            {
+                                w->setBounds(bounds);
+                            }
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        catch (std::exception &excep)
+        {
+            std::cout << excep.what() << "\n";
+        }
     }
     void createAndAddNode(std::string name)
     {
@@ -501,22 +581,18 @@ class MainComponent : public juce::Component, public juce::Timer
         juce::PopupMenu menuInternals;
         juce::PopupMenu menuClaps;
         juce::PopupMenu menuVST;
-        for(auto& e : xenakios::XapFactory::getInstance().m_entries)
+        for (auto &e : xenakios::XapFactory::getInstance().m_entries)
         {
             if (e.name.starts_with("Internal/"))
             {
-                menuInternals.addItem(e.name,[this,name=e.name]()
-                {
-                    createAndAddNode(name);
-                });
+                menuInternals.addItem(e.name, [this, name = e.name]() { createAndAddNode(name); });
             }
         }
-        
-        
+
         menuClaps.addItem("Surge XT", []() {});
         menuClaps.addItem("Conduit Ring Modulator", []() {});
         menuClaps.addItem("Conduit Polysynth", []() {});
-        
+
         menuVST.addItem("Valhalla VintageVerb", []() {});
         menuVST.addItem("Valhalla Room", []() {});
         menu.addSubMenu("Internal", menuInternals);
@@ -553,6 +629,7 @@ class MainComponent : public juce::Component, public juce::Timer
     }
     ~MainComponent() override
     {
+        saveState(juce::File());
         m_xap_windows.clear();
         m_aman.removeAudioCallback(m_player.get());
     }
