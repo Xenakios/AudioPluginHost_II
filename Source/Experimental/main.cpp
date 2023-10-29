@@ -344,7 +344,7 @@ class NodeListComponent : public juce::Component, public juce::ListBoxModel
 class NodeGraphComponent : public juce::Component
 {
   public:
-    NodeGraphComponent(XAPGraph *g) : m_graph(g) {}
+    NodeGraphComponent(XAPGraph *g) : m_graph(g) { refreshPins(); }
     void paint(juce::Graphics &g) override
     {
         g.fillAll(juce::Colours::black);
@@ -361,6 +361,7 @@ class NodeGraphComponent : public juce::Component
             int audioinportcount = proc->audioPortsCount(true);
             int noteinportcount = proc->notePortsCount(true);
             int totalinports = audioinportcount + noteinportcount + 1;
+            /*
             for (int i = 0; i < audioinportcount; ++i)
             {
                 clap_audio_port_info pinfo;
@@ -373,9 +374,52 @@ class NodeGraphComponent : public juce::Component
                     }
                 }
             }
+            g.setColour(juce::Colours::red);
+            for (int i=0;i<noteinportcount;++i)
+            {
+                clap_note_port_info pinfo;
+                if (proc->notePortsInfo(i,true,&pinfo))
+                {
+                    auto pt = getNodePinPosition(n.get(), 1, true, i, 0);
+                    g.fillEllipse(pt.x, pt.y - 5.0f, 10.0, 10.0f);
+                }
+            }
+            */
+            for (int i = 0; i < n->inputPins.size(); ++i)
+            {
+                float xpos = nodebounds.getCentreX();
+                if (n->inputPins.size() > 1)
+                    xpos = jmap<float>(i, 0, n->inputPins.size()-1, nodebounds.getX() + 5,
+                                       nodebounds.getRight() - 10);
+                if (n->inputPins[i].type == XAPNode::ConnectionType::Audio)
+                    g.setColour(juce::Colours::green);
+                else if (n->inputPins[i].type == XAPNode::ConnectionType::Events)
+                    g.setColour(juce::Colours::yellow);
+                else
+                    g.setColour(juce::Colours::red);
+                g.fillEllipse(xpos, nodebounds.getY() - 5.0f, 10.0, 10.0f);
+            }
+
+            for (int i = 0; i < n->outputPins.size(); ++i)
+            {
+                float xpos = nodebounds.getCentreX();
+                if (n->outputPins.size() > 1)
+                    xpos = jmap<float>(i, 0, n->outputPins.size()-1, (float)nodebounds.getX() + 5,
+                                       nodebounds.getRight() - 10);
+                if (n->outputPins[i].type == XAPNode::ConnectionType::Audio)
+                    g.setColour(juce::Colours::green);
+                else if (n->outputPins[i].type == XAPNode::ConnectionType::Events)
+                    g.setColour(juce::Colours::yellow);
+                else
+                    g.setColour(juce::Colours::red);
+                g.fillEllipse(xpos, nodebounds.getBottom() - 5.0f, 10.0, 10.0f);
+            }
+
             int audiooutportcount = proc->audioPortsCount(false);
             int noteoutportcount = proc->notePortsCount(false);
             int totaloutports = audiooutportcount + noteoutportcount + 1;
+            g.setColour(juce::Colours::green);
+            /*
             for (int i = 0; i < audiooutportcount; ++i)
             {
                 clap_audio_port_info pinfo;
@@ -388,6 +432,7 @@ class NodeGraphComponent : public juce::Component
                     }
                 }
             }
+            */
             g.setColour(juce::Colours::white);
             for (auto &conn : n->inputConnections)
             {
@@ -397,7 +442,7 @@ class NodeGraphComponent : public juce::Component
                 auto sourcepinpos = getNodePinPosition(
                     conn.source, type, false, conn.destinationPort, conn.destinationChannel);
                 g.drawLine(sourcepinpos.getX() + 5.0f, sourcepinpos.getY(),
-                           destpinpos.getX() + 5.0f, destpinpos.getY());
+                           destpinpos.getX() + 5.0f, destpinpos.getY(), 2.0f);
             }
         }
     }
@@ -437,7 +482,7 @@ class NodeGraphComponent : public juce::Component
             {
                 if (proc->notePortsInfo(port, true, &pinfo))
                 {
-                    float x = availw / 2.0;
+                    float x = availw + availw / 2.0;
                     return {nbounds.getX() + x, (float)nbounds.getY()};
                 }
             }
@@ -467,6 +512,7 @@ class NodeGraphComponent : public juce::Component
             auto newbounds = m_drag_start_bounds.translated(ev.getDistanceFromDragStartX(),
                                                             ev.getDistanceFromDragStartY());
             m_dragging_node->nodeSceneBounds = newbounds;
+            refreshPins();
             repaint();
         }
     }
@@ -486,11 +532,53 @@ class NodeGraphComponent : public juce::Component
         }
         return nullptr;
     }
+    void refreshPins()
+    {
+        return;
+        m_pins.clear();
+        for (auto &n : m_graph->proc_nodes)
+        {
+            auto nbounds = n->nodeSceneBounds;
+            PinUIProperties pin;
+            pin.node = n.get();
+            int total_in_ports_count = 0;
+            int audio_in_ports_count = n->processor->audioPortsCount(true);
+            int note_in_ports_count = n->processor->notePortsCount(true);
+            total_in_ports_count = audio_in_ports_count + note_in_ports_count + 1;
+            if (total_in_ports_count > 0)
+            {
+                double availw = nbounds.getWidth() / total_in_ports_count;
+                for (int i = 0; i < audio_in_ports_count; ++i)
+                {
+                    clap_audio_port_info pinfo;
+                    if (n->processor->audioPortsInfo(i, true, &pinfo))
+                    {
+                        int nchs = pinfo.channel_count;
+                        for (int j = 0; j < nchs; ++j)
+                        {
+                            pin.color = juce::Colours::green;
+                            float x = nbounds.getX() + availw * j;
+                            float y = nbounds.getY();
+                            pin.pos = {x, y};
+                        }
+                    }
+                }
+            }
+        }
+    }
 
   private:
     XAPGraph *m_graph = nullptr;
     XAPNode *m_dragging_node = nullptr;
     juce::Rectangle<int> m_drag_start_bounds;
+    struct PinUIProperties
+    {
+        PinUIProperties() {}
+        juce::Point<float> pos;
+        juce::Colour color;
+        XAPNode *node = nullptr;
+    };
+    std::vector<PinUIProperties> m_pins;
 };
 
 class MyContinuous : public sst::jucegui::data::Continuous
@@ -528,14 +616,13 @@ class MainComponent : public juce::Component, public juce::Timer
     void addNoteGeneratorTestNodes()
     {
         m_graph->addProcessorAsNode(std::make_unique<ClapEventSequencerProcessor>(2), "Note Gen");
-        // m_graph->addProcessorAsNode(std::make_unique<ClapPluginFormatProcessor>(
-        //                                 pathprefix + R"(CLAP\Surge Synth Team\Surge XT.clap)",
-        //                                 0),
-        //                             "Surge XT 1");
+        m_graph->addProcessorAsNode(std::make_unique<ClapPluginFormatProcessor>(
+                                        pathprefix + R"(CLAP\Surge Synth Team\Surge XT.clap)", 0),
+                                    "Surge XT 1");
 
-        m_graph->addProcessorAsNode(
-            std::make_unique<ClapPluginFormatProcessor>(pathprefix + "/CLAP/Conduit.clap", 0),
-            "Surge XT 1");
+        // m_graph->addProcessorAsNode(
+        //     std::make_unique<ClapPluginFormatProcessor>(pathprefix + "/CLAP/Conduit.clap", 0),
+        //     "Surge XT 1");
 
         // m_graph->addProcessorAsNode(std::make_unique<ClapPluginFormatProcessor>(
         //                                pathprefix + R"(CLAP\Surge Synth Team\Surge XT.clap)", 0),

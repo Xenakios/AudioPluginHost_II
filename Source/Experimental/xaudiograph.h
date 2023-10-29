@@ -37,6 +37,20 @@ class XAPNode
         double modulationDepth = 0.0;
         clap_id destinationParameter = 0;
     };
+    struct Pin
+    {
+        Pin() {}
+        Pin(bool isInput_, ConnectionType type_, int port_, int channel_)
+            : isInput(isInput_), type(type_), port(port_), channel(channel_)
+        {
+        }
+        bool isInput = false;
+        ConnectionType type;
+        int port = 0;
+        int channel = 0;
+    };
+    std::vector<Pin> inputPins;
+    std::vector<Pin> outputPins;
     std::string processorName;
     XAPNode(std::unique_ptr<xenakios::XAudioProcessor> nodeIn, std::string name = "")
         : processor(std::move(nodeIn)), displayName(name)
@@ -83,6 +97,8 @@ class XAPNode
 
     void initAudioBuffersFromProcessorInfo(int maxFrames)
     {
+        inputPins.clear();
+        outputPins.clear();
         destroyBuffers(inPortBuffers);
         destroyBuffers(outPortBuffers);
         inPortBuffers.resize(processor->audioPortsCount(true));
@@ -99,6 +115,7 @@ class XAPNode
                 inPortBuffers[i].data32 = new float *[pinfo.channel_count];
                 for (int j = 0; j < pinfo.channel_count; ++j)
                 {
+                    inputPins.emplace_back(true, XAPNode::ConnectionType::Audio, i, j);
                     inPortBuffers[i].data32[j] = new float[maxFrames];
                 }
             }
@@ -115,10 +132,21 @@ class XAPNode
                 outPortBuffers[i].data32 = new float *[pinfo.channel_count];
                 for (int j = 0; j < pinfo.channel_count; ++j)
                 {
+                    outputPins.emplace_back(false, XAPNode::ConnectionType::Audio, i, j);
                     outPortBuffers[i].data32[j] = new float[maxFrames];
                 }
             }
         }
+        for (int i = 0; i < processor->notePortsCount(true); ++i)
+        {
+            inputPins.emplace_back(true, XAPNode::ConnectionType::Events, i, 0);
+        }
+        for (int i = 0; i < processor->notePortsCount(false); ++i)
+        {
+            outputPins.emplace_back(false, XAPNode::ConnectionType::Events, i, 0);
+        }
+        inputPins.emplace_back(true, XAPNode::ConnectionType::Modulation, 0, 0);
+        
     }
 
     std::unique_ptr<xenakios::XAudioProcessor> processor;
