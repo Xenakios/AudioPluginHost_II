@@ -472,6 +472,7 @@ class MainComponent : public juce::Component, public juce::Timer
             m_xap_windows.back()->nodeID = n->displayName;
             m_xap_windows.back()->setTopLeftPosition(rng.nextInt({10, 600}),
                                                      rng.nextInt({100, 400}));
+            n->nodeSceneBounds = {rng.nextInt({10, 600}), rng.nextInt({10, 600}), 100, 20};
             m_xap_windows.back()->OnRequestDelete = [this](XapWindow *w) {
                 for (int i = 0; i < m_xap_windows.size(); ++i)
                 {
@@ -498,6 +499,7 @@ class MainComponent : public juce::Component, public juce::Timer
         wstate.addMember("win_bounds", getScreenBounds().toString().toStdString());
         root.addMember("mainwindowstate", wstate);
         std::vector<choc::value::Value> nodestates;
+        std::vector<choc::value::Value> connstates;
         for (auto &n : m_graph->proc_nodes)
         {
             auto nodestate = choc::value::createObject("");
@@ -515,9 +517,23 @@ class MainComponent : public juce::Component, public juce::Timer
             {
                 nodestate.addMember("plugwinbounds", bounds.toString().toStdString());
             }
+            nodestate.addMember("nodebounds", n->nodeSceneBounds.toString().toStdString());
+            for (auto &conn : n->inputConnections)
+            {
+                auto jconn = choc::value::createObject("");
+                jconn.addMember("type", static_cast<int>(conn.type));
+                jconn.addMember("src", conn.source->displayName);
+                jconn.addMember("src_port", conn.sourcePort);
+                jconn.addMember("src_chan", conn.sourceChannel);
+                jconn.addMember("dest", conn.destination->displayName);
+                jconn.addMember("dest_port", conn.destinationPort);
+                jconn.addMember("dest_chan", conn.destinationChannel);
+                connstates.push_back(jconn);
+            }
             nodestates.push_back(nodestate);
         }
         root.addMember("nodestates", choc::value::createArray(nodestates));
+        root.addMember("nodeconnections", choc::value::createArray(connstates));
         std::ofstream outfile("C:/develop/AudioPluginHost_mk2/Source/Experimental/state.json");
         choc::json::writeAsJSON(outfile, root, true);
     }
@@ -536,6 +552,11 @@ class MainComponent : public juce::Component, public juce::Timer
             {
                 getParentComponent()->setBounds(boundsrect);
             }
+            std::unordered_map<std::string, XAPNode *> nodemap;
+            for (auto &e : m_graph->proc_nodes)
+            {
+                nodemap[e->displayName] = e.get();
+            }
             auto jnodesarr = jroot["nodestates"];
             auto sz = jnodesarr.size();
             if (sz > 0)
@@ -544,6 +565,13 @@ class MainComponent : public juce::Component, public juce::Timer
                 {
                     auto jnodestate = jnodesarr[i];
                     auto jid = jnodestate["id"];
+                    auto jnodebounds = jnodestate["nodebounds"];
+                    auto nodebounds = juce::Rectangle<int>::fromString(jnodebounds.toString());
+                    if (!nodebounds.isEmpty())
+                    {
+                        DBG(jid.toString() << " has node scene bound " << nodebounds.toString());
+                        nodemap[jid.toString()]->nodeSceneBounds = nodebounds;
+                    }
                     for (auto &w : m_xap_windows)
                     {
                         if (w->nodeID == jid.toString())

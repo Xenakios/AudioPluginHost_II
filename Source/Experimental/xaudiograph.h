@@ -132,6 +132,7 @@ class XAPNode
     std::unordered_map<clap_id, double> modulationSums;
     bool modulationWasApplied = false;
     std::unordered_map<clap_id, clap_param_info> parameterInfos;
+    juce::Rectangle<int> nodeSceneBounds;
 };
 
 inline bool connectAudioBetweenNodes(XAPNode *sourceNode, int sourcePort, int sourceChannel,
@@ -145,6 +146,7 @@ inline bool connectAudioBetweenNodes(XAPNode *sourceNode, int sourcePort, int so
     conn.source = sourceNode;
     conn.sourceChannel = sourceChannel;
     conn.sourcePort = sourcePort;
+    conn.destination = destinationNode;
     conn.destinationPort = destinationPort;
     conn.destinationChannel = destinationChannel;
     destinationNode->inputConnections.push_back(conn);
@@ -160,6 +162,7 @@ inline bool connectEventPorts(XAPNode *sourceNode, int sourcePort, XAPNode *dest
     conn.type = XAPNode::ConnectionType::Events;
     conn.source = sourceNode;
     conn.sourcePort = sourcePort;
+    conn.destination = destinationNode;
     conn.destinationPort = destinationPort;
     destinationNode->inputConnections.push_back(conn);
     return true;
