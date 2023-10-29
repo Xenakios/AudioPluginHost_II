@@ -348,21 +348,109 @@ class NodeGraphComponent : public juce::Component
     void paint(juce::Graphics &g) override
     {
         g.fillAll(juce::Colours::black);
-        g.setColour(juce::Colours::white);
+
         for (auto &n : m_graph->proc_nodes)
         {
             auto nodebounds = n->nodeSceneBounds;
-            g.drawRect(nodebounds);
-            g.drawText(n->displayName, nodebounds, juce::Justification::centredLeft);
+            g.setColour(juce::Colours::darkgrey);
+            g.fillRect(nodebounds);
+            g.setColour(juce::Colours::white);
+            g.drawText(n->processorName, nodebounds, juce::Justification::centred);
+            g.setColour(juce::Colours::green);
+            auto proc = n->processor.get();
+            int audioinportcount = proc->audioPortsCount(true);
+            int noteinportcount = proc->notePortsCount(true);
+            int totalinports = audioinportcount + noteinportcount + 1;
+            for (int i = 0; i < audioinportcount; ++i)
+            {
+                clap_audio_port_info pinfo;
+                if (proc->audioPortsInfo(i, true, &pinfo))
+                {
+                    for (int j = 0; j < pinfo.channel_count; ++j)
+                    {
+                        auto pt = getNodePinPosition(n.get(), 0, true, i, j);
+                        g.fillEllipse(pt.x, pt.y - 5.0f, 10.0, 10.0f);
+                    }
+                }
+            }
+            int audiooutportcount = proc->audioPortsCount(false);
+            int noteoutportcount = proc->notePortsCount(false);
+            int totaloutports = audiooutportcount + noteoutportcount + 1;
+            for (int i = 0; i < audiooutportcount; ++i)
+            {
+                clap_audio_port_info pinfo;
+                if (proc->audioPortsInfo(i, false, &pinfo))
+                {
+                    for (int j = 0; j < pinfo.channel_count; ++j)
+                    {
+                        auto pt = getNodePinPosition(n.get(), 0, false, i, j);
+                        g.fillEllipse(pt.x, pt.y - 5.0f, 10.0, 10.0f);
+                    }
+                }
+            }
+            g.setColour(juce::Colours::white);
             for (auto &conn : n->inputConnections)
             {
-                int x0 = nodebounds.getCentreX();
-                int x1 = conn.source->nodeSceneBounds.getCentreX();
-                int y0 = nodebounds.getY();
-                int y1 = conn.source->nodeSceneBounds.getBottom();
-                g.drawLine(x0, y0, x1, y1);
+                int type = (int)conn.type;
+                auto destpinpos = getNodePinPosition(n.get(), type, true, conn.destinationPort,
+                                                     conn.destinationChannel);
+                auto sourcepinpos = getNodePinPosition(
+                    conn.source, type, false, conn.destinationPort, conn.destinationChannel);
+                g.drawLine(sourcepinpos.getX() + 5.0f, sourcepinpos.getY(),
+                           destpinpos.getX() + 5.0f, destpinpos.getY());
             }
         }
+    }
+    juce::Point<float> getNodePinPosition(XAPNode *node, int type, bool isInput, int port,
+                                          int channel)
+    {
+        if (!node)
+            return {};
+        auto nbounds = node->nodeSceneBounds;
+        auto proc = node->processor.get();
+        double availw = (double)nbounds.getWidth() / 3;
+        if (type == 0) // audio
+        {
+            if (isInput)
+            {
+                clap_audio_port_info pinfo;
+                if (proc->audioPortsInfo(port, true, &pinfo))
+                {
+                    float x = availw / pinfo.channel_count * channel;
+                    return {nbounds.getX() + x, (float)nbounds.getY()};
+                }
+            }
+            else
+            {
+                clap_audio_port_info pinfo;
+                if (proc->audioPortsInfo(port, false, &pinfo))
+                {
+                    float x = availw / pinfo.channel_count * channel;
+                    return {nbounds.getX() + x, (float)nbounds.getBottom()};
+                }
+            }
+        }
+        if (type == 1) // notes
+        {
+            clap_note_port_info pinfo;
+            if (isInput)
+            {
+                if (proc->notePortsInfo(port, true, &pinfo))
+                {
+                    float x = availw / 2.0;
+                    return {nbounds.getX() + x, (float)nbounds.getY()};
+                }
+            }
+            else
+            {
+                if (proc->notePortsInfo(port, false, &pinfo))
+                {
+                    float x = availw / 2.0;
+                    return {nbounds.getX() + x, (float)nbounds.getBottom()};
+                }
+            }
+        }
+        return {};
     }
     void mouseDown(const juce::MouseEvent &ev) override
     {
