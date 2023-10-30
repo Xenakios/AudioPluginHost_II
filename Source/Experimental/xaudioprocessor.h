@@ -1,6 +1,6 @@
 #pragma once
 
-#include <clap/clap.h>
+#include "clap/clap.h"
 #include <clap/helpers/event-list.hh>
 #include "sst/basic-blocks/params/ParamMetadata.h"
 #include <memory>

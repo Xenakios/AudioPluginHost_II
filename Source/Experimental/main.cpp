@@ -444,6 +444,8 @@ class NodeGraphComponent : public juce::Component
                 g.drawLine(x0 + 5.0f, y0, x1 + 5.0f, y1, 2.0f);
             }
         }
+        g.setColour(juce::Colours::white);
+        g.drawText(m_debug_text, 0, 0, getWidth(), 20, juce::Justification::centredLeft);
     }
     juce::Point<float> getNodePinPosition(XAPNode *node, int type, bool isInput, int port,
                                           int channel)
@@ -498,12 +500,34 @@ class NodeGraphComponent : public juce::Component
     }
     void mouseDown(const juce::MouseEvent &ev) override
     {
+        m_debug_text = "";
         m_dragging_node = findFromPosition(ev.x, ev.y);
         if (m_dragging_node)
         {
             m_drag_start_bounds = m_dragging_node->nodeSceneBounds;
+            return;
+        }
+        auto pin = findPinFromPosition(ev.x, ev.y);
+        m_drag_connection = XAPNode::Connection();
+        if (pin)
+        {
+            if (pin->isInput)
+            {
+                m_drag_connection.destination = pin->node;
+                m_drag_connection.destinationChannel = pin->channel;
+                m_drag_connection.destinationPort = pin->port;
+                m_drag_connection.type = pin->type;
+            }
+            else
+            {
+                m_drag_connection.source = pin->node;
+                m_drag_connection.sourceChannel = pin->channel;
+                m_drag_connection.sourcePort = pin->port;
+                m_drag_connection.type = pin->type;
+            }
         }
     }
+    juce::String m_debug_text;
     void mouseDrag(const juce::MouseEvent &ev) override
     {
         if (m_dragging_node)
@@ -513,12 +537,41 @@ class NodeGraphComponent : public juce::Component
             m_dragging_node->nodeSceneBounds = newbounds;
             refreshPins();
             repaint();
+            return;
+        }
+        if (m_drag_connection.source || m_drag_connection.destination)
+        {
+            if (m_drag_connection.source)
+                m_debug_text =
+                    "Dragging new connection from " + m_drag_connection.source->displayName;
+            else
+                m_debug_text =
+                    "Dragging new connection from " + m_drag_connection.destination->displayName;
+            auto pin = findPinFromPosition(ev.x, ev.y);
+            if (pin)
+            {
+                if (pin->isInput && m_drag_connection.source && pin->type == m_drag_connection.type)
+                {
+                    m_debug_text = "Would connect " + m_drag_connection.source->displayName +
+                                   " to " + pin->node->displayName;
+                }
+                if (!pin->isInput && m_drag_connection.destination &&
+                    pin->type == m_drag_connection.type)
+                {
+                    m_debug_text = "Would connect " + pin->node->displayName + " to " +
+                                   m_drag_connection.source->displayName;
+                }
+            }
+            repaint();
         }
     }
     void mouseUp(const juce::MouseEvent &ev) override
     {
         m_dragging_node = nullptr;
         m_drag_start_bounds = {};
+        m_drag_connection = XAPNode::Connection();
+        m_debug_text = "";
+        repaint();
     }
     void mouseMove(const juce::MouseEvent &ev) override
     {
@@ -557,7 +610,6 @@ class NodeGraphComponent : public juce::Component
     }
     XAPNode::Pin *findPinFromPosition(int x, int y)
     {
-
         for (auto &n : m_graph->proc_nodes)
         {
             auto nbounds = n->nodeSceneBounds;
@@ -629,6 +681,7 @@ class NodeGraphComponent : public juce::Component
         XAPNode *node = nullptr;
     };
     std::vector<PinUIProperties> m_pins;
+    XAPNode::Connection m_drag_connection;
 };
 
 class MyContinuous : public sst::jucegui::data::Continuous
@@ -669,7 +722,14 @@ class MainComponent : public juce::Component, public juce::Timer
         m_graph->addProcessorAsNode(std::make_unique<ClapPluginFormatProcessor>(
                                         pathprefix + R"(CLAP\Surge Synth Team\Surge XT.clap)", 0),
                                     "Surge XT 1");
-
+        m_graph->addProcessorAsNode(
+            std::make_unique<JucePluginWrapper>(
+                R"(C:\Program Files\Common Files\VST3\ValhallaVintageVerb.vst3)"),
+            "Valhalla");
+        m_graph->addProcessorAsNode(
+            std::make_unique<JucePluginWrapper>(
+                R"(C:\Program Files\Common Files\VST3\ValhallaDelay.vst3)"),
+            "Delay");
         // m_graph->addProcessorAsNode(
         //     std::make_unique<ClapPluginFormatProcessor>(pathprefix + "/CLAP/Conduit.clap", 0),
         //     "Surge XT 1");
@@ -685,6 +745,14 @@ class MainComponent : public juce::Component, public juce::Timer
 
         m_graph->connectAudio("Surge XT 1", 0, 0, "Main", 0, 0);
         m_graph->connectAudio("Surge XT 1", 0, 1, "Main", 0, 1);
+        m_graph->connectAudio("Surge XT 1", 1, 0, "Valhalla", 0, 0);
+        m_graph->connectAudio("Surge XT 1", 1, 1, "Valhalla", 0, 1);
+        m_graph->connectAudio("Surge XT 1", 2, 0, "Delay", 0, 0);
+        m_graph->connectAudio("Surge XT 1", 2, 1, "Delay", 0, 1);
+        m_graph->connectAudio("Valhalla", 0, 0, "Main", 0, 0);
+        m_graph->connectAudio("Valhalla", 0, 1, "Main", 0, 1);
+        m_graph->connectAudio("Delay", 0, 0, "Main", 0, 0);
+        m_graph->connectAudio("Delay", 0, 1, "Main", 0, 1);
         // m_graph->connectAudio("Surge XT 2", 0, 0, "Main", 0, 0);
         // m_graph->connectAudio("Surge XT 2", 0, 1, "Main", 0, 1);
         m_graph->outputNodeId = "Main";
@@ -974,8 +1042,8 @@ class GuiAppApplication : public juce::JUCEApplication
     //==============================================================================
     GuiAppApplication() {}
 
-    const juce::String getApplicationName() override { return "FOO"; }
-    const juce::String getApplicationVersion() override { return "0.0.0"; }
+    const juce::String getApplicationName() override { return "XAPHost"; }
+    const juce::String getApplicationVersion() override { return "0.1.0"; }
     bool moreThanOneInstanceAllowed() override { return true; }
 
     //==============================================================================

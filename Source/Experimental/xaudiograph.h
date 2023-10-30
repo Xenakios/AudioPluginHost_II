@@ -42,10 +42,11 @@ class XAPNode
     struct Pin
     {
         Pin() {}
-        Pin(bool isInput_, ConnectionType type_, int port_, int channel_)
-            : isInput(isInput_), type(type_), port(port_), channel(channel_)
+        Pin(XAPNode *node_, bool isInput_, ConnectionType type_, int port_, int channel_)
+            : node(node_), isInput(isInput_), type(type_), port(port_), channel(channel_)
         {
         }
+        XAPNode *node = nullptr;
         bool isInput = false;
         ConnectionType type;
         int port = 0;
@@ -117,8 +118,10 @@ class XAPNode
                 inPortBuffers[i].data32 = new float *[pinfo.channel_count];
                 for (int j = 0; j < pinfo.channel_count; ++j)
                 {
-                    inputPins.emplace_back(true, XAPNode::ConnectionType::Audio, i, j);
+                    inputPins.emplace_back(this, true, XAPNode::ConnectionType::Audio, i, j);
                     inPortBuffers[i].data32[j] = new float[maxFrames];
+                    for (int k = 0; k < maxFrames; ++k)
+                        inPortBuffers[i].data32[j][k] = 0.0f;
                 }
             }
         }
@@ -134,20 +137,22 @@ class XAPNode
                 outPortBuffers[i].data32 = new float *[pinfo.channel_count];
                 for (int j = 0; j < pinfo.channel_count; ++j)
                 {
-                    outputPins.emplace_back(false, XAPNode::ConnectionType::Audio, i, j);
+                    outputPins.emplace_back(this, false, XAPNode::ConnectionType::Audio, i, j);
                     outPortBuffers[i].data32[j] = new float[maxFrames];
+                    for (int k = 0; k < maxFrames; ++k)
+                        outPortBuffers[i].data32[j][k] = 0.0f;
                 }
             }
         }
         for (int i = 0; i < processor->notePortsCount(true); ++i)
         {
-            inputPins.emplace_back(true, XAPNode::ConnectionType::Events, i, 0);
+            inputPins.emplace_back(this, true, XAPNode::ConnectionType::Events, i, 0);
         }
         for (int i = 0; i < processor->notePortsCount(false); ++i)
         {
-            outputPins.emplace_back(false, XAPNode::ConnectionType::Events, i, 0);
+            outputPins.emplace_back(this, false, XAPNode::ConnectionType::Events, i, 0);
         }
-        inputPins.emplace_back(true, XAPNode::ConnectionType::Modulation, 0, 0);
+        inputPins.emplace_back(this, true, XAPNode::ConnectionType::Modulation, 0, 0);
     }
 
     std::unique_ptr<xenakios::XAudioProcessor> processor;
@@ -618,7 +623,7 @@ class XAPGraph : public xenakios::XAudioProcessor
             // printClapEvents(n->inEvents);
             ctx.audio_inputs_count = 1;
             ctx.audio_inputs = n->inPortBuffers.data();
-            ctx.audio_outputs_count = 1;
+            ctx.audio_outputs_count = n->outPortBuffers.size();
             ctx.audio_outputs = n->outPortBuffers.data();
             ctx.in_events = n->inEvents.clapInputEvents();
             ctx.out_events = n->outEvents.clapOutputEvents();

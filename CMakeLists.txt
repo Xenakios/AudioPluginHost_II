@@ -31,12 +31,12 @@ project(AudioPluginHost2 VERSION 0.0.1)
 add_subdirectory(JUCE)
 
 include_directories(
+    libs/clap/include
+    libs/clap-helpers/include
     Source/AudioGraph
     Source/Experimental/noise-plethora/rack/include
     libs/signalsmith-stretch
     libs/choc
-    libs/clap/include
-    libs/clap-helpers/include
     libs/sst-basic-blocks/include
     libs/fmt/include
     libs/sst-jucegui/include
