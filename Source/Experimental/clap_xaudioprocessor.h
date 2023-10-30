@@ -185,6 +185,7 @@ class ClapPluginFormatProcessor : public xenakios::XAudioProcessor
                     (clap_plugin_audio_ports *)m_plug->get_extension(m_plug, CLAP_EXT_AUDIO_PORTS);
                 m_ext_note_ports =
                     (clap_plugin_note_ports *)m_plug->get_extension(m_plug, CLAP_EXT_NOTE_PORTS);
+                m_ext_state = (clap_plugin_state *)m_plug->get_extension(m_plug, CLAP_EXT_STATE);
                 return true;
             }
         }
@@ -277,6 +278,14 @@ class ClapPluginFormatProcessor : public xenakios::XAudioProcessor
             // FIXME should flush events from the GenericEditor too
             m_ext_params->flush(m_plug, in, out);
         }
+    }
+    clap_plugin_state *m_ext_state = nullptr;
+    bool stateSave(const clap_ostream *stream) noexcept override
+    {
+
+        if (!m_ext_state)
+            return false;
+        return m_ext_state->save(m_plug, stream);
     }
 
     clap_plugin_gui *m_ext_gui = nullptr;

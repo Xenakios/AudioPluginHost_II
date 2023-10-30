@@ -217,6 +217,9 @@ class XAudioProcessor
         return false;
     }
 
+    virtual bool stateSave(const clap_ostream *stream) noexcept { return false; }
+    virtual bool stateLoad(const clap_istream *stream) noexcept { return false; }
+
     virtual bool renderSetMode(clap_plugin_render_mode mode) noexcept { return false; }
 
     // This should thread safely insert a parameter change into the processor's event list.

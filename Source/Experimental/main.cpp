@@ -726,10 +726,9 @@ class MainComponent : public juce::Component, public juce::Timer
             std::make_unique<JucePluginWrapper>(
                 R"(C:\Program Files\Common Files\VST3\ValhallaVintageVerb.vst3)"),
             "Valhalla");
-        m_graph->addProcessorAsNode(
-            std::make_unique<JucePluginWrapper>(
-                R"(C:\Program Files\Common Files\VST3\ValhallaDelay.vst3)"),
-            "Delay");
+        m_graph->addProcessorAsNode(std::make_unique<JucePluginWrapper>(
+                                        R"(C:\Program Files\Common Files\VST3\ValhallaDelay.vst3)"),
+                                    "Delay");
         // m_graph->addProcessorAsNode(
         //     std::make_unique<ClapPluginFormatProcessor>(pathprefix + "/CLAP/Conduit.clap", 0),
         //     "Surge XT 1");
@@ -866,6 +865,15 @@ class MainComponent : public juce::Component, public juce::Timer
         {
             auto nodestate = choc::value::createObject("");
             nodestate.addMember("id", n->displayName);
+            auto procstate = XAPGraph::getProcessorState(n->processor.get());
+            if (procstate.size() > 0)
+            {
+                DBG(n->processorName << " returned " << procstate.size() << " bytes of state");
+            }
+            else
+            {
+                DBG(n->processorName << " did not return state");
+            }
             juce::Rectangle<int> bounds;
             for (auto &w : m_xap_windows)
             {

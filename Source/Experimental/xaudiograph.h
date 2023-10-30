@@ -654,6 +654,25 @@ class XAPGraph : public xenakios::XAudioProcessor
         return CLAP_PROCESS_CONTINUE;
     }
     std::vector<std::unique_ptr<XAPNode>> proc_nodes;
+    static std::vector<unsigned char> getProcessorState(XAudioProcessor* proc)
+    {
+        std::vector<unsigned char> result;
+        result.reserve(1024);
+        clap_ostream os;
+        os.ctx = &result;
+        // int64_t(CLAP_ABI *write)(const struct clap_ostream *stream, const void *buffer, uint64_t
+        // size);
+        auto write = [](const struct clap_ostream *stream, const void *buffer, uint64_t size) {
+            unsigned char *charptr = (unsigned char *)buffer;
+            std::vector<unsigned char> *ov = (std::vector<unsigned char> *)stream->ctx;
+            for (uint64_t i = 0; i < size; ++i)
+                ov->push_back(charptr[i]);
+            return (int64_t)size;
+        };
+        os.write = write;
+        proc->stateSave(&os);
+        return result;
+    }
 
   private:
     std::vector<XAPNode *> runOrder;
