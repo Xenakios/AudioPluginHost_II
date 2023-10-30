@@ -215,11 +215,11 @@ inline bool connectEventPorts(XAPNode *sourceNode, int sourcePort, XAPNode *dest
     conn.sourcePort = sourcePort;
     conn.destination = destinationNode;
     conn.destinationPort = destinationPort;
-    
+
     conn.sourcePinIndex =
         findPinIndex(sourceNode, XAPNode::ConnectionType::Events, false, sourcePort, 0);
-    conn.destinationPinIndex = findPinIndex(destinationNode, XAPNode::ConnectionType::Events, true,
-                                            destinationPort, 0);
+    conn.destinationPinIndex =
+        findPinIndex(destinationNode, XAPNode::ConnectionType::Events, true, destinationPort, 0);
 
     destinationNode->inputConnections.push_back(conn);
     return true;
