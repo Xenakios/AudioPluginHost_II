@@ -654,17 +654,15 @@ class XAPGraph : public xenakios::XAudioProcessor
         return CLAP_PROCESS_CONTINUE;
     }
     std::vector<std::unique_ptr<XAPNode>> proc_nodes;
-    static std::vector<unsigned char> getProcessorState(XAudioProcessor* proc)
+    static std::vector<unsigned char> getProcessorState(XAudioProcessor *proc)
     {
         std::vector<unsigned char> result;
         result.reserve(1024);
         clap_ostream os;
         os.ctx = &result;
-        // int64_t(CLAP_ABI *write)(const struct clap_ostream *stream, const void *buffer, uint64_t
-        // size);
         auto write = [](const struct clap_ostream *stream, const void *buffer, uint64_t size) {
             unsigned char *charptr = (unsigned char *)buffer;
-            std::vector<unsigned char> *ov = (std::vector<unsigned char> *)stream->ctx;
+            auto ov = (std::vector<unsigned char> *)stream->ctx;
             for (uint64_t i = 0; i < size; ++i)
                 ov->push_back(charptr[i]);
             return (int64_t)size;
@@ -672,6 +670,29 @@ class XAPGraph : public xenakios::XAudioProcessor
         os.write = write;
         proc->stateSave(&os);
         return result;
+    }
+    static bool setProcessorState(XAudioProcessor *proc, std::vector<unsigned char> &chunk)
+    {
+        if (chunk.size() == 0)
+            return false;
+        clap_istream is;
+        std::pair<std::vector<unsigned char> &, size_t> vec_and_pos{chunk, 0};
+        is.ctx = &vec_and_pos;
+        is.read = [](const struct clap_istream *stream, void *buffer, uint64_t size) {
+            unsigned char *charptr = (unsigned char *)buffer;
+            auto &indata = *(std::pair<std::vector<unsigned char> &, size_t> *)stream->ctx;
+            int readbytes = 0;
+            for (int i = 0; i < size; ++i)
+            {
+                if (indata.second >= indata.first.size())
+                    break;
+                charptr[i] = indata.first[indata.second];
+                ++indata.second;
+                ++readbytes;
+            }
+            return (int64_t)readbytes;
+        };
+        return proc->stateLoad(&is);
     }
 
   private:

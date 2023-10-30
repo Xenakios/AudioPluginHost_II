@@ -282,12 +282,16 @@ class ClapPluginFormatProcessor : public xenakios::XAudioProcessor
     clap_plugin_state *m_ext_state = nullptr;
     bool stateSave(const clap_ostream *stream) noexcept override
     {
-
         if (!m_ext_state)
             return false;
         return m_ext_state->save(m_plug, stream);
     }
-
+    bool stateLoad(const clap_istream *stream) noexcept override
+    {
+        if (!m_ext_state)
+            return false;
+        return m_ext_state->load(m_plug, stream);
+    }
     clap_plugin_gui *m_ext_gui = nullptr;
     void initGUIExtension()
     {

@@ -19,6 +19,7 @@
 #include <sst/jucegui/components/HSlider.h>
 #include "text/choc_JSON.h"
 #include "text/choc_Files.h"
+#include "memory/choc_Base64.h"
 #include <fstream>
 
 inline void mapModulationEvents(const clap::helpers::EventList &sourceList, clap_id sourceParId,
@@ -869,6 +870,9 @@ class MainComponent : public juce::Component, public juce::Timer
             if (procstate.size() > 0)
             {
                 DBG(n->processorName << " returned " << procstate.size() << " bytes of state");
+                auto b64state = choc::base64::encodeToString(procstate);
+                DBG(b64state.size() << " bytes as base64");
+                nodestate.addMember("procstatebase64", b64state);
             }
             else
             {
@@ -942,6 +946,19 @@ class MainComponent : public juce::Component, public juce::Timer
                         DBG(jid.toString() << " has node scene bound " << nodebounds.toString());
                         nodemap[jid.toString()]->nodeSceneBounds = nodebounds;
                     }
+                    auto b64state = jnodestate["procstatebase64"].toString();
+                    if (b64state.size() > 0)
+                    {
+                        std::vector<unsigned char> vec;
+                        if (choc::base64::decodeToContainer(vec, b64state))
+                        {
+                            auto *proc = nodemap[jid.toString()]->processor.get();
+                            if (!m_graph->setProcessorState(proc, vec))
+                            {
+                                DBG("could not set state");
+                            }
+                        } else DBG("could not decode base64");
+                    } else DBG("no base64 string");
                     for (auto &w : m_xap_windows)
                     {
                         if (w->nodeID == jid.toString())
