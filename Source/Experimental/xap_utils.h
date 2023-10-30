@@ -84,3 +84,26 @@ template <typename Key, typename Value> class KeyValueTable
   private:
     std::vector<Entry> entries;
 };
+
+class VecToStreamAdapter
+{
+    std::vector<unsigned char> &m_src;
+    size_t readpos = 0;
+
+  public:
+    VecToStreamAdapter(std::vector<unsigned char> &src) : m_src(src) {}
+    size_t read(void *dest, size_t sz)
+    {
+        auto o = (unsigned char*)dest;
+        if (readpos >= m_src.size())
+            return 0;
+        for (size_t i = 0; i < sz; ++i)
+        {
+            o[i] = m_src[readpos];
+            ++readpos;
+            if (readpos >= m_src.size())
+                return i;
+        }
+        return sz;
+    }
+};

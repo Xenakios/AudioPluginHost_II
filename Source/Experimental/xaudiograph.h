@@ -676,21 +676,12 @@ class XAPGraph : public xenakios::XAudioProcessor
         if (chunk.size() == 0)
             return false;
         clap_istream is;
-        std::pair<std::vector<unsigned char> &, size_t> vec_and_pos{chunk, 0};
-        is.ctx = &vec_and_pos;
+        VecToStreamAdapter adapter{chunk};
+        is.ctx = &adapter;
         is.read = [](const struct clap_istream *stream, void *buffer, uint64_t size) {
             unsigned char *charptr = (unsigned char *)buffer;
-            auto &indata = *(std::pair<std::vector<unsigned char> &, size_t> *)stream->ctx;
-            int readbytes = 0;
-            for (int i = 0; i < size; ++i)
-            {
-                if (indata.second >= indata.first.size())
-                    break;
-                charptr[i] = indata.first[indata.second];
-                ++indata.second;
-                ++readbytes;
-            }
-            return (int64_t)readbytes;
+            auto adap = (VecToStreamAdapter *)stream->ctx;
+            return (int64_t)adap->read(buffer, size);
         };
         return proc->stateLoad(&is);
     }
