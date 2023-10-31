@@ -197,6 +197,35 @@ class JucePluginWrapper : public xenakios::XAudioProcessor, public juce::AudioPl
         }
         return CLAP_PROCESS_CONTINUE;
     }
+
+    bool stateSave(const clap_ostream *stream) noexcept override
+    {
+        juce::MemoryBlock block;
+        m_internal->getStateInformation(block);
+        stream->write(stream, block.getData(), block.getSize());
+        return true;
+    }
+    bool stateLoad(const clap_istream *stream) noexcept override
+    {
+        juce::MemoryBlock block;
+        constexpr size_t bufsize = 4096;
+        unsigned char buf[bufsize];
+        memset(buf, 0, bufsize);
+        while (true)
+        {
+            int read = stream->read(stream, buf, bufsize);
+            if (read == 0)
+                break;
+            block.append(buf, read);
+        }
+        if (block.getSize() > 0)
+        {
+            m_internal->setStateInformation(block.getData(), block.getSize());
+            return true;
+        }
+        return false;
+    }
+
     uint32_t notePortsCount(bool isInput) const noexcept override
     {
         if (isInput && m_internal->acceptsMidi())
