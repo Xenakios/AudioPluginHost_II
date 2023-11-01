@@ -94,7 +94,7 @@ class VecToStreamAdapter
     VecToStreamAdapter(std::vector<unsigned char> &src) : m_src(src) {}
     size_t read(void *dest, size_t sz)
     {
-        auto o = (unsigned char*)dest;
+        auto o = (unsigned char *)dest;
         if (readpos >= m_src.size())
             return 0;
         for (size_t i = 0; i < sz; ++i)
@@ -102,7 +102,7 @@ class VecToStreamAdapter
             o[i] = m_src[readpos];
             ++readpos;
             if (readpos >= m_src.size())
-                return i;
+                return i + 1;
         }
         return sz;
     }

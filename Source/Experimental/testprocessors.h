@@ -8,6 +8,7 @@
 #include "sst/basic-blocks/modulators/SimpleLFO.h"
 #include "xap_generic_editor.h"
 #include "xapwithjucegui.h"
+#include "text/choc_JSON.h"
 
 inline void insertToEndOfEventListFromFIFO(
     choc::fifo::SingleReaderSingleWriterFIFO<xenakios::CrossThreadMessage> &source,
@@ -210,9 +211,8 @@ class ToneProcessorTest : public XAPWithJuceGUI
     int m_mod_out_counter = 0;
 };
 
-static xenakios::RegisterXap reg_tonegen{"Internal/Tone Generator",[](){
-    return std::make_unique<ToneProcessorTest>();
-}};
+static xenakios::RegisterXap reg_tonegen{"Internal/Tone Generator",
+                                         []() { return std::make_unique<ToneProcessorTest>(); }};
 
 class XAPGain : public XAPWithJuceGUI
 {
@@ -298,6 +298,62 @@ class XAPGain : public XAPWithJuceGUI
             }
         }
     }
+    bool stateSave(const clap_ostream *stream) noexcept override
+    {
+        choc::value::Value v = choc::value::createObject("");
+        v.addMember("version", 0);
+        v.addMember("volume", m_volume);
+        v.addMember("smoothing", m_gain_proc.getRampDurationSeconds());
+        auto json = choc::json::toString(v, true);
+
+        if (json.size() > 0)
+        {
+            DBG("volume serialized json is\n" << json);
+            if (stream->write(stream, json.data(), json.size()) != -1)
+                return true;
+        }
+
+        return false;
+    }
+    bool stateLoad(const clap_istream *stream) noexcept override
+    {
+        std::string json;
+        constexpr size_t bufsize = 4096;
+        json.reserve(bufsize);
+        unsigned char buf[bufsize];
+        memset(buf, 0, bufsize);
+        while (true)
+        {
+            int read = stream->read(stream, buf, bufsize);
+            if (read == 0)
+                break;
+            for (size_t i = 0; i < read; ++i)
+                json.push_back(buf[i]);
+        }
+        DBG("volume deserialized json is\n" << json);
+        if (json.size() > 0)
+        {
+            auto val = choc::json::parseValue(json);
+            if (val.isObject() && val.hasObjectMember("version") && val["version"].get<int>() >= 0)
+            {
+                // these are not thread safe!
+                m_volume = val["volume"].get<double>();
+                m_gain_proc.setRampDurationSeconds(val["smoothing"].get<double>());
+            }
+            //if (m_editor_attached)
+            {
+                m_to_ui_fifo.push(xenakios::CrossThreadMessage{(clap_id)ParamIds::Volume,
+                                                               CLAP_EVENT_PARAM_VALUE, m_volume});
+                m_to_ui_fifo.push(xenakios::CrossThreadMessage{
+                    (clap_id)ParamIds::Smoothing, CLAP_EVENT_PARAM_VALUE,
+                    m_gain_proc.getRampDurationSeconds()});
+            }
+
+            return true;
+        }
+
+        return false;
+    }
     clap_process_status process(const clap_process *process) noexcept override
     {
         auto numInChans = process->audio_inputs->channel_count;
@@ -339,9 +395,8 @@ class XAPGain : public XAPWithJuceGUI
     void guiDestroy() noexcept override { m_editor = nullptr; }
 };
 
-static xenakios::RegisterXap reg_volume{"Internal/Volume",[](){
-    return std::make_unique<XAPGain>();
-}};
+static xenakios::RegisterXap reg_volume{"Internal/Volume",
+                                        []() { return std::make_unique<XAPGain>(); }};
 
 const size_t maxHolderDataSize = 128;
 

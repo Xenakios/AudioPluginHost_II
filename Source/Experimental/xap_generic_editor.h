@@ -43,6 +43,7 @@ class GenericEditor : public juce::Component, public juce::Timer
                 clap_param_info pinfo;
                 m_proc.paramsInfo(i, &pinfo);
                 auto comps = std::make_unique<ParamComponents>();
+                m_id_to_comps[pinfo.id] = comps.get();
                 comps->paramId = pinfo.id;
                 comps->label.setText(pinfo.name, juce::dontSendNotification);
                 comps->slider = std::make_unique<juce::Slider>();
