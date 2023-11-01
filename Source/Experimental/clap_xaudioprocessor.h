@@ -49,15 +49,38 @@ class ClapPluginFormatProcessor : public xenakios::XAudioProcessor
         m_plug->stop_processing(m_plug);
         m_processingStarted = false;
     }
-    void restartPlugin()
-    {
-        
-    }
-    ClapPluginFormatProcessor(std::string plugfilename, int plugindex) : m_plugdll(plugfilename)
+    void restartPlugin() {}
+    using LoggerFunc = std::function<void(clap_log_severity, const char *)>;
+    LoggerFunc OnLogMessage;
+
+    ClapPluginFormatProcessor(std::string plugfilename, int plugindex, LoggerFunc logfunc = nullptr)
+        : m_plugdll(plugfilename), OnLogMessage(logfunc)
     {
         auto get_extension_lambda = [](const struct clap_host *host,
                                        const char *eid) -> const void * {
             // DBG("plugin requested host extension " << eid);
+            if (!strcmp(eid, CLAP_EXT_THREAD_CHECK))
+            {
+                static clap_host_thread_check ext_thcheck;
+                ext_thcheck.is_audio_thread = [](const clap_host *) {
+                    return !juce::MessageManager::getInstance()->isThisTheMessageThread();
+                };
+                ext_thcheck.is_main_thread = [](const clap_host *) {
+                    return juce::MessageManager::getInstance()->isThisTheMessageThread();
+                };
+                return &ext_thcheck;
+            }
+            if (!strcmp(eid, CLAP_EXT_LOG))
+            {
+                static clap_host_log ext_log;
+                ext_log.log = [](const clap_host_t *host_, clap_log_severity severity,
+                                 const char *msg) {
+                    auto claphost = (ClapPluginFormatProcessor *)host_->host_data;
+                    if (claphost->OnLogMessage)
+                        claphost->OnLogMessage(severity, msg);
+                };
+                return &ext_log;
+            }
             if (!strcmp(eid, CLAP_EXT_GUI))
             {
                 static clap_host_gui ext_gui;
@@ -179,7 +202,7 @@ class ClapPluginFormatProcessor : public xenakios::XAudioProcessor
         if (OnPluginRequestedResize)
             OnPluginRequestedResize(w, h);
     }
-    
+
     bool activate(double sampleRate, uint32_t minFrameCount,
                   uint32_t maxFrameCount) noexcept override
     {
@@ -195,16 +218,17 @@ class ClapPluginFormatProcessor : public xenakios::XAudioProcessor
                 m_ext_note_ports =
                     (clap_plugin_note_ports *)m_plug->get_extension(m_plug, CLAP_EXT_NOTE_PORTS);
                 m_ext_state = (clap_plugin_state *)m_plug->get_extension(m_plug, CLAP_EXT_STATE);
-                m_ext_plugin_tail = (clap_plugin_tail*)m_plug->get_extension(m_plug, CLAP_EXT_TAIL);
+                m_ext_plugin_tail =
+                    (clap_plugin_tail *)m_plug->get_extension(m_plug, CLAP_EXT_TAIL);
                 return true;
             }
         }
         return false;
     }
-    uint32_t tailGet() const noexcept override 
-    { 
+    uint32_t tailGet() const noexcept override
+    {
         if (!m_plug)
-            return 0; 
+            return 0;
         return m_ext_plugin_tail->get(m_plug);
     }
     void initParamsExtension()

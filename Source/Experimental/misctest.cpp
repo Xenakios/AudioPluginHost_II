@@ -1,6 +1,8 @@
 #include <iostream>
 #include <memory>
 #include <vector>
+#include <span>
+#include <array>
 
 class object_t
 {
@@ -88,20 +90,20 @@ void test_polym()
     while (true)
     {
         char line[4096];
-        std::cin.getline(line,4096);
+        std::cin.getline(line, 4096);
         std::string str(line);
         if (str == "quit")
             break;
         doc.m_name = str;
         history.emplace_back(doc);
     }
-    for (auto& e : history)
+    for (auto &e : history)
     {
         std::cout << "------ Doc state ------\n";
         draw(e, std::cout, 0);
         std::cout << "-----------------------\n";
     }
-    
+
     /*
     history_t history;
     doc_t doc;
@@ -125,10 +127,28 @@ void test_polym()
     */
 }
 
-int main()
+inline void f(std::span<float, 3> s)
 {
-    test_polym();
-    return 0;
+    std::cout << "span has " << s.size() << " elements\n";
+    s[0] = 666.0f;
+    for (auto &e : s)
+        std::cout << e << " ";
+    std::cout << "\n";
 }
 
+inline void test_span()
+{
+    float arr[3] = {0.1f, 0.2f, 0.3f};
+    f(arr);
+    std::array<float, 3> stdarr{0.5f, 0.6f, 0.7f};
+    f(stdarr);
+    float arrerr[2] = {0.2f, 0.3f};
+    f(arrerr);
+}
 
+int main()
+{
+    test_span();
+    // test_polym();
+    return 0;
+}

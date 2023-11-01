@@ -710,6 +710,7 @@ class MainComponent : public juce::Component, public juce::Timer
     sst::jucegui::components::HSlider m_sst_knob;
     std::unique_ptr<NodeListComponent> m_node_list;
     juce::TextEditor m_node_info_ed;
+    juce::TextEditor m_log_ed;
     std::unique_ptr<NodeGraphComponent> m_graph_component;
     void timerCallback() override
     {
@@ -719,9 +720,13 @@ class MainComponent : public juce::Component, public juce::Timer
     std::string pathprefix = R"(C:\Program Files\Common Files\)";
     void addNoteGeneratorTestNodes()
     {
+        auto logfunc = [this](clap_log_severity sev, const char * msg)
+        {
+            DBG("Clap plugin logged at level " << sev << " : " << msg);
+        };
         m_graph->addProcessorAsNode(std::make_unique<ClapEventSequencerProcessor>(2), "Note Gen");
         m_graph->addProcessorAsNode(std::make_unique<ClapPluginFormatProcessor>(
-                                        pathprefix + R"(CLAP\Surge Synth Team\Surge XT.clap)", 0),
+                                        pathprefix + R"(CLAP\Surge Synth Team\Surge XT.clap)", 0, logfunc),
                                     "Surge XT 1");
         m_graph->addProcessorAsNode(
             std::make_unique<JucePluginWrapper>(
@@ -793,7 +798,7 @@ class MainComponent : public juce::Component, public juce::Timer
     }
     MainComponent()
     {
-
+        addAndMakeVisible(m_log_ed);
         addAndMakeVisible(m_infolabel);
         addAndMakeVisible(m_mod_rout_combo);
         sst::jucegui::style::StyleSheet::initializeStyleSheets([]() {});
@@ -1050,13 +1055,10 @@ class MainComponent : public juce::Component, public juce::Timer
     }
     void resized() override
     {
-
-        // m_mod_rout_combo.setBounds(0, m_infolabel.getBottom() + 1, 50, 25);
-        // m_sst_knob.setBounds(200, 10, 400, 50);
-        m_node_list->setBounds(0, 0, 300, getHeight() - 25);
+        //m_node_list->setBounds(0, 0, 300, getHeight() - 25);
+        m_log_ed.setBounds(0,0,300,getHeight()-25);
         m_graph_component->setBounds(m_node_list->getRight() + 1, 0, getWidth() - 298,
                                      getHeight() - 25);
-        // m_node_info_ed.setBounds(m_node_list->getRight() + 1, 0, 300, 200);
         m_infolabel.setBounds(0, m_node_list->getBottom(), getWidth(), 25);
     }
 };
