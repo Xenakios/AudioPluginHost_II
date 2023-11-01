@@ -290,6 +290,7 @@ class ClapPluginFormatProcessor : public xenakios::XAudioProcessor
     {
         if (!m_ext_state)
             return false;
+        // have to trust the hosted plugin does this thread safely...
         return m_ext_state->load(m_plug, stream);
     }
     clap_plugin_gui *m_ext_gui = nullptr;

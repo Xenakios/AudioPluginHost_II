@@ -220,6 +220,7 @@ class JucePluginWrapper : public xenakios::XAudioProcessor, public juce::AudioPl
         }
         if (block.getSize() > 0)
         {
+            // here we have to trust the hosted plugin does this thread safely...
             m_internal->setStateInformation(block.getData(), block.getSize());
             return true;
         }

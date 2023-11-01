@@ -337,6 +337,8 @@ class XAPGain : public XAPWithJuceGUI
             if (val.isObject() && val.hasObjectMember("version") && val["version"].get<int>() >= 0)
             {
                 // these are not thread safe!
+                // but interestingly, the SST Conduit plugin seems to be doing things
+                // similarly, where they just update the plugin parameter states directly
                 m_volume = val["volume"].get<double>();
                 m_gain_proc.setRampDurationSeconds(val["smoothing"].get<double>());
             }
