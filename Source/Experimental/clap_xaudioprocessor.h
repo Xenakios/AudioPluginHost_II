@@ -4,29 +4,6 @@
 #include "platform/choc_DynamicLibrary.h"
 #include "xap_generic_editor.h"
 
-inline void my_host_par_rescan(const clap_host_t *host, clap_param_rescan_flags flags)
-{
-    // auto cp = (ClapProcessor*)host->host_data;
-    // cp->updateParameterInfos();
-    std::cout << "plugin parameters changed, host should rescan\n";
-}
-
-inline void my_host_par_clear(const clap_host_t *host, clap_id param_id,
-                              clap_param_clear_flags flags)
-{
-}
-
-inline void my_host_par_request_flush(const clap_host_t *host) {}
-
-inline void request_restart(const struct clap_host *) {}
-
-inline void request_process(const struct clap_host *) {}
-
-inline void request_callback_nop(const struct clap_host *)
-{
-    // DBG("nop request_callback";
-}
-
 class ClapPluginFormatProcessor : public xenakios::XAudioProcessor
 {
     choc::file::DynamicLibrary m_plugdll;
@@ -36,9 +13,18 @@ class ClapPluginFormatProcessor : public xenakios::XAudioProcessor
                             "0.0.0",           nullptr, nullptr,   nullptr,    nullptr};
     std::atomic<bool> m_inited{false};
     clap_plugin_params_t *m_ext_params = nullptr;
-    bool m_processingStarted = false;
+    std::atomic<bool> m_processingStarted{false};
     std::atomic<bool> m_activated{false};
     choc::fifo::SingleReaderSingleWriterFIFO<xenakios::CrossThreadMessage> m_from_generic_editor;
+
+    enum ProcState
+    {
+        PS_Stopped,
+        PS_StartRequested,
+        PS_Started,
+        PS_StopRequested
+    };
+    std::atomic<ProcState> m_processing_state{PS_Stopped};
 
   public:
     std::vector<clap_param_info> m_param_infos;
@@ -48,6 +34,24 @@ class ClapPluginFormatProcessor : public xenakios::XAudioProcessor
             return false;
         *desc = *m_plug->desc;
         return true;
+    }
+    bool startProcessing() noexcept override
+    {
+        if (!m_plug)
+            return false;
+        m_processingStarted = true;
+        return m_plug->start_processing(m_plug);
+    }
+    void stopProcessing() noexcept override
+    {
+        if (!m_plug)
+            return;
+        m_plug->stop_processing(m_plug);
+        m_processingStarted = false;
+    }
+    void restartPlugin()
+    {
+        
     }
     ClapPluginFormatProcessor(std::string plugfilename, int plugindex) : m_plugdll(plugfilename)
     {
@@ -87,13 +91,17 @@ class ClapPluginFormatProcessor : public xenakios::XAudioProcessor
         xen_host_info.get_extension = get_extension_lambda;
         xen_host_info.request_callback = [](const struct clap_host *host_) {
             auto claphost = (ClapPluginFormatProcessor *)host_->host_data;
-            // note that this is risky because the processor could be
+            // Note that this is risky because the processor could be
             // destroyed before the callback happens...
+            // Also, this is might be called from the audio thread, and
+            // this is going to make a heap allocation...
             juce::MessageManager::callAsync(
                 [claphost]() { claphost->m_plug->on_main_thread(claphost->m_plug); });
         };
-        xen_host_info.request_process = request_process;
-        xen_host_info.request_restart = request_restart;
+        xen_host_info.request_process = [](const struct clap_host *host) {};
+        xen_host_info.request_restart = [](const struct clap_host *host) {
+
+        };
 
         if (m_plugdll.handle)
         {
@@ -171,6 +179,7 @@ class ClapPluginFormatProcessor : public xenakios::XAudioProcessor
         if (OnPluginRequestedResize)
             OnPluginRequestedResize(w, h);
     }
+    
     bool activate(double sampleRate, uint32_t minFrameCount,
                   uint32_t maxFrameCount) noexcept override
     {
@@ -186,10 +195,17 @@ class ClapPluginFormatProcessor : public xenakios::XAudioProcessor
                 m_ext_note_ports =
                     (clap_plugin_note_ports *)m_plug->get_extension(m_plug, CLAP_EXT_NOTE_PORTS);
                 m_ext_state = (clap_plugin_state *)m_plug->get_extension(m_plug, CLAP_EXT_STATE);
+                m_ext_plugin_tail = (clap_plugin_tail*)m_plug->get_extension(m_plug, CLAP_EXT_TAIL);
                 return true;
             }
         }
         return false;
+    }
+    uint32_t tailGet() const noexcept override 
+    { 
+        if (!m_plug)
+            return 0; 
+        return m_ext_plugin_tail->get(m_plug);
     }
     void initParamsExtension()
     {
@@ -213,6 +229,7 @@ class ClapPluginFormatProcessor : public xenakios::XAudioProcessor
             return m_ext_params->get_value(m_plug, paramId, value);
         return false;
     }
+    clap_plugin_tail *m_ext_plugin_tail = nullptr;
     clap_plugin_audio_ports *m_ext_audio_ports = nullptr;
     clap_plugin_note_ports *m_ext_note_ports = nullptr;
     uint32_t audioPortsCount(bool isInput) const noexcept override

@@ -162,10 +162,8 @@ class XAudioProcessor
         return true;
     }
     virtual void deactivate() noexcept {}
-    // doubtful we'd ever want to have control over these...?
-    // the processor should be ready to process once activated etc,
-    // but let's leave these on for the moment
-    virtual bool startProcessing() noexcept { return true; }
+    
+    virtual bool startProcessing() noexcept { return false; }
     virtual void stopProcessing() noexcept {}
 
     // This could maybe be pure virtual because the processor is useless if it doesn't process!
@@ -176,6 +174,8 @@ class XAudioProcessor
     virtual void reset() noexcept {}
     virtual void onMainThread() noexcept {}
     virtual const void *extension(const char *id) noexcept { return nullptr; }
+
+    virtual uint32_t tailGet() const noexcept { return 0; }
 
     // Parameters
     // We will simply allow a parameter count of 0 instead of a separate call
