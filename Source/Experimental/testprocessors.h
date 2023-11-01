@@ -214,7 +214,7 @@ static xenakios::RegisterXap reg_tonegen{"Internal/Tone Generator",[](){
     return std::make_unique<ToneProcessorTest>();
 }};
 
-class GainProcessorTest : public XAPWithJuceGUI
+class XAPGain : public XAPWithJuceGUI
 {
   public:
     std::vector<clap_param_info> m_param_infos;
@@ -226,7 +226,7 @@ class GainProcessorTest : public XAPWithJuceGUI
         Volume = 42,
         Smoothing = 666
     };
-    GainProcessorTest()
+    XAPGain()
     {
         m_param_infos.push_back(
             makeParamInfo((clap_id)ParamIds::Volume, "Gain", -96.0, 0.0, -12.0,
@@ -340,7 +340,7 @@ class GainProcessorTest : public XAPWithJuceGUI
 };
 
 static xenakios::RegisterXap reg_volume{"Internal/Volume",[](){
-    return std::make_unique<GainProcessorTest>();
+    return std::make_unique<XAPGain>();
 }};
 
 const size_t maxHolderDataSize = 128;
