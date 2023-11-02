@@ -70,6 +70,7 @@ class JucePluginWrapper : public xenakios::XAudioProcessor, public juce::AudioPl
                                        m_internal->getTotalNumOutputChannels());
         m_work_buf.setSize(maxchans_needed, maxFrameCount);
         m_work_buf.clear();
+        // m_internal->setRateAndBufferSizeDetails()
         m_internal->setPlayConfigDetails(2, 2, sampleRate, maxFrameCount);
         m_internal->prepareToPlay(sampleRate, maxFrameCount);
         m_param_infos.clear();

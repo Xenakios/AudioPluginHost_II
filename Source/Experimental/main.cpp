@@ -123,7 +123,7 @@ inline void test_graph_processor_realtime()
     juce::AudioDeviceManager man;
     man.initialiseWithDefaultDevices(0, 2);
     XAPPlayer xplayer(*g);
-    man.addAudioCallback(&xplayer);
+    // addAudioCallback(&xplayer);
     double t0 = juce::Time::getMillisecondCounterHiRes();
     while (true)
     {
@@ -349,7 +349,8 @@ class NodeGraphComponent : public juce::Component
     void paint(juce::Graphics &g) override
     {
         g.fillAll(juce::Colours::black);
-
+        juce::Path connpath;
+        connpath.preallocateSpace(16);
         for (auto &n : m_graph->proc_nodes)
         {
             auto nodebounds = n->nodeSceneBounds;
@@ -429,8 +430,10 @@ class NodeGraphComponent : public juce::Component
             }
             */
             g.setColour(juce::Colours::white);
+
             for (auto &conn : n->inputConnections)
             {
+                connpath.clear();
                 int type = (int)conn.type;
                 int destIndex = findPinIndex(n.get(), conn.type, true, conn.destinationPort,
                                              conn.destinationChannel);
@@ -442,6 +445,8 @@ class NodeGraphComponent : public juce::Component
                 float x1 = getPinXPos(conn.source, sourceIndex, false);
                 float y0 = n->nodeSceneBounds.getY();
                 float y1 = conn.source->nodeSceneBounds.getBottom();
+                //connpath.startNewSubPath(x0 + 5.0f, y0);
+                //connpath.cubicTo(x0*)
                 g.drawLine(x0 + 5.0f, y0, x1 + 5.0f, y1, 2.0f);
             }
         }
@@ -720,14 +725,14 @@ class MainComponent : public juce::Component, public juce::Timer
     std::string pathprefix = R"(C:\Program Files\Common Files\)";
     void addNoteGeneratorTestNodes()
     {
-        auto logfunc = [this](clap_log_severity sev, const char * msg)
-        {
+        auto logfunc = [this](clap_log_severity sev, const char *msg) {
             DBG("Clap plugin logged at level " << sev << " : " << msg);
         };
         m_graph->addProcessorAsNode(std::make_unique<ClapEventSequencerProcessor>(2), "Note Gen");
-        m_graph->addProcessorAsNode(std::make_unique<ClapPluginFormatProcessor>(
-                                        pathprefix + R"(CLAP\Surge Synth Team\Surge XT.clap)", 0, logfunc),
-                                    "Surge XT 1");
+        m_graph->addProcessorAsNode(
+            std::make_unique<ClapPluginFormatProcessor>(
+                pathprefix + R"(CLAP\Surge Synth Team\Surge XT.clap)", 0, logfunc),
+            "Surge XT 1");
         m_graph->addProcessorAsNode(
             std::make_unique<JucePluginWrapper>(
                 R"(C:\Program Files\Common Files\VST3\ValhallaVintageVerb.vst3)"),
@@ -962,8 +967,12 @@ class MainComponent : public juce::Component, public juce::Timer
                             {
                                 DBG("could not set state");
                             }
-                        } else DBG("could not decode base64");
-                    } else DBG("no base64 string");
+                        }
+                        else
+                            DBG("could not decode base64");
+                    }
+                    else
+                        DBG("no base64 string");
                     for (auto &w : m_xap_windows)
                     {
                         if (w->nodeID == jid.toString())
@@ -1055,8 +1064,8 @@ class MainComponent : public juce::Component, public juce::Timer
     }
     void resized() override
     {
-        //m_node_list->setBounds(0, 0, 300, getHeight() - 25);
-        m_log_ed.setBounds(0,0,300,getHeight()-25);
+        // m_node_list->setBounds(0, 0, 300, getHeight() - 25);
+        m_log_ed.setBounds(0, 0, 300, getHeight() - 25);
         m_graph_component->setBounds(m_node_list->getRight() + 1, 0, getWidth() - 298,
                                      getHeight() - 25);
         m_infolabel.setBounds(0, m_node_list->getBottom(), getWidth(), 25);
