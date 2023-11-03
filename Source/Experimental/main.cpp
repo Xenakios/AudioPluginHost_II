@@ -738,7 +738,7 @@ class MainComponent : public juce::Component, public juce::Timer
                 R"(C:\Program Files\Common Files\VST3\ValhallaVintageVerb.vst3)"),
             "Valhalla");
         m_graph->addProcessorAsNode(std::make_unique<JucePluginWrapper>(
-                                        R"(C:\Program Files\Common Files\VST3\ValhallaDelay.vst3)"),
+                                        R"(C:\Program Files\Common Files\VST3\GRM\GRM Spaces.vst3)"),
                                     "Delay");
         // m_graph->addProcessorAsNode(
         //     std::make_unique<ClapPluginFormatProcessor>(pathprefix + "/CLAP/Conduit.clap", 0),

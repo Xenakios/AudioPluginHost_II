@@ -68,7 +68,7 @@ class JucePluginWrapper : public xenakios::XAudioProcessor, public juce::AudioPl
         m_internal->enableAllBuses();
         int maxchans_needed = std::max(m_internal->getTotalNumInputChannels(),
                                        m_internal->getTotalNumOutputChannels());
-        m_work_buf.setSize(maxchans_needed, maxFrameCount);
+        m_work_buf.setSize(64, maxFrameCount);
         m_work_buf.clear();
         // m_internal->setRateAndBufferSizeDetails()
         m_internal->setPlayConfigDetails(2, 2, sampleRate, maxFrameCount);
