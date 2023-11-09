@@ -162,7 +162,7 @@ class XAudioProcessor
         return true;
     }
     virtual void deactivate() noexcept {}
-    
+
     virtual bool startProcessing() noexcept { return false; }
     virtual void stopProcessing() noexcept {}
 
@@ -230,6 +230,13 @@ class XAudioProcessor
     virtual bool enqueueParameterChange(CrossThreadMessage msg) noexcept { return false; }
     virtual bool dequeueParameterChange(CrossThreadMessage &msg) noexcept { return false; }
     virtual bool dequeueEventForGUI(CrossThreadMessage &msg) noexcept { return false; }
+
+    virtual uint32_t remoteControlsPageCount() noexcept { return 0; }
+    virtual bool remoteControlsPageGet(uint32_t pageIndex, clap_remote_controls_page *page) noexcept
+    {
+        return false;
+    }
+
     // the original Clap C++ helper methods for GUI.
     // We really might not want to handle *all* this, but I wonder
     // if we are kind of forced when hosting actual Clap plugins?
@@ -260,9 +267,7 @@ using CreationFunc = std::function<std::unique_ptr<XAudioProcessor>()>;
 class XapFactory
 {
   private:
-    
     XapFactory() {}
-    
 
   public:
     static XapFactory &getInstance()
@@ -276,7 +281,7 @@ class XapFactory
     }
     std::unique_ptr<XAudioProcessor> createFromName(std::string name)
     {
-        for(auto& e : m_entries)
+        for (auto &e : m_entries)
         {
             if (e.name == name)
                 return e.createfunc();

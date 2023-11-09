@@ -13,6 +13,7 @@ class ClapPluginFormatProcessor : public xenakios::XAudioProcessor
                             "0.0.0",           nullptr, nullptr,   nullptr,    nullptr};
     std::atomic<bool> m_inited{false};
     clap_plugin_params_t *m_ext_params = nullptr;
+    clap_plugin_remote_controls *m_ext_remote_controls = nullptr;
     std::atomic<bool> m_processingStarted{false};
     std::atomic<bool> m_activated{false};
     choc::fifo::SingleReaderSingleWriterFIFO<xenakios::CrossThreadMessage> m_from_generic_editor;
@@ -220,6 +221,8 @@ class ClapPluginFormatProcessor : public xenakios::XAudioProcessor
                 m_ext_state = (clap_plugin_state *)m_plug->get_extension(m_plug, CLAP_EXT_STATE);
                 m_ext_plugin_tail =
                     (clap_plugin_tail *)m_plug->get_extension(m_plug, CLAP_EXT_TAIL);
+                m_ext_remote_controls = (clap_plugin_remote_controls *)m_plug->get_extension(
+                    m_plug, CLAP_EXT_REMOTE_CONTROLS);
                 return true;
             }
         }
@@ -334,6 +337,21 @@ class ClapPluginFormatProcessor : public xenakios::XAudioProcessor
         // have to trust the hosted plugin does this thread safely...
         return m_ext_state->load(m_plug, stream);
     }
+
+    uint32_t remoteControlsPageCount() noexcept override
+    {
+        if (!m_ext_remote_controls)
+            return 0;
+        return m_ext_remote_controls->count(m_plug);
+    }
+    bool remoteControlsPageGet(uint32_t pageIndex,
+                               clap_remote_controls_page *page) noexcept override
+    {
+        if (!m_ext_remote_controls)
+            return false;
+        return m_ext_remote_controls->get(m_plug, pageIndex, page);
+    }
+
     clap_plugin_gui *m_ext_gui = nullptr;
     void initGUIExtension()
     {
