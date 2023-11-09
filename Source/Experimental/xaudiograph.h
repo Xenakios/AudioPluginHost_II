@@ -517,8 +517,22 @@ class XAPGraph : public xenakios::XAudioProcessor
                 }
             }
             n->initAudioBuffersFromProcessorInfo(procbufsize);
-            // n->initBuffers(2, 2, procbufsize);
-            // n->processor->renderSetMode(CLAP_RENDER_OFFLINE);
+            /*
+            for (int i = 0; i < n->processor->remoteControlsPageCount(); ++i)
+            {
+                clap_remote_controls_page page;
+                if (n->processor->remoteControlsPageGet(i, &page))
+                {
+                    std::cout << "\t\tRemote control page " << i << " " << page.section_name << "/"
+                              << page.page_name << "\n";
+                    for (int j = 0; j < CLAP_REMOTE_CONTROLS_COUNT; ++j)
+                    {
+                        auto id = page.param_ids[j];
+                        std::cout << "\t\t\t" << id << " " << n->parameterInfos[id].name << "\n";
+                    }
+                }
+            }
+            */
         }
         std::cout << "****                 ****\n";
         int outlen = 30 * sr;
