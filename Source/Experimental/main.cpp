@@ -738,7 +738,7 @@ class MainComponent : public juce::Component, public juce::Timer
                 R"(C:\Program Files\Common Files\VST3\ValhallaVintageVerb.vst3)"),
             "Valhalla");
         m_graph->addProcessorAsNode(std::make_unique<JucePluginWrapper>(
-                                        R"(C:\Program Files\Common Files\VST3\GRM\GRM Spaces.vst3)"),
+                                        R"(C:\\Program Files\\Common Files\\VST3\\ValhallaDelay.vst3)"),
                                     "Delay");
         // m_graph->addProcessorAsNode(
         //     std::make_unique<ClapPluginFormatProcessor>(pathprefix + "/CLAP/Conduit.clap", 0),
@@ -840,7 +840,7 @@ class MainComponent : public juce::Component, public juce::Timer
             m_xap_windows.back()->nodeID = n->displayName;
             m_xap_windows.back()->setTopLeftPosition(rng.nextInt({10, 600}),
                                                      rng.nextInt({100, 400}));
-            n->nodeSceneBounds = {rng.nextInt({10, 600}), rng.nextInt({10, 600}), 100, 20};
+            n->nodeSceneBounds = {rng.nextInt({10, 600}), rng.nextInt({10, 600}), 200, 40};
             m_xap_windows.back()->OnRequestDelete = [this](XapWindow *w) {
                 for (int i = 0; i < m_xap_windows.size(); ++i)
                 {
@@ -1066,9 +1066,9 @@ class MainComponent : public juce::Component, public juce::Timer
     {
         // m_node_list->setBounds(0, 0, 300, getHeight() - 25);
         m_log_ed.setBounds(0, 0, 300, getHeight() - 25);
-        m_graph_component->setBounds(m_node_list->getRight() + 1, 0, getWidth() - 298,
+        m_graph_component->setBounds(m_log_ed.getRight() + 1, 0, getWidth() - 298,
                                      getHeight() - 25);
-        m_infolabel.setBounds(0, m_node_list->getBottom(), getWidth(), 25);
+        m_infolabel.setBounds(0, m_log_ed.getBottom(), getWidth(), 25);
     }
 };
 

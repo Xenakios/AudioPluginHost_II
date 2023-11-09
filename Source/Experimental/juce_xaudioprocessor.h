@@ -66,12 +66,11 @@ class JucePluginWrapper : public xenakios::XAudioProcessor, public juce::AudioPl
         m_internal->setPlayHead(this);
 
         m_internal->enableAllBuses();
+        m_internal->setPlayConfigDetails(2, 2, sampleRate, maxFrameCount);
         int maxchans_needed = std::max(m_internal->getTotalNumInputChannels(),
                                        m_internal->getTotalNumOutputChannels());
-        m_work_buf.setSize(64, maxFrameCount);
+        m_work_buf.setSize(maxchans_needed, maxFrameCount);
         m_work_buf.clear();
-        // m_internal->setRateAndBufferSizeDetails()
-        m_internal->setPlayConfigDetails(2, 2, sampleRate, maxFrameCount);
         m_internal->prepareToPlay(sampleRate, maxFrameCount);
         m_param_infos.clear();
         auto &pars = m_internal->getParameters();
@@ -99,6 +98,16 @@ class JucePluginWrapper : public xenakios::XAudioProcessor, public juce::AudioPl
     clap_process_status process(const clap_process *process) noexcept override
     {
         jassert(m_internal);
+        int maxchans_needed = std::max(m_internal->getTotalNumInputChannels(),
+                                       m_internal->getTotalNumOutputChannels());
+        if (maxchans_needed > m_work_buf.getNumChannels())
+        {
+            m_work_buf.setSize(maxchans_needed, m_work_buf.getNumSamples());
+            m_work_buf.clear();
+            std::cout << "Had to adjust work buffer channels size for Juce plugin "
+                << m_internal->getName() << " to " << maxchans_needed << "\n";
+        }
+
         if (process->transport)
         {
             m_transport_pos = juce::AudioPlayHead::PositionInfo();
