@@ -482,70 +482,10 @@ class XAPGraph : public xenakios::XAudioProcessor
     bool m_activated = false;
     void deactivate() noexcept override { m_activated = false; }
     bool activate(double sampleRate, uint32_t minFrameCount,
-                  uint32_t maxFrameCount) noexcept override
-    {
-        if (proc_nodes.size() == 0)
-            return false;
-        runOrder = topoSort(findNodeByName(outputNodeId));
-
-        int procbufsize = maxFrameCount;
-
-        memset(&transport, 0, sizeof(clap_event_transport));
-        double sr = sampleRate;
-        m_sr = sampleRate;
-        std::cout << "**** GRAPH RUN ORDER ****\n";
-        for (auto &n : runOrder)
-        {
-            n->processor->activate(sr, procbufsize, procbufsize);
-            std::cout << "\t" << n->displayName << "\n";
-            for (int i = 0; i < n->processor->audioPortsCount(true); ++i)
-            {
-                clap_audio_port_info pinfo;
-                if (n->processor->audioPortsInfo(i, true, &pinfo))
-                {
-                    std::cout << "\t\tInput port " << i << " has " << pinfo.channel_count
-                              << " channels\n";
-                }
-            }
-            for (int i = 0; i < n->processor->audioPortsCount(false); ++i)
-            {
-                clap_audio_port_info pinfo;
-                if (n->processor->audioPortsInfo(i, false, &pinfo))
-                {
-                    std::cout << "\t\tOutput port " << i << " has " << pinfo.channel_count
-                              << " channels\n";
-                }
-            }
-            n->initAudioBuffersFromProcessorInfo(procbufsize);
-            /*
-            for (int i = 0; i < n->processor->remoteControlsPageCount(); ++i)
-            {
-                clap_remote_controls_page page;
-                if (n->processor->remoteControlsPageGet(i, &page))
-                {
-                    std::cout << "\t\tRemote control page " << i << " " << page.section_name << "/"
-                              << page.page_name << "\n";
-                    for (int j = 0; j < CLAP_REMOTE_CONTROLS_COUNT; ++j)
-                    {
-                        auto id = page.param_ids[j];
-                        std::cout << "\t\t\t" << id << " " << n->parameterInfos[id].name << "\n";
-                    }
-                }
-            }
-            */
-        }
-        std::cout << "****                 ****\n";
-        int outlen = 30 * sr;
-
-        eventMergeVector.reserve(1024);
-
-        transport.flags = CLAP_TRANSPORT_HAS_SECONDS_TIMELINE | CLAP_TRANSPORT_IS_PLAYING;
-        m_activated = true;
-        return true;
-    }
+                  uint32_t maxFrameCount) noexcept override;
 
     clap_process_status process(const clap_process *process) noexcept override;
-    
+
     std::vector<std::unique_ptr<XAPNode>> proc_nodes;
     static std::vector<unsigned char> getProcessorState(XAudioProcessor *proc)
     {
