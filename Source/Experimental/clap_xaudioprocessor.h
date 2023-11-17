@@ -129,8 +129,6 @@ class ClapPluginFormatProcessor : public xenakios::XAudioProcessor
 
         if (m_plugdll.handle)
         {
-            // entry is not really a function but a struct, but luckily the choc
-            // dll loader seems to work for this anyway, at least on Windows!
             clap_plugin_entry_t *entry =
                 (clap_plugin_entry_t *)m_plugdll.findFunction("clap_entry");
             if (entry)
