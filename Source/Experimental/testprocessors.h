@@ -9,6 +9,7 @@
 #include "xap_generic_editor.h"
 #include "xapwithjucegui.h"
 #include "text/choc_JSON.h"
+#include "xapfactory.h"
 
 inline void insertToEndOfEventListFromFIFO(
     choc::fifo::SingleReaderSingleWriterFIFO<xenakios::CrossThreadMessage> &source,
