@@ -71,7 +71,7 @@ class FilePlayerProcessor : public XAPWithJuceGUI
                 .asFloat()
                 .withRange(-3.0f, 2.0f)
                 .withDefault(0.0)
-                .withATwoToTheBFormatting(1,1,"x")
+                .withATwoToTheBFormatting(1, 1, "x")
                 .withFlags(CLAP_PARAM_IS_AUTOMATABLE | CLAP_PARAM_IS_MODULATABLE)
                 .withName("Playrate")
                 .withID((clap_id)ParamIds::Playrate));
@@ -379,6 +379,5 @@ class FilePlayerProcessor : public XAPWithJuceGUI
         return CLAP_PROCESS_CONTINUE;
     }
 };
-static xenakios::RegisterXap reg_fileplayer{"Internal/File Player",[](){
-    return std::make_unique<FilePlayerProcessor>();
-}};
+static xenakios::RegisterXap reg_fileplayer{
+    "File Player", "Internal", []() { return std::make_unique<FilePlayerProcessor>(); }};

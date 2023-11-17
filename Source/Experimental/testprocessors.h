@@ -212,7 +212,7 @@ class ToneProcessorTest : public XAPWithJuceGUI
     int m_mod_out_counter = 0;
 };
 
-static xenakios::RegisterXap reg_tonegen{"Internal/Tone Generator",
+static xenakios::RegisterXap reg_tonegen{"Tone Generator", "Internal",
                                          []() { return std::make_unique<ToneProcessorTest>(); }};
 
 class XAPGain : public XAPWithJuceGUI
@@ -343,7 +343,7 @@ class XAPGain : public XAPWithJuceGUI
                 m_volume = val["volume"].get<double>();
                 m_gain_proc.setRampDurationSeconds(val["smoothing"].get<double>());
             }
-            //if (m_editor_attached)
+            // if (m_editor_attached)
             {
                 m_to_ui_fifo.push(xenakios::CrossThreadMessage{(clap_id)ParamIds::Volume,
                                                                CLAP_EVENT_PARAM_VALUE, m_volume});
@@ -398,7 +398,7 @@ class XAPGain : public XAPWithJuceGUI
     void guiDestroy() noexcept override { m_editor = nullptr; }
 };
 
-static xenakios::RegisterXap reg_volume{"Internal/Volume",
+static xenakios::RegisterXap reg_volume{"Volume", "Internal",
                                         []() { return std::make_unique<XAPGain>(); }};
 
 const size_t maxHolderDataSize = 128;

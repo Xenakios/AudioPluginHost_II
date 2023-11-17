@@ -2,6 +2,7 @@
 #include <functional>
 #include <memory>
 #include "xaudioprocessor.h"
+#include <filesystem>
 
 namespace xenakios
 {
@@ -12,17 +13,19 @@ class XapFactory
   private:
     XapFactory();
     void scanClapPlugins();
+    void scanClapPlugin(const std::filesystem::path &path);
+
   public:
     static XapFactory &getInstance()
     {
-        static XapFactory* fact = nullptr;
+        static XapFactory *fact = nullptr;
         if (!fact)
             fact = new XapFactory;
         return *fact;
     }
-    void registerEntry(std::string name, CreationFunc createFunc)
+    void registerEntry(std::string name, std::string proctype, CreationFunc createFunc)
     {
-        m_entries.emplace_back(name, createFunc);
+        m_entries.emplace_back(name, proctype, createFunc);
     }
     std::unique_ptr<XAudioProcessor> createFromName(std::string name)
     {
@@ -36,8 +39,12 @@ class XapFactory
     struct Entry
     {
         Entry() {}
-        Entry(std::string name_, CreationFunc func_) : name(name_), createfunc(func_) {}
+        Entry(std::string name_, std::string proctype_, CreationFunc func_)
+            : name(name_), proctype(proctype_), createfunc(func_)
+        {
+        }
         std::string name;
+        std::string proctype;
         CreationFunc createfunc;
     };
     std::vector<Entry> m_entries;
@@ -46,9 +53,9 @@ class XapFactory
 class RegisterXap
 {
   public:
-    RegisterXap(std::string name, CreationFunc createFunc)
+    RegisterXap(std::string name, std::string proctype, CreationFunc createFunc)
     {
-        XapFactory::getInstance().registerEntry(name, createFunc);
+        XapFactory::getInstance().registerEntry(name, proctype, createFunc);
     }
 };
 } // namespace xenakios

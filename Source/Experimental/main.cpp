@@ -716,6 +716,7 @@ class MainComponent : public juce::Component, public juce::Timer
     std::unique_ptr<NodeListComponent> m_node_list;
     juce::TextEditor m_node_info_ed;
     juce::TextEditor m_log_ed;
+    juce::TextButton m_plug_test_but;
     std::unique_ptr<NodeGraphComponent> m_graph_component;
     void timerCallback() override
     {
@@ -806,6 +807,8 @@ class MainComponent : public juce::Component, public juce::Timer
         addAndMakeVisible(m_log_ed);
         addAndMakeVisible(m_infolabel);
         addAndMakeVisible(m_mod_rout_combo);
+        addAndMakeVisible(m_plug_test_but);
+        m_plug_test_but.onClick=[this](){ showNodeAddMenu(); };
         sst::jucegui::style::StyleSheet::initializeStyleSheets([]() {});
         auto style = sst::jucegui::style::StyleSheet::getBuiltInStyleSheet(
             sst::jucegui::style::StyleSheet::BuiltInTypes::DARK);
@@ -1008,26 +1011,21 @@ class MainComponent : public juce::Component, public juce::Timer
     void showNodeAddMenu()
     {
         juce::PopupMenu menu;
-        juce::PopupMenu menuInternals;
-        juce::PopupMenu menuClaps;
-        juce::PopupMenu menuVST;
+        std::unordered_map<std::string, juce::PopupMenu> menumap;
         for (auto &e : xenakios::XapFactory::getInstance().m_entries)
         {
-            if (e.name.starts_with("Internal/"))
+            if (menumap.count(e.proctype) == 0)
             {
-                menuInternals.addItem(e.name, [this, name = e.name]() { createAndAddNode(name); });
+                menumap[e.proctype] = juce::PopupMenu();
             }
+            menumap[e.proctype].addItem(e.name, [this, name = e.name]() { createAndAddNode(name); });
         }
 
-        menuClaps.addItem("Surge XT", []() {});
-        menuClaps.addItem("Conduit Ring Modulator", []() {});
-        menuClaps.addItem("Conduit Polysynth", []() {});
+        for (auto& m : menumap)
+        {
+            menu.addSubMenu(m.first,m.second);
+        }
 
-        menuVST.addItem("Valhalla VintageVerb", []() {});
-        menuVST.addItem("Valhalla Room", []() {});
-        menu.addSubMenu("Internal", menuInternals);
-        menu.addSubMenu("CLAP", menuClaps);
-        menu.addSubMenu("VST3", menuVST);
         menu.showMenuAsync(juce::PopupMenu::Options());
     }
     void populateNodeInfoBox(XAPNode *node)
@@ -1066,7 +1064,9 @@ class MainComponent : public juce::Component, public juce::Timer
     void resized() override
     {
         // m_node_list->setBounds(0, 0, 300, getHeight() - 25);
-        m_log_ed.setBounds(0, 0, 300, getHeight() - 25);
+        m_plug_test_but.setButtonText("Add...");
+        m_plug_test_but.setBounds(0,0,100,19);
+        m_log_ed.setBounds(0, 20, 300, getHeight() - 45);
         m_graph_component->setBounds(m_log_ed.getRight() + 1, 0, getWidth() - 298,
                                      getHeight() - 25);
         m_infolabel.setBounds(0, m_log_ed.getBottom(), getWidth(), 25);

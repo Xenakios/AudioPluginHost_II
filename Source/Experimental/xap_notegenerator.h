@@ -98,7 +98,7 @@ class ClapEventSequencerProcessor : public XAPWithJuceGUI
         info->id = 8008;
         info->preferred_dialect = CLAP_NOTE_DIALECT_CLAP;
         info->supported_dialects = CLAP_NOTE_DIALECT_CLAP;
-        strcpy_s(info->name,"Entropic Sequencer Output");
+        strcpy_s(info->name, "Entropic Sequencer Output");
         return true;
     }
     ClapEventSequencerProcessor(int seed)
@@ -288,6 +288,6 @@ class ClapEventSequencerProcessor : public XAPWithJuceGUI
     }
     void guiDestroy() noexcept override { m_editor = nullptr; }
 };
-inline xenakios::RegisterXap reg_notegen{"Internal/Entropic Sequencer",[](){
-    return std::make_unique<ClapEventSequencerProcessor>(400);
-}};
+inline xenakios::RegisterXap reg_notegen{
+    "Entropic Sequencer", "Internal",
+    []() { return std::make_unique<ClapEventSequencerProcessor>(400); }};
