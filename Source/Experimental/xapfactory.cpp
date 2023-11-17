@@ -35,6 +35,7 @@ void XapFactory::scanClapPlugin(const std::filesystem::path &path)
                     m_entries.emplace_back(desc->name, "CLAP", [this, pathstr, i]() {
                         return std::make_unique<ClapPluginFormatProcessor>(pathstr, i);
                     });
+                    m_entries.back().manufacturer = desc->vendor;
                 }
             }
             entry->deinit();

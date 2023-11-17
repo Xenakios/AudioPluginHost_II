@@ -1011,14 +1011,16 @@ class MainComponent : public juce::Component, public juce::Timer
     void showNodeAddMenu()
     {
         juce::PopupMenu menu;
-        std::unordered_map<std::string, juce::PopupMenu> menumap;
+        std::map<std::string, juce::PopupMenu> menumap;
         for (auto &e : xenakios::XapFactory::getInstance().m_entries)
         {
-            if (menumap.count(e.proctype) == 0)
+            if (e.manufacturer.empty())
+                e.manufacturer = "Xenakios Internal";
+            if (menumap.count(e.manufacturer) == 0)
             {
-                menumap[e.proctype] = juce::PopupMenu();
+                menumap[e.manufacturer] = juce::PopupMenu();
             }
-            menumap[e.proctype].addItem(e.name, [this, name = e.name]() { createAndAddNode(name); });
+            menumap[e.manufacturer].addItem(e.name, [this, name = e.name]() { createAndAddNode(name); });
         }
 
         for (auto& m : menumap)

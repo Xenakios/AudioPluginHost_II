@@ -45,6 +45,7 @@ class XapFactory
         }
         std::string name;
         std::string proctype;
+        std::string manufacturer;
         CreationFunc createfunc;
     };
     std::vector<Entry> m_entries;
