@@ -63,24 +63,26 @@ void XapFactory::scanClapPlugins()
 
 void XapFactory::scanVST3Plugins()
 {
-    std::vector<std::string> valhallas;
-    valhallas.push_back(R"(C:\Program Files\Common Files\VST3\ValhallaDelay.vst3)");
-    valhallas.push_back(R"(C:\Program Files\Common Files\VST3\ValhallaSupermassive.vst3)");
-    valhallas.push_back(R"(C:\Program Files\Common Files\VST3\ValhallaRoom.vst3)");
-    valhallas.push_back(R"(C:\Program Files\Common Files\VST3\ValhallaVintageVerb.vst3)");
+    std::vector<std::string> vst3plugins;
+    vst3plugins.push_back(R"(C:\Program Files\Common Files\VST3\ValhallaDelay.vst3)");
+    vst3plugins.push_back(R"(C:\Program Files\Common Files\VST3\ValhallaSupermassive.vst3)");
+    vst3plugins.push_back(R"(C:\Program Files\Common Files\VST3\ValhallaRoom.vst3)");
+    vst3plugins.push_back(R"(C:\Program Files\Common Files\VST3\ValhallaVintageVerb.vst3)");
+    vst3plugins.push_back(
+        R"(C:\Program Files\Common Files\VST3\mda-vst3.vst3\Contents\x86_64-win\mda-vst3.vst3)");
+
     juce::AudioPluginFormatManager plugmana;
     juce::VST3PluginFormat f;
     plugmana.addDefaultFormats();
     juce::KnownPluginList klist;
 
-    for (auto &pfile : valhallas)
+    for (auto &pfile : vst3plugins)
     {
         juce::OwnedArray<juce::PluginDescription> typesFound;
         klist.scanAndAddFile(pfile, true, typesFound, f);
         for (int i = 0; i < typesFound.size(); ++i)
         {
-            m_entries.emplace_back(typesFound[i]->name.toStdString(), "VST3", [i,pfile]
-            {
+            m_entries.emplace_back(typesFound[i]->name.toStdString(), "VST3", [i, pfile] {
                 return std::make_unique<JucePluginWrapper>(pfile, i);
             });
             m_entries.back().manufacturer = typesFound[i]->manufacturerName.toStdString();
