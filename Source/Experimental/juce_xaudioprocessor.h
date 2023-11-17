@@ -11,7 +11,7 @@ class JucePluginWrapper : public xenakios::XAudioProcessor, public juce::AudioPl
     juce::AudioBuffer<float> m_work_buf;
     juce::MidiBuffer m_midi_buffer;
     clap_plugin_descriptor m_plug_descriptor;
-    JucePluginWrapper(juce::String plugfile)
+    JucePluginWrapper(juce::String plugfile, int subpluginindex = 0)
     {
         memset(&m_plug_descriptor, 0, sizeof(clap_plugin_descriptor));
         juce::AudioPluginFormatManager plugmana;
@@ -26,12 +26,13 @@ class JucePluginWrapper : public xenakios::XAudioProcessor, public juce::AudioPl
         klist.scanAndAddFile(plugfile, true, typesFound, f);
         for (auto &e : typesFound)
         {
-            std::cout << e->name << "\n";
+            // std::cout << e->name << "\n";
         }
         if (typesFound.size() > 0)
         {
             juce::String err;
-            m_internal = plugmana.createPluginInstance(*typesFound[0], 44100, 512, err);
+            m_internal =
+                plugmana.createPluginInstance(*typesFound[subpluginindex], 44100, 512, err);
             if (!m_internal)
             {
                 std::cout << err << "\n";
@@ -105,7 +106,7 @@ class JucePluginWrapper : public xenakios::XAudioProcessor, public juce::AudioPl
             m_work_buf.setSize(maxchans_needed, m_work_buf.getNumSamples());
             m_work_buf.clear();
             std::cout << "Had to adjust work buffer channels size for Juce plugin "
-                << m_internal->getName() << " to " << maxchans_needed << "\n";
+                      << m_internal->getName() << " to " << maxchans_needed << "\n";
         }
 
         if (process->transport)

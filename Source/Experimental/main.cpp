@@ -804,6 +804,8 @@ class MainComponent : public juce::Component, public juce::Timer
     }
     MainComponent()
     {
+        xenakios::XapFactory::getInstance().scanClapPlugins();
+        xenakios::XapFactory::getInstance().scanVST3Plugins();
         addAndMakeVisible(m_log_ed);
         addAndMakeVisible(m_infolabel);
         addAndMakeVisible(m_mod_rout_combo);
@@ -866,7 +868,7 @@ class MainComponent : public juce::Component, public juce::Timer
             loadState(juce::File());
             m_graph_component->repaint();
         });
-        auto& inst = xenakios::XapFactory::getInstance();
+        
     }
     void saveState(juce::File file)
     {

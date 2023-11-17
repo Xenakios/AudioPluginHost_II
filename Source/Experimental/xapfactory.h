@@ -12,10 +12,12 @@ class XapFactory
 {
   private:
     XapFactory();
-    void scanClapPlugins();
+
     void scanClapPlugin(const std::filesystem::path &path);
 
   public:
+    void scanClapPlugins();
+    void scanVST3Plugins();
     static XapFactory &getInstance()
     {
         static XapFactory *fact = nullptr;

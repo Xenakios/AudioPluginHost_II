@@ -40,22 +40,7 @@ inline void insertToEndOfEventListFromFIFO(
 
 template <typename T> inline clap_id to_clap_id(T x) { return static_cast<clap_id>(x); }
 
-inline clap_param_info makeParamInfo(clap_id paramId, juce::String name, double minval,
-                                     double maxval, double defaultVal, clap_param_info_flags flags,
-                                     void *cookie = nullptr)
-{
-    clap_param_info result;
-    result.cookie = cookie;
-    result.default_value = defaultVal;
-    result.min_value = minval;
-    result.max_value = maxval;
-    result.id = paramId;
-    result.flags = flags;
-    auto ptr = name.toUTF8();
-    strcpy_s(result.name, ptr);
-    result.module[0] = 0;
-    return result;
-}
+
 
 class ToneProcessorTest : public XAPWithJuceGUI
 {

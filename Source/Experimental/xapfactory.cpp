@@ -2,11 +2,12 @@
 #include <iostream>
 #include "platform/choc_DynamicLibrary.h"
 #include "clap_xaudioprocessor.h"
+#include "juce_xaudioprocessor.h"
 
 namespace xenakios
 {
 
-XapFactory::XapFactory() { scanClapPlugins(); }
+XapFactory::XapFactory() {}
 
 void XapFactory::scanClapPlugin(const std::filesystem::path &path)
 {
@@ -32,7 +33,7 @@ void XapFactory::scanClapPlugin(const std::filesystem::path &path)
                 if (desc)
                 {
                     std::cout << "\t" << desc->name << "\n";
-                    m_entries.emplace_back(desc->name, "CLAP", [this, pathstr, i]() {
+                    m_entries.emplace_back(desc->name, "CLAP", [pathstr, i]() {
                         return std::make_unique<ClapPluginFormatProcessor>(pathstr, i);
                     });
                     m_entries.back().manufacturer = desc->vendor;
@@ -56,6 +57,33 @@ void XapFactory::scanClapPlugins()
         {
             std::cout << f.path() << "\n";
             scanClapPlugin(f.path());
+        }
+    }
+}
+
+void XapFactory::scanVST3Plugins()
+{
+    std::vector<std::string> valhallas;
+    valhallas.push_back(R"(C:\Program Files\Common Files\VST3\ValhallaDelay.vst3)");
+    valhallas.push_back(R"(C:\Program Files\Common Files\VST3\ValhallaSupermassive.vst3)");
+    valhallas.push_back(R"(C:\Program Files\Common Files\VST3\ValhallaRoom.vst3)");
+    valhallas.push_back(R"(C:\Program Files\Common Files\VST3\ValhallaVintageVerb.vst3)");
+    juce::AudioPluginFormatManager plugmana;
+    juce::VST3PluginFormat f;
+    plugmana.addDefaultFormats();
+    juce::KnownPluginList klist;
+
+    for (auto &pfile : valhallas)
+    {
+        juce::OwnedArray<juce::PluginDescription> typesFound;
+        klist.scanAndAddFile(pfile, true, typesFound, f);
+        for (int i = 0; i < typesFound.size(); ++i)
+        {
+            m_entries.emplace_back(typesFound[i]->name.toStdString(), "VST3", [i,pfile]
+            {
+                return std::make_unique<JucePluginWrapper>(pfile, i);
+            });
+            m_entries.back().manufacturer = typesFound[i]->manufacturerName.toStdString();
         }
     }
 }
