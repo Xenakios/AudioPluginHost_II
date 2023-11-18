@@ -952,6 +952,7 @@ class MainComponent : public juce::Component, public juce::Timer
 
             auto jnodesarr = jroot["nodestates"];
             auto sz = jnodesarr.size();
+            std::optional<uint64_t> sink_node_id;
             if (sz > 0)
             {
 
@@ -960,6 +961,17 @@ class MainComponent : public juce::Component, public juce::Timer
                     auto jnodestate = jnodesarr[i];
                     auto jid = jnodestate["id"].toString();
                     auto jidx = jnodestate["idx"].getInt64();
+                    auto is_sink = jnodestate["is_sink"].getWithDefault<bool>(false);
+                    if (is_sink)
+                    {
+                        // there should only be one sink node!
+                        // we probably should figure out something else for determining the sink node,
+                        // like have a node type that is going to be the final audio output
+                        jassert(!sink_node_id);
+                        sink_node_id = jidx;
+                        m_graph->outputNodeId = jid;
+                    }
+                        
                     auto jprocid = jnodestate["procid"].toString();
                     auto uproc = xenakios::XapFactory::getInstance().createFromID(jprocid);
                     if (uproc)
@@ -992,6 +1004,7 @@ class MainComponent : public juce::Component, public juce::Timer
                         }
                     }
                 }
+                jassert(sink_node_id);
                 std::unordered_map<uint64_t, XAPNode *> nodemap;
                 for (auto &e : m_graph->proc_nodes)
                 {
