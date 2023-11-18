@@ -40,10 +40,13 @@ class JucePluginWrapper : public xenakios::XAudioProcessor, public juce::AudioPl
             else
             {
                 m_desc = m_internal->getPluginDescription();
+                clap_id_string = "vst3." + std::to_string(subpluginindex) + "." +
+                                 std::to_string(m_desc.uniqueId) + "." + m_desc.name.toStdString();
             }
         }
     }
     juce::PluginDescription m_desc;
+    std::string clap_id_string;
     bool getDescriptor(clap_plugin_descriptor_t *dec) const override
     {
         memset(dec, 0, sizeof(clap_plugin_descriptor));
@@ -51,6 +54,7 @@ class JucePluginWrapper : public xenakios::XAudioProcessor, public juce::AudioPl
         {
             dec->name = m_internal->getName().getCharPointer();
             dec->vendor = m_desc.manufacturerName.getCharPointer();
+            dec->id = clap_id_string.c_str();
             return true;
         }
         return false;

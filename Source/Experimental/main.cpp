@@ -445,8 +445,8 @@ class NodeGraphComponent : public juce::Component
                 float x1 = getPinXPos(conn.source, sourceIndex, false);
                 float y0 = n->nodeSceneBounds.getY();
                 float y1 = conn.source->nodeSceneBounds.getBottom();
-                //connpath.startNewSubPath(x0 + 5.0f, y0);
-                //connpath.cubicTo(x0*)
+                // connpath.startNewSubPath(x0 + 5.0f, y0);
+                // connpath.cubicTo(x0*)
                 g.drawLine(x0 + 5.0f, y0, x1 + 5.0f, y1, 2.0f);
             }
         }
@@ -729,18 +729,20 @@ class MainComponent : public juce::Component, public juce::Timer
         auto logfunc = [this](clap_log_severity sev, const char *msg) {
             DBG("Clap plugin logged at level " << sev << " : " << msg);
         };
-        m_graph->addProcessorAsNode(std::make_unique<ClapEventSequencerProcessor>(2), "Note Gen");
-        m_graph->addProcessorAsNode(
+        auto notegenid = m_graph->addProcessorAsNode(
+            std::make_unique<ClapEventSequencerProcessor>(2), "Note Gen");
+        auto surgeid = m_graph->addProcessorAsNode(
             std::make_unique<ClapPluginFormatProcessor>(
                 pathprefix + R"(CLAP\Surge Synth Team\Surge XT.clap)", 0, logfunc),
             "Surge XT 1");
-        m_graph->addProcessorAsNode(
+        auto vintageverbid = m_graph->addProcessorAsNode(
             std::make_unique<JucePluginWrapper>(
                 R"(C:\Program Files\Common Files\VST3\ValhallaVintageVerb.vst3)"),
             "Valhalla");
-        m_graph->addProcessorAsNode(std::make_unique<JucePluginWrapper>(
-                                        R"(C:\\Program Files\\Common Files\\VST3\\ValhallaDelay.vst3)"),
-                                    "Delay");
+        auto vdelayid = m_graph->addProcessorAsNode(
+            std::make_unique<JucePluginWrapper>(
+                R"(C:\\Program Files\\Common Files\\VST3\\ValhallaDelay.vst3)"),
+            "Delay");
         // m_graph->addProcessorAsNode(
         //     std::make_unique<ClapPluginFormatProcessor>(pathprefix + "/CLAP/Conduit.clap", 0),
         //     "Surge XT 1");
@@ -748,14 +750,16 @@ class MainComponent : public juce::Component, public juce::Timer
         // m_graph->addProcessorAsNode(std::make_unique<ClapPluginFormatProcessor>(
         //                                pathprefix + R"(CLAP\Surge Synth Team\Surge XT.clap)", 0),
         //                            "Surge XT 2");
-        m_graph->addProcessorAsNode(std::make_unique<XAPGain>(), "Main");
-        connectEventPorts(m_graph->findNodeByName("Note Gen"), 0,
-                          m_graph->findNodeByName("Surge XT 1"), 0);
-        // connectEventPorts(m_graph->findNodeByName("Note Gen"), 1,
-        //                  m_graph->findNodeByName("Surge XT 2"), 0);
-
-        m_graph->connectAudio("Surge XT 1", 0, 0, "Main", 0, 0);
-        m_graph->connectAudio("Surge XT 1", 0, 1, "Main", 0, 1);
+        auto volumeid = m_graph->addProcessorAsNode(std::make_unique<XAPGain>(), "Main");
+        m_graph->makeConnection(XAPNode::ConnectionType::Events, notegenid, 0, 0, surgeid, 0, 0);
+        // connectEventPorts(m_graph->findNodeByName("Note Gen"), 0,
+        //                   m_graph->findNodeByName("Surge XT 1"), 0);
+        //  connectEventPorts(m_graph->findNodeByName("Note Gen"), 1,
+        //                   m_graph->findNodeByName("Surge XT 2"), 0);
+        m_graph->makeConnection(XAPNode::ConnectionType::Audio, surgeid, 0, 0, volumeid, 0, 0);
+        m_graph->makeConnection(XAPNode::ConnectionType::Audio, surgeid, 0, 1, volumeid, 0, 1);
+        // m_graph->connectAudio("Surge XT 1", 0, 0, "Main", 0, 0);
+        // m_graph->connectAudio("Surge XT 1", 0, 1, "Main", 0, 1);
         m_graph->connectAudio("Surge XT 1", 1, 0, "Valhalla", 0, 0);
         m_graph->connectAudio("Surge XT 1", 1, 1, "Valhalla", 0, 1);
         m_graph->connectAudio("Surge XT 1", 2, 0, "Delay", 0, 0);
@@ -810,7 +814,7 @@ class MainComponent : public juce::Component, public juce::Timer
         addAndMakeVisible(m_infolabel);
         addAndMakeVisible(m_mod_rout_combo);
         addAndMakeVisible(m_plug_test_but);
-        m_plug_test_but.onClick=[this](){ showNodeAddMenu(); };
+        m_plug_test_but.onClick = [this]() { showNodeAddMenu(); };
         sst::jucegui::style::StyleSheet::initializeStyleSheets([]() {});
         auto style = sst::jucegui::style::StyleSheet::getBuiltInStyleSheet(
             sst::jucegui::style::StyleSheet::BuiltInTypes::DARK);
@@ -868,7 +872,6 @@ class MainComponent : public juce::Component, public juce::Timer
             loadState(juce::File());
             m_graph_component->repaint();
         });
-        
     }
     void saveState(juce::File file)
     {
@@ -882,6 +885,15 @@ class MainComponent : public juce::Component, public juce::Timer
         {
             auto nodestate = choc::value::createObject("");
             nodestate.addMember("id", n->displayName);
+            nodestate.addMember("idx", static_cast<int64_t>(n->ID));
+            clap_plugin_descriptor desc;
+            if (n->processor->getDescriptor(&desc))
+            {
+                if (desc.id)
+                    nodestate.addMember("procid", desc.id);
+            }
+
+            /*
             auto procstate = XAPGraph::getProcessorState(n->processor.get());
             if (procstate.size() > 0)
             {
@@ -894,6 +906,7 @@ class MainComponent : public juce::Component, public juce::Timer
             {
                 DBG(n->processorName << " did not return state");
             }
+            */
             juce::Rectangle<int> bounds;
             for (auto &w : m_xap_windows)
             {
@@ -912,10 +925,10 @@ class MainComponent : public juce::Component, public juce::Timer
             {
                 auto jconn = choc::value::createObject("");
                 jconn.addMember("type", static_cast<int>(conn.type));
-                jconn.addMember("src", conn.source->displayName);
+                jconn.addMember("src", static_cast<int64_t>(conn.source->ID));
                 jconn.addMember("src_port", conn.sourcePort);
                 jconn.addMember("src_chan", conn.sourceChannel);
-                jconn.addMember("dest", conn.destination->displayName);
+                jconn.addMember("dest", static_cast<int64_t>(conn.destination->ID));
                 jconn.addMember("dest_port", conn.destinationPort);
                 jconn.addMember("dest_chan", conn.destinationChannel);
                 connstates.push_back(jconn);
@@ -1000,14 +1013,14 @@ class MainComponent : public juce::Component, public juce::Timer
             std::cout << excep.what() << "\n";
         }
     }
-    void createAndAddNode(std::string name)
+    void createAndAddNode(std::string procid)
     {
-        DBG("Should create : " << name);
-        auto newproc = xenakios::XapFactory::getInstance().createFromName(name);
+        DBG("Should create : " << procid);
+        auto newproc = xenakios::XapFactory::getInstance().createFromID(procid);
         clap_plugin_descriptor desc;
         if (newproc && newproc->getDescriptor(&desc))
         {
-            DBG("Created : " << desc.name);
+            DBG("Created : " << desc.name << " " << desc.id);
         }
     }
     void showNodeAddMenu()
@@ -1022,12 +1035,13 @@ class MainComponent : public juce::Component, public juce::Timer
             {
                 menumap[e.manufacturer] = juce::PopupMenu();
             }
-            menumap[e.manufacturer].addItem(e.name, [this, name = e.name]() { createAndAddNode(name); });
+            menumap[e.manufacturer].addItem(e.proctype + " : " + e.name,
+                                            [this, pid = e.procid]() { createAndAddNode(pid); });
         }
 
-        for (auto& m : menumap)
+        for (auto &m : menumap)
         {
-            menu.addSubMenu(m.first,m.second);
+            menu.addSubMenu(m.first, m.second);
         }
 
         menu.showMenuAsync(juce::PopupMenu::Options());
@@ -1069,7 +1083,7 @@ class MainComponent : public juce::Component, public juce::Timer
     {
         // m_node_list->setBounds(0, 0, 300, getHeight() - 25);
         m_plug_test_but.setButtonText("Add...");
-        m_plug_test_but.setBounds(0,0,100,19);
+        m_plug_test_but.setBounds(0, 0, 100, 19);
         m_log_ed.setBounds(0, 20, 300, getHeight() - 45);
         m_graph_component->setBounds(m_log_ed.getRight() + 1, 0, getWidth() - 298,
                                      getHeight() - 25);

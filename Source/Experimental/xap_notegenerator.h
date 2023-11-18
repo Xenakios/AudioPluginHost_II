@@ -82,6 +82,7 @@ class ClapEventSequencerProcessor : public XAPWithJuceGUI
         memset(desc, 0, sizeof(clap_plugin_descriptor));
         desc->name = "XAP Entropic Sequencer";
         desc->vendor = "Xenakios";
+        desc->id = "org.xenakios.xupic.entropic-sequencer";
         return true;
     }
     uint32_t notePortsCount(bool isInput) const noexcept override
@@ -289,5 +290,5 @@ class ClapEventSequencerProcessor : public XAPWithJuceGUI
     void guiDestroy() noexcept override { m_editor = nullptr; }
 };
 inline xenakios::RegisterXap reg_notegen{
-    "Entropic Sequencer", "Internal",
+    "Entropic Sequencer", "org.xenakios.xupic.entropic-sequencer",
     []() { return std::make_unique<ClapEventSequencerProcessor>(400); }};

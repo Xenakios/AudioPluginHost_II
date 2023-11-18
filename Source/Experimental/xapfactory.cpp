@@ -33,10 +33,14 @@ void XapFactory::scanClapPlugin(const std::filesystem::path &path)
                 if (desc)
                 {
                     std::cout << "\t" << desc->name << "\n";
-                    m_entries.emplace_back(desc->name, "CLAP", [pathstr, i]() {
+                    std::string procid;
+                    if (desc->id)
+                        procid = desc->id;
+                    m_entries.emplace_back(desc->name, procid, [pathstr, i]() {
                         return std::make_unique<ClapPluginFormatProcessor>(pathstr, i);
                     });
                     m_entries.back().manufacturer = desc->vendor;
+                    m_entries.back().proctype = "CLAP";
                 }
             }
             entry->deinit();
@@ -82,10 +86,14 @@ void XapFactory::scanVST3Plugins()
         klist.scanAndAddFile(pfile, true, typesFound, f);
         for (int i = 0; i < typesFound.size(); ++i)
         {
-            m_entries.emplace_back(typesFound[i]->name.toStdString(), "VST3", [i, pfile] {
+            std::string procid = "vst3." + std::to_string(i) + "." +
+                                 std::to_string(typesFound[i]->uniqueId) + "." +
+                                 typesFound[i]->name.toStdString();
+            m_entries.emplace_back(typesFound[i]->name.toStdString(), procid, [i, pfile] {
                 return std::make_unique<JucePluginWrapper>(pfile, i);
             });
             m_entries.back().manufacturer = typesFound[i]->manufacturerName.toStdString();
+            m_entries.back().proctype = "VST3";
         }
     }
 }

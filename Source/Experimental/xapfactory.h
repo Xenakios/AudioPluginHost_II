@@ -25,9 +25,10 @@ class XapFactory
             fact = new XapFactory;
         return *fact;
     }
-    void registerEntry(std::string name, std::string proctype, CreationFunc createFunc)
+    void registerEntry(std::string name, std::string procid, CreationFunc createFunc)
     {
-        m_entries.emplace_back(name, proctype, createFunc);
+        m_entries.emplace_back(name, procid, createFunc);
+        m_entries.back().proctype = "Internal";
     }
     std::unique_ptr<XAudioProcessor> createFromName(std::string name)
     {
@@ -38,16 +39,26 @@ class XapFactory
         }
         return nullptr;
     }
+    std::unique_ptr<XAudioProcessor> createFromID(std::string id)
+    {
+        for (auto &e : m_entries)
+        {
+            if (e.procid == id)
+                return e.createfunc();
+        }
+        return nullptr;
+    }
     struct Entry
     {
         Entry() {}
-        Entry(std::string name_, std::string proctype_, CreationFunc func_)
-            : name(name_), proctype(proctype_), createfunc(func_)
+        Entry(std::string name_, std::string procid_, CreationFunc func_)
+            : name(name_), procid(procid_), createfunc(func_)
         {
         }
         std::string name;
         std::string proctype;
         std::string manufacturer;
+        std::string procid;
         CreationFunc createfunc;
     };
     std::vector<Entry> m_entries;
@@ -56,9 +67,9 @@ class XapFactory
 class RegisterXap
 {
   public:
-    RegisterXap(std::string name, std::string proctype, CreationFunc createFunc)
+    RegisterXap(std::string name, std::string procid, CreationFunc createFunc)
     {
-        XapFactory::getInstance().registerEntry(name, proctype, createFunc);
+        XapFactory::getInstance().registerEntry(name, procid, createFunc);
     }
 };
 } // namespace xenakios

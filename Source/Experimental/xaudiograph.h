@@ -55,9 +55,12 @@ class XAPNode
     std::vector<Pin> inputPins;
     std::vector<Pin> outputPins;
     std::string processorName;
-    XAPNode(std::unique_ptr<xenakios::XAudioProcessor> nodeIn, std::string name = "")
+    uint64_t ID = 0;
+    XAPNode(std::unique_ptr<xenakios::XAudioProcessor> nodeIn, std::string name = "",
+            uint64_t id = 0)
         : processor(std::move(nodeIn)), displayName(name)
     {
+        ID = id;
         clap_plugin_descriptor desc;
         if (processor->getDescriptor(&desc))
         {
@@ -421,9 +424,21 @@ class XAPGraph : public xenakios::XAudioProcessor
 {
   public:
     XAPGraph() {}
-    void addProcessorAsNode(std::unique_ptr<xenakios::XAudioProcessor> proc, std::string id)
+    uint64_t addProcessorAsNode(std::unique_ptr<xenakios::XAudioProcessor> proc,
+                                std::string displayid)
     {
-        proc_nodes.emplace_back(std::make_unique<XAPNode>(std::move(proc), id));
+        proc_nodes.emplace_back(
+            std::make_unique<XAPNode>(std::move(proc), displayid, runningNodeID));
+        auto result = runningNodeID;
+        ++runningNodeID;
+        return result;
+    }
+    XAPNode *findNodeByID(uint64_t id)
+    {
+        for (auto &n : proc_nodes)
+            if (n->ID == id)
+                return n.get();
+        return nullptr;
     }
     XAPNode *findNodeByName(std::string name)
     {
@@ -452,6 +467,30 @@ class XAPGraph : public xenakios::XAudioProcessor
         return connectAudioBetweenNodes(srcNode, sourcePort, sourceChannel, destNode,
                                         destinationPort, destinationChannel);
     }
+    bool makeConnection(XAPNode::ConnectionType conntype, uint64_t sourceNodeID, int sourcePort,
+                        int sourceChannel, uint64_t destinationNodeID, int destinationPort,
+                        int destinationChannel)
+    {
+        auto sourceNode = findNodeByID(sourceNodeID);
+        auto destinationNode = findNodeByID(destinationNodeID);
+        if (sourceNode == nullptr || destinationNode == nullptr)
+            return false;
+        XAPNode::Connection conn;
+        conn.type = conntype;
+        conn.source = sourceNode;
+        conn.sourceChannel = sourceChannel;
+        conn.sourcePort = sourcePort;
+        conn.sourcePinIndex = findPinIndex(sourceNode, conntype, false, sourcePort, sourceChannel);
+        conn.destinationPinIndex =
+            findPinIndex(destinationNode, conntype, true, destinationPort, destinationChannel);
+
+        conn.destination = destinationNode;
+        conn.destinationPort = destinationPort;
+        conn.destinationChannel = destinationChannel;
+        destinationNode->inputConnections.push_back(conn);
+
+        return true;
+    }
     bool connectModulationByNames(const std::string &sourceNodeName, clap_id sourceParamId,
                                   const std::string &destinationNodeName,
                                   clap_id destinationParamId, bool destructive,
@@ -477,7 +516,7 @@ class XAPGraph : public xenakios::XAudioProcessor
         }
         return result;
     }
-
+    uint64_t runningNodeID = 0;
     std::string outputNodeId = "";
     bool m_activated = false;
     void deactivate() noexcept override { m_activated = false; }

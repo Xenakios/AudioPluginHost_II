@@ -225,6 +225,7 @@ class XAPGain : public XAPWithJuceGUI
         memset(desc, 0, sizeof(clap_plugin_descriptor));
         desc->name = "Volume";
         desc->vendor = "Xenakios";
+        desc->id = "org.xenakios.xupic.volume";
         return true;
     }
     uint32_t audioPortsCount(bool isInput) const noexcept override { return 1; }
@@ -383,7 +384,7 @@ class XAPGain : public XAPWithJuceGUI
     void guiDestroy() noexcept override { m_editor = nullptr; }
 };
 
-static xenakios::RegisterXap reg_volume{"Volume", "Internal",
+static xenakios::RegisterXap reg_volume{"Volume", "org.xenakios.xupic.volume",
                                         []() { return std::make_unique<XAPGain>(); }};
 
 const size_t maxHolderDataSize = 128;
