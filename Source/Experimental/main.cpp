@@ -445,9 +445,7 @@ class NodeGraphComponent : public juce::Component
                 float x1 = getPinXPos(conn.source, sourceIndex, false);
                 float y0 = n->nodeSceneBounds.getY();
                 float y1 = conn.source->nodeSceneBounds.getBottom();
-                // connpath.startNewSubPath(x0 + 5.0f, y0);
-                // connpath.cubicTo(x0*)
-                g.drawLine(x0 + 5.0f, y0, x1 + 5.0f, y1, 2.0f);
+                g.drawArrow(juce::Line<float>(x1 + 5.0f, y1, x0 + 5.0f, y0), 2.0f, 10.0f, 10.0f);
             }
         }
         g.setColour(juce::Colours::white);
@@ -852,10 +850,9 @@ class MainComponent : public juce::Component, public juce::Timer
         m_node_info_ed.setMultiLine(true);
         m_node_info_ed.setReadOnly(true);
 
-        
         m_player = std::make_unique<XAPPlayer>(*m_graph);
         m_aman.initialiseWithDefaultDevices(0, 2);
-        
+
         m_graph_component = std::make_unique<NodeGraphComponent>(m_graph.get());
         addAndMakeVisible(m_graph_component.get());
         setSize(1000, 600);
@@ -992,7 +989,7 @@ class MainComponent : public juce::Component, public juce::Timer
                                     }
                                 }
                             };
-                                                }
+                        }
                     }
                 }
                 std::unordered_map<uint64_t, XAPNode *> nodemap;
@@ -1043,7 +1040,6 @@ class MainComponent : public juce::Component, public juce::Timer
                     }
                     else
                         DBG("no base64 string");
-                    
                 }
             }
         }
