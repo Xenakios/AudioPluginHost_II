@@ -721,7 +721,18 @@ class MainComponent : public juce::Component, public juce::Timer
     void timerCallback() override
     {
         int usage = m_aman.getCpuUsage() * 100.0;
-        m_infolabel.setText("CPU " + juce::String(usage) + "%", juce::dontSendNotification);
+        juce::String txt;
+        if (m_graph->m_last_touched_node)
+        {
+            auto lasttouchedparam = m_graph->m_last_touched_param;
+            auto lasttouchedproc = m_graph->m_last_touched_node;
+            auto lasttouchedparamname =
+                juce::String(lasttouchedproc->parameterInfos[lasttouchedparam].name);
+            txt += juce::String(lasttouchedproc->processorName) + " ";
+            txt +=
+                lasttouchedparamname + " " + juce::String(m_graph->m_last_touched_param_value, 2);
+        }
+        m_infolabel.setText("CPU " + juce::String(usage) + "% " + txt, juce::dontSendNotification);
     }
     std::string pathprefix = R"(C:\Program Files\Common Files\)";
     void addNoteGeneratorTestNodes()

@@ -167,13 +167,29 @@ clap_process_status XAPGraph::process(const clap_process *process) noexcept
         for (size_t i = 0; i < n->outEvents.size(); ++i)
         {
             auto oev = n->outEvents.get(i);
-            if (oev->type == CLAP_EVENT_PARAM_GESTURE_BEGIN)
+            if (equalsToAny(oev->type, CLAP_EVENT_PARAM_GESTURE_BEGIN,
+                            CLAP_EVENT_PARAM_GESTURE_END))
             {
                 auto gev = reinterpret_cast<clap_event_param_gesture *>(oev);
                 m_last_touched_node = n;
                 m_last_touched_param = gev->param_id;
-                // DBG("parameter " << gev->param_id << " begin gesture in proc " <<
-                // n->processorName);
+                /*
+                if (oev->type == CLAP_EVENT_PARAM_GESTURE_BEGIN)
+                    DBG("parameter " << gev->param_id << " begin gesture in proc "
+                                     << n->processorName);
+                if (oev->type == CLAP_EVENT_PARAM_GESTURE_END)
+                    DBG("parameter " << gev->param_id << " end gesture in proc "
+                                   << n->processorName);
+                */
+            }
+            if (oev->type == CLAP_EVENT_PARAM_VALUE)
+            {
+                auto pev = reinterpret_cast<clap_event_param_value *>(oev);
+                m_last_touched_node = n;
+                m_last_touched_param = pev->param_id;
+                m_last_touched_param_value = pev->value;
+                // DBG("parameter " << pev->param_id << " changed to " << pev->value << " in proc "
+                //                  << n->processorName);
             }
         }
     }

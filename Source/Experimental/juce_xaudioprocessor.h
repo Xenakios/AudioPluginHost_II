@@ -3,7 +3,9 @@
 #include "xaudioprocessor.h"
 #include "JuceHeader.h"
 
-class JucePluginWrapper : public xenakios::XAudioProcessor, public juce::AudioPlayHead
+class JucePluginWrapper : public xenakios::XAudioProcessor,
+                          public juce::AudioPlayHead,
+                          public juce::AudioProcessorParameter::Listener
 {
   public:
     std::vector<clap_param_info> m_param_infos;
@@ -39,6 +41,7 @@ class JucePluginWrapper : public xenakios::XAudioProcessor, public juce::AudioPl
             }
             else
             {
+                updateParameterInfos();
                 m_desc = m_internal->getPluginDescription();
                 clap_id_string = "vst3." + std::to_string(subpluginindex) + "." +
                                  std::to_string(m_desc.uniqueId) + "." + m_desc.name.toStdString();
@@ -63,7 +66,37 @@ class JucePluginWrapper : public xenakios::XAudioProcessor, public juce::AudioPl
     {
         return m_transport_pos;
     }
+    choc::fifo::SingleReaderSingleWriterFIFO<xenakios::CrossThreadMessage> m_param_messages_fifo;
+    void parameterValueChanged(int parameterIndex, float newValue) override
+    {
+        m_param_messages_fifo.push({(clap_id)parameterIndex, CLAP_EVENT_PARAM_VALUE, newValue});
+    }
+    void parameterGestureChanged(int parameterIndex, bool gestureIsStarting) override
+    {
+        int et = CLAP_EVENT_PARAM_GESTURE_BEGIN;
+        if (!gestureIsStarting)
+            et = CLAP_EVENT_PARAM_GESTURE_END;
+        m_param_messages_fifo.push({(clap_id)parameterIndex, et, 0.0});
+    }
     juce::Optional<juce::AudioPlayHead::PositionInfo> m_transport_pos;
+    void updateParameterInfos()
+    {
+        m_param_infos.clear();
+        auto &pars = m_internal->getParameters();
+        // We should probably create the clap parameter
+        // id in some other way that makes them non-contiguous...
+        clap_id parid = 0;
+        for (auto &par : pars)
+        {
+            auto pinfo = makeParamInfo(parid, par->getName(100), 0.0, 1.0, par->getDefaultValue(),
+                                       CLAP_PARAM_IS_AUTOMATABLE);
+            m_param_infos.push_back(pinfo);
+            par->addListener(this);
+            // std::cout << parid << "\t" << par->getName(100) << "\t" << par->getDefaultValue()
+            //           << "\n";
+            ++parid;
+        }
+    }
     bool activate(double sampleRate, uint32_t minFrameCount,
                   uint32_t maxFrameCount) noexcept override
     {
@@ -77,20 +110,7 @@ class JucePluginWrapper : public xenakios::XAudioProcessor, public juce::AudioPl
         m_work_buf.setSize(maxchans_needed, maxFrameCount);
         m_work_buf.clear();
         m_internal->prepareToPlay(sampleRate, maxFrameCount);
-        m_param_infos.clear();
-        auto &pars = m_internal->getParameters();
-        // We should probably create the clap parameter
-        // id in some other way that makes them non-contiguous...
-        clap_id parid = 0;
-        for (auto &par : pars)
-        {
-            auto pinfo = makeParamInfo(parid, par->getName(100), 0.0, 1.0, par->getDefaultValue(),
-                                       CLAP_PARAM_IS_AUTOMATABLE);
-            m_param_infos.push_back(pinfo);
-            // std::cout << parid << "\t" << par->getName(100) << "\t" << par->getDefaultValue()
-            //           << "\n";
-            ++parid;
-        }
+
         return true;
     }
     uint32_t paramsCount() const noexcept override { return m_param_infos.size(); }
@@ -210,6 +230,39 @@ class JucePluginWrapper : public xenakios::XAudioProcessor, public juce::AudioPl
             }
             smp += chunk;
         }
+        xenakios::CrossThreadMessage msg;
+        while (m_param_messages_fifo.pop(msg))
+        {
+            if (equalsToAny(msg.eventType, CLAP_EVENT_PARAM_GESTURE_BEGIN,
+                            CLAP_EVENT_PARAM_GESTURE_END))
+            {
+                clap_event_param_gesture ge;
+                ge.header.flags = 0;
+                ge.header.size = sizeof(clap_event_param_gesture);
+                ge.header.space_id = CLAP_CORE_EVENT_SPACE_ID;
+                ge.header.time = 0;
+                ge.header.type = msg.eventType;
+                ge.param_id = msg.paramId;
+                process->out_events->try_push(process->out_events, (clap_event_header *)&ge);
+            }
+            if (msg.eventType == CLAP_EVENT_PARAM_VALUE)
+            {
+                clap_event_param_value pe;
+                pe.header.flags = 0;
+                pe.header.size = sizeof(clap_event_param_value);
+                pe.header.space_id = CLAP_CORE_EVENT_SPACE_ID;
+                pe.header.time = 0;
+                pe.header.type = CLAP_EVENT_PARAM_VALUE;
+                pe.channel = -1;
+                pe.cookie = nullptr;
+                pe.key = -1;
+                pe.note_id = -1;
+                pe.port_index = -1;
+                pe.value = msg.value;
+                pe.param_id = msg.paramId;
+                process->out_events->try_push(process->out_events, (clap_event_header *)&pe);
+            }
+        }
         return CLAP_PROCESS_CONTINUE;
     }
 
@@ -310,9 +363,17 @@ class JucePluginWrapper : public xenakios::XAudioProcessor, public juce::AudioPl
     // virtual bool guiSetScale(double scale) noexcept { return false; }
     bool guiCreate(const char *api, bool isFloating) noexcept override
     {
+        if (!m_internal)
+            return false;
         if (m_internal->hasEditor())
         {
             m_editor = m_internal->createEditor();
+            return true;
+        }
+        else
+        {
+            // the generic editor is kind of sucky, but will have to do for now
+            m_editor = new juce::GenericAudioProcessorEditor(m_internal.get());
             return true;
         }
         return false;

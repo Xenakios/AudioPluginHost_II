@@ -561,7 +561,9 @@ class XAPGraph : public xenakios::XAudioProcessor
     {
         return {m_last_touched_node, m_last_touched_param};
     }
-
+    XAPNode *m_last_touched_node = nullptr;
+    clap_id m_last_touched_param = CLAP_INVALID_ID;
+    double m_last_touched_param_value = 0.0;
   private:
     std::vector<XAPNode *> runOrder;
     clap_event_transport transport;
@@ -572,6 +574,5 @@ class XAPGraph : public xenakios::XAudioProcessor
     clap::helpers::EventList noteMergeList;
     std::unordered_map<clap_id, double> accumModValues;
     double m_sr = 0.0;
-    XAPNode *m_last_touched_node = nullptr;
-    clap_id m_last_touched_param = CLAP_INVALID_ID;
+    
 };
