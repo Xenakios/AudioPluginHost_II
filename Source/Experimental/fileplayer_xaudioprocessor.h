@@ -380,4 +380,4 @@ class FilePlayerProcessor : public XAPWithJuceGUI
     }
 };
 static xenakios::RegisterXap reg_fileplayer{
-    "File Player", "Internal", []() { return std::make_unique<FilePlayerProcessor>(); }};
+    "File Player", "com.xenakios.fileplayer", []() { return std::make_unique<FilePlayerProcessor>(); }};

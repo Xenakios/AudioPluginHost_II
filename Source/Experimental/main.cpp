@@ -1029,8 +1029,6 @@ class MainComponent : public juce::Component, public juce::Timer
         std::map<std::string, juce::PopupMenu> menumap;
         for (auto &e : xenakios::XapFactory::getInstance().m_entries)
         {
-            if (e.manufacturer.empty())
-                e.manufacturer = "Xenakios Internal";
             if (menumap.count(e.manufacturer) == 0)
             {
                 menumap[e.manufacturer] = juce::PopupMenu();

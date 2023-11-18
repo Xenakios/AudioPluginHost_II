@@ -29,6 +29,7 @@ class XapFactory
     {
         m_entries.emplace_back(name, procid, createFunc);
         m_entries.back().proctype = "Internal";
+        m_entries.back().manufacturer = "Xenakios";
     }
     std::unique_ptr<XAudioProcessor> createFromName(std::string name)
     {
