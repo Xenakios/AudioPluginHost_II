@@ -425,12 +425,16 @@ class XAPGraph : public xenakios::XAudioProcessor
   public:
     XAPGraph() {}
     uint64_t addProcessorAsNode(std::unique_ptr<xenakios::XAudioProcessor> proc,
-                                std::string displayid)
+                                std::string displayid, std::optional<uint64_t> id = {})
     {
+        uint64_t id_to_use = runningNodeID;
+        if (id)
+            id_to_use = *id;
         proc_nodes.emplace_back(
-            std::make_unique<XAPNode>(std::move(proc), displayid, runningNodeID));
-        auto result = runningNodeID;
-        ++runningNodeID;
+            std::make_unique<XAPNode>(std::move(proc), displayid, id_to_use));
+        //auto result = runningNodeID;
+        //++runningNodeID;
+        auto result = proc_nodes.size();
         return result;
     }
     XAPNode *findNodeByID(uint64_t id)

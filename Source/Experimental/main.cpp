@@ -838,7 +838,7 @@ class MainComponent : public juce::Component, public juce::Timer
         startTimerHz(10);
 
         m_graph = std::make_unique<XAPGraph>();
-        addNoteGeneratorTestNodes();
+        // addNoteGeneratorTestNodes();
         // addFilePlayerTestNodes();
         // addToneGeneratorTestNodes();
         // addConduitTestNodes();
@@ -852,40 +852,22 @@ class MainComponent : public juce::Component, public juce::Timer
         m_node_info_ed.setMultiLine(true);
         m_node_info_ed.setReadOnly(true);
 
-        juce::Random rng{7};
-        for (auto &n : m_graph->proc_nodes)
-        {
-            // continue;
-            m_xap_windows.emplace_back(std::make_unique<XapWindow>(*n->processor));
-            m_xap_windows.back()->nodeID = n->displayName;
-            m_xap_windows.back()->setTopLeftPosition(rng.nextInt({10, 600}),
-                                                     rng.nextInt({100, 400}));
-            n->nodeSceneBounds = {rng.nextInt({10, 600}), rng.nextInt({10, 600}), 200, 40};
-            m_xap_windows.back()->OnRequestDelete = [this](XapWindow *w) {
-                for (int i = 0; i < m_xap_windows.size(); ++i)
-                {
-                    if (m_xap_windows[i].get() == w)
-                    {
-                        m_xap_windows.erase(m_xap_windows.begin() + i);
-                        break;
-                    }
-                }
-            };
-        }
-
+        
         m_player = std::make_unique<XAPPlayer>(*m_graph);
         m_aman.initialiseWithDefaultDevices(0, 2);
-        m_aman.addAudioCallback(m_player.get());
+        
         m_graph_component = std::make_unique<NodeGraphComponent>(m_graph.get());
         addAndMakeVisible(m_graph_component.get());
         setSize(1000, 600);
         juce::MessageManager::callAsync([this]() {
             loadState(juce::File());
             m_graph_component->repaint();
+            m_aman.addAudioCallback(m_player.get());
         });
     }
     void saveState(juce::File file)
     {
+        return;
         auto root = choc::value::createObject("");
         auto wstate = choc::value::createObject("");
         wstate.addMember("win_bounds", getScreenBounds().toString().toStdString());
@@ -919,14 +901,17 @@ class MainComponent : public juce::Component, public juce::Timer
             }
             */
             juce::Rectangle<int> bounds;
+            bool plugvisible = false;
             for (auto &w : m_xap_windows)
             {
                 if (&w->m_proc == n->processor.get())
                 {
                     bounds = w->getScreenBounds();
+                    plugvisible = w->isVisible();
                     break;
                 }
             }
+            nodestate.addMember("plugwinvisible", plugvisible);
             if (!bounds.isEmpty())
             {
                 nodestate.addMember("plugwinbounds", bounds.toString().toStdString());
@@ -953,6 +938,7 @@ class MainComponent : public juce::Component, public juce::Timer
     }
     void loadState(juce::File file)
     {
+        m_graph->outputNodeId = "Main";
         try
         {
             auto jsontxt = choc::file::loadFileAsString(
@@ -966,25 +952,79 @@ class MainComponent : public juce::Component, public juce::Timer
             {
                 getParentComponent()->setBounds(boundsrect);
             }
-            std::unordered_map<std::string, XAPNode *> nodemap;
-            for (auto &e : m_graph->proc_nodes)
-            {
-                nodemap[e->displayName] = e.get();
-            }
+
             auto jnodesarr = jroot["nodestates"];
             auto sz = jnodesarr.size();
             if (sz > 0)
             {
+
+                for (uint32 i = 0; i < sz; ++i)
+                {
+                    auto jnodestate = jnodesarr[i];
+                    auto jid = jnodestate["id"].toString();
+                    auto jidx = jnodestate["idx"].getInt64();
+                    auto jprocid = jnodestate["procid"].toString();
+                    auto uproc = xenakios::XapFactory::getInstance().createFromID(jprocid);
+                    if (uproc)
+                    {
+                        auto proc = uproc.get();
+                        m_graph->addProcessorAsNode(std::move(uproc), jid, jidx);
+                        DBG("Added " << m_graph->proc_nodes.back()->displayName
+                                     << " to graph from state");
+                        bool plugvis = jnodestate["plugwinvisible"].getBool();
+                        if (plugvis)
+                        {
+                            m_xap_windows.emplace_back(std::make_unique<XapWindow>(*proc));
+                            m_xap_windows.back()->nodeID = m_graph->proc_nodes.back()->displayName;
+                            auto jbounds = jnodestate["plugwinbounds"].toString();
+                            auto bounds = juce::Rectangle<int>::fromString(jbounds);
+                            if (!bounds.isEmpty())
+                            {
+                                m_xap_windows.back()->setBounds(bounds);
+                            }
+                            m_xap_windows.back()->OnRequestDelete = [this](XapWindow *w) {
+                                for (int i = 0; i < m_xap_windows.size(); ++i)
+                                {
+                                    if (m_xap_windows[i].get() == w)
+                                    {
+                                        m_xap_windows.erase(m_xap_windows.begin() + i);
+                                        break;
+                                    }
+                                }
+                            };
+                                                }
+                    }
+                }
+                std::unordered_map<uint64_t, XAPNode *> nodemap;
+                for (auto &e : m_graph->proc_nodes)
+                {
+                    nodemap[e->ID] = e.get();
+                }
+                auto jconns = jroot["nodeconnections"];
+                for (int i = 0; i < jconns.size(); ++i)
+                {
+                    auto jconn = jconns[i];
+                    auto ctype = (XAPNode::ConnectionType)jconn["type"].getInt64();
+                    uint64_t sourceid = jconn["src"].getInt64();
+                    int sourceport = jconn["src_port"].getInt64();
+                    int sourcechannel = jconn["src_chan"].getInt64();
+                    uint64_t destid = jconn["dest"].getInt64();
+                    int destport = jconn["dest_port"].getInt64();
+                    int destchannel = jconn["dest_chan"].getInt64();
+                    m_graph->makeConnection(ctype, sourceid, sourceport, sourcechannel, destid,
+                                            destport, destchannel);
+                }
                 for (uint32 i = 0; i < sz; ++i)
                 {
                     auto jnodestate = jnodesarr[i];
                     auto jid = jnodestate["id"];
+                    uint64_t jidx = jnodestate["idx"].getInt64();
                     auto jnodebounds = jnodestate["nodebounds"];
                     auto nodebounds = juce::Rectangle<int>::fromString(jnodebounds.toString());
                     if (!nodebounds.isEmpty())
                     {
                         DBG(jid.toString() << " has node scene bound " << nodebounds.toString());
-                        nodemap[jid.toString()]->nodeSceneBounds = nodebounds;
+                        nodemap[jidx]->nodeSceneBounds = nodebounds;
                     }
                     auto b64state = jnodestate["procstatebase64"].toString();
                     if (b64state.size() > 0)
@@ -992,7 +1032,7 @@ class MainComponent : public juce::Component, public juce::Timer
                         std::vector<unsigned char> vec;
                         if (choc::base64::decodeToContainer(vec, b64state))
                         {
-                            auto *proc = nodemap[jid.toString()]->processor.get();
+                            auto *proc = nodemap[jidx]->processor.get();
                             if (!m_graph->setProcessorState(proc, vec))
                             {
                                 DBG("could not set state");
@@ -1003,19 +1043,7 @@ class MainComponent : public juce::Component, public juce::Timer
                     }
                     else
                         DBG("no base64 string");
-                    for (auto &w : m_xap_windows)
-                    {
-                        if (w->nodeID == jid.toString())
-                        {
-                            auto jbounds = jnodestate["plugwinbounds"].toString();
-                            auto bounds = juce::Rectangle<int>::fromString(jbounds);
-                            if (!bounds.isEmpty())
-                            {
-                                w->setBounds(bounds);
-                            }
-                            break;
-                        }
-                    }
+                    
                 }
             }
         }
