@@ -606,12 +606,19 @@ class NodeGraphComponent : public juce::Component, public juce::Timer
             m_graph->from_ui_fifo.push(msg);
         });
         juce::PopupMenu removeinconnmenu;
-        for (auto &conn : n->inputConnections)
+        for (size_t i = 0; i < n->inputConnections.size(); ++i)
         {
+            auto &conn = n->inputConnections[i];
             juce::String txt = juce::String(conn.source->displayName) + " port " +
                                juce::String(conn.sourcePort) + " channel " +
                                juce::String(conn.sourceChannel);
-            removeinconnmenu.addItem(txt, []() {});
+            removeinconnmenu.addItem(txt, [this, n, i]() {
+                XAPGraph::CTMessage msg;
+                msg.connectionIndex = i;
+                msg.node = n;
+                msg.op = XAPGraph::CTMessage::Opcode::RemoveNodeInput;
+                m_graph->from_ui_fifo.push(msg);
+            });
         }
         menu.addSubMenu("Remove input", removeinconnmenu);
         menu.showMenuAsync(juce::PopupMenu::Options());

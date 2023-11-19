@@ -434,11 +434,16 @@ class XAPGraph : public xenakios::XAudioProcessor
         {
             None,
             RemoveNodeInputs,
+            RemoveNodeInput,
             RemoveNode,
             DeleteNode
         };
         Opcode op = Opcode::None;
         XAPNode *node = nullptr;
+        XAPNode *inputNode = nullptr;
+        int connectionIndex = -1;
+        int port = -1;
+        int channel = -1;
     };
     choc::fifo::SingleReaderSingleWriterFIFO<CTMessage> from_ui_fifo;
     choc::fifo::SingleReaderSingleWriterFIFO<CTMessage> to_ui_fifo;
@@ -452,18 +457,18 @@ class XAPGraph : public xenakios::XAudioProcessor
         proc_nodes.reserve(1024);
         runOrder.reserve(1024);
     }
-    void updateRunOrder() 
-    { 
-        for(auto& n : proc_nodes)
+    void updateRunOrder()
+    {
+        for (auto &n : proc_nodes)
         {
             n->isActiveInGraph = false;
         }
-        runOrder = topoSort(findNodeByName(outputNodeId)); 
-        for(auto& n : runOrder)
+        runOrder = topoSort(findNodeByName(outputNodeId));
+        for (auto &n : runOrder)
         {
             n->isActiveInGraph = true;
         }
-        for(auto& n : proc_nodes)
+        for (auto &n : proc_nodes)
         {
             if (!n->isActiveInGraph)
             {
@@ -509,6 +514,14 @@ class XAPGraph : public xenakios::XAudioProcessor
             if (msg.op == CTMessage::Opcode::RemoveNodeInputs)
             {
                 msg.node->inputConnections.clear();
+                updateRunOrder();
+            }
+            if (msg.op == CTMessage::Opcode::RemoveNodeInput)
+            {
+                msg.node->inputConnections.erase(msg.node->inputConnections.begin() +
+                                                 msg.connectionIndex);
+                // this might not really require re-evaluating the whole run order,
+                // but for now it will work like this...
                 updateRunOrder();
             }
             if (msg.op == CTMessage::Opcode::RemoveNode)
