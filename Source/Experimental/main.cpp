@@ -41,9 +41,55 @@ inline void mapModulationEvents(const clap::helpers::EventList &sourceList, clap
 class XAPPlayer : public juce::AudioIODeviceCallback
 {
   public:
-    XAPPlayer(xenakios::XAudioProcessor &procToPlay, int subblocksize = 64)
+    struct CTMessage
+    {
+        enum class OPCode
+        {
+            Nop,
+            Shutdown,
+            SwitchXAP,
+            DeleteXAP
+        };
+        OPCode op = OPCode::Nop;
+        xenakios::XAudioProcessor *proc = nullptr; // switch to, send back to deletion
+    };
+    choc::fifo::SingleReaderSingleWriterFIFO<CTMessage> from_ui_fifo;
+    choc::fifo::SingleReaderSingleWriterFIFO<CTMessage> to_ui_fifo;
+    XAPPlayer(xenakios::XAudioProcessor *procToPlay, int subblocksize = 64)
         : m_proc(procToPlay), m_subblocksize(subblocksize)
     {
+        // 128 should be enough, we have some problem already if the fifos need more
+        from_ui_fifo.reset(128);
+        to_ui_fifo.reset(128);
+    }
+    std::atomic<bool> shutdownReady{false};
+    void handleFromUIMessages()
+    {
+        CTMessage msg;
+        while (from_ui_fifo.pop(msg))
+        {
+            if (msg.op == CTMessage::OPCode::Shutdown)
+            {
+                if (m_proc)
+                {
+                    m_proc->stopProcessing();
+                    m_proc = nullptr;
+                    shutdownReady = true;
+                }
+            }
+            if (msg.op == CTMessage::OPCode::SwitchXAP && msg.proc)
+            {
+                if (m_proc)
+                {
+                    m_proc->stopProcessing();
+                }
+                CTMessage toui;
+                toui.op = CTMessage::OPCode::DeleteXAP;
+                toui.proc = m_proc;
+                m_proc = msg.proc;
+                to_ui_fifo.push(toui);
+            }
+        }
     }
     void audioDeviceIOCallbackWithContext(const float *const *inputChannelData,
                                           int numInputChannels, float *const *outputChannelData,
@@ -51,6 +97,18 @@ class XAPPlayer : public juce::AudioIODeviceCallback
                                           const AudioIODeviceCallbackContext &context) override
     {
         jassert(m_output_ring_buf.size() >= numSamples * numOutputChannels);
+        handleFromUIMessages();
+        if (!m_proc)
+        {
+            for (int i = 0; i < numOutputChannels; ++i)
+            {
+                for (int j = 0; j < numSamples; ++j)
+                {
+                    outputChannelData[i][j] = 0.0f;
+                }
+            }
+            return;
+        }
         clap_process process;
         juce::zerostruct(process);
         clap_audio_buffer cab[1];
@@ -64,7 +122,7 @@ class XAPPlayer : public juce::AudioIODeviceCallback
         process.frames_count = m_subblocksize;
         while (m_output_ring_buf.available() < numSamples * numOutputChannels)
         {
-            auto err = m_proc.process(&process);
+            auto err = m_proc->process(&process);
             if (err == CLAP_PROCESS_ERROR)
             {
                 for (int i = 0; i < numOutputChannels; ++i)
@@ -103,15 +161,19 @@ class XAPPlayer : public juce::AudioIODeviceCallback
             }
         }
     }
+    double curSampleRate = 0.0;
+    int curBufferSize = 0;
     void audioDeviceAboutToStart(AudioIODevice *device) override
     {
-        m_proc.activate(device->getCurrentSampleRate(), device->getCurrentBufferSizeSamples(),
-                        device->getCurrentBufferSizeSamples());
+        curSampleRate = device->getCurrentSampleRate();
+        curBufferSize = device->getCurrentBufferSizeSamples();
+        // m_proc->activate(device->getCurrentSampleRate(), device->getCurrentBufferSizeSamples(),
+        //                  device->getCurrentBufferSizeSamples());
     }
     void audioDeviceStopped() override {}
 
   private:
-    xenakios::XAudioProcessor &m_proc;
+    xenakios::XAudioProcessor *m_proc = nullptr;
     SimpleRingBuffer<float, 2048> m_input_ring_buf;
     SimpleRingBuffer<float, 2048> m_output_ring_buf;
     int m_subblocksize = 0;
@@ -122,7 +184,7 @@ inline void test_graph_processor_realtime()
     auto g = std::make_unique<XAPGraph>();
     juce::AudioDeviceManager man;
     man.initialiseWithDefaultDevices(0, 2);
-    XAPPlayer xplayer(*g);
+    XAPPlayer xplayer(g.get());
     // addAudioCallback(&xplayer);
     double t0 = juce::Time::getMillisecondCounterHiRes();
     while (true)
@@ -716,11 +778,32 @@ class MainComponent : public juce::Component, public juce::Timer
     juce::TextEditor m_log_ed;
     juce::TextButton m_plug_test_but;
     std::unique_ptr<NodeGraphComponent> m_graph_component;
+    void handleMessagesFromAudioThread()
+    {
+        XAPPlayer::CTMessage msg;
+        while (m_player->to_ui_fifo.pop(msg))
+        {
+            if (msg.op == XAPPlayer::CTMessage::OPCode::DeleteXAP)
+            {
+                DBG("audio thread sent processor to delete " << (uint64_t)msg.proc);
+                if (msg.proc && msg.proc != m_graph.get())
+                {
+                    delete msg.proc;
+                }
+                if (msg.proc == m_graph.get())
+                {
+                    DBG("player asked to delete current processor!");
+                    jassert(false);
+                }
+            }
+        }
+    }
     void timerCallback() override
     {
+        handleMessagesFromAudioThread();
         int usage = m_aman.getCpuUsage() * 100.0;
         juce::String txt;
-        if (m_graph->m_last_touched_node)
+        if (m_graph && m_graph->m_last_touched_node)
         {
             auto lasttouchedparam = m_graph->m_last_touched_param;
             auto lasttouchedproc = m_graph->m_last_touched_node;
@@ -850,7 +933,7 @@ class MainComponent : public juce::Component, public juce::Timer
         m_node_info_ed.setMultiLine(true);
         m_node_info_ed.setReadOnly(true);
 
-        m_player = std::make_unique<XAPPlayer>(*m_graph);
+        m_player = std::make_unique<XAPPlayer>(nullptr);
         m_aman.initialiseWithDefaultDevices(0, 2);
 
         m_graph_component = std::make_unique<NodeGraphComponent>(m_graph.get());
@@ -860,6 +943,13 @@ class MainComponent : public juce::Component, public juce::Timer
             loadState(juce::File());
             m_graph_component->repaint();
             m_aman.addAudioCallback(m_player.get());
+            jassert(m_player->curBufferSize > 0 && m_player->curSampleRate > 0.0);
+            m_graph->activate(m_player->curSampleRate, m_player->curBufferSize,
+                              m_player->curBufferSize);
+            XAPPlayer::CTMessage msg;
+            msg.op = XAPPlayer::CTMessage::OPCode::SwitchXAP;
+            msg.proc = m_graph.get();
+            m_player->from_ui_fifo.push(msg);
         });
     }
     void saveState(juce::File file)
@@ -965,13 +1055,13 @@ class MainComponent : public juce::Component, public juce::Timer
                     if (is_sink)
                     {
                         // there should only be one sink node!
-                        // we probably should figure out something else for determining the sink node,
-                        // like have a node type that is going to be the final audio output
+                        // we probably should figure out something else for determining the sink
+                        // node, like have a node type that is going to be the final audio output
                         jassert(!sink_node_id);
                         sink_node_id = jidx;
                         m_graph->outputNodeId = jid;
                     }
-                        
+
                     auto jprocid = jnodestate["procid"].toString();
                     auto uproc = xenakios::XapFactory::getInstance().createFromID(jprocid);
                     if (uproc)
