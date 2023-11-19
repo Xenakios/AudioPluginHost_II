@@ -1123,7 +1123,7 @@ class MainComponent : public juce::Component, public juce::Timer
                     auto nodebounds = juce::Rectangle<int>::fromString(jnodebounds.toString());
                     if (!nodebounds.isEmpty())
                     {
-                        DBG(jid.toString() << " has node scene bound " << nodebounds.toString());
+                        // DBG(jid.toString() << " has node scene bound " << nodebounds.toString());
                         nodemap[jidx]->nodeSceneBounds = nodebounds;
                     }
                     auto b64state = jnodestate["procstatebase64"].toString();
@@ -1142,7 +1142,9 @@ class MainComponent : public juce::Component, public juce::Timer
                             DBG("could not decode base64");
                     }
                     else
-                        DBG("no base64 string");
+                    {
+                        // DBG("no base64 string");
+                    }
                 }
             }
         }
@@ -1213,6 +1215,23 @@ class MainComponent : public juce::Component, public juce::Timer
     {
         saveState(juce::File());
         m_xap_windows.clear();
+        XAPPlayer::CTMessage msg;
+        msg.op = XAPPlayer::CTMessage::OPCode::Shutdown;
+        m_player->from_ui_fifo.push(msg);
+        // need to wait that the processors have stopped, which has
+        // to be done for Claps in the audio thread
+        int sleepcount = 0;
+        while (!m_player->shutdownReady.load())
+        {
+            juce::Thread::sleep(10);
+            ++sleepcount;
+            if (sleepcount > 500) // arbitrary but let's not hang when quitting
+            {
+                DBG("Shutting down took too long, breaking");
+                break;
+            }
+        }
+        // now ready to shutdown audio playback
         m_aman.removeAudioCallback(m_player.get());
     }
     void resized() override

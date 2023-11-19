@@ -430,9 +430,8 @@ class XAPGraph : public xenakios::XAudioProcessor
         uint64_t id_to_use = runningNodeID;
         if (id)
             id_to_use = *id;
-        proc_nodes.emplace_back(
-            std::make_unique<XAPNode>(std::move(proc), displayid, id_to_use));
-        //auto result = runningNodeID;
+        proc_nodes.emplace_back(std::make_unique<XAPNode>(std::move(proc), displayid, id_to_use));
+        // auto result = runningNodeID;
         //++runningNodeID;
         auto result = proc_nodes.size();
         return result;
@@ -526,7 +525,24 @@ class XAPGraph : public xenakios::XAudioProcessor
     void deactivate() noexcept override { m_activated = false; }
     bool activate(double sampleRate, uint32_t minFrameCount,
                   uint32_t maxFrameCount) noexcept override;
-
+    std::atomic<bool> m_processing_started{false};
+    bool startProcessing() noexcept override
+    {
+        // error if called again when already started
+        jassert(!m_processing_started);
+        m_processing_started = true;
+        return true;
+    }
+    void stopProcessing() noexcept override
+    {
+        // error if called when not already started?
+        jassert(m_processing_started);
+        for (auto &n : runOrder)
+        {
+            n->processor->stopProcessing();
+        }
+        m_processing_started = false;
+    }
     clap_process_status process(const clap_process *process) noexcept override;
 
     std::vector<std::unique_ptr<XAPNode>> proc_nodes;
@@ -568,6 +584,7 @@ class XAPGraph : public xenakios::XAudioProcessor
     XAPNode *m_last_touched_node = nullptr;
     clap_id m_last_touched_param = CLAP_INVALID_ID;
     double m_last_touched_param_value = 0.0;
+
   private:
     std::vector<XAPNode *> runOrder;
     clap_event_transport transport;
@@ -578,5 +595,4 @@ class XAPGraph : public xenakios::XAudioProcessor
     clap::helpers::EventList noteMergeList;
     std::unordered_map<clap_id, double> accumModValues;
     double m_sr = 0.0;
-    
 };

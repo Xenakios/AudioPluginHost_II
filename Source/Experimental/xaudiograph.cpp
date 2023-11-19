@@ -11,18 +11,18 @@ bool XAPGraph::activate(double sampleRate, uint32_t minFrameCount, uint32_t maxF
     memset(&transport, 0, sizeof(clap_event_transport));
     double sr = sampleRate;
     m_sr = sampleRate;
-    std::cout << "**** GRAPH RUN ORDER ****\n";
+    // std::cout << "**** GRAPH RUN ORDER ****\n";
     for (auto &n : runOrder)
     {
         n->processor->activate(sr, procbufsize, procbufsize);
-        std::cout << "\t" << n->displayName << "\n";
+        // std::cout << "\t" << n->displayName << "\n";
         for (int i = 0; i < n->processor->audioPortsCount(true); ++i)
         {
             clap_audio_port_info pinfo;
             if (n->processor->audioPortsInfo(i, true, &pinfo))
             {
-                std::cout << "\t\tInput port " << i << " has " << pinfo.channel_count
-                          << " channels\n";
+                // std::cout << "\t\tInput port " << i << " has " << pinfo.channel_count
+                //           << " channels\n";
             }
         }
         for (int i = 0; i < n->processor->audioPortsCount(false); ++i)
@@ -30,8 +30,8 @@ bool XAPGraph::activate(double sampleRate, uint32_t minFrameCount, uint32_t maxF
             clap_audio_port_info pinfo;
             if (n->processor->audioPortsInfo(i, false, &pinfo))
             {
-                std::cout << "\t\tOutput port " << i << " has " << pinfo.channel_count
-                          << " channels\n";
+                // std::cout << "\t\tOutput port " << i << " has " << pinfo.channel_count
+                //           << " channels\n";
             }
         }
         n->initAudioBuffersFromProcessorInfo(procbufsize);
@@ -52,9 +52,7 @@ bool XAPGraph::activate(double sampleRate, uint32_t minFrameCount, uint32_t maxF
         }
         */
     }
-    std::cout << "****                 ****\n";
-    int outlen = 30 * sr;
-
+    // std::cout << "****                 ****\n";
     eventMergeVector.reserve(1024);
 
     transport.flags = CLAP_TRANSPORT_HAS_SECONDS_TIMELINE | CLAP_TRANSPORT_IS_PLAYING;
@@ -66,6 +64,12 @@ clap_process_status XAPGraph::process(const clap_process *process) noexcept
 {
     if (!m_activated)
         return CLAP_PROCESS_ERROR;
+    // we tolerate startProcessing not being called before process, but maybe should require
+    // explicit start?
+    if (!m_processing_started)
+    {
+        m_processing_started = true;
+    }
     auto procbufsize = process->frames_count;
     double x = outcounter / m_sr; // in seconds
     clap_sectime y = std::round(CLAP_SECTIME_FACTOR * x);

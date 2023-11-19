@@ -32,7 +32,7 @@ void XapFactory::scanClapPlugin(const std::filesystem::path &path)
                 auto desc = fac->get_plugin_descriptor(fac, i);
                 if (desc)
                 {
-                    std::cout << "\t" << desc->name << "\n";
+                    // std::cout << "\t" << desc->name << "\n";
                     std::string procid;
                     if (desc->id)
                         procid = desc->id;
@@ -59,7 +59,7 @@ void XapFactory::scanClapPlugins()
     {
         if (f.is_regular_file() && f.path().extension() == ".clap")
         {
-            std::cout << f.path() << "\n";
+            // std::cout << f.path() << "\n";
             scanClapPlugin(f.path());
         }
     }
