@@ -404,10 +404,32 @@ class NodeListComponent : public juce::Component, public juce::ListBoxModel
     std::function<void(int)> OnListRowClicked;
 };
 
-class NodeGraphComponent : public juce::Component
+class NodeGraphComponent : public juce::Component, public juce::Timer
 {
   public:
-    NodeGraphComponent(XAPGraph *g) : m_graph(g) { refreshPins(); }
+    NodeGraphComponent(XAPGraph *g) : m_graph(g)
+    {
+        startTimer(100);
+        refreshPins();
+    }
+    void timerCallback() override
+    {
+        XAPGraph::CTMessage msg;
+        while (m_graph->to_ui_fifo.pop(msg))
+        {
+            if (msg.op == XAPGraph::CTMessage::Opcode::DeleteNode)
+            {
+                msg.node->OnRequestGUIClose(msg.node);
+                delete msg.node;
+                if (m_dragging_node == msg.node)
+                {
+                    m_dragging_node = nullptr;
+                }
+                
+            }
+        }
+        repaint();
+    }
     void paint(juce::Graphics &g) override
     {
         g.fillAll(juce::Colours::black);
@@ -564,10 +586,35 @@ class NodeGraphComponent : public juce::Component
         }
         return {};
     }
+    void showNodeContextMenu(XAPNode *n)
+    {
+        juce::PopupMenu menu;
+        menu.addItem("Remove", [n, this]() {
+            XAPGraph::CTMessage msg;
+            msg.op = XAPGraph::CTMessage::Opcode::RemoveNode;
+            msg.node = n;
+            m_graph->from_ui_fifo.push(msg);
+        });
+        menu.addItem("Remove all input connections",[this,n]
+        {
+            XAPGraph::CTMessage msg;
+            msg.op = XAPGraph::CTMessage::Opcode::RemoveNodeInputs;
+            msg.node = n;
+            m_graph->from_ui_fifo.push(msg);
+        });
+        menu.showMenuAsync(juce::PopupMenu::Options());
+    }
     void mouseDown(const juce::MouseEvent &ev) override
     {
         m_debug_text = "";
         m_dragging_node = findFromPosition(ev.x, ev.y);
+        if (ev.mods.isRightButtonDown())
+        {
+            if (m_dragging_node)
+                showNodeContextMenu(m_dragging_node);
+            return;
+        }
+
         if (m_dragging_node)
         {
             m_drag_start_bounds = m_dragging_node->nodeSceneBounds;
@@ -1070,6 +1117,16 @@ class MainComponent : public juce::Component, public juce::Timer
                         m_graph->addProcessorAsNode(std::move(uproc), jid, jidx);
                         DBG("Added " << m_graph->proc_nodes.back()->displayName
                                      << " to graph from state");
+                        m_graph->proc_nodes.back()->OnRequestGUIClose = [this](XAPNode *dn) {
+                            for (size_t i = 0; i < m_xap_windows.size(); ++i)
+                            {
+                                if (&m_xap_windows[i]->m_proc == dn->processor.get())
+                                {
+                                    m_xap_windows.erase(m_xap_windows.begin() + i);
+                                    break;
+                                }
+                            }
+                        };
                         bool plugvis = jnodestate["plugwinvisible"].getBool();
                         if (plugvis)
                         {

@@ -4,7 +4,7 @@ bool XAPGraph::activate(double sampleRate, uint32_t minFrameCount, uint32_t maxF
 {
     if (proc_nodes.size() == 0)
         return false;
-    runOrder = topoSort(findNodeByName(outputNodeId));
+    updateRunOrder();
 
     int procbufsize = maxFrameCount;
 
@@ -70,6 +70,7 @@ clap_process_status XAPGraph::process(const clap_process *process) noexcept
     {
         m_processing_started = true;
     }
+    handleUIMessages();
     auto procbufsize = process->frames_count;
     double x = outcounter / m_sr; // in seconds
     clap_sectime y = std::round(CLAP_SECTIME_FACTOR * x);
