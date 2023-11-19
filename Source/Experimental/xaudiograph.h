@@ -55,6 +55,7 @@ class XAPNode
     std::vector<Pin> inputPins;
     std::vector<Pin> outputPins;
     std::string processorName;
+    bool isActiveInGraph = false;
     uint64_t ID = 0;
     XAPNode(std::unique_ptr<xenakios::XAudioProcessor> nodeIn, std::string name = "",
             uint64_t id = 0)
@@ -451,7 +452,25 @@ class XAPGraph : public xenakios::XAudioProcessor
         proc_nodes.reserve(1024);
         runOrder.reserve(1024);
     }
-    void updateRunOrder() { runOrder = topoSort(findNodeByName(outputNodeId)); }
+    void updateRunOrder() 
+    { 
+        for(auto& n : proc_nodes)
+        {
+            n->isActiveInGraph = false;
+        }
+        runOrder = topoSort(findNodeByName(outputNodeId)); 
+        for(auto& n : runOrder)
+        {
+            n->isActiveInGraph = true;
+        }
+        for(auto& n : proc_nodes)
+        {
+            if (!n->isActiveInGraph)
+            {
+                n->processor->stopProcessing();
+            }
+        }
+    }
     void removeInputNodeFromNode(XAPNode *targetNode, XAPNode *sourceNode)
     {
         if (targetNode->inputConnections.size() == 0)
@@ -489,9 +508,6 @@ class XAPGraph : public xenakios::XAudioProcessor
         {
             if (msg.op == CTMessage::Opcode::RemoveNodeInputs)
             {
-                // Not going to work properly. 
-                // We should stop the processing of the node processor
-                // if the node is no longer part of the node run order
                 msg.node->inputConnections.clear();
                 updateRunOrder();
             }

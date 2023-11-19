@@ -425,7 +425,6 @@ class NodeGraphComponent : public juce::Component, public juce::Timer
                 {
                     m_dragging_node = nullptr;
                 }
-                
             }
         }
         repaint();
@@ -440,6 +439,11 @@ class NodeGraphComponent : public juce::Component, public juce::Timer
             auto nodebounds = n->nodeSceneBounds;
             g.setColour(juce::Colours::darkgrey);
             g.fillRect(nodebounds);
+            if (n->isActiveInGraph)
+            {
+                g.setColour(juce::Colours::darkorange);
+                g.fillRect(nodebounds.getX(), nodebounds.getY(), 10, 10);
+            }
             g.setColour(juce::Colours::white);
             g.drawText(n->processorName, nodebounds, juce::Justification::centred);
             g.setColour(juce::Colours::green);
@@ -595,13 +599,21 @@ class NodeGraphComponent : public juce::Component, public juce::Timer
             msg.node = n;
             m_graph->from_ui_fifo.push(msg);
         });
-        menu.addItem("Remove all input connections",[this,n]
-        {
+        menu.addItem("Remove all input connections", [this, n] {
             XAPGraph::CTMessage msg;
             msg.op = XAPGraph::CTMessage::Opcode::RemoveNodeInputs;
             msg.node = n;
             m_graph->from_ui_fifo.push(msg);
         });
+        juce::PopupMenu removeinconnmenu;
+        for (auto &conn : n->inputConnections)
+        {
+            juce::String txt = juce::String(conn.source->displayName) + " port " +
+                               juce::String(conn.sourcePort) + " channel " +
+                               juce::String(conn.sourceChannel);
+            removeinconnmenu.addItem(txt, []() {});
+        }
+        menu.addSubMenu("Remove input", removeinconnmenu);
         menu.showMenuAsync(juce::PopupMenu::Options());
     }
     void mouseDown(const juce::MouseEvent &ev) override
