@@ -69,6 +69,10 @@ class XAPNode
         scanParameters();
         // we may get a double scan of the parameters at init time, but such is life...
         processor->OnPluginRequestedParameterRescan = [this](auto) { scanParameters(); };
+        // some leeway to allow manipulating these in realtime context
+        inputConnections.reserve(16);
+        inputPins.reserve(16);
+        outputPins.reserve(16);
     }
     ~XAPNode()
     {
@@ -77,7 +81,7 @@ class XAPNode
     }
     void scanParameters()
     {
-        DBG("scanning parameters for " << displayName);
+        // DBG("scanning parameters for " << displayName);
         parameterInfos.clear();
         for (int i = 0; i < processor->paramsCount(); ++i)
         {
