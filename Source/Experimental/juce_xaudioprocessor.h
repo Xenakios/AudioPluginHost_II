@@ -161,6 +161,7 @@ class JucePluginWrapper : public xenakios::XAudioProcessor,
         {
             nextEvent = inEvents->get(inEvents, nextEventIndex);
         }
+
         while (smp < frames)
         {
             uint32_t chunk = std::min(basechunk, frames - smp);
@@ -213,11 +214,12 @@ class JucePluginWrapper : public xenakios::XAudioProcessor,
                     nextEvent = inEvents->get(inEvents, nextEventIndex);
             }
             m_work_buf.setSize(m_work_buf.getNumChannels(), chunk, false, false, true);
+            auto workbufptrs = m_work_buf.getArrayOfWritePointers();
             for (int i = 0; i < 2; ++i)
             {
                 for (int j = 0; j < chunk; ++j)
                 {
-                    m_work_buf.setSample(i, j, process->audio_inputs[0].data32[i][smp + j]);
+                    workbufptrs[i][j] = process->audio_inputs[0].data32[i][smp + j];
                 }
             }
             m_internal->processBlock(m_work_buf, m_midi_buffer);
@@ -225,7 +227,7 @@ class JucePluginWrapper : public xenakios::XAudioProcessor,
             {
                 for (int j = 0; j < chunk; ++j)
                 {
-                    process->audio_outputs[0].data32[i][smp + j] = m_work_buf.getSample(i, j);
+                    process->audio_outputs[0].data32[i][smp + j] = workbufptrs[i][j];
                 }
             }
             smp += chunk;
