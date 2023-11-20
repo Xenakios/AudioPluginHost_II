@@ -22,22 +22,6 @@
 #include "memory/choc_Base64.h"
 #include <fstream>
 
-inline void mapModulationEvents(const clap::helpers::EventList &sourceList, clap_id sourceParId,
-                                clap::helpers::EventList &destList, clap_id destParId,
-                                double destAmount)
-{
-    for (int i = 0; i < sourceList.size(); ++i)
-    {
-        auto ev = sourceList.get(i);
-        if (ev->type == CLAP_EVENT_PARAM_MOD)
-        {
-            auto pev = reinterpret_cast<clap_event_param_mod *>(ev);
-            double amt = pev->amount * destAmount;
-            xenakios::pushParamEvent(destList, true, 0, destParId, amt);
-        }
-    }
-}
-
 class XAPPlayer : public juce::AudioIODeviceCallback
 {
   public:

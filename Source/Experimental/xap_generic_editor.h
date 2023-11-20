@@ -2,6 +2,7 @@
 
 #include "xaudioprocessor.h"
 #include "JuceHeader.h"
+#include "xap_utils.h"
 
 namespace xenakios
 {

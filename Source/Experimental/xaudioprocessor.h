@@ -6,88 +6,12 @@
 #include <memory>
 #include <vector>
 #include <functional>
+#include "xap_utils.h"
 
 namespace xenakios
 {
 
 using ParamDesc = sst::basic_blocks::params::ParamMetaData;
-
-struct CrossThreadMessage
-{
-    CrossThreadMessage() {}
-    CrossThreadMessage(clap_id parId, int eType, double val)
-        : paramId(parId), eventType(eType), value(val)
-    {
-    }
-    template <typename T> CrossThreadMessage withParamId(T id)
-    {
-        auto result = *this;
-        result.paramId = static_cast<clap_id>(id);
-        return result;
-    }
-    CrossThreadMessage withType(int etype)
-    {
-        auto result = *this;
-        result.eventType = etype;
-        return result;
-    }
-    CrossThreadMessage withValue(double v)
-    {
-        auto result = *this;
-        result.value = v;
-        return result;
-    }
-    template <typename T> CrossThreadMessage asParamChange(T parid, double v)
-    {
-        auto result = *this;
-        result.eventType = CLAP_EVENT_PARAM_VALUE;
-        result.paramId = static_cast<clap_id>(parid);
-        result.value = v;
-        return result;
-    }
-    clap_id paramId = CLAP_INVALID_ID;
-    int eventType = CLAP_EVENT_PARAM_VALUE;
-    double value = 0.0;
-};
-
-inline void pushParamEvent(clap::helpers::EventList &elist, bool is_mod, uint32_t timeStamp,
-                           clap_id paramId, double value)
-{
-    if (!is_mod)
-    {
-        clap_event_param_value pv;
-        pv.header.space_id = CLAP_CORE_EVENT_SPACE_ID;
-        pv.header.size = sizeof(clap_event_param_value);
-        pv.header.flags = 0;
-        pv.header.time = timeStamp;
-        pv.header.type = CLAP_EVENT_PARAM_VALUE;
-        pv.cookie = nullptr;
-        pv.param_id = paramId;
-        pv.value = value;
-        pv.channel = -1;
-        pv.key = -1;
-        pv.note_id = -1;
-        pv.port_index = -1;
-        elist.push(reinterpret_cast<const clap_event_header *>(&pv));
-    }
-    else
-    {
-        clap_event_param_mod pv;
-        pv.header.space_id = CLAP_CORE_EVENT_SPACE_ID;
-        pv.header.size = sizeof(clap_event_param_mod);
-        pv.header.flags = 0;
-        pv.header.time = timeStamp;
-        pv.header.type = CLAP_EVENT_PARAM_MOD;
-        pv.cookie = nullptr;
-        pv.param_id = paramId;
-        pv.amount = value;
-        pv.channel = -1;
-        pv.key = -1;
-        pv.note_id = -1;
-        pv.port_index = -1;
-        elist.push(reinterpret_cast<const clap_event_header *>(&pv));
-    }
-}
 
 /*
 We mirror Clap C++ plugin helper as much as possible/sensible, but we do assume certain
@@ -209,7 +133,5 @@ class XAudioProcessor
     virtual bool guiSetTransient(const clap_window *window) noexcept { return false; }
     std::function<void(uint32_t w, uint32_t h)> OnPluginRequestedResize;
 };
-
-
 
 } // namespace xenakios

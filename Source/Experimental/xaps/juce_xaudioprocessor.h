@@ -88,7 +88,7 @@ class JucePluginWrapper : public xenakios::XAudioProcessor,
         clap_id parid = 0;
         for (auto &par : pars)
         {
-            auto pinfo = makeParamInfo(parid, par->getName(100), 0.0, 1.0, par->getDefaultValue(),
+            auto pinfo = makeParamInfo(parid, par->getName(100).toStdString(), 0.0, 1.0, par->getDefaultValue(),
                                        CLAP_PARAM_IS_AUTOMATABLE);
             m_param_infos.push_back(pinfo);
             par->addListener(this);
