@@ -112,19 +112,6 @@ clap_process_status XAPGraph::process(const clap_process *process) noexcept
         if (eventMergeVector.size() > 0 || modulationMergeList.size() > 0 ||
             noteMergeList.size() > 0 || n->modulationWasApplied)
         {
-            // i've forgotten why this cross thread message stuff is here...?
-            /*
-            xenakios::CrossThreadMessage ctmsg;
-            while (n->processor->dequeueParameterChange(ctmsg))
-            {
-                if (ctmsg.eventType == CLAP_EVENT_PARAM_VALUE)
-                {
-                    auto from_ui_ev =
-                        makeClapParameterValueEvent(0, ctmsg.paramId, ctmsg.value);
-                    modulationMergeList.push((clap_event_header *)&from_ui_ev);
-                }
-            }
-            */
             for (int i = 0; i < modulationMergeList.size(); ++i)
                 eventMergeVector.push_back(modulationMergeList.get(i));
             for (int i = 0; i < noteMergeList.size(); ++i)

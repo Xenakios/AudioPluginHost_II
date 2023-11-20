@@ -605,6 +605,17 @@ class NodeGraphComponent : public juce::Component, public juce::Timer
             });
         }
         menu.addSubMenu("Remove input", removeinconnmenu);
+        juce::PopupMenu paramsmenu;
+        for (int i = 0; i < n->processor->paramsCount(); ++i)
+        {
+            clap_param_info pinfo;
+            if (n->processor->paramsInfo(i, &pinfo))
+            {
+                juce::String txt = juce::String(pinfo.name) + " " + juce::String(pinfo.id);
+                paramsmenu.addItem(txt, []() {});
+            }
+        }
+        menu.addSubMenu("Parameters", paramsmenu);
         menu.showMenuAsync(juce::PopupMenu::Options());
     }
     void mouseDown(const juce::MouseEvent &ev) override
