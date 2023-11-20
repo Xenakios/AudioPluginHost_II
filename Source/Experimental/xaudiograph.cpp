@@ -53,7 +53,6 @@ bool XAPGraph::activate(double sampleRate, uint32_t minFrameCount, uint32_t maxF
         */
     }
     // std::cout << "****                 ****\n";
-    eventMergeVector.reserve(1024);
 
     transport.flags = CLAP_TRANSPORT_HAS_SECONDS_TIMELINE | CLAP_TRANSPORT_IS_PLAYING;
     m_activated = true;
@@ -81,9 +80,9 @@ clap_process_status XAPGraph::process(const clap_process *process) noexcept
     ctx.transport = &transport;
     for (auto &n : runOrder)
     {
-        eventMergeVector.clear();
+        eventMergeList.clear();
         accumModValues.clear();
-        noteMergeList.clear();
+
         // clear node audio input buffers before summing into them
         clearNodeAudioInputs(n, procbufsize);
         n->modulationWasApplied = false;
@@ -100,22 +99,17 @@ clap_process_status XAPGraph::process(const clap_process *process) noexcept
             }
             else if (conn.type == XAPNode::ConnectionType::Events)
             {
-                handleNodeEventsAlt(conn, noteMergeList);
+                handleNodeEventsAlt(conn, eventMergeList);
             }
             else
             {
-                handleNodeModulationEvents(conn, modulationMergeList);
+                handleNodeModulationEvents(conn, eventMergeList);
             }
         }
 
         n->inEvents.clear();
-        if (eventMergeVector.size() > 0 || modulationMergeList.size() > 0 ||
-            noteMergeList.size() > 0 || n->modulationWasApplied)
+        if (n->modulationWasApplied || eventMergeList.size() > 0)
         {
-            for (int i = 0; i < modulationMergeList.size(); ++i)
-                eventMergeVector.push_back(modulationMergeList.get(i));
-            for (int i = 0; i < noteMergeList.size(); ++i)
-                eventMergeVector.push_back(noteMergeList.get(i));
             // we can't easily retain the timestamps of summed modulations
             // so we just put all the summed modulations at timestamp 0.
             // there might be ways around this, but it would complicate things too much
@@ -130,17 +124,21 @@ clap_process_status XAPGraph::process(const clap_process *process) noexcept
                     const auto &pinfo = n->parameterInfos[modsum.first];
                     moda = std::clamp(moda, pinfo.min_value, pinfo.max_value);
                     auto modev = makeClapParameterModEvent(0, modsum.first, moda);
-                    n->inEvents.push((clap_event_header *)&modev);
+                    eventMergeList.pushEvent(&modev);
+                    // n->inEvents.push((clap_event_header *)&modev);
                     // DBG(transport.song_pos_seconds
                     //    << " " << n->displayName << " Applied summed modulation for par "
                     //    << (int64_t)modsum.first << " with amount " << moda);
                 }
             }
-            choc::sorting::stable_sort(eventMergeVector.begin(), eventMergeVector.end(),
-                                       [](auto &lhs, auto &rhs) { return lhs->time < rhs->time; });
-            for (auto &e : eventMergeVector)
+            eventMergeList.sortEvents();
+            // choc::sorting::stable_sort(eventMergeVector.begin(), eventMergeVector.end(),
+            //                            [](auto &lhs, auto &rhs) { return lhs->time < rhs->time;
+            //                            });
+            for (int i = 0; i < eventMergeList.size(); ++i)
             {
-                n->inEvents.push(e);
+                auto ev = eventMergeList.get(i);
+                n->inEvents.push(ev);
             }
         }
         // printClapEvents(n->inEvents);
@@ -190,8 +188,7 @@ clap_process_status XAPGraph::process(const clap_process *process) noexcept
         n->inEvents.clear();
         n->outEvents.clear();
     }
-    modulationMergeList.clear();
-    noteMergeList.clear();
+
     auto outbufs = runOrder.back()->outPortBuffers[0].data32;
     for (int i = 0; i < process->audio_outputs[0].channel_count; ++i)
     {

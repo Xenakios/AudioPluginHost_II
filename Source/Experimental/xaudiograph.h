@@ -324,13 +324,11 @@ inline std::optional<clap_id> findParameterFromName(xenakios::XAudioProcessor *p
 }
 
 inline void handleNodeModulationEvents(XAPNode::Connection &conn,
-                                       clap::helpers::EventList &modulationMergeList)
+                                       xenakios::SortingEventList &modulationMergeList)
 {
     auto &oevents = conn.source->outEvents;
-    // for (int j = 0; j < oevents.size(); ++j)
     if (oevents.size() > 0)
     {
-        // auto ev = oevents.get(j);
         auto ev = oevents.get(oevents.size() - 1);
         if (ev->type == CLAP_EVENT_PARAM_MOD)
         {
@@ -342,8 +340,11 @@ inline void handleNodeModulationEvents(XAPNode::Connection &conn,
                 {
                     val = 0.5 + 0.5 * sourcemev->amount;
                     // for now, we don't sum destructive modulations
-                    xenakios::pushParamEvent(modulationMergeList, false, sourcemev->header.time,
-                                             conn.destinationParameter, val);
+                    auto routed_ev = xenakios::make_event_param_value(
+                        sourcemev->header.time, conn.destinationParameter, val, nullptr);
+                    modulationMergeList.pushEvent(&routed_ev);
+                    // xenakios::pushParamEvent(modulationMergeList, false, sourcemev->header.time,
+                    //                          conn.destinationParameter, val);
                 }
                 else
                 {
@@ -368,7 +369,8 @@ inline void handleNodeEvents(XAPNode::Connection &conn,
     }
 }
 
-inline void handleNodeEventsAlt(XAPNode::Connection &conn, clap::helpers::EventList &eventMergeList)
+inline void handleNodeEventsAlt(XAPNode::Connection &conn,
+                                xenakios::SortingEventList &eventMergeList)
 {
     // this is wayyyy too messy to handle like this, but we have to live with this for now
     auto &oevents = conn.source->outEvents;
@@ -382,7 +384,7 @@ inline void handleNodeEventsAlt(XAPNode::Connection &conn, clap::helpers::EventL
             {
                 clap_event_note nev = *tev;
                 nev.port_index = conn.destinationPort;
-                eventMergeList.tryPush((const clap_event_header *)&nev);
+                eventMergeList.pushEvent((const clap_event_header *)&nev);
             }
         }
         if (ev->type == CLAP_EVENT_NOTE_EXPRESSION)
@@ -392,7 +394,7 @@ inline void handleNodeEventsAlt(XAPNode::Connection &conn, clap::helpers::EventL
             {
                 clap_event_note_expression nev = *expev;
                 nev.port_index = conn.destinationPort;
-                eventMergeList.tryPush((const clap_event_header *)&nev);
+                eventMergeList.pushEvent((const clap_event_header *)&nev);
             }
         }
     }
@@ -702,9 +704,8 @@ class XAPGraph : public xenakios::XAudioProcessor
     clap_event_transport transport;
     int outcounter = 0;
 
-    std::vector<clap_event_header *> eventMergeVector;
-    clap::helpers::EventList modulationMergeList;
-    clap::helpers::EventList noteMergeList;
+    xenakios::SortingEventList eventMergeList;
+
     std::unordered_map<clap_id, double> accumModValues;
     double m_sr = 0.0;
 };
