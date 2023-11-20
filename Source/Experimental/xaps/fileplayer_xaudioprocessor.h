@@ -1,6 +1,6 @@
 #pragma once
 
-#include "xapwithjucegui.h"
+#include "../xapwithjucegui.h"
 #include "signalsmith-stretch.h"
 
 class FilePlayerProcessor : public XAPWithJuceGUI

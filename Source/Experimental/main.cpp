@@ -1,12 +1,12 @@
 #include <iostream>
-#include "testprocessors.h"
+#include "xaps/testprocessors.h"
 #include <memory>
 #include <vector>
 
 #include <clap/helpers/event-list.hh>
 #include "clap_xaudioprocessor.h"
 #include "juce_xaudioprocessor.h"
-#include "fileplayer_xaudioprocessor.h"
+#include "xaps/fileplayer_xaudioprocessor.h"
 #include "xap_utils.h"
 #include "xaps/xap_notegenerator.h"
 #include "xap_modulator.h"
