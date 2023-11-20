@@ -1,9 +1,9 @@
 #pragma once
 
-#include "xapwithjucegui.h"
-#include "dejavurandom.h"
-#include "xap_generic_editor.h"
-#include "xapfactory.h"
+#include "../xapwithjucegui.h"
+#include "../dejavurandom.h"
+#include "../xap_generic_editor.h"
+#include "../xapfactory.h"
 
 class ClapEventSequencerProcessor : public XAPWithJuceGUI
 {

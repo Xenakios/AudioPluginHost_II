@@ -34,7 +34,7 @@ include_directories(
     libs/clap/include
     libs/clap-helpers/include
     Source/AudioGraph
-    Source/Experimental/noise-plethora/rack/include
+    Source/Plugins/noise-plethora/rack/include
     libs/signalsmith-stretch
     libs/choc
     libs/sst-basic-blocks/include
@@ -105,22 +105,22 @@ target_sources(ConsoleAppExample
         Source/Experimental/xapfactory.cpp
         Source/Experimental/xaudiograph.cpp
         Source/Experimental/xap_utils.cpp
-        Source/Experimental/xap_notegenerator.cpp
+        Source/Experimental/xaps/xap_notegenerator.cpp
         Source/Experimental/xaudioprocessor.cpp
         
-        Source/Experimental/noise-plethora/random.cpp
-        Source/Experimental/noise-plethora/teensy/effect_freeverb.cpp
-        Source/Experimental/noise-plethora/teensy/effect_bitcrusher.cpp
-        Source/Experimental/noise-plethora/teensy/effect_granular.cpp
-        Source/Experimental/noise-plethora/teensy/effect_combine.cpp
-        Source/Experimental/noise-plethora/teensy/effect_multiply.cpp
-        Source/Experimental/noise-plethora/teensy/effect_flange.cpp
-        Source/Experimental/noise-plethora/teensy/effect_wavefolder.cpp
-        Source/Experimental/noise-plethora/teensy/filter_variable.cpp
-        Source/Experimental/noise-plethora/teensy/synth_pwm.cpp
-        Source/Experimental/noise-plethora/teensy/synth_pinknoise.cpp
-        Source/Experimental/noise-plethora/teensy/synth_whitenoise.cpp
-        Source/Experimental/noise-plethora/plugins/Banks.cpp
+        Source/Plugins/noise-plethora/random.cpp
+        Source/Plugins/noise-plethora/teensy/effect_freeverb.cpp
+        Source/Plugins/noise-plethora/teensy/effect_bitcrusher.cpp
+        Source/Plugins/noise-plethora/teensy/effect_granular.cpp
+        Source/Plugins/noise-plethora/teensy/effect_combine.cpp
+        Source/Plugins/noise-plethora/teensy/effect_multiply.cpp
+        Source/Plugins/noise-plethora/teensy/effect_flange.cpp
+        Source/Plugins/noise-plethora/teensy/effect_wavefolder.cpp
+        Source/Plugins/noise-plethora/teensy/filter_variable.cpp
+        Source/Plugins/noise-plethora/teensy/synth_pwm.cpp
+        Source/Plugins/noise-plethora/teensy/synth_pinknoise.cpp
+        Source/Plugins/noise-plethora/teensy/synth_whitenoise.cpp
+        Source/Plugins/noise-plethora/plugins/Banks.cpp
         libs/sst-jucegui/src/sst/jucegui/components/Knob.cpp
         libs/sst-jucegui/src/sst/jucegui/components/HSlider.cpp
         libs/sst-jucegui/src/sst/jucegui/components/ContinuousParamEditor.cpp
