@@ -1,8 +1,8 @@
 #include "xapfactory.h"
 #include <iostream>
 #include "platform/choc_DynamicLibrary.h"
-#include "clap_xaudioprocessor.h"
-#include "juce_xaudioprocessor.h"
+#include "xaps/clap_xaudioprocessor.h"
+#include "xaps/juce_xaudioprocessor.h"
 
 namespace xenakios
 {

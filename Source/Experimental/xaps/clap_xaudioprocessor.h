@@ -1,10 +1,10 @@
 #pragma once
 
-#include "xaudioprocessor.h"
+#include "../xaudioprocessor.h"
 #include "platform/choc_DynamicLibrary.h"
-#include "xap_generic_editor.h"
+#include "../xap_generic_editor.h"
 #include "containers/choc_SingleReaderSingleWriterFIFO.h"
-#include "xap_utils.h"
+#include "../xap_utils.h"
 
 class ClapPluginFormatProcessor : public xenakios::XAudioProcessor
 {

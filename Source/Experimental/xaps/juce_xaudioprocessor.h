@@ -1,6 +1,6 @@
 #pragma once
 
-#include "xaudioprocessor.h"
+#include "../xaudioprocessor.h"
 #include "JuceHeader.h"
 
 class JucePluginWrapper : public xenakios::XAudioProcessor,
@@ -375,7 +375,7 @@ class JucePluginWrapper : public xenakios::XAudioProcessor,
         else
         {
             // the generic editor is kind of sucky, but will have to do for now
-            m_editor = new juce::GenericAudioProcessorEditor(m_internal.get());
+            m_editor = new juce::GenericAudioProcessorEditor(*m_internal);
             return true;
         }
         return false;

@@ -1,7 +1,7 @@
 #pragma once
 
-#include "xapwithjucegui.h"
-#include "xap_generic_editor.h"
+#include "../xapwithjucegui.h"
+#include "../xap_generic_editor.h"
 
 #include "sst/basic-blocks/modulators/SimpleLFO.h"
 

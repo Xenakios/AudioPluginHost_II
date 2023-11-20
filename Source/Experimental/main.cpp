@@ -4,12 +4,12 @@
 #include <vector>
 
 #include <clap/helpers/event-list.hh>
-#include "clap_xaudioprocessor.h"
-#include "juce_xaudioprocessor.h"
+#include "xaps/clap_xaudioprocessor.h"
+#include "xaps/juce_xaudioprocessor.h"
 #include "xaps/fileplayer_xaudioprocessor.h"
 #include "xap_utils.h"
 #include "xaps/xap_notegenerator.h"
-#include "xap_modulator.h"
+#include "xaps/xap_modulator.h"
 #include "xclapeventlist.h"
 #include "../Plugins/noise-plethora/plugins/NoisePlethoraPlugin.hpp"
 #include "../Plugins/noise-plethora/plugins/Banks.hpp"
