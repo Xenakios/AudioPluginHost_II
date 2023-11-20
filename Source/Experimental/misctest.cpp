@@ -6,6 +6,7 @@
 #include "clap/clap.h"
 #include <algorithm>
 #include <cassert>
+#include <random>
 
 class object_t
 {
@@ -227,6 +228,22 @@ class SortingEventList
     bool sorted = false;
 };
 
+inline clap_event_param_gesture make_event_param_gesture(uint32_t time, clap_id paramid,
+                                                         bool is_begin)
+{
+    clap_event_param_gesture result;
+    result.header.flags = 0;
+    result.header.size = sizeof(clap_event_param_gesture);
+    result.header.space_id = CLAP_CORE_EVENT_SPACE_ID;
+    if (is_begin)
+        result.header.type = CLAP_EVENT_PARAM_GESTURE_BEGIN;
+    else
+        result.header.type = CLAP_EVENT_PARAM_GESTURE_END;
+    result.header.time = time;
+    result.param_id = paramid;
+    return result;
+}
+
 inline clap_event_param_value make_event_param_value(uint32_t time, clap_id paramid, double value,
                                                      void *cookie, int16_t port = -1,
                                                      int16_t channel = -1, int16_t key = -1,
@@ -249,9 +266,9 @@ inline clap_event_param_value make_event_param_value(uint32_t time, clap_id para
 }
 
 inline clap_event_param_mod make_event_param_mod(uint32_t time, clap_id paramid, double amount,
-                                                     void *cookie, int16_t port = -1,
-                                                     int16_t channel = -1, int16_t key = -1,
-                                                     int32_t noteid = -1, uint32_t flags = 0)
+                                                 void *cookie, int16_t port = -1,
+                                                 int16_t channel = -1, int16_t key = -1,
+                                                 int32_t noteid = -1, uint32_t flags = 0)
 {
     clap_event_param_mod result;
     result.header.flags = flags;
@@ -269,22 +286,66 @@ inline clap_event_param_mod make_event_param_mod(uint32_t time, clap_id paramid,
     return result;
 }
 
+inline clap_event_note make_event_note(uint32_t time, uint16_t evtype, int16_t port,
+                                       int16_t channel, int16_t key, int32_t note_id,
+                                       double velocity, uint32_t flags = 0)
+{
+    clap_event_note result;
+    result.header.flags = flags;
+    result.header.size = sizeof(clap_event_note);
+    result.header.space_id = CLAP_CORE_EVENT_SPACE_ID;
+    result.header.type = evtype;
+    result.header.time = time;
+    result.port_index = port;
+    result.channel = channel;
+    result.key = key;
+    result.note_id = note_id;
+    result.velocity = velocity;
+    return result;
+}
+
+inline clap_event_note_expression
+make_event_note_expression(uint32_t time, clap_note_expression net, int16_t port, int16_t channel,
+                           int16_t key, int32_t note_id, double value, uint32_t flags = 0)
+{
+    clap_event_note_expression result;
+    result.header.flags = flags;
+    result.header.size = sizeof(clap_event_note_expression);
+    result.header.space_id = CLAP_CORE_EVENT_SPACE_ID;
+    result.header.type = CLAP_EVENT_NOTE_EXPRESSION;
+    result.header.time = time;
+    result.port_index = port;
+    result.channel = channel;
+    result.key = key;
+    result.note_id = note_id;
+    result.expression_id = net;
+    result.value = value;
+    return result;
+}
+
 inline void test_alt_event_list()
 {
     SortingEventList list;
-    clap_event_param_mod mev;
-    mev.header.time = 0;
-    mev.param_id = 666;
-    mev.amount = 0.42;
+    auto mev = make_event_param_mod(45, 666, 0.42, nullptr);
     list.pushEvent(&mev);
-    clap_event_note nev;
-    nev.header.time = 0;
-    nev.channel = 0;
-    nev.note_id = 10000;
-    nev.key = 60;
-    nev.velocity = 0.7;
-    nev.port_index = 6;
+    auto nev = make_event_note(0, CLAP_EVENT_NOTE_ON, 0, 0, 60, 10000, 0.888);
     list.pushEvent(&nev);
+    std::mt19937 rng;
+    std::uniform_int_distribution<int> timedist(0, 512);
+    std::uniform_real_distribution<double> valdist(0.0, 1.0);
+    for (int i = 0; i < 100; ++i)
+    {
+        auto time = timedist(rng);
+        auto val = valdist(rng);
+        auto exev = make_event_note_expression(time, CLAP_NOTE_EXPRESSION_PAN, -1, -1, 60, -1, val);
+        list.pushEvent(&exev);
+    }
+    list.sortEvents();
+    for (int i = 0; i < list.size(); ++i)
+    {
+        auto ev = list.get(i);
+        std::cout << i << "\t" << ev->time << "\t" << ev->type << "\n";
+    }
 }
 
 int main()
