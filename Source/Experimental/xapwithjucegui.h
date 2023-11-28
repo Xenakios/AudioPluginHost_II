@@ -55,7 +55,6 @@ class XAPWithJuceGUI : public xenakios::XAudioProcessor
             }
         }
     }
-    
 
     void handleGUIEvents()
     {

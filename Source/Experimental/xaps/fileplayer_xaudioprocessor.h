@@ -112,6 +112,11 @@ class FilePlayerProcessor : public XAPWithJuceGUI
                 .withName("Loop end")
                 .withID((clap_id)ParamIds::LoopEnd));
         importFile(juce::File(R"(C:\MusicAudio\sourcesamples\there was a time .wav)"));
+        for (auto &pd : paramDescriptions)
+        {
+            m_to_ui_fifo.push(
+                xenakios::CrossThreadMessage(pd.id, CLAP_EVENT_PARAM_VALUE, pd.defaultVal));
+        }
     }
     uint32_t audioPortsCount(bool isInput) const noexcept override
     {
@@ -379,5 +384,6 @@ class FilePlayerProcessor : public XAPWithJuceGUI
         return CLAP_PROCESS_CONTINUE;
     }
 };
-static xenakios::RegisterXap reg_fileplayer{
-    "File Player", "com.xenakios.fileplayer", []() { return std::make_unique<FilePlayerProcessor>(); }};
+static xenakios::RegisterXap reg_fileplayer{"File Player", "com.xenakios.fileplayer", []() {
+                                                return std::make_unique<FilePlayerProcessor>();
+                                            }};
