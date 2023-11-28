@@ -1090,7 +1090,7 @@ class MainComponent : public juce::Component, public juce::Timer
         try
         {
             auto jsontxt = choc::file::loadFileAsString(
-                "C:/develop/AudioPluginHost_mk2/Source/Experimental/state.json");
+                "C:/develop/AudioPluginHost_mk2/Source/Experimental/state2.json");
             auto jroot = choc::json::parse(jsontxt);
             auto jwstate = jroot["mainwindowstate"];
             auto jbounds = jwstate["win_bounds"];
