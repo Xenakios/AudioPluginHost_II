@@ -15,8 +15,13 @@ struct xenakios_event_change_file
     int target = 0; // which file should be changed
     char filepath[256];
 };
+
+template <typename T> inline clap_id to_clap_id(T x) { return static_cast<clap_id>(x); }
+
 namespace xenakios
 {
+
+
 
 struct CrossThreadMessage
 {

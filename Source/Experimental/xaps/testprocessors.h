@@ -38,10 +38,6 @@ inline void insertToEndOfEventListFromFIFO(
     }
 }
 
-template <typename T> inline clap_id to_clap_id(T x) { return static_cast<clap_id>(x); }
-
-
-
 class ToneProcessorTest : public XAPWithJuceGUI
 {
   public:

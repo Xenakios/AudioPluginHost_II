@@ -2,6 +2,9 @@
 
 #include "../xapwithjucegui.h"
 #include "signalsmith-stretch.h"
+#include "../xap_generic_editor.h"
+#include "../xap_utils.h"
+#include "../xapfactory.h"
 
 class FilePlayerProcessor : public XAPWithJuceGUI
 {
@@ -16,7 +19,23 @@ class FilePlayerProcessor : public XAPWithJuceGUI
     std::array<juce::LagrangeInterpolator, 2> m_resamplers;
     std::vector<float> m_resampler_work_buf;
     double m_file_sample_rate = 1.0;
-
+    struct FilePlayerMessage
+    {
+        enum class Opcode
+        {
+            ParamBegin,
+            ParamChange,
+            ParamEnd,
+            RequestFileChange,
+            FileChanged
+        };
+        Opcode opcode;
+        clap_id parid = CLAP_INVALID_ID;
+        double value = 0.0;
+        std::string_view filename;
+    };
+    choc::fifo::SingleReaderSingleWriterFIFO<FilePlayerMessage> messages_to_ui;
+    choc::fifo::SingleReaderSingleWriterFIFO<FilePlayerMessage> messages_from_ui;
     juce::dsp::Gain<float> m_gain_proc;
     double m_volume = 0.0f;
     double m_volume_mod = 0.0f;
@@ -46,12 +65,8 @@ class FilePlayerProcessor : public XAPWithJuceGUI
         return true;
     }
 
-    bool guiCreate(const char *api, bool isFloating) noexcept override
-    {
-        m_editor = std::make_unique<xenakios::GenericEditor>(*this);
-        m_editor->setSize(500, 400);
-        return true;
-    }
+    bool guiCreate(const char *api, bool isFloating) noexcept override;
+
     void guiDestroy() noexcept override { m_editor = nullptr; }
     static constexpr double minRate = -3.0;
     static constexpr double maxRate = 2.0;
@@ -111,11 +126,17 @@ class FilePlayerProcessor : public XAPWithJuceGUI
                 .withFlags(CLAP_PARAM_IS_AUTOMATABLE | CLAP_PARAM_IS_MODULATABLE)
                 .withName("Loop end")
                 .withID((clap_id)ParamIds::LoopEnd));
-        importFile(juce::File(R"(C:\MusicAudio\sourcesamples\there was a time .wav)"));
+        messages_to_ui.reset(256);
+        messages_from_ui.reset(256);
+        // importFile(juce::File(R"(C:\MusicAudio\sourcesamples\there was a time .wav)"));
+
         for (auto &pd : paramDescriptions)
         {
-            m_to_ui_fifo.push(
-                xenakios::CrossThreadMessage(pd.id, CLAP_EVENT_PARAM_VALUE, pd.defaultVal));
+            FilePlayerMessage msg;
+            msg.opcode = FilePlayerMessage::Opcode::ParamChange;
+            msg.parid = pd.id;
+            msg.value = pd.defaultVal;
+            messages_to_ui.push(msg);
         }
     }
     uint32_t audioPortsCount(bool isInput) const noexcept override
@@ -160,7 +181,7 @@ class FilePlayerProcessor : public XAPWithJuceGUI
 
         m_stretch.presetDefault(2, sampleRate);
         m_work_buf.setSize(2, maxFrameCount * 16);
-
+        m_work_buf.clear();
         for (auto &rs : m_resamplers)
             rs.reset();
         m_resampler_work_buf.resize(maxFrameCount * 32);
@@ -198,6 +219,8 @@ class FilePlayerProcessor : public XAPWithJuceGUI
         }
         return false;
     }
+    std::string currentfilename;
+    juce::CriticalSection m_cs;
     void importFile(juce::File f)
     {
         juce::AudioFormatManager man;
@@ -206,10 +229,26 @@ class FilePlayerProcessor : public XAPWithJuceGUI
         jassert(reader);
         if (reader)
         {
-            m_file_buf.setSize(2, reader->lengthInSamples);
-            reader->read(&m_file_buf, 0, reader->lengthInSamples, 0, true, true);
+            juce::AudioBuffer<float> tempbuf(2, reader->lengthInSamples);
+            tempbuf.clear();
+            reader->read(&tempbuf, 0, reader->lengthInSamples, 0, true, true);
+            m_cs.enter();
+            // m_file_buf.setSize(2, reader->lengthInSamples);
             m_file_sample_rate = reader->sampleRate;
+            // m_stretch.reset();
+            m_work_buf.clear();
+            std::swap(tempbuf, m_file_buf);
+            // m_file_buf.clear();
+
+            m_cs.exit();
+            // reader->read(&m_file_buf, 0, reader->lengthInSamples, 0, true, true);
+
             delete reader;
+            currentfilename = f.getFileName().toStdString();
+            FilePlayerMessage msg;
+            msg.opcode = FilePlayerMessage::Opcode::FileChanged;
+            msg.filename = currentfilename;
+            messages_to_ui.push(msg);
         }
     }
     void handleEvent(const clap_event_header *ev)
@@ -256,6 +295,7 @@ class FilePlayerProcessor : public XAPWithJuceGUI
     }
     clap_process_status process(const clap_process *process) noexcept override
     {
+        juce::ScopedLock locker(m_cs);
         xenakios::CrossThreadMessage msg;
         while (m_from_ui_fifo.pop(msg))
         {
@@ -273,7 +313,7 @@ class FilePlayerProcessor : public XAPWithJuceGUI
         }
         if (m_file_buf.getNumSamples() == 0)
         {
-            jassert(false);
+            // jassert(false);
             return CLAP_PROCESS_CONTINUE;
         }
 

@@ -106,6 +106,7 @@ target_sources(ConsoleAppExample
         Source/Experimental/xaudiograph.cpp
         Source/Experimental/xap_utils.cpp
         Source/Experimental/xaps/xap_notegenerator.cpp
+        Source/Experimental/xaps/fileplayer_xaudioprocessor.cpp
         Source/Experimental/xaudioprocessor.cpp
         
         Source/Plugins/noise-plethora/random.cpp
