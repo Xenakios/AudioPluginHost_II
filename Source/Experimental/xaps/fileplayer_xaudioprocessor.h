@@ -6,7 +6,7 @@
 #include "../xap_utils.h"
 #include "../xapfactory.h"
 
-class FilePlayerProcessor : public XAPWithJuceGUI
+class FilePlayerProcessor : public XAPWithJuceGUI, public juce::Timer
 {
   public:
     double m_sr = 44100;
@@ -19,17 +19,19 @@ class FilePlayerProcessor : public XAPWithJuceGUI
     std::array<juce::LagrangeInterpolator, 2> m_resamplers;
     std::vector<float> m_resampler_work_buf;
     double m_file_sample_rate = 1.0;
+    double m_temp_file_sample_rate = 1.0;
     struct FilePlayerMessage
     {
         enum class Opcode
         {
+            Nop,
             ParamBegin,
             ParamChange,
             ParamEnd,
             RequestFileChange,
             FileChanged
         };
-        Opcode opcode;
+        Opcode opcode = Opcode::Nop;
         clap_id parid = CLAP_INVALID_ID;
         double value = 0.0;
         std::string_view filename;
@@ -55,6 +57,31 @@ class FilePlayerProcessor : public XAPWithJuceGUI
         LoopStart = 3322,
         LoopEnd = 888777
     };
+    juce::AudioFormatManager fman;
+    void timerCallback() override
+    {
+        FilePlayerMessage msg;
+        while (messages_to_io.pop(msg))
+        {
+            if (msg.opcode == FilePlayerMessage::Opcode::RequestFileChange)
+            {
+                juce::String tempstring(msg.filename.data());
+                juce::File afile(tempstring);
+                auto reader = fman.createReaderFor(afile);
+                if (reader)
+                {
+                    m_temp_file_sample_rate = reader->sampleRate;
+                    m_file_temp_buf.setSize(2, reader->lengthInSamples);
+                    reader->read(&m_file_temp_buf, 0, reader->lengthInSamples, 0, true, true);
+                    FilePlayerMessage readymsg;
+                    readymsg.opcode = FilePlayerMessage::Opcode::FileChanged;
+                    readymsg.filename = msg.filename;
+                    messages_from_ui.push(readymsg);
+                    delete reader;
+                }
+            }
+        }
+    }
     bool getDescriptor(clap_plugin_descriptor *desc) const override
     {
         memset(desc, 0, sizeof(clap_plugin_descriptor));
@@ -73,6 +100,7 @@ class FilePlayerProcessor : public XAPWithJuceGUI
     using ParamDesc = xenakios::ParamDesc;
     FilePlayerProcessor()
     {
+        fman.registerBasicFormats();
         paramDescriptions.push_back(
             ParamDesc()
                 .asDecibel()
@@ -128,6 +156,8 @@ class FilePlayerProcessor : public XAPWithJuceGUI
                 .withID((clap_id)ParamIds::LoopEnd));
         messages_to_ui.reset(256);
         messages_from_ui.reset(256);
+        messages_to_io.reset(8);
+        messages_from_io.reset(8);
         // importFile(juce::File(R"(C:\MusicAudio\sourcesamples\there was a time .wav)"));
 
         for (auto &pd : paramDescriptions)
@@ -138,6 +168,7 @@ class FilePlayerProcessor : public XAPWithJuceGUI
             msg.value = pd.defaultVal;
             messages_to_ui.push(msg);
         }
+        startTimer(500);
     }
     uint32_t audioPortsCount(bool isInput) const noexcept override
     {
@@ -220,7 +251,7 @@ class FilePlayerProcessor : public XAPWithJuceGUI
         return false;
     }
     std::string currentfilename;
-    juce::CriticalSection m_cs;
+    
     void importFile(juce::File f)
     {
         juce::AudioFormatManager man;
@@ -232,7 +263,7 @@ class FilePlayerProcessor : public XAPWithJuceGUI
             juce::AudioBuffer<float> tempbuf(2, reader->lengthInSamples);
             tempbuf.clear();
             reader->read(&tempbuf, 0, reader->lengthInSamples, 0, true, true);
-            m_cs.enter();
+            
             // m_file_buf.setSize(2, reader->lengthInSamples);
             m_file_sample_rate = reader->sampleRate;
             // m_stretch.reset();
@@ -240,7 +271,7 @@ class FilePlayerProcessor : public XAPWithJuceGUI
             std::swap(tempbuf, m_file_buf);
             // m_file_buf.clear();
 
-            m_cs.exit();
+            
             // reader->read(&m_file_buf, 0, reader->lengthInSamples, 0, true, true);
 
             delete reader;
@@ -251,7 +282,7 @@ class FilePlayerProcessor : public XAPWithJuceGUI
             messages_to_ui.push(msg);
         }
     }
-    void handleEvent(const clap_event_header *ev)
+    void handleEvent(const clap_event_header *ev, bool is_from_ui)
     {
         if (ev->type == CLAP_EVENT_PARAM_VALUE)
         {
@@ -293,136 +324,40 @@ class FilePlayerProcessor : public XAPWithJuceGUI
                 importFile(juce::File(fch->filepath));
         }
     }
-    clap_process_status process(const clap_process *process) noexcept override
+    choc::fifo::SingleReaderSingleWriterFIFO<FilePlayerMessage> messages_to_io;
+    choc::fifo::SingleReaderSingleWriterFIFO<FilePlayerMessage> messages_from_io;
+    void handleMessagesFromUI()
     {
-        juce::ScopedLock locker(m_cs);
-        xenakios::CrossThreadMessage msg;
-        while (m_from_ui_fifo.pop(msg))
+        FilePlayerMessage msg;
+        while (messages_from_ui.pop(msg))
         {
-            if (msg.eventType == CLAP_EVENT_PARAM_VALUE)
+            if (msg.opcode == FilePlayerMessage::Opcode::ParamChange)
             {
-                auto pev = makeClapParameterValueEvent(0, msg.paramId, msg.value);
-                handleEvent((const clap_event_header *)&pev);
+                auto pev = xenakios::make_event_param_value(0, msg.parid, msg.value, nullptr);
+                handleEvent((const clap_event_header *)&pev, true);
+            }
+            // ok, so this is tricky, we can't actually load and change the file
+            // in the audio thread, so offload to another thread
+            if (msg.opcode == FilePlayerMessage::Opcode::RequestFileChange)
+            {
+                messages_to_io.push(msg);
+            }
+            if (msg.opcode == FilePlayerMessage::Opcode::FileChanged)
+            {
+                m_file_sample_rate = m_temp_file_sample_rate;
+                // double t0 = juce::Time::getMillisecondCounterHiRes();
+                std::swap(m_file_temp_buf, m_file_buf);
+                // double t1 = juce::Time::getMillisecondCounterHiRes();
+                // DBG("swap took " << t1-t0 << " millisecons");
+                // the swap seems to be very fast
+                FilePlayerMessage outmsg;
+                outmsg.opcode = FilePlayerMessage::Opcode::FileChanged;
+                outmsg.filename = msg.filename;
+                messages_to_ui.push(outmsg);
             }
         }
-        auto inevts = process->in_events;
-        for (int i = 0; i < inevts->size(inevts); ++i)
-        {
-            auto ev = inevts->get(inevts, i);
-            handleEvent(ev);
-        }
-        if (m_file_buf.getNumSamples() == 0)
-        {
-            // jassert(false);
-            return CLAP_PROCESS_CONTINUE;
-        }
-
-        int loop_start_samples = m_loop_start * m_file_buf.getNumSamples();
-        int loop_end_samples = m_loop_end * m_file_buf.getNumSamples();
-        if (loop_start_samples > loop_end_samples)
-            std::swap(loop_start_samples, loop_end_samples);
-        if (loop_start_samples == loop_end_samples)
-        {
-            loop_end_samples += 4100;
-            if (loop_end_samples >= m_file_buf.getNumSamples())
-            {
-                loop_start_samples = m_file_buf.getNumSamples() - 4100;
-                loop_end_samples = m_file_buf.getNumSamples() - 1;
-            }
-        }
-        if (m_buf_playpos < loop_start_samples)
-            m_buf_playpos = loop_start_samples;
-        if (m_buf_playpos >= loop_end_samples)
-            m_buf_playpos = loop_start_samples;
-        auto filebuf = m_file_buf.getArrayOfReadPointers();
-
-        auto wbuf = m_work_buf.getArrayOfWritePointers();
-        int cachedpos = m_buf_playpos;
-        float compensrate = m_file_sample_rate / m_sr;
-        bool preserve_pitch = m_preserve_pitch;
-        // time octaves
-        double rate = m_rate;
-        rate += m_rate_mod;
-        // we could allow modulation to make it go a bit over these limits...
-        rate = std::clamp(rate, -3.0, 2.0);
-        // then convert to actual playback ratio
-        rate = std::pow(2.0, rate);
-        auto getxfadedsample = [](const float *srcbuf, int index, int start, int end,
-                                  int xfadelen) {
-            // not within xfade region so just return original sample
-            int xfadestart = end - xfadelen;
-            if (index >= start && index < xfadestart)
-                return srcbuf[index];
-
-            float xfadegain = juce::jmap<float>(index, xfadestart, end - 1, 1.0f, 0.0f);
-            jassert(xfadegain >= 0.0f && xfadegain <= 1.0);
-            float s0 = srcbuf[index];
-            int temp = index - xfadestart + (start - xfadelen);
-            if (temp < 0)
-                return s0 * xfadegain;
-            jassert(temp >= 0 && temp < end);
-            float s1 = srcbuf[temp];
-            return s0 * xfadegain + s1 * (1.0f - xfadegain);
-        };
-        int xfadelen = 4000;
-        if (preserve_pitch)
-        {
-            double pshift = m_pitch;
-            pshift += m_pitch_mod;
-            pshift = std::clamp(pshift, -12.0, 12.0);
-            double pitchratio = std::pow(2.0, pshift / 12.0);
-            m_stretch.setTransposeFactor(pitchratio * compensrate);
-            rate *= compensrate;
-            int samplestopush = process->frames_count * rate;
-            for (int i = 0; i < samplestopush; ++i)
-            {
-                wbuf[0][i] = getxfadedsample(filebuf[0], m_buf_playpos, loop_start_samples,
-                                             loop_end_samples, xfadelen);
-                wbuf[1][i] = getxfadedsample(filebuf[1], m_buf_playpos, loop_start_samples,
-                                             loop_end_samples, xfadelen);
-                ++m_buf_playpos;
-                if (m_buf_playpos >= loop_end_samples)
-                    m_buf_playpos = loop_start_samples;
-            }
-            m_stretch.process(m_work_buf.getArrayOfReadPointers(), samplestopush,
-                              process->audio_outputs[0].data32, process->frames_count);
-        }
-        else
-        {
-            rate *= compensrate;
-            int samplestopush = process->frames_count * rate;
-            int consumed[2] = {0, 0};
-            samplestopush += 1;
-            for (int i = 0; i < samplestopush; ++i)
-            {
-                wbuf[0][i] = getxfadedsample(filebuf[0], m_buf_playpos, loop_start_samples,
-                                             loop_end_samples, xfadelen);
-                wbuf[1][i] = getxfadedsample(filebuf[1], m_buf_playpos, loop_start_samples,
-                                             loop_end_samples, xfadelen);
-                ++m_buf_playpos;
-                if (m_buf_playpos >= loop_end_samples)
-                    m_buf_playpos = loop_start_samples;
-            }
-            for (int ch = 0; ch < 2; ++ch)
-            {
-                consumed[ch] =
-                    m_resamplers[ch].process(rate, wbuf[ch], process->audio_outputs[0].data32[ch],
-                                             process->frames_count, samplestopush, 0);
-            }
-            jassert(consumed[0] == consumed[1]);
-            m_buf_playpos = (cachedpos + consumed[0]);
-            if (m_buf_playpos >= loop_end_samples)
-            {
-                m_buf_playpos = loop_start_samples;
-            }
-        }
-        m_gain_proc.setGainDecibels(m_volume);
-        juce::dsp::AudioBlock<float> block(process->audio_outputs[0].data32, 2,
-                                           process->frames_count);
-        juce::dsp::ProcessContextReplacing<float> ctx(block);
-        m_gain_proc.process(ctx);
-        return CLAP_PROCESS_CONTINUE;
     }
+    clap_process_status process(const clap_process *process) noexcept override;
 };
 static xenakios::RegisterXap reg_fileplayer{"File Player", "com.xenakios.fileplayer", []() {
                                                 return std::make_unique<FilePlayerProcessor>();
