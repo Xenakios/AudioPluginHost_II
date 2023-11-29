@@ -128,6 +128,7 @@ clap_process_status FilePlayerProcessor::process(const clap_process *process) no
         auto ev = inevts->get(inevts, i);
         handleEvent(ev, false);
     }
+    handleMessagesFromIO();
     if (m_file_buf.getNumSamples() == 0)
     {
         // jassert(false);

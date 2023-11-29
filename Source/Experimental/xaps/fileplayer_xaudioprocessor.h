@@ -6,7 +6,7 @@
 #include "../xap_utils.h"
 #include "../xapfactory.h"
 
-class FilePlayerProcessor : public XAPWithJuceGUI, public juce::Timer
+class FilePlayerProcessor : public XAPWithJuceGUI, public juce::Thread
 {
   public:
     double m_sr = 44100;
@@ -29,7 +29,8 @@ class FilePlayerProcessor : public XAPWithJuceGUI, public juce::Timer
             ParamChange,
             ParamEnd,
             RequestFileChange,
-            FileChanged
+            FileChanged,
+            StopIOThread
         };
         Opcode opcode = Opcode::Nop;
         clap_id parid = CLAP_INVALID_ID;
@@ -58,28 +59,40 @@ class FilePlayerProcessor : public XAPWithJuceGUI, public juce::Timer
         LoopEnd = 888777
     };
     juce::AudioFormatManager fman;
-    void timerCallback() override
+    void run() override
     {
-        FilePlayerMessage msg;
-        while (messages_to_io.pop(msg))
+        bool stop = false;
+        while (!stop)
         {
-            if (msg.opcode == FilePlayerMessage::Opcode::RequestFileChange)
+            if (threadShouldExit())
+                break;
+            FilePlayerMessage msg;
+            while (messages_to_io.pop(msg))
             {
-                juce::String tempstring(msg.filename.data());
-                juce::File afile(tempstring);
-                auto reader = fman.createReaderFor(afile);
-                if (reader)
+                if (msg.opcode == FilePlayerMessage::Opcode::StopIOThread)
                 {
-                    m_temp_file_sample_rate = reader->sampleRate;
-                    m_file_temp_buf.setSize(2, reader->lengthInSamples);
-                    reader->read(&m_file_temp_buf, 0, reader->lengthInSamples, 0, true, true);
-                    FilePlayerMessage readymsg;
-                    readymsg.opcode = FilePlayerMessage::Opcode::FileChanged;
-                    readymsg.filename = msg.filename;
-                    messages_from_ui.push(readymsg);
-                    delete reader;
+                    stop = true;
+                    break;
+                }
+                if (msg.opcode == FilePlayerMessage::Opcode::RequestFileChange)
+                {
+                    juce::String tempstring(msg.filename.data());
+                    juce::File afile(tempstring);
+                    auto reader = fman.createReaderFor(afile);
+                    if (reader)
+                    {
+                        m_temp_file_sample_rate = reader->sampleRate;
+                        m_file_temp_buf.setSize(2, reader->lengthInSamples);
+                        reader->read(&m_file_temp_buf, 0, reader->lengthInSamples, 0, true, true);
+                        FilePlayerMessage readymsg;
+                        readymsg.opcode = FilePlayerMessage::Opcode::FileChanged;
+                        readymsg.filename = msg.filename;
+                        messages_from_io.push(readymsg);
+                        delete reader;
+                    }
                 }
             }
+            juce::Thread::sleep(50);
         }
     }
     bool getDescriptor(clap_plugin_descriptor *desc) const override
@@ -98,7 +111,11 @@ class FilePlayerProcessor : public XAPWithJuceGUI, public juce::Timer
     static constexpr double minRate = -3.0;
     static constexpr double maxRate = 2.0;
     using ParamDesc = xenakios::ParamDesc;
-    FilePlayerProcessor()
+    ~FilePlayerProcessor() override
+    {
+        stopThread(5000);
+    }
+    FilePlayerProcessor() : juce::Thread("filerplayeriothread")
     {
         fman.registerBasicFormats();
         paramDescriptions.push_back(
@@ -168,7 +185,7 @@ class FilePlayerProcessor : public XAPWithJuceGUI, public juce::Timer
             msg.value = pd.defaultVal;
             messages_to_ui.push(msg);
         }
-        startTimer(500);
+        startThread(juce::Thread::Priority::normal);
     }
     uint32_t audioPortsCount(bool isInput) const noexcept override
     {
@@ -251,7 +268,7 @@ class FilePlayerProcessor : public XAPWithJuceGUI, public juce::Timer
         return false;
     }
     std::string currentfilename;
-    
+
     void importFile(juce::File f)
     {
         juce::AudioFormatManager man;
@@ -263,7 +280,7 @@ class FilePlayerProcessor : public XAPWithJuceGUI, public juce::Timer
             juce::AudioBuffer<float> tempbuf(2, reader->lengthInSamples);
             tempbuf.clear();
             reader->read(&tempbuf, 0, reader->lengthInSamples, 0, true, true);
-            
+
             // m_file_buf.setSize(2, reader->lengthInSamples);
             m_file_sample_rate = reader->sampleRate;
             // m_stretch.reset();
@@ -271,7 +288,6 @@ class FilePlayerProcessor : public XAPWithJuceGUI, public juce::Timer
             std::swap(tempbuf, m_file_buf);
             // m_file_buf.clear();
 
-            
             // reader->read(&m_file_buf, 0, reader->lengthInSamples, 0, true, true);
 
             delete reader;
@@ -326,6 +342,26 @@ class FilePlayerProcessor : public XAPWithJuceGUI, public juce::Timer
     }
     choc::fifo::SingleReaderSingleWriterFIFO<FilePlayerMessage> messages_to_io;
     choc::fifo::SingleReaderSingleWriterFIFO<FilePlayerMessage> messages_from_io;
+    void handleMessagesFromIO()
+    {
+        FilePlayerMessage msg;
+        while (messages_from_io.pop(msg))
+        {
+            if (msg.opcode == FilePlayerMessage::Opcode::FileChanged)
+            {
+                m_file_sample_rate = m_temp_file_sample_rate;
+                // double t0 = juce::Time::getMillisecondCounterHiRes();
+                std::swap(m_file_temp_buf, m_file_buf);
+                // double t1 = juce::Time::getMillisecondCounterHiRes();
+                // DBG("swap took " << t1-t0 << " millisecons");
+                // the swap seems to be very fast
+                FilePlayerMessage outmsg;
+                outmsg.opcode = FilePlayerMessage::Opcode::FileChanged;
+                outmsg.filename = msg.filename;
+                messages_to_ui.push(outmsg);
+            }
+        }
+    }
     void handleMessagesFromUI()
     {
         FilePlayerMessage msg;
@@ -342,20 +378,7 @@ class FilePlayerProcessor : public XAPWithJuceGUI, public juce::Timer
             {
                 messages_to_io.push(msg);
             }
-            if (msg.opcode == FilePlayerMessage::Opcode::FileChanged)
-            {
-                m_file_sample_rate = m_temp_file_sample_rate;
-                // double t0 = juce::Time::getMillisecondCounterHiRes();
-                std::swap(m_file_temp_buf, m_file_buf);
-                // double t1 = juce::Time::getMillisecondCounterHiRes();
-                // DBG("swap took " << t1-t0 << " millisecons");
-                // the swap seems to be very fast
-                FilePlayerMessage outmsg;
-                outmsg.opcode = FilePlayerMessage::Opcode::FileChanged;
-                outmsg.filename = msg.filename;
-                messages_to_ui.push(outmsg);
-            }
-        }
+                }
     }
     clap_process_status process(const clap_process *process) noexcept override;
 };
