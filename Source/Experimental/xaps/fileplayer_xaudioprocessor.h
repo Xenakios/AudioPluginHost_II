@@ -31,6 +31,7 @@ class FilePlayerProcessor : public XAPWithJuceGUI, public juce::Thread
             RequestFileChange,
             FileChanged,
             FileLoadError,
+            FilePlayPosition,
             StopIOThread
         };
         Opcode opcode = Opcode::Nop;
@@ -50,6 +51,8 @@ class FilePlayerProcessor : public XAPWithJuceGUI, public juce::Thread
     double m_loop_start = 0.0; // proportion of whole file
     double m_loop_end = 1.0;
     bool m_preserve_pitch = true;
+    int m_filepos_throttle_counter = 0;
+    int m_filepos_throttle_frames = 2048;
     enum class ParamIds
     {
         Volume = 42,

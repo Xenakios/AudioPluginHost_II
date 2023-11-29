@@ -2,9 +2,13 @@
 
 class FilePlayerEditor : public juce::Component,
                          public juce::Timer,
-                         public juce::FilenameComponentListener
+                         public juce::FilenameComponentListener,
+                         public juce::ChangeListener
 {
   public:
+    void changeListenerCallback(juce::ChangeBroadcaster *source) override { repaint(); }
+    juce::AudioThumbnailCache m_thumb_cache;
+    std::unique_ptr<juce::AudioThumbnail> m_thumb;
     void filenameComponentChanged(juce::FilenameComponent *fc) override
     {
         DBG(fc->getCurrentFile().getFullPathName());
@@ -15,10 +19,14 @@ class FilePlayerEditor : public juce::Component,
         m_proc->messages_from_ui.push(msg);
     }
     std::unique_ptr<juce::FileChooser> m_file_chooser;
+    juce::AudioFormatManager m_afman;
     FilePlayerEditor(FilePlayerProcessor *proc)
-        : m_proc(proc),
+        : m_thumb_cache(100), m_proc(proc),
           m_file_comp("", juce::File(), false, false, false, "*.wav", "", "Choose audio file")
     {
+        m_afman.registerBasicFormats();
+        m_thumb = std::make_unique<juce::AudioThumbnail>(128, m_afman, m_thumb_cache);
+        m_thumb->addChangeListener(this);
         addAndMakeVisible(m_load_but);
         addAndMakeVisible(m_file_label);
         addAndMakeVisible(m_file_comp);
@@ -57,6 +65,7 @@ class FilePlayerEditor : public juce::Component,
             });
     }
     juce::String m_cur_file_text{"No file loaded"};
+    double m_file_playpos = 0.0;
     void timerCallback() override
     {
         FilePlayerProcessor::FilePlayerMessage msg;
@@ -65,12 +74,23 @@ class FilePlayerEditor : public juce::Component,
             if (msg.opcode == FilePlayerProcessor::FilePlayerMessage::Opcode::FileChanged)
             {
                 if (msg.filename.data())
-                    m_cur_file_text = msg.filename.data();
+                {
+                    juce::File f(file_to_change_to);
+                    m_cur_file_text = f.getFileName();
+
+                    m_thumb->setSource(new juce::FileInputSource(f));
+                }
+
                 repaint();
             }
             if (msg.opcode == FilePlayerProcessor::FilePlayerMessage::Opcode::FileLoadError)
             {
                 m_cur_file_text = "Error loading file";
+                repaint();
+            }
+            if (msg.opcode == FilePlayerProcessor::FilePlayerMessage::Opcode::FilePlayPosition)
+            {
+                m_file_playpos = msg.value;
                 repaint();
             }
             if (msg.opcode == FilePlayerProcessor::FilePlayerMessage::Opcode::ParamChange)
@@ -101,9 +121,18 @@ class FilePlayerEditor : public juce::Component,
     {
         g.setColour(juce::Colours::black);
         g.fillRect(0, 0, getWidth(), m_wave_h);
+        g.setColour(juce::Colours::darkgrey);
+        if (m_thumb->getTotalLength() > 0.0 && m_cur_file_text != "Error loading file")
+        {
+            m_thumb->drawChannels(g, juce::Rectangle<int>(0, 0, getWidth(), m_wave_h), 0.0,
+                                  m_thumb->getTotalLength(), 1.0f);
+            g.setColour(juce::Colours::white);
+            double xcor = juce::jmap<double>(m_file_playpos,0.0,1.0,0.0,getWidth());
+            g.drawLine(xcor,0.0,xcor,m_wave_h);
+        }
         g.setColour(juce::Colours::white);
-        g.setFont(30);
-        g.drawText(m_cur_file_text, 0, 0, getWidth(), m_wave_h, juce::Justification::centredLeft);
+        g.setFont(20);
+        g.drawText(m_cur_file_text, 0, 0, getWidth(), m_wave_h, juce::Justification::topLeft);
     }
 
   private:
@@ -177,7 +206,7 @@ void FilePlayerProcessor::run()
                     m_temp_file_sample_rate = reader->sampleRate;
                     m_file_temp_buf.setSize(2, reader->lengthInSamples);
                     reader->read(&m_file_temp_buf, 0, reader->lengthInSamples, 0, true, true);
-                    currentfilename = afile.getFileName().toStdString();
+                    currentfilename = afile.getFullPathName().toStdString();
                     FilePlayerMessage readymsg;
                     readymsg.opcode = FilePlayerMessage::Opcode::FileChanged;
                     readymsg.filename = currentfilename;
@@ -211,7 +240,18 @@ clap_process_status FilePlayerProcessor::process(const clap_process *process) no
         // jassert(false);
         return CLAP_PROCESS_CONTINUE;
     }
-
+    if (m_filepos_throttle_counter == 0)
+    {
+        FilePlayerMessage outmsg;
+        outmsg.opcode = FilePlayerMessage::Opcode::FilePlayPosition;
+        outmsg.value = 1.0 / m_file_buf.getNumSamples() * m_buf_playpos;
+        messages_to_ui.push(outmsg);
+    }
+    m_filepos_throttle_counter += process->frames_count;
+    if (m_filepos_throttle_counter >= m_filepos_throttle_frames)
+    {
+        m_filepos_throttle_counter = 0;
+    }
     int loop_start_samples = m_loop_start * m_file_buf.getNumSamples();
     int loop_end_samples = m_loop_end * m_file_buf.getNumSamples();
     if (loop_start_samples > loop_end_samples)
