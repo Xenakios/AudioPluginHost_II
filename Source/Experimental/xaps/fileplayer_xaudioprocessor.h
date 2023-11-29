@@ -30,6 +30,7 @@ class FilePlayerProcessor : public XAPWithJuceGUI, public juce::Thread
             ParamEnd,
             RequestFileChange,
             FileChanged,
+            FileLoadError,
             StopIOThread
         };
         Opcode opcode = Opcode::Nop;
@@ -59,42 +60,8 @@ class FilePlayerProcessor : public XAPWithJuceGUI, public juce::Thread
         LoopEnd = 888777
     };
     juce::AudioFormatManager fman;
-    void run() override
-    {
-        bool stop = false;
-        while (!stop)
-        {
-            if (threadShouldExit())
-                break;
-            FilePlayerMessage msg;
-            while (messages_to_io.pop(msg))
-            {
-                if (msg.opcode == FilePlayerMessage::Opcode::StopIOThread)
-                {
-                    stop = true;
-                    break;
-                }
-                if (msg.opcode == FilePlayerMessage::Opcode::RequestFileChange)
-                {
-                    juce::String tempstring(msg.filename.data());
-                    juce::File afile(tempstring);
-                    auto reader = fman.createReaderFor(afile);
-                    if (reader)
-                    {
-                        m_temp_file_sample_rate = reader->sampleRate;
-                        m_file_temp_buf.setSize(2, reader->lengthInSamples);
-                        reader->read(&m_file_temp_buf, 0, reader->lengthInSamples, 0, true, true);
-                        FilePlayerMessage readymsg;
-                        readymsg.opcode = FilePlayerMessage::Opcode::FileChanged;
-                        readymsg.filename = msg.filename;
-                        messages_from_io.push(readymsg);
-                        delete reader;
-                    }
-                }
-            }
-            juce::Thread::sleep(50);
-        }
-    }
+    void run() override;
+
     bool getDescriptor(clap_plugin_descriptor *desc) const override
     {
         memset(desc, 0, sizeof(clap_plugin_descriptor));
@@ -111,10 +78,7 @@ class FilePlayerProcessor : public XAPWithJuceGUI, public juce::Thread
     static constexpr double minRate = -3.0;
     static constexpr double maxRate = 2.0;
     using ParamDesc = xenakios::ParamDesc;
-    ~FilePlayerProcessor() override
-    {
-        stopThread(5000);
-    }
+    ~FilePlayerProcessor() override { stopThread(5000); }
     FilePlayerProcessor() : juce::Thread("filerplayeriothread")
     {
         fman.registerBasicFormats();
@@ -269,35 +233,6 @@ class FilePlayerProcessor : public XAPWithJuceGUI, public juce::Thread
     }
     std::string currentfilename;
 
-    void importFile(juce::File f)
-    {
-        juce::AudioFormatManager man;
-        man.registerBasicFormats();
-        auto reader = man.createReaderFor(f);
-        jassert(reader);
-        if (reader)
-        {
-            juce::AudioBuffer<float> tempbuf(2, reader->lengthInSamples);
-            tempbuf.clear();
-            reader->read(&tempbuf, 0, reader->lengthInSamples, 0, true, true);
-
-            // m_file_buf.setSize(2, reader->lengthInSamples);
-            m_file_sample_rate = reader->sampleRate;
-            // m_stretch.reset();
-            m_work_buf.clear();
-            std::swap(tempbuf, m_file_buf);
-            // m_file_buf.clear();
-
-            // reader->read(&m_file_buf, 0, reader->lengthInSamples, 0, true, true);
-
-            delete reader;
-            currentfilename = f.getFileName().toStdString();
-            FilePlayerMessage msg;
-            msg.opcode = FilePlayerMessage::Opcode::FileChanged;
-            msg.filename = currentfilename;
-            messages_to_ui.push(msg);
-        }
-    }
     void handleEvent(const clap_event_header *ev, bool is_from_ui)
     {
         if (ev->type == CLAP_EVENT_PARAM_VALUE)
@@ -330,15 +265,6 @@ class FilePlayerProcessor : public XAPWithJuceGUI, public juce::Thread
             // if (aev->param_id == to_clap_id(ParamIds::LoopEnd))
             //     m_loop_end = aev->value;
         }
-        if (ev->space_id == XENAKIOS_CLAP_NAMESPACE && ev->type == XENAKIOS_EVENT_CHANGEFILE)
-        {
-            auto fch = reinterpret_cast<const xenakios_event_change_file *>(ev);
-            // this should obviously be asynced in some way when realtime...
-            if (m_running_offline)
-                importFile(juce::File(fch->filepath));
-            else
-                importFile(juce::File(fch->filepath));
-        }
     }
     choc::fifo::SingleReaderSingleWriterFIFO<FilePlayerMessage> messages_to_io;
     choc::fifo::SingleReaderSingleWriterFIFO<FilePlayerMessage> messages_from_io;
@@ -360,6 +286,12 @@ class FilePlayerProcessor : public XAPWithJuceGUI, public juce::Thread
                 outmsg.filename = msg.filename;
                 messages_to_ui.push(outmsg);
             }
+            if (msg.opcode == FilePlayerMessage::Opcode::FileLoadError)
+            {
+                FilePlayerMessage outmsg;
+                outmsg.opcode = FilePlayerMessage::Opcode::FileLoadError;
+                messages_to_ui.push(outmsg);
+            }
         }
     }
     void handleMessagesFromUI()
@@ -378,7 +310,7 @@ class FilePlayerProcessor : public XAPWithJuceGUI, public juce::Thread
             {
                 messages_to_io.push(msg);
             }
-                }
+        }
     }
     clap_process_status process(const clap_process *process) noexcept override;
 };

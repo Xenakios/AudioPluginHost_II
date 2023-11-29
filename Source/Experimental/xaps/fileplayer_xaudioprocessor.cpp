@@ -1,13 +1,29 @@
 #include "fileplayer_xaudioprocessor.h"
 
-class FilePlayerEditor : public juce::Component, public juce::Timer
+class FilePlayerEditor : public juce::Component,
+                         public juce::Timer,
+                         public juce::FilenameComponentListener
 {
   public:
+    void filenameComponentChanged(juce::FilenameComponent *fc) override
+    {
+        DBG(fc->getCurrentFile().getFullPathName());
+        file_to_change_to = fc->getCurrentFile().getFullPathName().toStdString();
+        FilePlayerProcessor::FilePlayerMessage msg;
+        msg.opcode = FilePlayerProcessor::FilePlayerMessage::Opcode::RequestFileChange;
+        msg.filename = file_to_change_to;
+        m_proc->messages_from_ui.push(msg);
+    }
     std::unique_ptr<juce::FileChooser> m_file_chooser;
-    FilePlayerEditor(FilePlayerProcessor *proc) : m_proc(proc)
+    FilePlayerEditor(FilePlayerProcessor *proc)
+        : m_proc(proc),
+          m_file_comp("", juce::File(), false, false, false, "*.wav", "", "Choose audio file")
     {
         addAndMakeVisible(m_load_but);
         addAndMakeVisible(m_file_label);
+        addAndMakeVisible(m_file_comp);
+        m_file_comp.addListener(this);
+
         m_load_but.setButtonText("Load file...");
         m_load_but.onClick = [this]() { showFileOpenDialog(); };
         for (int i = 0; i < m_proc->paramDescriptions.size(); ++i)
@@ -40,7 +56,7 @@ class FilePlayerEditor : public juce::Component, public juce::Timer
                 }
             });
     }
-
+    juce::String m_cur_file_text{"No file loaded"};
     void timerCallback() override
     {
         FilePlayerProcessor::FilePlayerMessage msg;
@@ -49,7 +65,13 @@ class FilePlayerEditor : public juce::Component, public juce::Timer
             if (msg.opcode == FilePlayerProcessor::FilePlayerMessage::Opcode::FileChanged)
             {
                 if (msg.filename.data())
-                    m_file_label.setText(msg.filename.data(), juce::dontSendNotification);
+                    m_cur_file_text = msg.filename.data();
+                repaint();
+            }
+            if (msg.opcode == FilePlayerProcessor::FilePlayerMessage::Opcode::FileLoadError)
+            {
+                m_cur_file_text = "Error loading file";
+                repaint();
             }
             if (msg.opcode == FilePlayerProcessor::FilePlayerMessage::Opcode::ParamChange)
             {
@@ -61,10 +83,12 @@ class FilePlayerEditor : public juce::Component, public juce::Timer
             }
         }
     }
+    int m_wave_h = 148;
     void resized() override
     {
-        m_load_but.setBounds(0, 150, 100, 25);
-        m_file_label.setBounds(102, 150, 300, 25);
+        // m_load_but.setBounds(0, 150, 100, 25);
+        // m_file_label.setBounds(102, 150, 300, 25);
+        m_file_comp.setBounds(0, 150, getWidth(), 25);
         if (m_par_comps.size() == 0)
             return;
         int h = m_par_comps[0]->h;
@@ -73,10 +97,19 @@ class FilePlayerEditor : public juce::Component, public juce::Timer
             m_par_comps[i]->setBounds(0, 175 + h * i, getWidth(), h);
         }
     }
+    void paint(juce::Graphics &g) override
+    {
+        g.setColour(juce::Colours::black);
+        g.fillRect(0, 0, getWidth(), m_wave_h);
+        g.setColour(juce::Colours::white);
+        g.setFont(30);
+        g.drawText(m_cur_file_text, 0, 0, getWidth(), m_wave_h, juce::Justification::centredLeft);
+    }
 
   private:
     FilePlayerProcessor *m_proc = nullptr;
     juce::TextButton m_load_but;
+    juce::FilenameComponent m_file_comp;
     juce::Label m_file_label;
     class SliderAndLabel : public juce::Component
     {
@@ -97,7 +130,7 @@ class FilePlayerEditor : public juce::Component, public juce::Timer
             addAndMakeVisible(label);
             label.setText(desc.name, juce::dontSendNotification);
         }
-        void update() {}
+
         void resized() override
         {
             label.setBounds(0, 0, getWidth() / 2, h);
@@ -117,6 +150,50 @@ bool FilePlayerProcessor::guiCreate(const char *api, bool isFloating) noexcept
     m_editor = std::make_unique<FilePlayerEditor>(this);
     m_editor->setSize(600, 500);
     return true;
+}
+
+void FilePlayerProcessor::run()
+{
+    bool stop = false;
+    while (!stop)
+    {
+        if (threadShouldExit())
+            break;
+        FilePlayerMessage msg;
+        while (messages_to_io.pop(msg))
+        {
+            if (msg.opcode == FilePlayerMessage::Opcode::StopIOThread)
+            {
+                stop = true;
+                break;
+            }
+            if (msg.opcode == FilePlayerMessage::Opcode::RequestFileChange)
+            {
+                juce::String tempstring(msg.filename.data());
+                juce::File afile(tempstring);
+                auto reader = fman.createReaderFor(afile);
+                if (reader)
+                {
+                    m_temp_file_sample_rate = reader->sampleRate;
+                    m_file_temp_buf.setSize(2, reader->lengthInSamples);
+                    reader->read(&m_file_temp_buf, 0, reader->lengthInSamples, 0, true, true);
+                    currentfilename = afile.getFileName().toStdString();
+                    FilePlayerMessage readymsg;
+                    readymsg.opcode = FilePlayerMessage::Opcode::FileChanged;
+                    readymsg.filename = currentfilename;
+                    messages_from_io.push(readymsg);
+                    delete reader;
+                }
+                else
+                {
+                    FilePlayerMessage readymsg;
+                    readymsg.opcode = FilePlayerMessage::Opcode::FileLoadError;
+                    messages_from_io.push(readymsg);
+                }
+            }
+        }
+        juce::Thread::sleep(50);
+    }
 }
 
 clap_process_status FilePlayerProcessor::process(const clap_process *process) noexcept
