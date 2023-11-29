@@ -99,10 +99,15 @@ class FilePlayerEditor : public juce::Component,
                 {
                     mapParToComponent[msg.parid]->slider.setValue(msg.value,
                                                                   juce::dontSendNotification);
+                    if (msg.parid == (clap_id)FilePlayerProcessor::ParamIds::TriggeredMode)
+                    {
+                        m_triggered_mode = msg.value;
+                    }
                 }
             }
         }
     }
+    bool m_triggered_mode = false;
     int m_wave_h = 148;
     void resized() override
     {
@@ -117,22 +122,34 @@ class FilePlayerEditor : public juce::Component,
             m_par_comps[i]->setBounds(0, 175 + h * i, getWidth(), h);
         }
     }
+    void mouseDown(const juce::MouseEvent &ev) override
+    {
+        double newpos = juce::jmap<double>(ev.x, 0.0, getWidth(), 0.0, 1.0);
+        newpos = juce::jlimit<double>(0.0, 1.0, newpos);
+        FilePlayerProcessor::FilePlayerMessage msg;
+        msg.opcode = FilePlayerProcessor::FilePlayerMessage::Opcode::FilePlayPosition;
+        msg.value = newpos;
+        m_proc->messages_from_ui.push(msg);
+    }
     void paint(juce::Graphics &g) override
     {
         g.setColour(juce::Colours::black);
         g.fillRect(0, 0, getWidth(), m_wave_h);
         g.setColour(juce::Colours::darkgrey);
+        juce::String txt = m_cur_file_text;
         if (m_thumb->getTotalLength() > 0.0 && m_cur_file_text != "Error loading file")
         {
             m_thumb->drawChannels(g, juce::Rectangle<int>(0, 0, getWidth(), m_wave_h), 0.0,
                                   m_thumb->getTotalLength(), 1.0f);
             g.setColour(juce::Colours::white);
-            double xcor = juce::jmap<double>(m_file_playpos,0.0,1.0,0.0,getWidth());
-            g.drawLine(xcor,0.0,xcor,m_wave_h);
+            double xcor = juce::jmap<double>(m_file_playpos, 0.0, 1.0, 0.0, getWidth());
+            g.drawLine(xcor, 0.0, xcor, m_wave_h);
+            if (m_proc->m_triggered_mode)
+                txt += " (Press mouse over waveform to play)";
         }
         g.setColour(juce::Colours::white);
         g.setFont(20);
-        g.drawText(m_cur_file_text, 0, 0, getWidth(), m_wave_h, juce::Justification::topLeft);
+        g.drawText(txt, 0, 0, getWidth(), m_wave_h, juce::Justification::topLeft);
     }
 
   private:

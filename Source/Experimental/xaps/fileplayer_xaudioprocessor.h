@@ -32,11 +32,13 @@ class FilePlayerProcessor : public XAPWithJuceGUI, public juce::Thread
             FileChanged,
             FileLoadError,
             FilePlayPosition,
+            Trigger,
             StopIOThread
         };
         Opcode opcode = Opcode::Nop;
         clap_id parid = CLAP_INVALID_ID;
         double value = 0.0;
+        bool gate = false;
         std::string_view filename;
     };
     choc::fifo::SingleReaderSingleWriterFIFO<FilePlayerMessage> messages_to_ui;
@@ -50,6 +52,8 @@ class FilePlayerProcessor : public XAPWithJuceGUI, public juce::Thread
     double m_pitch_mod = 0.0;  // semitones
     double m_loop_start = 0.0; // proportion of whole file
     double m_loop_end = 1.0;
+    bool m_triggered_mode = false;
+    bool m_trigger_active = false;
     bool m_preserve_pitch = true;
     int m_filepos_throttle_counter = 0;
     int m_filepos_throttle_frames = 2048;
@@ -60,7 +64,8 @@ class FilePlayerProcessor : public XAPWithJuceGUI, public juce::Thread
         Pitch = 91155,
         PreservePitch = 6543,
         LoopStart = 3322,
-        LoopEnd = 888777
+        LoopEnd = 888777,
+        TriggeredMode = 900
     };
     juce::AudioFormatManager fman;
     void run() override;
@@ -138,12 +143,18 @@ class FilePlayerProcessor : public XAPWithJuceGUI, public juce::Thread
                 .withFlags(CLAP_PARAM_IS_AUTOMATABLE | CLAP_PARAM_IS_MODULATABLE)
                 .withName("Loop end")
                 .withID((clap_id)ParamIds::LoopEnd));
+        paramDescriptions.push_back(
+            ParamDesc()
+                .asBool()
+                .withDefault(0.0f)
+                .withFlags(CLAP_PARAM_IS_AUTOMATABLE | CLAP_PARAM_IS_STEPPED)
+                .withName("Triggered mode")
+                .withID((clap_id)ParamIds::TriggeredMode));
         messages_to_ui.reset(256);
         messages_from_ui.reset(256);
         messages_to_io.reset(8);
         messages_from_io.reset(8);
-        // importFile(juce::File(R"(C:\MusicAudio\sourcesamples\there was a time .wav)"));
-
+        
         for (auto &pd : paramDescriptions)
         {
             FilePlayerMessage msg;
@@ -228,6 +239,8 @@ class FilePlayerProcessor : public XAPWithJuceGUI, public juce::Thread
             result = m_loop_start;
         else if (paramId == (clap_id)ParamIds::LoopEnd)
             result = m_loop_end;
+        else if (paramId == (clap_id)ParamIds::TriggeredMode)
+            result = m_triggered_mode;
         if (result)
         {
             return true;
@@ -252,7 +265,13 @@ class FilePlayerProcessor : public XAPWithJuceGUI, public juce::Thread
             if (aev->param_id == to_clap_id(ParamIds::LoopEnd))
                 m_loop_end = aev->value;
             if (aev->param_id == to_clap_id(ParamIds::PreservePitch))
-                m_preserve_pitch = aev->value;
+                m_preserve_pitch = aev->value >= 0.5;
+            if (aev->param_id == to_clap_id(ParamIds::TriggeredMode))
+            {
+                m_triggered_mode = aev->value >= 0.5;
+                m_trigger_active = false;
+            }
+                
         }
         if (ev->type == CLAP_EVENT_PARAM_MOD)
         {
@@ -297,6 +316,7 @@ class FilePlayerProcessor : public XAPWithJuceGUI, public juce::Thread
             }
         }
     }
+    // must only be called from audio thread
     void handleMessagesFromUI()
     {
         FilePlayerMessage msg;
@@ -312,6 +332,13 @@ class FilePlayerProcessor : public XAPWithJuceGUI, public juce::Thread
             if (msg.opcode == FilePlayerMessage::Opcode::RequestFileChange)
             {
                 messages_to_io.push(msg);
+            }
+            if (msg.opcode == FilePlayerMessage::Opcode::FilePlayPosition)
+            {
+                if (m_file_buf.getNumSamples() > 0)
+                {
+                    m_buf_playpos = msg.value * m_file_buf.getNumSamples();
+                }
             }
         }
     }
