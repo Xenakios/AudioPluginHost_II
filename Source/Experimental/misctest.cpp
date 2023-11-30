@@ -151,9 +151,9 @@ inline void test_span()
     // f(arrerr);
 }
 
-
 inline void test_alt_event_list()
 {
+    using namespace xenakios;
     SortingEventList list;
     auto mev = make_event_param_mod(45, 666, 0.42, nullptr);
     list.pushEvent(&mev);
@@ -177,9 +177,14 @@ inline void test_alt_event_list()
     }
 }
 
+void baz(auto a, auto b) { std::cout << a << " " << b << " " << a + b << "\n"; }
+
+inline void test_auto() { baz(3, 2.5); }
+
 int main()
 {
-    test_alt_event_list();
+    test_auto();
+    // test_alt_event_list();
     // test_span();
     // test_polym();
     return 0;

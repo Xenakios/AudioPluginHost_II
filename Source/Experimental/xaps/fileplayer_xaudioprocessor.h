@@ -43,6 +43,8 @@ class FilePlayerProcessor : public XAPWithJuceGUI, public juce::Thread
     };
     choc::fifo::SingleReaderSingleWriterFIFO<FilePlayerMessage> messages_to_ui;
     choc::fifo::SingleReaderSingleWriterFIFO<FilePlayerMessage> messages_from_ui;
+    choc::fifo::SingleReaderSingleWriterFIFO<FilePlayerMessage> messages_to_io;
+    choc::fifo::SingleReaderSingleWriterFIFO<FilePlayerMessage> messages_from_io;
     juce::dsp::Gain<float> m_gain_proc;
     double m_volume = 0.0f;
     double m_volume_mod = 0.0f;
@@ -288,8 +290,7 @@ class FilePlayerProcessor : public XAPWithJuceGUI, public juce::Thread
             //     m_loop_end = aev->value;
         }
     }
-    choc::fifo::SingleReaderSingleWriterFIFO<FilePlayerMessage> messages_to_io;
-    choc::fifo::SingleReaderSingleWriterFIFO<FilePlayerMessage> messages_from_io;
+    
     void handleMessagesFromIO()
     {
         FilePlayerMessage msg;
@@ -298,11 +299,13 @@ class FilePlayerProcessor : public XAPWithJuceGUI, public juce::Thread
             if (msg.opcode == FilePlayerMessage::Opcode::FileChanged)
             {
                 m_file_sample_rate = m_temp_file_sample_rate;
+                // swapping AudioBuffers should be fast and not block
+                // but might need more investigation
                 // double t0 = juce::Time::getMillisecondCounterHiRes();
                 std::swap(m_file_temp_buf, m_file_buf);
                 // double t1 = juce::Time::getMillisecondCounterHiRes();
                 // DBG("swap took " << t1-t0 << " millisecons");
-                // the swap seems to be very fast
+                
                 FilePlayerMessage outmsg;
                 outmsg.opcode = FilePlayerMessage::Opcode::FileChanged;
                 outmsg.filename = msg.filename;

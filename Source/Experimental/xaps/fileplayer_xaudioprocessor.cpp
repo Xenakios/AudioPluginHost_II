@@ -12,7 +12,7 @@ class FilePlayerEditor : public juce::Component,
     void filenameComponentChanged(juce::FilenameComponent *fc) override
     {
         DBG(fc->getCurrentFile().getFullPathName());
-        file_to_change_to = fc->getCurrentFile().getFullPathName().toStdString();
+        std::string fn = fc->getCurrentFile().getFullPathName().toStdString();
         FilePlayerProcessor::FilePlayerMessage msg;
         msg.opcode = FilePlayerProcessor::FilePlayerMessage::Opcode::RequestFileChange;
         msg.filename = file_to_change_to;
@@ -150,6 +150,7 @@ class FilePlayerEditor : public juce::Component,
         g.setColour(juce::Colours::white);
         g.setFont(20);
         g.drawText(txt, 0, 0, getWidth(), m_wave_h, juce::Justification::topLeft);
+        
     }
 
   private:
