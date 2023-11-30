@@ -26,21 +26,18 @@ class FilePlayerEditor : public juce::Component,
           m_file_comp("", juce::File(), false, false, false, "*.wav", "", "Choose audio file")
     {
         juce::StringArray presetFiles;
-        presetFiles.add(R"(C:\MusicAudio\sourcesamples\_Fails_to_load.wav)");
         presetFiles.add(R"(C:\MusicAudio\sourcesamples\sheila.wav)");
         presetFiles.add(R"(C:\MusicAudio\sourcesamples\songs\chrono.wav)");
         presetFiles.add(R"(C:\MusicAudio\sourcesamples\there was a time .wav)");
+        presetFiles.add(R"(C:\MusicAudio\sourcesamples\_Fails_to_load.wav)");
         m_file_comp.setRecentlyUsedFilenames(presetFiles);
         m_afman.registerBasicFormats();
         m_thumb = std::make_unique<juce::AudioThumbnail>(128, m_afman, m_thumb_cache);
         m_thumb->addChangeListener(this);
-        addAndMakeVisible(m_load_but);
-        addAndMakeVisible(m_file_label);
+        
         addAndMakeVisible(m_file_comp);
         m_file_comp.addListener(this);
 
-        m_load_but.setButtonText("Load file...");
-        m_load_but.onClick = [this]() { showFileOpenDialog(); };
         for (int i = 0; i < m_proc->paramDescriptions.size(); ++i)
         {
             auto comp = std::make_unique<SliderAndLabel>(m_proc, m_proc->paramDescriptions[i]);
@@ -49,27 +46,6 @@ class FilePlayerEditor : public juce::Component,
             m_par_comps.push_back(std::move(comp));
         }
         startTimer(100);
-    }
-    // message to processor doesn't own the file name string so need to keep it alive here
-    std::string file_to_change_to;
-    void showFileOpenDialog()
-    {
-        m_file_chooser =
-            std::make_unique<juce::FileChooser>("Choose audio file", juce::File(), "*.wav", true);
-        m_file_chooser->launchAsync(
-            juce::FileBrowserComponent::FileChooserFlags::openMode |
-                juce::FileBrowserComponent::FileChooserFlags::canSelectFiles,
-            [this](const juce::FileChooser &chooser) {
-                if (chooser.getResult() != juce::File())
-                {
-                    // m_proc->importFile(chooser.getResult());
-                    file_to_change_to = chooser.getResult().getFullPathName().toStdString();
-                    FilePlayerProcessor::FilePlayerMessage msg;
-                    msg.opcode = FilePlayerProcessor::FilePlayerMessage::Opcode::RequestFileChange;
-                    msg.filename = file_to_change_to;
-                    m_proc->messages_from_ui.push(msg);
-                }
-            });
     }
     juce::String m_cur_file_text{"No file loaded"};
     double m_file_playpos = 0.0;
@@ -118,8 +94,6 @@ class FilePlayerEditor : public juce::Component,
     int m_wave_h = 148;
     void resized() override
     {
-        // m_load_but.setBounds(0, 150, 100, 25);
-        // m_file_label.setBounds(102, 150, 300, 25);
         m_file_comp.setBounds(0, 150, getWidth(), 25);
         if (m_par_comps.size() == 0)
             return;
@@ -161,9 +135,9 @@ class FilePlayerEditor : public juce::Component,
 
   private:
     FilePlayerProcessor *m_proc = nullptr;
-    juce::TextButton m_load_but;
+    
     juce::FilenameComponent m_file_comp;
-    juce::Label m_file_label;
+    
     class SliderAndLabel : public juce::Component
     {
       public:
@@ -257,6 +231,7 @@ void FilePlayerProcessor::handleMessagesFromUI()
     FilePlayerMessage msg;
     while (messages_from_ui.pop(msg))
     {
+        // the string needs to be empty so we don't have to deallocate in the audio thread
         jassert(msg.filename.empty());
         if (msg.opcode == FilePlayerMessage::Opcode::ParamChange)
         {
@@ -279,6 +254,7 @@ void FilePlayerProcessor::handleMessagesFromIO()
     FilePlayerMessage msg;
     while (messages_from_io.pop(msg))
     {
+        // the string needs to be empty so we don't have to deallocate in the audio thread
         jassert(msg.filename.empty());
         if (msg.opcode == FilePlayerMessage::Opcode::FileChanged)
         {
@@ -292,12 +268,7 @@ void FilePlayerProcessor::handleMessagesFromIO()
 
             
         }
-        if (msg.opcode == FilePlayerMessage::Opcode::FileLoadError)
-        {
-            FilePlayerMessage outmsg;
-            outmsg.opcode = FilePlayerMessage::Opcode::FileLoadError;
-            messages_to_ui.push(outmsg);
-        }
+        
     }
 }
 
