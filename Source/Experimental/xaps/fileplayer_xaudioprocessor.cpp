@@ -15,8 +15,9 @@ class FilePlayerEditor : public juce::Component,
         std::string fn = fc->getCurrentFile().getFullPathName().toStdString();
         FilePlayerProcessor::FilePlayerMessage msg;
         msg.opcode = FilePlayerProcessor::FilePlayerMessage::Opcode::RequestFileChange;
-        msg.filename = file_to_change_to;
-        m_proc->messages_from_ui.push(msg);
+        msg.filename = fn;
+        m_proc->messages_to_io.push(msg);
+        // m_proc->messages_from_ui.push(msg);
     }
     std::unique_ptr<juce::FileChooser> m_file_chooser;
     juce::AudioFormatManager m_afman;
@@ -73,9 +74,9 @@ class FilePlayerEditor : public juce::Component,
         {
             if (msg.opcode == FilePlayerProcessor::FilePlayerMessage::Opcode::FileChanged)
             {
-                if (msg.filename.data())
+                if (!msg.filename.empty())
                 {
-                    juce::File f(file_to_change_to);
+                    juce::File f(msg.filename);
                     m_cur_file_text = f.getFileName();
 
                     m_thumb->setSource(new juce::FileInputSource(f));
@@ -150,7 +151,6 @@ class FilePlayerEditor : public juce::Component,
         g.setColour(juce::Colours::white);
         g.setFont(20);
         g.drawText(txt, 0, 0, getWidth(), m_wave_h, juce::Justification::topLeft);
-        
     }
 
   private:
@@ -214,6 +214,7 @@ void FilePlayerProcessor::run()
                 stop = true;
                 break;
             }
+
             if (msg.opcode == FilePlayerMessage::Opcode::RequestFileChange)
             {
                 juce::String tempstring(msg.filename.data());
@@ -227,19 +228,70 @@ void FilePlayerProcessor::run()
                     currentfilename = afile.getFullPathName().toStdString();
                     FilePlayerMessage readymsg;
                     readymsg.opcode = FilePlayerMessage::Opcode::FileChanged;
-                    readymsg.filename = currentfilename;
                     messages_from_io.push(readymsg);
+                    readymsg.opcode = FilePlayerMessage::Opcode::FileChanged;
+                    readymsg.filename = msg.filename;
+                    messages_to_ui.push(readymsg);
                     delete reader;
                 }
                 else
                 {
                     FilePlayerMessage readymsg;
                     readymsg.opcode = FilePlayerMessage::Opcode::FileLoadError;
-                    messages_from_io.push(readymsg);
+                    messages_to_ui.push(readymsg);
                 }
             }
         }
         juce::Thread::sleep(50);
+    }
+}
+
+void FilePlayerProcessor::handleMessagesFromUI()
+{
+    FilePlayerMessage msg;
+    while (messages_from_ui.pop(msg))
+    {
+        jassert(msg.filename.empty());
+        if (msg.opcode == FilePlayerMessage::Opcode::ParamChange)
+        {
+            auto pev = xenakios::make_event_param_value(0, msg.parid, msg.value, nullptr);
+            handleEvent((const clap_event_header *)&pev, true);
+        }
+
+        if (msg.opcode == FilePlayerMessage::Opcode::FilePlayPosition)
+        {
+            if (m_file_buf.getNumSamples() > 0)
+            {
+                m_buf_playpos = msg.value * m_file_buf.getNumSamples();
+            }
+        }
+    }
+}
+
+void FilePlayerProcessor::handleMessagesFromIO()
+{
+    FilePlayerMessage msg;
+    while (messages_from_io.pop(msg))
+    {
+        jassert(msg.filename.empty());
+        if (msg.opcode == FilePlayerMessage::Opcode::FileChanged)
+        {
+            m_file_sample_rate = m_temp_file_sample_rate;
+            // swapping AudioBuffers should be fast and not block
+            // but might need more investigation
+            // double t0 = juce::Time::getMillisecondCounterHiRes();
+            std::swap(m_file_temp_buf, m_file_buf);
+            // double t1 = juce::Time::getMillisecondCounterHiRes();
+            // DBG("swap took " << t1-t0 << " millisecons");
+
+            
+        }
+        if (msg.opcode == FilePlayerMessage::Opcode::FileLoadError)
+        {
+            FilePlayerMessage outmsg;
+            outmsg.opcode = FilePlayerMessage::Opcode::FileLoadError;
+            messages_to_ui.push(outmsg);
+        }
     }
 }
 

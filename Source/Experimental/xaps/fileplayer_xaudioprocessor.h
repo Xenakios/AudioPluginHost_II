@@ -5,6 +5,7 @@
 #include "../xap_generic_editor.h"
 #include "../xap_utils.h"
 #include "../xapfactory.h"
+#include "containers/choc_SingleReaderMultipleWriterFIFO.h"
 
 class FilePlayerProcessor : public XAPWithJuceGUI, public juce::Thread
 {
@@ -39,9 +40,11 @@ class FilePlayerProcessor : public XAPWithJuceGUI, public juce::Thread
         clap_id parid = CLAP_INVALID_ID;
         double value = 0.0;
         bool gate = false;
-        std::string_view filename;
+        std::string filename;
     };
-    choc::fifo::SingleReaderSingleWriterFIFO<FilePlayerMessage> messages_to_ui;
+    // Note that this isn't *strictly* realtime safe since it uses a spinlock inside, 
+    // but we are not expecting lots of contention
+    choc::fifo::SingleReaderMultipleWriterFIFO<FilePlayerMessage> messages_to_ui;
     choc::fifo::SingleReaderSingleWriterFIFO<FilePlayerMessage> messages_from_ui;
     choc::fifo::SingleReaderSingleWriterFIFO<FilePlayerMessage> messages_to_io;
     choc::fifo::SingleReaderSingleWriterFIFO<FilePlayerMessage> messages_from_io;
@@ -291,60 +294,11 @@ class FilePlayerProcessor : public XAPWithJuceGUI, public juce::Thread
         }
     }
     
-    void handleMessagesFromIO()
-    {
-        FilePlayerMessage msg;
-        while (messages_from_io.pop(msg))
-        {
-            if (msg.opcode == FilePlayerMessage::Opcode::FileChanged)
-            {
-                m_file_sample_rate = m_temp_file_sample_rate;
-                // swapping AudioBuffers should be fast and not block
-                // but might need more investigation
-                // double t0 = juce::Time::getMillisecondCounterHiRes();
-                std::swap(m_file_temp_buf, m_file_buf);
-                // double t1 = juce::Time::getMillisecondCounterHiRes();
-                // DBG("swap took " << t1-t0 << " millisecons");
-                
-                FilePlayerMessage outmsg;
-                outmsg.opcode = FilePlayerMessage::Opcode::FileChanged;
-                outmsg.filename = msg.filename;
-                messages_to_ui.push(outmsg);
-            }
-            if (msg.opcode == FilePlayerMessage::Opcode::FileLoadError)
-            {
-                FilePlayerMessage outmsg;
-                outmsg.opcode = FilePlayerMessage::Opcode::FileLoadError;
-                messages_to_ui.push(outmsg);
-            }
-        }
-    }
+    void handleMessagesFromIO();
+    
     // must only be called from audio thread
-    void handleMessagesFromUI()
-    {
-        FilePlayerMessage msg;
-        while (messages_from_ui.pop(msg))
-        {
-            if (msg.opcode == FilePlayerMessage::Opcode::ParamChange)
-            {
-                auto pev = xenakios::make_event_param_value(0, msg.parid, msg.value, nullptr);
-                handleEvent((const clap_event_header *)&pev, true);
-            }
-            // ok, so this is tricky, we can't actually load and change the file
-            // in the audio thread, so offload to another thread
-            if (msg.opcode == FilePlayerMessage::Opcode::RequestFileChange)
-            {
-                messages_to_io.push(msg);
-            }
-            if (msg.opcode == FilePlayerMessage::Opcode::FilePlayPosition)
-            {
-                if (m_file_buf.getNumSamples() > 0)
-                {
-                    m_buf_playpos = msg.value * m_file_buf.getNumSamples();
-                }
-            }
-        }
-    }
+    void handleMessagesFromUI();
+    
     clap_process_status process(const clap_process *process) noexcept override;
 };
 static xenakios::RegisterXap reg_fileplayer{"File Player", "com.xenakios.fileplayer", []() {
