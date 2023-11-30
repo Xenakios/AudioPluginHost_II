@@ -25,6 +25,12 @@ class FilePlayerEditor : public juce::Component,
         : m_thumb_cache(100), m_proc(proc),
           m_file_comp("", juce::File(), false, false, false, "*.wav", "", "Choose audio file")
     {
+        juce::StringArray presetFiles;
+        presetFiles.add(R"(C:\MusicAudio\sourcesamples\_Fails_to_load.wav)");
+        presetFiles.add(R"(C:\MusicAudio\sourcesamples\sheila.wav)");
+        presetFiles.add(R"(C:\MusicAudio\sourcesamples\songs\chrono.wav)");
+        presetFiles.add(R"(C:\MusicAudio\sourcesamples\there was a time .wav)");
+        m_file_comp.setRecentlyUsedFilenames(presetFiles);
         m_afman.registerBasicFormats();
         m_thumb = std::make_unique<juce::AudioThumbnail>(128, m_afman, m_thumb_cache);
         m_thumb->addChangeListener(this);
