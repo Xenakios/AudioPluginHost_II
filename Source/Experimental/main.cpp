@@ -1618,8 +1618,25 @@ template <typename ContType> inline void test_keyvaluemap(int iters, std::string
     std::cout << accum << "\n";
 }
 
+void test_filter()
+{
+    juce::dsp::ProcessorDuplicator<juce::dsp::IIR::Filter<float>, dsp::IIR::Coefficients<float>> duplicator;
+    dsp::IIR::Filter<float> filt;
+    {
+        dsp::IIR::Coefficients<float>::Ptr newCoefficients;
+        newCoefficients = juce::dsp::IIR::Coefficients<float>::makePeakFilter(
+            44100, 2000.0, 1.0, Decibels::decibelsToGain(12.0));
+        std::cout << newCoefficients->getRawCoefficients() << "\n";
+        filt.coefficients = newCoefficients;
+        duplicator.state = newCoefficients;
+    }
+    
+    std::cout << duplicator.state->getRawCoefficients() << "\n";
+}
+
 int main()
 {
+    test_filter();
     // test_polym();
     // test_keyvaluemap<KeyValueTable<clap_id, clap_param_info>>(1000000, "custom kvmap");
     // test_keyvaluemap<std::unordered_map<clap_id, clap_param_info>>(1000000,

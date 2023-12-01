@@ -201,12 +201,40 @@ inline void test_moody()
         push_clap_event_to_fifo(fifo, &ev);
     }
     std::cout << "fifo has " << fifo.size_approx() << " bytes\n";
-    
+}
+
+struct GainOp
+{
+    float operator()(float input) { return input * gain; }
+    std::array<float, 2> operator()(std::array<float, 2> input)
+    {
+        input[0] *= gain;
+        input[1] *= gain;
+        return input;
+    }
+    float gain = 1.0f;
+};
+
+template <typename DspOP> inline float operator|(float x, DspOP &op) { return op(x); }
+template <typename DspOP> inline std::array<float, 2> operator|(std::array<float, 2> x, DspOP &op)
+{
+    return op(x);
+}
+
+inline void test_pipe()
+{
+    GainOp gain1;
+    gain1.gain = 2.0f;
+    GainOp gain2;
+    gain2.gain = 2.0;
+    auto output = std::array<float, 2>{1.0f, -1.0f} | gain1 | gain2;
+    std::cout << output[0] << " " << output[1] << "\n";
 }
 
 int main()
 {
-    test_moody();
+    test_pipe();
+    // test_moody();
     // test_auto();
     //  test_alt_event_list();
     //  test_span();

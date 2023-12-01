@@ -34,7 +34,7 @@ class FilePlayerEditor : public juce::Component,
         m_afman.registerBasicFormats();
         m_thumb = std::make_unique<juce::AudioThumbnail>(128, m_afman, m_thumb_cache);
         m_thumb->addChangeListener(this);
-        
+
         addAndMakeVisible(m_file_comp);
         m_file_comp.addListener(this);
 
@@ -49,6 +49,7 @@ class FilePlayerEditor : public juce::Component,
     }
     juce::String m_cur_file_text{"No file loaded"};
     double m_file_playpos = 0.0;
+    double m_offlineprogress = -1.0;
     void timerCallback() override
     {
         FilePlayerProcessor::FilePlayerMessage msg;
@@ -63,12 +64,18 @@ class FilePlayerEditor : public juce::Component,
 
                     m_thumb->setSource(new juce::FileInputSource(f));
                 }
-
+                m_offlineprogress = -1.0;
                 repaint();
             }
             if (msg.opcode == FilePlayerProcessor::FilePlayerMessage::Opcode::FileLoadError)
             {
+                m_offlineprogress = -1.0;
                 m_cur_file_text = "Error loading file";
+                repaint();
+            }
+            if (msg.opcode == FilePlayerProcessor::FilePlayerMessage::Opcode::OfflineProgress)
+            {
+                m_offlineprogress = msg.value;
                 repaint();
             }
             if (msg.opcode == FilePlayerProcessor::FilePlayerMessage::Opcode::FilePlayPosition)
@@ -128,6 +135,8 @@ class FilePlayerEditor : public juce::Component,
             if (m_proc->m_triggered_mode)
                 txt += " (Press mouse over waveform to play)";
         }
+        if (m_offlineprogress >= 0.0)
+            txt = "Processing " + juce::String(m_offlineprogress * 100, 1) + "%";
         g.setColour(juce::Colours::white);
         g.setFont(20);
         g.drawText(txt, 0, 0, getWidth(), m_wave_h, juce::Justification::topLeft);
@@ -135,9 +144,9 @@ class FilePlayerEditor : public juce::Component,
 
   private:
     FilePlayerProcessor *m_proc = nullptr;
-    
+
     juce::FilenameComponent m_file_comp;
-    
+
     class SliderAndLabel : public juce::Component
     {
       public:
@@ -204,7 +213,21 @@ void FilePlayerProcessor::run()
                 {
                     m_temp_file_sample_rate = reader->sampleRate;
                     m_file_temp_buf.setSize(2, reader->lengthInSamples);
-                    reader->read(&m_file_temp_buf, 0, reader->lengthInSamples, 0, true, true);
+                    int blocksize = 65536;
+                    int filepos = 0;
+                    FilePlayerMessage progressmsg;
+                    progressmsg.opcode = FilePlayerMessage::Opcode::OfflineProgress;
+                    while (filepos < reader->lengthInSamples)
+                    {
+                        int numtoread =
+                            std::min<int64_t>(blocksize, reader->lengthInSamples - filepos);
+                        reader->read(&m_file_temp_buf, filepos, numtoread, filepos, true, true);
+                        double progress = 1.0 / reader->lengthInSamples * filepos;
+                        progressmsg.value = progress;
+                        messages_to_ui.push(progressmsg);
+                        filepos += numtoread;
+                    }
+
                     currentfilename = afile.getFullPathName().toStdString();
                     FilePlayerMessage readymsg;
                     readymsg.opcode = FilePlayerMessage::Opcode::FileChanged;
@@ -265,10 +288,7 @@ void FilePlayerProcessor::handleMessagesFromIO()
             std::swap(m_file_temp_buf, m_file_buf);
             // double t1 = juce::Time::getMillisecondCounterHiRes();
             // DBG("swap took " << t1-t0 << " millisecons");
-
-            
         }
-        
     }
 }
 
