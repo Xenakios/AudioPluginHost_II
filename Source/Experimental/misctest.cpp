@@ -8,6 +8,8 @@
 #include <cassert>
 #include <random>
 #include "xap_utils.h"
+#include "concurrentqueue.h"
+#include <chrono>
 
 class object_t
 {
@@ -181,11 +183,33 @@ void baz(auto a, auto b) { std::cout << a << " " << b << " " << a + b << "\n"; }
 
 inline void test_auto() { baz(3, 2.5); }
 
+using FifoType = moodycamel::ConcurrentQueue<uint8_t>;
+
+template <typename EventType>
+inline void push_clap_event_to_fifo(FifoType &fifo, const EventType *ev)
+{
+    const uint8_t *ev_as_bytes = reinterpret_cast<const uint8_t *>(ev);
+    fifo.enqueue_bulk(ev_as_bytes, ev->header.size);
+}
+
+inline void test_moody()
+{
+    FifoType fifo{16384, 2, 1};
+    for (int i = 0; i < 8; ++i)
+    {
+        auto ev = xenakios::make_event_note(0, CLAP_EVENT_NOTE_ON, 0, 0, 60 + i, 0, 0.5);
+        push_clap_event_to_fifo(fifo, &ev);
+    }
+    std::cout << "fifo has " << fifo.size_approx() << " bytes\n";
+    
+}
+
 int main()
 {
-    test_auto();
-    // test_alt_event_list();
-    // test_span();
-    // test_polym();
+    test_moody();
+    // test_auto();
+    //  test_alt_event_list();
+    //  test_span();
+    //  test_polym();
     return 0;
 }

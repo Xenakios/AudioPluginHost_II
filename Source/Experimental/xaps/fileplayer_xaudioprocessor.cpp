@@ -175,7 +175,7 @@ class FilePlayerEditor : public juce::Component,
 bool FilePlayerProcessor::guiCreate(const char *api, bool isFloating) noexcept
 {
     m_editor = std::make_unique<FilePlayerEditor>(this);
-    m_editor->setSize(600, 500);
+    m_editor->setSize(1000, 350);
     return true;
 }
 

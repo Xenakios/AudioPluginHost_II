@@ -40,7 +40,7 @@ include_directories(
     libs/sst-basic-blocks/include
     libs/fmt/include
     libs/sst-jucegui/include
-
+    libs/concurrentqueue
 )
 
 juce_add_gui_app(AudioPluginHost2
