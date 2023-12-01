@@ -10,33 +10,7 @@
 #include "../xapwithjucegui.h"
 #include "text/choc_JSON.h"
 #include "../xapfactory.h"
-
-inline void insertToEndOfEventListFromFIFO(
-    choc::fifo::SingleReaderSingleWriterFIFO<xenakios::CrossThreadMessage> &source,
-    clap_input_events *processDestination, clap_output_events *outputList = nullptr)
-{
-    int lastpos = 0;
-    int lasteventindex = processDestination->size(processDestination) - 1;
-    if (lasteventindex > 0)
-    {
-        auto ev = processDestination->get(processDestination, lasteventindex);
-        lastpos = ev->time;
-    }
-
-    xenakios::CrossThreadMessage msg;
-    while (source.pop(msg))
-    {
-        if (msg.eventType == CLAP_EVENT_PARAM_VALUE)
-        {
-            auto pv = makeClapParameterValueEvent(lastpos, msg.paramId, msg.value);
-        }
-        else if (msg.eventType == CLAP_EVENT_PARAM_GESTURE_BEGIN ||
-                 msg.eventType == CLAP_EVENT_PARAM_GESTURE_END)
-        {
-            clap_event_param_gesture ge;
-        }
-    }
-}
+#include "../xap_extensions.h"
 
 class ToneProcessorTest : public XAPWithJuceGUI
 {
@@ -248,6 +222,11 @@ class XAPGain : public XAPWithJuceGUI
     bool activate(double sampleRate, uint32_t minFrameCount,
                   uint32_t maxFrameCount) noexcept override
     {
+        auto ext_test = static_cast<TestExtension*>(GetHostExtension("com.xenakios.xupic-test-extension"));
+        if (ext_test)
+        {
+            ext_test->SayHello();
+        }
         m_gain_proc.prepare({sampleRate, maxFrameCount, 2});
         m_gain_proc.setRampDurationSeconds(0.01);
         return true;

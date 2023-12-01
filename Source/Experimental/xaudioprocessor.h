@@ -25,6 +25,7 @@ class XAudioProcessor
     XAudioProcessor() {}
     virtual ~XAudioProcessor() {}
     virtual bool getDescriptor(clap_plugin_descriptor *desc) const { return false; }
+    std::function<void *(const char *)> GetHostExtension{[](const char *) { return nullptr; }};
     // would we ever have a reason to return false here...?
     virtual bool init() noexcept { return true; }
     // should perhaps be pure virtual

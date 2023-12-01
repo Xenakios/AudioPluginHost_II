@@ -21,6 +21,7 @@
 #include "text/choc_Files.h"
 #include "memory/choc_Base64.h"
 #include <fstream>
+#include "xap_extensions.h"
 
 class XAPPlayer : public juce::AudioIODeviceCallback
 {
@@ -879,14 +880,12 @@ class MainComponent : public juce::Component, public juce::Timer
     std::string pathprefix = R"(C:\Program Files\Common Files\)";
     void addNoteGeneratorTestNodes()
     {
-        auto logfunc = [this](clap_log_severity sev, const char *msg) {
-            DBG("Clap plugin logged at level " << sev << " : " << msg);
-        };
+        
         auto notegenid = m_graph->addProcessorAsNode(
             std::make_unique<ClapEventSequencerProcessor>(2), "Note Gen");
         auto surgeid = m_graph->addProcessorAsNode(
             std::make_unique<ClapPluginFormatProcessor>(
-                pathprefix + R"(CLAP\Surge Synth Team\Surge XT.clap)", 0, logfunc),
+                pathprefix + R"(CLAP\Surge Synth Team\Surge XT.clap)", 0),
             "Surge XT 1");
         auto vintageverbid = m_graph->addProcessorAsNode(
             std::make_unique<JucePluginWrapper>(
@@ -1084,6 +1083,7 @@ class MainComponent : public juce::Component, public juce::Timer
         std::ofstream outfile("C:/develop/AudioPluginHost_mk2/Source/Experimental/state.json");
         choc::json::writeAsJSON(outfile, root, true);
     }
+    TestExtension m_test_extension{m_log_ed};
     void loadState(juce::File file)
     {
         m_graph->outputNodeId = "Main";
@@ -1127,6 +1127,11 @@ class MainComponent : public juce::Component, public juce::Timer
                     auto uproc = xenakios::XapFactory::getInstance().createFromID(jprocid);
                     if (uproc)
                     {
+                        uproc->GetHostExtension = [this](const char *extid) -> void * {
+                            if (strcmp(extid, "com.xenakios.xupic-test-extension") == 0)
+                                return (void *)&m_test_extension;
+                            return nullptr;
+                        };
                         auto proc = uproc.get();
                         m_graph->addProcessorAsNode(std::move(uproc), jid, jidx);
                         DBG("Added " << m_graph->proc_nodes.back()->displayName
@@ -1620,7 +1625,8 @@ template <typename ContType> inline void test_keyvaluemap(int iters, std::string
 
 void test_filter()
 {
-    juce::dsp::ProcessorDuplicator<juce::dsp::IIR::Filter<float>, dsp::IIR::Coefficients<float>> duplicator;
+    juce::dsp::ProcessorDuplicator<juce::dsp::IIR::Filter<float>, dsp::IIR::Coefficients<float>>
+        duplicator;
     dsp::IIR::Filter<float> filt;
     {
         dsp::IIR::Coefficients<float>::Ptr newCoefficients;
@@ -1630,7 +1636,7 @@ void test_filter()
         filt.coefficients = newCoefficients;
         duplicator.state = newCoefficients;
     }
-    
+
     std::cout << duplicator.state->getRawCoefficients() << "\n";
 }
 

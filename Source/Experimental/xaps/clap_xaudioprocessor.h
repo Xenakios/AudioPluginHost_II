@@ -5,6 +5,7 @@
 #include "../xap_generic_editor.h"
 #include "containers/choc_SingleReaderSingleWriterFIFO.h"
 #include "../xap_utils.h"
+#include "../xap_extensions.h"
 
 class ClapPluginFormatProcessor : public xenakios::XAudioProcessor
 {
@@ -63,11 +64,10 @@ class ClapPluginFormatProcessor : public xenakios::XAudioProcessor
         m_processingStarted = false;
     }
     void restartPlugin() {}
-    using LoggerFunc = std::function<void(clap_log_severity, const char *)>;
-    LoggerFunc OnLogMessage;
-
-    ClapPluginFormatProcessor(std::string plugfilename, int plugindex, LoggerFunc logfunc = nullptr)
-        : m_plugdll(plugfilename), OnLogMessage(logfunc)
+    
+    TestExtension* m_host_ext_test = nullptr;
+    ClapPluginFormatProcessor(std::string plugfilename, int plugindex)
+        : m_plugdll(plugfilename)
     {
         auto get_extension_lambda = [](const struct clap_host *host,
                                        const char *eid) -> const void * {
@@ -89,8 +89,8 @@ class ClapPluginFormatProcessor : public xenakios::XAudioProcessor
                 ext_log.log = [](const clap_host_t *host_, clap_log_severity severity,
                                  const char *msg) {
                     auto claphost = (ClapPluginFormatProcessor *)host_->host_data;
-                    if (claphost->OnLogMessage)
-                        claphost->OnLogMessage(severity, msg);
+                    if (claphost->m_host_ext_test)
+                        claphost->m_host_ext_test->log(msg);
                 };
                 return &ext_log;
             }
@@ -219,6 +219,7 @@ class ClapPluginFormatProcessor : public xenakios::XAudioProcessor
     bool activate(double sampleRate, uint32_t minFrameCount,
                   uint32_t maxFrameCount) noexcept override
     {
+        m_host_ext_test = static_cast<TestExtension*>(GetHostExtension("com.xenakios.xupic-test-extension"));
         if (m_plug)
         {
             if (m_plug->activate(m_plug, sampleRate, minFrameCount, maxFrameCount))
