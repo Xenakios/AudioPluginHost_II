@@ -75,6 +75,7 @@ class FilePlayerEditor : public juce::Component,
             }
             if (msg.opcode == FilePlayerProcessor::FilePlayerMessage::Opcode::OfflineProgress)
             {
+                m_file_comp.setEnabled(false);
                 m_offlineprogress = msg.value;
                 repaint();
             }
@@ -96,6 +97,8 @@ class FilePlayerEditor : public juce::Component,
                 }
             }
         }
+        if (m_offlineprogress < 0.0)
+            m_file_comp.setEnabled(true);
     }
     bool m_triggered_mode = false;
     int m_wave_h = 148;
@@ -226,6 +229,8 @@ void FilePlayerProcessor::run()
                         progressmsg.value = progress;
                         messages_to_ui.push(progressmsg);
                         filepos += numtoread;
+                        // artificially slow down for testing
+                        // juce::Thread::sleep(10);
                     }
 
                     currentfilename = afile.getFullPathName().toStdString();
