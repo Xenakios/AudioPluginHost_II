@@ -65,7 +65,7 @@ class ClapPluginFormatProcessor : public xenakios::XAudioProcessor
     }
     void restartPlugin() {}
     
-    TestExtension* m_host_ext_test = nullptr;
+    IHostExtension* m_host_ext = nullptr;
     ClapPluginFormatProcessor(std::string plugfilename, int plugindex)
         : m_plugdll(plugfilename)
     {
@@ -89,8 +89,8 @@ class ClapPluginFormatProcessor : public xenakios::XAudioProcessor
                 ext_log.log = [](const clap_host_t *host_, clap_log_severity severity,
                                  const char *msg) {
                     auto claphost = (ClapPluginFormatProcessor *)host_->host_data;
-                    if (claphost->m_host_ext_test)
-                        claphost->m_host_ext_test->log(msg);
+                    if (claphost->m_host_ext)
+                        claphost->m_host_ext->log(msg);
                 };
                 return &ext_log;
             }
@@ -219,7 +219,7 @@ class ClapPluginFormatProcessor : public xenakios::XAudioProcessor
     bool activate(double sampleRate, uint32_t minFrameCount,
                   uint32_t maxFrameCount) noexcept override
     {
-        m_host_ext_test = static_cast<TestExtension*>(GetHostExtension("com.xenakios.xupic-test-extension"));
+        m_host_ext = static_cast<IHostExtension*>(GetHostExtension("com.xenakios.xupic-test-extension"));
         if (m_plug)
         {
             if (m_plug->activate(m_plug, sampleRate, minFrameCount, maxFrameCount))

@@ -416,7 +416,7 @@ class NodeGraphComponent : public juce::Component, public juce::Timer
     }
     void paint(juce::Graphics &g) override
     {
-        g.fillAll(juce::Colours::black);
+        g.fillAll(m_backgroundcolor);
         juce::Path connpath;
         connpath.preallocateSpace(16);
         for (auto &n : m_graph->proc_nodes)
@@ -656,6 +656,7 @@ class NodeGraphComponent : public juce::Component, public juce::Timer
         }
     }
     juce::String m_debug_text;
+    juce::Colour m_backgroundcolor{juce::Colours::black};
     void mouseDrag(const juce::MouseEvent &ev) override
     {
         if (m_dragging_node)
@@ -823,9 +824,16 @@ class MyContinuous : public sst::jucegui::data::Continuous
     std::string getLabel() const override { return "Test Parameter"; };
 };
 
-class MainComponent : public juce::Component, public juce::Timer
+class MainComponent : public juce::Component, public juce::Timer, public IHostExtension
 {
   public:
+    void SayHello() override { m_log_ed.insertTextAtCaret("Hello from extension"); }
+    void log(const char *msg) override { m_log_ed.insertTextAtCaret(msg); }
+    void setNodeCanvasProperty(int propIndex, juce::var v) override
+    {
+        if (propIndex == 0)
+            m_graph_component->m_backgroundcolor = juce::Colour{(uint32_t)(int)v};
+    }
     std::vector<std::unique_ptr<XapWindow>> m_xap_windows;
     juce::AudioDeviceManager m_aman;
     std::unique_ptr<XAPGraph> m_graph;
@@ -880,7 +888,7 @@ class MainComponent : public juce::Component, public juce::Timer
     std::string pathprefix = R"(C:\Program Files\Common Files\)";
     void addNoteGeneratorTestNodes()
     {
-        
+
         auto notegenid = m_graph->addProcessorAsNode(
             std::make_unique<ClapEventSequencerProcessor>(2), "Note Gen");
         auto surgeid = m_graph->addProcessorAsNode(
@@ -1083,7 +1091,7 @@ class MainComponent : public juce::Component, public juce::Timer
         std::ofstream outfile("C:/develop/AudioPluginHost_mk2/Source/Experimental/state.json");
         choc::json::writeAsJSON(outfile, root, true);
     }
-    TestExtension m_test_extension{m_log_ed};
+
     void loadState(juce::File file)
     {
         m_graph->outputNodeId = "Main";
@@ -1129,7 +1137,7 @@ class MainComponent : public juce::Component, public juce::Timer
                     {
                         uproc->GetHostExtension = [this](const char *extid) -> void * {
                             if (strcmp(extid, "com.xenakios.xupic-test-extension") == 0)
-                                return (void *)&m_test_extension;
+                                return (void *)(IHostExtension*)this;
                             return nullptr;
                         };
                         auto proc = uproc.get();

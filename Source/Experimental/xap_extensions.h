@@ -2,17 +2,12 @@
 
 #include "JuceHeader.h"
 
-class TestExtension
+class IHostExtension
 {
 public:
-    juce::TextEditor& m_ed;
-    TestExtension(juce::TextEditor& ed) : m_ed(ed) {}
-    void SayHello()
-    {
-        m_ed.insertTextAtCaret("Hello from TestExtension");
-    }
-    void log(const char* msg)
-    {
-        m_ed.insertTextAtCaret(msg);
-    }
+    virtual ~IHostExtension() {}
+    virtual void SayHello() = 0;
+    virtual void log(const char* msg) = 0;
+    virtual void setNodeCanvasProperty(int propIndex, juce::var v) = 0;
+    
 };

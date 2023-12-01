@@ -222,10 +222,12 @@ class XAPGain : public XAPWithJuceGUI
     bool activate(double sampleRate, uint32_t minFrameCount,
                   uint32_t maxFrameCount) noexcept override
     {
-        auto ext_test = static_cast<TestExtension*>(GetHostExtension("com.xenakios.xupic-test-extension"));
+        auto ext_test =
+            static_cast<IHostExtension *>(GetHostExtension("com.xenakios.xupic-test-extension"));
         if (ext_test)
         {
             ext_test->SayHello();
+            ext_test->setNodeCanvasProperty(0, (int)juce::Colours::salmon.getARGB());
         }
         m_gain_proc.prepare({sampleRate, maxFrameCount, 2});
         m_gain_proc.setRampDurationSeconds(0.01);
