@@ -16,6 +16,7 @@ class XapSlider : public juce::Component
     bool m_mousedown = false;
     double m_drag_start_pos = 0.0;
     ParamDesc m_pardesc;
+    bool m_is_bipolar = false;
 
   public:
     XapSlider(bool isHorizontal, ParamDesc pdesc) : m_pardesc(pdesc)
@@ -24,17 +25,34 @@ class XapSlider : public juce::Component
         m_default_value = m_value;
         m_min_value = pdesc.minVal;
         m_max_value = pdesc.maxVal;
+        if (m_min_value < 0.0)
+            m_is_bipolar = true;
         m_labeltxt = pdesc.name;
         m_modulation_amt = 0.0;
     }
     void paint(juce::Graphics &g) override
     {
         g.fillAll(juce::Colours::black);
-
-        double xcor = juce::jmap<double>(m_value, m_min_value, m_max_value, 2.0, getWidth() - 4.0);
         g.setColour(juce::Colours::darkgrey);
-        g.fillRect(2.0f, 0.0, xcor, getWidth() - 2.0);
+        double xforvalue =
+            juce::jmap<double>(m_value, m_min_value, m_max_value, 2.0, getWidth() - 4.0);
+        if (!m_is_bipolar)
+        {
+            // g.fillRect(2.0, 0.0, xforvalue, getHeight());
+        }
+        else
+        {
+            double xforzero =
+                juce::jmap<double>(0.0, m_min_value, m_max_value, 2.0, getWidth() - 4.0);
+
+            //if (xforvalue < xforzero)
+            //    g.fillRect(xforvalue, 0.0, xforzero - xforvalue, getHeight());
+            //else
+            //    g.fillRect(xforzero, 0.0, xforvalue - xforzero, getHeight());
+        }
+
         g.setColour(juce::Colours::lightgrey);
+        g.drawLine(xforvalue, 0.0, xforvalue, getHeight(), 3.0);
         g.drawRect(2, 0, getWidth() - 4, getHeight());
         g.setColour(juce::Colours::white);
         g.drawText(m_labeltxt, 5, 0, getWidth() - 10, getHeight(),
