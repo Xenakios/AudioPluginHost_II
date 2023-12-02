@@ -17,6 +17,7 @@ class XapSlider : public juce::Component
     double m_drag_start_pos = 0.0;
     ParamDesc m_pardesc;
     bool m_is_bipolar = false;
+    std::vector<double> m_snap_positions;
 
   public:
     XapSlider(bool isHorizontal, ParamDesc pdesc) : m_pardesc(pdesc)
@@ -29,6 +30,21 @@ class XapSlider : public juce::Component
             m_is_bipolar = true;
         m_labeltxt = pdesc.name;
         m_modulation_amt = 0.0;
+        m_snap_positions.resize(9);
+        for (int i = 0; i < 9; ++i)
+            m_snap_positions[i] = m_min_value + (m_max_value - m_min_value) / 8 * i;
+        setWantsKeyboardFocus(true);
+    }
+    bool keyPressed(const juce::KeyPress &key) override
+    {
+        auto c = key.getTextCharacter();
+        if (c >= '1' && c <= '9')
+        {
+            int slot = c - 49;
+            setValue(m_snap_positions[slot], true);
+            return true;
+        }
+        return false;
     }
     void paint(juce::Graphics &g) override
     {
@@ -45,14 +61,18 @@ class XapSlider : public juce::Component
             double xforzero =
                 juce::jmap<double>(0.0, m_min_value, m_max_value, 2.0, getWidth() - 4.0);
 
-            //if (xforvalue < xforzero)
-            //    g.fillRect(xforvalue, 0.0, xforzero - xforvalue, getHeight());
-            //else
-            //    g.fillRect(xforzero, 0.0, xforvalue - xforzero, getHeight());
+            // if (xforvalue < xforzero)
+            //     g.fillRect(xforvalue, 0.0, xforzero - xforvalue, getHeight());
+            // else
+            //     g.fillRect(xforzero, 0.0, xforvalue - xforzero, getHeight());
         }
-
+        if (hasKeyboardFocus(false))
+            g.setColour(juce::Colours::cyan);
+        else
+            g.setColour(juce::Colours::lightgrey);
+        double h = getHeight() - 4;
+        g.fillEllipse(xforvalue - h / 2, 2, h, h);
         g.setColour(juce::Colours::lightgrey);
-        g.drawLine(xforvalue, 0.0, xforvalue, getHeight(), 3.0);
         g.drawRect(2, 0, getWidth() - 4, getHeight());
         g.setColour(juce::Colours::white);
         g.drawText(m_labeltxt, 5, 0, getWidth() - 10, getHeight(),
@@ -64,9 +84,36 @@ class XapSlider : public juce::Component
                        juce::Justification::centredRight);
         }
     }
+    void mouseDoubleClick(const MouseEvent &event) override
+    {
+        m_value = m_default_value;
+        if (OnValueChanged)
+            OnValueChanged();
+        repaint();
+    }
     void mouseDown(const juce::MouseEvent &ev) override
     {
-        //
+        if (ev.mods.isRightButtonDown())
+        {
+            juce::PopupMenu menu;
+            juce::PopupMenu storemenu;
+            for (int i = 0; i < m_snap_positions.size(); ++i)
+            {
+                storemenu.addItem(juce::String(i),
+                                  [i, this]() { m_snap_positions[i] = getValue(); });
+            }
+            menu.addSubMenu("Store to", storemenu);
+            juce::PopupMenu loadmenu;
+            for (int i = 0; i < m_snap_positions.size(); ++i)
+            {
+                loadmenu.addItem(juce::String(i),
+                                 [i, this]() { setValue(m_snap_positions[i], true); });
+            }
+            menu.addSubMenu("Load from", loadmenu);
+            menu.showMenuAsync({});
+            return;
+        }
+
         m_drag_start_pos = m_value;
         repaint();
     }
@@ -89,9 +136,11 @@ class XapSlider : public juce::Component
         m_mousedown = false;
         repaint();
     }
-    void setValue(double v)
+    void setValue(double v, bool notify = false)
     {
         m_value = v;
+        if (notify && OnValueChanged)
+            OnValueChanged();
         repaint();
     }
     double getValue() { return m_value; }
