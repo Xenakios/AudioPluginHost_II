@@ -227,11 +227,12 @@ class XAPGain : public XAPWithJuceGUI
         if (ext_test)
         {
             ext_test->SayHello();
-            ext_test->setNodeCanvasProperty(0, (int)juce::Colours::salmon.getARGB());
+            // ext_test->setNodeCanvasProperty(0, (int)juce::Colours::salmon.getARGB());
         }
         m_gain_proc.prepare({sampleRate, maxFrameCount, 2});
         m_gain_proc.setRampDurationSeconds(0.01);
         return true;
+        
     }
     uint32_t paramsCount() const noexcept override { return m_param_infos.size(); }
     bool paramsInfo(uint32_t paramIndex, clap_param_info *info) const noexcept override

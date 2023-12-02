@@ -1097,6 +1097,7 @@ class MainComponent : public juce::Component, public juce::Timer, public IHostEx
         m_graph->outputNodeId = "Main";
         try
         {
+            
             auto jsontxt = choc::file::loadFileAsString(
                 "C:/develop/AudioPluginHost_mk2/Source/Experimental/state2.json");
             auto jroot = choc::json::parse(jsontxt);
@@ -1130,7 +1131,7 @@ class MainComponent : public juce::Component, public juce::Timer, public IHostEx
                         sink_node_id = jidx;
                         m_graph->outputNodeId = jid;
                     }
-
+                    
                     auto jprocid = jnodestate["procid"].toString();
                     auto uproc = xenakios::XapFactory::getInstance().createFromID(jprocid);
                     if (uproc)

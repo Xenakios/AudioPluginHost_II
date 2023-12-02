@@ -3,6 +3,115 @@
 #include "JuceHeader.h"
 #include "xap_utils.h"
 #include "containers/choc_NonAllocatingStableSort.h"
+#include "xapfactory.h"
+
+// utility that is used by the graph to receive and output audio
+// input is got via magical means, output will be available normally
+class IOProcessor : public xenakios::XAudioProcessor
+{
+    bool m_is_input = false;
+
+  public:
+    IOProcessor(bool isInput) : m_is_input(isInput) {}
+    bool getDescriptor(clap_plugin_descriptor *desc) const override
+    {
+        memset(desc, 0, sizeof(clap_plugin_descriptor));
+        if (m_is_input)
+            desc->name = "Audio Input";
+        else
+            desc->name = "Audio Output";
+        desc->vendor = "Xenakios";
+        desc->id = "org.xenakios.xupic.graph_io_input";
+        if (!m_is_input)
+            desc->id = "org.xenakios.xupic.graph_io_output";
+        return true;
+    }
+    uint32_t audioPortsCount(bool isInput) const noexcept override
+    {
+        if (!m_is_input && isInput)
+            return 1;
+        return 0;
+        if (m_is_input && isInput)
+            return 0;
+        if (m_is_input && !isInput)
+            return 1;
+        
+        return 0;
+    }
+    bool audioPortsInfo(uint32_t index, bool isInput,
+                        clap_audio_port_info *info) const noexcept override
+    {
+        info->channel_count = 2;
+        info->flags = 0;
+        if (!isInput)
+        {
+            info->id = 250;
+            strcpy_s(info->name, "IO output");
+        }
+        if (isInput)
+        {
+            info->id = 300;
+            strcpy_s(info->name, "IO input");
+        }
+        info->in_place_pair = false;
+        info->port_type = "";
+        return true;
+    }
+    int numChans = 2;
+    bool activate(double sampleRate, uint32_t minFrameCount,
+                  uint32_t maxFrameCount) noexcept override
+    {
+
+        m_ext_input_buffer.resize(numChans);
+        for (int i = 0; i < numChans; ++i)
+        {
+            m_ext_input_buffer[i].resize(maxFrameCount);
+        }
+        return true;
+    }
+    std::vector<std::vector<float>> m_ext_input_buffer;
+    clap_process_status process(const clap_process *process) noexcept override
+    {
+        // for safety, silence all output channels first
+        for (int i = 0; i < process->audio_outputs[0].channel_count; ++i)
+        {
+            for (int j = 0; j < process->frames_count; ++j)
+            {
+                process->audio_outputs[0].data32[i][j] = 0.0f;
+            }
+        }
+
+        // copy from external input buffer
+        if (m_is_input && process->audio_outputs[0].channel_count >= numChans)
+        {
+            for (int i = 0; i < numChans; ++i)
+            {
+                for (int j = 0; j < process->frames_count; ++j)
+                {
+                    process->audio_outputs[0].data32[i][j] = m_ext_input_buffer[i][j];
+                }
+            }
+        }
+        // just pass through
+        if (!m_is_input && process->audio_inputs[0].channel_count >= numChans)
+        {
+            for (int i = 0; i < numChans; ++i)
+            {
+                for (int j = 0; j < process->frames_count; ++j)
+                {
+                    process->audio_outputs[0].data32[i][j] = process->audio_inputs[0].data32[i][j];
+                }
+            }
+        }
+        return CLAP_PROCESS_CONTINUE;
+    }
+};
+
+static xenakios::RegisterXap reg_audio_in{"Audio input", "org.xenakios.xupic.graph_io_input",
+                                        []() { return std::make_unique<IOProcessor>(true); }};
+
+static xenakios::RegisterXap reg_audio_out{"Audio output", "org.xenakios.xupic.graph_io_output",
+                                        []() { return std::make_unique<IOProcessor>(false); }};
 
 class XAPNode
 {
@@ -458,7 +567,12 @@ class XAPGraph : public xenakios::XAudioProcessor
         // might need to allocate...
         proc_nodes.reserve(1024);
         runOrder.reserve(1024);
+        //m_graph->addProcessorAsNode(std::make_unique<IOProcessor>(true), "Audio Input", 100);
+        //    m_graph->addProcessorAsNode(std::make_unique<IOProcessor>(false), "Audio Output", 101);
+        
     }
+    std::unique_ptr<IOProcessor> m_input_processor;
+    std::unique_ptr<IOProcessor> m_output_processor;
     void updateRunOrder()
     {
         for (auto &n : proc_nodes)

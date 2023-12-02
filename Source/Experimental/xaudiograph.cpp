@@ -12,6 +12,10 @@ bool XAPGraph::activate(double sampleRate, uint32_t minFrameCount, uint32_t maxF
     double sr = sampleRate;
     m_sr = sampleRate;
     // std::cout << "**** GRAPH RUN ORDER ****\n";
+    for (auto &n : proc_nodes)
+    {
+        n->initAudioBuffersFromProcessorInfo(maxFrameCount);
+    }
     for (auto &n : runOrder)
     {
         n->processor->activate(sr, procbufsize, procbufsize);
