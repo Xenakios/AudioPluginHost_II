@@ -1,6 +1,9 @@
 #pragma once
 
 #include "JuceHeader.h"
+#include "sst/basic-blocks/params/ParamMetadata.h"
+
+using ParamDesc = sst::basic_blocks::params::ParamMetaData;
 
 class XapSlider : public juce::Component
 {
@@ -12,16 +15,16 @@ class XapSlider : public juce::Component
     juce::String m_labeltxt;
     bool m_mousedown = false;
     double m_drag_start_pos = 0.0;
+    ParamDesc m_pardesc;
 
   public:
-    XapSlider(juce::String label, bool isHorizontal, double minval, double maxval,
-              double defaultval)
+    XapSlider(bool isHorizontal, ParamDesc pdesc) : m_pardesc(pdesc)
     {
-        m_value = defaultval;
+        m_value = pdesc.defaultVal;
         m_default_value = m_value;
-        m_min_value = minval;
-        m_max_value = maxval;
-        m_labeltxt = label;
+        m_min_value = pdesc.minVal;
+        m_max_value = pdesc.maxVal;
+        m_labeltxt = pdesc.name;
         m_modulation_amt = 0.0;
     }
     void paint(juce::Graphics &g) override
@@ -36,8 +39,12 @@ class XapSlider : public juce::Component
         g.setColour(juce::Colours::white);
         g.drawText(m_labeltxt, 5, 0, getWidth() - 10, getHeight(),
                    juce::Justification::centredLeft);
-        g.drawText(juce::String(m_value), 5, 0, getWidth() - 10, getHeight(),
-                   juce::Justification::centredRight);
+        auto partext = m_pardesc.valueToString(m_value);
+        if (partext)
+        {
+            g.drawText(*partext, 5, 0, getWidth() - 10, getHeight(),
+                       juce::Justification::centredRight);
+        }
     }
     void mouseDown(const juce::MouseEvent &ev) override
     {
@@ -47,6 +54,12 @@ class XapSlider : public juce::Component
     }
     void mouseDrag(const juce::MouseEvent &ev) override
     {
+        m_value = juce::jmap<double>(ev.x, 2, getWidth() - 4, m_min_value, m_max_value);
+        m_value = juce::jlimit(m_min_value, m_max_value, m_value);
+        if (OnValueChanged)
+            OnValueChanged();
+        repaint();
+        return;
         double diff = juce::jmap<double>(ev.getDistanceFromDragStartX(), 2, getWidth() - 4,
                                          m_min_value, m_max_value);
         m_value = m_drag_start_pos + diff;
@@ -63,9 +76,11 @@ class XapSlider : public juce::Component
         m_value = v;
         repaint();
     }
+    double getValue() { return m_value; }
     void setModulationAmount(double amt)
     {
         m_modulation_amt = amt;
         repaint();
     }
+    std::function<void()> OnValueChanged;
 };

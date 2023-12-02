@@ -7,7 +7,6 @@ class FilePlayerEditor : public juce::Component,
                          public juce::ChangeListener
 {
   public:
-    XapSlider m_test_slider{"Test parameter", true, -12.0, 12.0, 0.0};
     void changeListenerCallback(juce::ChangeBroadcaster *source) override { repaint(); }
     juce::AudioThumbnailCache m_thumb_cache;
     std::unique_ptr<juce::AudioThumbnail> m_thumb;
@@ -37,15 +36,19 @@ class FilePlayerEditor : public juce::Component,
         m_thumb = std::make_unique<juce::AudioThumbnail>(128, m_afman, m_thumb_cache);
         m_thumb->addChangeListener(this);
 
-        addAndMakeVisible(m_test_slider);
-        m_test_slider.setValue(0.4);
-
         addAndMakeVisible(m_file_comp);
         m_file_comp.addListener(this);
 
         for (int i = 0; i < m_proc->paramDescriptions.size(); ++i)
         {
-            auto comp = std::make_unique<SliderAndLabel>(m_proc, m_proc->paramDescriptions[i]);
+            auto comp = std::make_unique<XapSlider>(true, m_proc->paramDescriptions[i]);
+            comp->OnValueChanged = [this, pslider = comp.get(), i]() {
+                FilePlayerProcessor::FilePlayerMessage msg;
+                msg.opcode = FilePlayerProcessor::FilePlayerMessage::Opcode::ParamChange;
+                msg.parid = (clap_id)m_proc->paramDescriptions[i].id;
+                msg.value = pslider->getValue();
+                m_proc->messages_from_ui.push(msg);
+            };
             addAndMakeVisible(comp.get());
             mapParToComponent[m_proc->paramDescriptions[i].id] = comp.get();
             m_par_comps.push_back(std::move(comp));
@@ -93,8 +96,8 @@ class FilePlayerEditor : public juce::Component,
             {
                 if (mapParToComponent.count(msg.parid))
                 {
-                    mapParToComponent[msg.parid]->slider.setValue(msg.value,
-                                                                  juce::dontSendNotification);
+                    mapParToComponent[msg.parid]->setValue(msg.value);
+
                     if (msg.parid == (clap_id)FilePlayerProcessor::ParamIds::TriggeredMode)
                     {
                         m_triggered_mode = msg.value;
@@ -112,12 +115,11 @@ class FilePlayerEditor : public juce::Component,
         m_file_comp.setBounds(0, 150, getWidth(), 25);
         if (m_par_comps.size() == 0)
             return;
-        int h = m_par_comps[0]->h;
+        int h = 25;
         for (int i = 0; i < m_par_comps.size(); ++i)
         {
-            m_par_comps[i]->setBounds(0, 175 + h * i, getWidth(), h);
+            m_par_comps[i]->setBounds(0, 175 + h * i, getWidth(), 22);
         }
-        m_test_slider.setBounds(0, m_par_comps.back()->getBottom()+1, getWidth(), 20);
     }
     void mouseDown(const juce::MouseEvent &ev) override
     {
@@ -156,38 +158,8 @@ class FilePlayerEditor : public juce::Component,
 
     juce::FilenameComponent m_file_comp;
 
-    class SliderAndLabel : public juce::Component
-    {
-      public:
-        clap_id param_id = 0;
-        SliderAndLabel(FilePlayerProcessor *proc, xenakios::ParamDesc &desc) : m_proc(proc)
-        {
-            param_id = desc.id;
-            addAndMakeVisible(slider);
-            slider.setRange(desc.minVal, desc.maxVal);
-            slider.onValueChange = [this]() {
-                FilePlayerProcessor::FilePlayerMessage msg;
-                msg.opcode = FilePlayerProcessor::FilePlayerMessage::Opcode::ParamChange;
-                msg.parid = param_id;
-                msg.value = slider.getValue();
-                m_proc->messages_from_ui.push(msg);
-            };
-            addAndMakeVisible(label);
-            label.setText(desc.name, juce::dontSendNotification);
-        }
-
-        void resized() override
-        {
-            label.setBounds(0, 0, getWidth() / 2, h);
-            slider.setBounds(label.getRight(), 0, getWidth() / 2, h);
-        }
-        int h = 25;
-        juce::Slider slider;
-        juce::Label label;
-        FilePlayerProcessor *m_proc = nullptr;
-    };
-    std::vector<std::unique_ptr<SliderAndLabel>> m_par_comps;
-    std::unordered_map<clap_id, SliderAndLabel *> mapParToComponent;
+    std::vector<std::unique_ptr<XapSlider>> m_par_comps;
+    std::unordered_map<clap_id, XapSlider *> mapParToComponent;
 };
 
 bool FilePlayerProcessor::guiCreate(const char *api, bool isFloating) noexcept
