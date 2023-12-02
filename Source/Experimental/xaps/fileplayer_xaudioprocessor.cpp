@@ -1,4 +1,5 @@
 #include "fileplayer_xaudioprocessor.h"
+#include "../xap_slider.h"
 
 class FilePlayerEditor : public juce::Component,
                          public juce::Timer,
@@ -6,6 +7,7 @@ class FilePlayerEditor : public juce::Component,
                          public juce::ChangeListener
 {
   public:
+    XapSlider m_test_slider{"Test parameter", true, -12.0, 12.0, 0.0};
     void changeListenerCallback(juce::ChangeBroadcaster *source) override { repaint(); }
     juce::AudioThumbnailCache m_thumb_cache;
     std::unique_ptr<juce::AudioThumbnail> m_thumb;
@@ -34,6 +36,9 @@ class FilePlayerEditor : public juce::Component,
         m_afman.registerBasicFormats();
         m_thumb = std::make_unique<juce::AudioThumbnail>(128, m_afman, m_thumb_cache);
         m_thumb->addChangeListener(this);
+
+        addAndMakeVisible(m_test_slider);
+        m_test_slider.setValue(0.4);
 
         addAndMakeVisible(m_file_comp);
         m_file_comp.addListener(this);
@@ -112,6 +117,7 @@ class FilePlayerEditor : public juce::Component,
         {
             m_par_comps[i]->setBounds(0, 175 + h * i, getWidth(), h);
         }
+        m_test_slider.setBounds(0, m_par_comps.back()->getBottom()+1, getWidth(), 20);
     }
     void mouseDown(const juce::MouseEvent &ev) override
     {
@@ -187,7 +193,7 @@ class FilePlayerEditor : public juce::Component,
 bool FilePlayerProcessor::guiCreate(const char *api, bool isFloating) noexcept
 {
     m_editor = std::make_unique<FilePlayerEditor>(this);
-    m_editor->setSize(1000, 350);
+    m_editor->setSize(1000, 400);
     return true;
 }
 
