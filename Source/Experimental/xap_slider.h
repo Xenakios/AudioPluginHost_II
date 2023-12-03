@@ -132,7 +132,7 @@ class XapSlider : public juce::Component
         if (partext)
         {
             g.drawText(*partext, 5, 0, getWidth() - 10, getHeight(),
-                       juce::Justification::centredRight);
+                       juce::Justification::centred);
         }
     }
     void mouseDoubleClick(const MouseEvent &event) override
