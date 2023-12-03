@@ -185,8 +185,8 @@ inline void test_graph_processor_realtime()
 inline void test_graph_processor_offline()
 {
     auto g = std::make_unique<XAPGraph>();
-    g->addProcessorAsNode(std::make_unique<ToneProcessorTest>(), "Tone 1");
-    g->addProcessorAsNode(std::make_unique<ToneProcessorTest>(), "Tone 2");
+    g->addProcessorAsNode(std::make_unique<XAPToneGenerator>(), "Tone 1");
+    g->addProcessorAsNode(std::make_unique<XAPToneGenerator>(), "Tone 2");
     g->addProcessorAsNode(std::make_unique<ClapPluginFormatProcessor>(
                               R"(C:\Program Files\Common Files\CLAP\Conduit.clap)", 3),
                           "Ring Mod");
@@ -219,13 +219,13 @@ inline void test_graph_processor_offline()
     g->activate(sr, blocksize, blocksize);
 
     g->findProcessor("Tone 1")->enqueueParameterChange(
-        xenakios::CrossThreadMessage().asParamChange(ToneProcessorTest::ParamIds::Pitch, 72.0));
+        xenakios::CrossThreadMessage().asParamChange(XAPToneGenerator::ParamIds::Pitch, 72.0));
     g->findProcessor("Tone 1")->enqueueParameterChange(
-        {(clap_id)ToneProcessorTest::ParamIds::Distortion, CLAP_EVENT_PARAM_VALUE, 0.1});
+        {(clap_id)XAPToneGenerator::ParamIds::Distortion, CLAP_EVENT_PARAM_VALUE, 0.1});
     g->findProcessor("Tone 2")->enqueueParameterChange(
-        {(clap_id)ToneProcessorTest::ParamIds::Pitch, CLAP_EVENT_PARAM_VALUE, 35.5});
+        {(clap_id)XAPToneGenerator::ParamIds::Pitch, CLAP_EVENT_PARAM_VALUE, 35.5});
     g->findProcessor("Tone 2")->enqueueParameterChange(
-        xenakios::CrossThreadMessage().asParamChange(ToneProcessorTest::ParamIds::Distortion, 0.0));
+        xenakios::CrossThreadMessage().asParamChange(XAPToneGenerator::ParamIds::Distortion, 0.0));
     // ids taken from Conduit source, 842 ring mod mix level, 712 other source is internal
     // osc/sidechain
     g->findNodeByName("Ring Mod")
@@ -957,16 +957,16 @@ class MainComponent : public juce::Component, public juce::Timer, public IHostEx
     }
     void addToneGeneratorTestNodes()
     {
-        m_graph->addProcessorAsNode(std::make_unique<ToneProcessorTest>(), "Tone 1");
+        m_graph->addProcessorAsNode(std::make_unique<XAPToneGenerator>(), "Tone 1");
         m_graph->addProcessorAsNode(std::make_unique<XAPGain>(), "Main");
         m_graph->addProcessorAsNode(std::make_unique<ModulatorSource>(1, 1.0), "LFO 1");
         m_graph->addProcessorAsNode(std::make_unique<ModulatorSource>(1, 4.0), "LFO 2");
         m_graph->connectAudio("Tone 1", 0, 0, "Main", 0, 0);
         m_graph->connectAudio("Tone 1", 0, 0, "Main", 0, 1);
         m_graph->connectModulationByNames("LFO 1", 0, "Tone 1",
-                                          (clap_id)ToneProcessorTest::ParamIds::Pitch, false, 6.0);
+                                          (clap_id)XAPToneGenerator::ParamIds::Pitch, false, 6.0);
         m_graph->connectModulationByNames("LFO 2", 0, "Tone 1",
-                                          (clap_id)ToneProcessorTest::ParamIds::Pitch, false, 1.0);
+                                          (clap_id)XAPToneGenerator::ParamIds::Pitch, false, 1.0);
         m_graph->outputNodeId = "Main";
     }
     MainComponent()

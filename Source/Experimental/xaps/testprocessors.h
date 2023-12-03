@@ -12,10 +12,10 @@
 #include "../xapfactory.h"
 #include "../xap_extensions.h"
 
-class ToneProcessorTest : public XAPWithJuceGUI
+class XAPToneGenerator : public XAPWithJuceGUI
 {
   public:
-    std::vector<clap_param_info> m_param_infos;
+    
     juce::dsp::Oscillator<float> m_osc;
     double m_pitch = 60.0;
     double m_pitch_mod = 0.0f;
@@ -28,16 +28,27 @@ class ToneProcessorTest : public XAPWithJuceGUI
 
     };
 
-    ToneProcessorTest()
+    XAPToneGenerator()
     {
         m_osc.initialise([](float x) { return std::sin(x); }, 1024);
-        m_param_infos.push_back(
-            makeParamInfo((clap_id)ParamIds::Pitch, "Pitch", 0.0, 127.0, 60.0,
-                          CLAP_PARAM_IS_AUTOMATABLE | CLAP_PARAM_IS_MODULATABLE));
+        paramDescriptions.push_back(
+            ParamDesc()
+                .withLinearScaleFormatting("semitones")
+                .withRange(0.0, 127.0)
+                .withDefault(60.0)
+                .withFlags(CLAP_PARAM_IS_AUTOMATABLE | CLAP_PARAM_IS_MODULATABLE)
+                .withName("Pitch")
+                .withID((clap_id)ParamIds::Pitch));
+        paramDescriptions.push_back(
+            ParamDesc()
+                .withRange(0.0, 1.0)
+                .withDefault(0.0)
+                .withLinearScaleFormatting("%", 100.0f)
+                .withFlags(CLAP_PARAM_IS_AUTOMATABLE | CLAP_PARAM_IS_MODULATABLE)
+                .withName("Distortion")
+                .withID((clap_id)ParamIds::Distortion));
 
-        m_param_infos.push_back(
-            makeParamInfo((clap_id)ParamIds::Distortion, "Distortion", 0.0, 1.0, 0.3,
-                          CLAP_PARAM_IS_AUTOMATABLE | CLAP_PARAM_IS_MODULATABLE));
+        
     }
     bool activate(double sampleRate, uint32_t minFrameCount,
                   uint32_t maxFrameCount) noexcept override
@@ -59,10 +70,13 @@ class ToneProcessorTest : public XAPWithJuceGUI
         desc->vendor = "Xenakios";
         return true;
     }
-    uint32_t paramsCount() const noexcept override { return m_param_infos.size(); }
+    uint32_t paramsCount() const noexcept override { return paramDescriptions.size(); }
     bool paramsInfo(uint32_t paramIndex, clap_param_info *info) const noexcept override
     {
-        *info = m_param_infos[paramIndex];
+        if (paramIndex >= paramDescriptions.size())
+            return false;
+        const auto &pd = paramDescriptions[paramIndex];
+        pd.template toClapParamInfo<CLAP_NAME_SIZE>(info);
         return true;
     }
     void handleEvent(const clap_event_header *ev)
@@ -167,14 +181,14 @@ class ToneProcessorTest : public XAPWithJuceGUI
     int m_mod_out_counter = 0;
 };
 
-static xenakios::RegisterXap reg_tonegen{"Tone Generator", "Internal",
-                                         []() { return std::make_unique<ToneProcessorTest>(); }};
+static xenakios::RegisterXap reg_tonegen{"Tone Generator", "com.xenakios.tonegenerator",
+                                         []() { return std::make_unique<XAPToneGenerator>(); }};
 
 class XAPGain : public XAPWithJuceGUI
 {
   public:
     juce::dsp::Gain<float> m_gain_proc;
-    double m_volume = 0.0f;
+    double m_volume = -6.0f;
     double m_volume_mod = 0.0f;
     enum class ParamIds
     {
@@ -188,7 +202,7 @@ class XAPGain : public XAPWithJuceGUI
             ParamDesc()
                 .asDecibel()
                 .withRange(-96.0, 12.0)
-                .withDefault(-12.0)
+                .withDefault(-6.0)
                 .withFlags(CLAP_PARAM_IS_AUTOMATABLE | CLAP_PARAM_IS_MODULATABLE)
                 .withName("Volume")
                 .withID((clap_id)ParamIds::Volume));
@@ -348,8 +362,7 @@ class XAPGain : public XAPWithJuceGUI
                 handleEvent((const clap_event_header *)&pev);
                 process->out_events->try_push(process->out_events,
                                               reinterpret_cast<const clap_event_header *>(&pev));
-                
-            }
+                        }
         }
         auto inEvents = process->in_events;
         for (int i = 0; i < inEvents->size(inEvents); ++i)
