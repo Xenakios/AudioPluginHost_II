@@ -97,6 +97,7 @@ class XapSlider : public juce::Component
 
         return false;
     }
+    juce::Font m_font;
     void paint(juce::Graphics &g) override
     {
         g.fillAll(juce::Colours::black);
@@ -126,6 +127,7 @@ class XapSlider : public juce::Component
         g.setColour(juce::Colours::lightgrey);
         g.drawRect(2, 0, getWidth() - 4, getHeight());
         g.setColour(juce::Colours::white);
+        g.setFont(m_font);
         g.drawText(m_labeltxt, 5, 0, getWidth() - 10, getHeight(),
                    juce::Justification::centredLeft);
         auto partext = m_pardesc.valueToString(m_value);

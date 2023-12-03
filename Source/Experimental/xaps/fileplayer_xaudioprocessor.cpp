@@ -22,10 +22,13 @@ class FilePlayerEditor : public juce::Component,
     }
     std::unique_ptr<juce::FileChooser> m_file_chooser;
     juce::AudioFormatManager m_afman;
+    juce::Font m_font;
     FilePlayerEditor(FilePlayerProcessor *proc)
         : m_thumb_cache(100), m_proc(proc),
           m_file_comp("", juce::File(), false, false, false, "*.wav", "", "Choose audio file")
     {
+        auto monospace = juce::Font::getDefaultMonospacedFontName();
+        m_font = juce::Font(monospace, 13.0f, juce::Font::plain);
         juce::StringArray presetFiles;
         presetFiles.add(R"(C:\MusicAudio\sourcesamples\sheila.wav)");
         presetFiles.add(R"(C:\MusicAudio\sourcesamples\songs\chrono.wav)");
@@ -42,6 +45,7 @@ class FilePlayerEditor : public juce::Component,
         for (int i = 0; i < m_proc->paramDescriptions.size(); ++i)
         {
             auto comp = std::make_unique<XapSlider>(true, m_proc->paramDescriptions[i]);
+            comp->m_font = m_font;
             comp->OnValueChanged = [this, pslider = comp.get(), i]() {
                 FilePlayerProcessor::FilePlayerMessage msg;
                 msg.opcode = FilePlayerProcessor::FilePlayerMessage::Opcode::ParamChange;
