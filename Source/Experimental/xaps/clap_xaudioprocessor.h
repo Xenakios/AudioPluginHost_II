@@ -59,15 +59,17 @@ class ClapPluginFormatProcessor : public xenakios::XAudioProcessor
         if (!m_plug)
             return;
         // error if stopProcessing called when already stopped?
-        jassert(m_processingStarted);
-        m_plug->stop_processing(m_plug);
-        m_processingStarted = false;
+        if (m_processingStarted)
+        {
+            // jassert(m_processingStarted);
+            m_plug->stop_processing(m_plug);
+            m_processingStarted = false;
+        }
     }
     void restartPlugin() {}
-    
-    IHostExtension* m_host_ext = nullptr;
-    ClapPluginFormatProcessor(std::string plugfilename, int plugindex)
-        : m_plugdll(plugfilename)
+
+    IHostExtension *m_host_ext = nullptr;
+    ClapPluginFormatProcessor(std::string plugfilename, int plugindex) : m_plugdll(plugfilename)
     {
         auto get_extension_lambda = [](const struct clap_host *host,
                                        const char *eid) -> const void * {
@@ -167,6 +169,28 @@ class ClapPluginFormatProcessor : public xenakios::XAudioProcessor
                     m_inited = true;
                     initParamsExtension();
                     initGUIExtension();
+                    if (!m_ext_gui && m_ext_params)
+                    {
+                        // create parameter infos for generic GUI
+                        auto numparams = m_ext_params->count(m_plug);
+                        paramDescriptions.reserve(numparams);
+                        for (int i = 0; i < numparams; ++i)
+                        {
+                            clap_param_info pinfo;
+                            if (m_ext_params->get_info(m_plug, i, &pinfo))
+                            {
+                                paramDescriptions.push_back(
+                                    ParamDesc()
+                                        .asFloat()
+                                        .withRange(pinfo.min_value, pinfo.max_value)
+                                        .withName(pinfo.name)
+                                        .withDefault(pinfo.default_value)
+                                        .withFlags(pinfo.flags)
+                                        .withLinearScaleFormatting("")
+                                        .withID(pinfo.id));
+                            }
+                        }
+                    }
                     m_from_generic_editor.reset(2048);
                 }
                 else
@@ -217,30 +241,8 @@ class ClapPluginFormatProcessor : public xenakios::XAudioProcessor
     }
 
     bool activate(double sampleRate, uint32_t minFrameCount,
-                  uint32_t maxFrameCount) noexcept override
-    {
-        m_host_ext = static_cast<IHostExtension*>(GetHostExtension("com.xenakios.xupic-test-extension"));
-        if (m_plug)
-        {
-            if (m_plug->activate(m_plug, sampleRate, minFrameCount, maxFrameCount))
-            {
+                  uint32_t maxFrameCount) noexcept override;
 
-                m_activated = true;
-                initParamsExtension();
-                m_ext_audio_ports =
-                    (clap_plugin_audio_ports *)m_plug->get_extension(m_plug, CLAP_EXT_AUDIO_PORTS);
-                m_ext_note_ports =
-                    (clap_plugin_note_ports *)m_plug->get_extension(m_plug, CLAP_EXT_NOTE_PORTS);
-                m_ext_state = (clap_plugin_state *)m_plug->get_extension(m_plug, CLAP_EXT_STATE);
-                m_ext_plugin_tail =
-                    (clap_plugin_tail *)m_plug->get_extension(m_plug, CLAP_EXT_TAIL);
-                m_ext_remote_controls = (clap_plugin_remote_controls *)m_plug->get_extension(
-                    m_plug, CLAP_EXT_REMOTE_CONTROLS);
-                return true;
-            }
-        }
-        return false;
-    }
     uint32_t tailGet() const noexcept override
     {
         if (!m_plug)
