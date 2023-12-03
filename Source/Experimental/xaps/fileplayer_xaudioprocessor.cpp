@@ -28,7 +28,7 @@ class FilePlayerEditor : public juce::Component,
           m_file_comp("", juce::File(), false, false, false, "*.wav", "", "Choose audio file")
     {
         auto monospace = juce::Font::getDefaultMonospacedFontName();
-        m_font = juce::Font(monospace, 13.0f, juce::Font::plain);
+        m_font = juce::Font(monospace, 13.0f, juce::Font::bold);
         juce::StringArray presetFiles;
         presetFiles.add(R"(C:\MusicAudio\sourcesamples\sheila.wav)");
         presetFiles.add(R"(C:\MusicAudio\sourcesamples\songs\chrono.wav)");
@@ -94,7 +94,7 @@ class FilePlayerEditor : public juce::Component,
             if (msg.opcode == FilePlayerProcessor::FilePlayerMessage::Opcode::FilePlayPosition)
             {
                 m_file_playpos = msg.value;
-                repaint();
+                repaint(0, 0, getWidth(), m_wave_h);
             }
             if (msg.opcode == FilePlayerProcessor::FilePlayerMessage::Opcode::ParamChange)
             {

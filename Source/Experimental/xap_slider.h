@@ -51,6 +51,7 @@ class XapSlider : public juce::Component
             juce::KeyPress(juce::KeyPress::rightKey, juce::ModifierKeys::shiftModifier, 0),
             m_param_step * 0.1);
         setWantsKeyboardFocus(true);
+        addChildComponent(m_ed);
     }
     void mouseWheelMove(const juce::MouseEvent &event,
                         const juce::MouseWheelDetails &wheel) override
@@ -64,7 +65,8 @@ class XapSlider : public juce::Component
         {
             if (event.mods.isCommandDown())
                 delta *= 2.0;
-            else delta *= 0.1;
+            else
+                delta *= 0.1;
         }
         setValue(m_value + delta, true);
     }
@@ -98,6 +100,9 @@ class XapSlider : public juce::Component
         return false;
     }
     juce::Font m_font;
+    juce::TextEditor m_ed;
+    void focusGained(juce::Component::FocusChangeType cause) override { repaint(); }
+    void focusLost(juce::Component::FocusChangeType cause) override { repaint(); }
     void paint(juce::Graphics &g) override
     {
         g.fillAll(juce::Colours::black);
@@ -133,8 +138,7 @@ class XapSlider : public juce::Component
         auto partext = m_pardesc.valueToString(m_value);
         if (partext)
         {
-            g.drawText(*partext, 5, 0, getWidth() - 10, getHeight(),
-                       juce::Justification::centred);
+            g.drawText(*partext, 5, 0, getWidth() - 10, getHeight(), juce::Justification::centred);
         }
     }
     void mouseDoubleClick(const MouseEvent &event) override
@@ -144,11 +148,32 @@ class XapSlider : public juce::Component
             OnValueChanged();
         repaint();
     }
+    void showTextEditor()
+    {
+        m_ed.setVisible(true);
+        m_ed.grabKeyboardFocus();
+        m_ed.setBounds(getWidth() / 2, 0, 80, getHeight());
+        auto txt = m_pardesc.valueToString(m_value);
+        if (txt)
+            m_ed.setText(*txt);
+        else
+            m_ed.setText(juce::String(m_value));
+        m_ed.selectAll();
+        m_ed.onReturnKey = [this]() {
+            std::string err;
+            auto v = m_pardesc.valueFromString(m_ed.getText().toStdString(), err);
+            if (v)
+                setValue(*v);
+            else DBG(err);
+            m_ed.setVisible(false);
+        };
+    }
     void mouseDown(const juce::MouseEvent &ev) override
     {
         if (ev.mods.isRightButtonDown())
         {
             juce::PopupMenu menu;
+            menu.addItem("Edit value...", [this]() { showTextEditor(); });
             juce::PopupMenu storemenu;
             for (int i = 0; i < m_snap_positions.size(); ++i)
             {
