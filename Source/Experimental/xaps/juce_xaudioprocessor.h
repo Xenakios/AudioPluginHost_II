@@ -88,8 +88,8 @@ class JucePluginWrapper : public xenakios::XAudioProcessor,
         clap_id parid = 0;
         for (auto &par : pars)
         {
-            auto pinfo = makeParamInfo(parid, par->getName(100).toStdString(), 0.0, 1.0, par->getDefaultValue(),
-                                       CLAP_PARAM_IS_AUTOMATABLE);
+            auto pinfo = makeParamInfo(parid, par->getName(100).toStdString(), 0.0, 1.0,
+                                       par->getDefaultValue(), CLAP_PARAM_IS_AUTOMATABLE);
             m_param_infos.push_back(pinfo);
             par->addListener(this);
             // std::cout << parid << "\t" << par->getName(100) << "\t" << par->getDefaultValue()
@@ -400,7 +400,17 @@ class JucePluginWrapper : public xenakios::XAudioProcessor,
         *height = m_editor->getHeight();
         return true;
     }
-    // virtual bool guiCanResize() const noexcept { return false; }
+    bool guiCanResize() const noexcept override
+    {
+        if (!m_editor)
+            return false;
+        auto ape = dynamic_cast<juce::AudioProcessorEditor *>(m_editor);
+        if (ape)
+        {
+            return ape->isResizable();
+        }
+        return true;
+    }
     // virtual bool guiGetResizeHints(clap_gui_resize_hints_t *hints) noexcept { return false; }
     // virtual bool guiAdjustSize(uint32_t *width, uint32_t *height) noexcept
     //{

@@ -290,14 +290,15 @@ struct PluginContentComponent : public juce::Component
     }
     void resized() override
     {
-        auto m_test_proc = &m_proc;
         uint32_t w = 0;
         uint32_t h = 0;
-        m_test_proc->guiGetSize(&w, &h);
+        m_proc.guiGetSize(&w, &h);
         infoLabel.setBounds(0, getHeight() - m_info_area_margin, getWidth(), m_info_area_margin);
 
-        if (!m_plugin_requested_resize && m_test_proc->guiCanResize())
-            m_test_proc->guiSetSize(getWidth(), getHeight() - m_info_area_margin);
+        if (!m_plugin_requested_resize && m_proc.guiCanResize())
+        {
+            m_proc.guiSetSize(getWidth(), getHeight() - m_info_area_margin);
+        }
     }
 
     int m_info_area_margin = 25;
@@ -1097,7 +1098,7 @@ class MainComponent : public juce::Component, public juce::Timer, public IHostEx
         m_graph->outputNodeId = "Main";
         try
         {
-            
+
             auto jsontxt = choc::file::loadFileAsString(
                 "C:/develop/AudioPluginHost_mk2/Source/Experimental/state2.json");
             auto jroot = choc::json::parse(jsontxt);
@@ -1131,14 +1132,14 @@ class MainComponent : public juce::Component, public juce::Timer, public IHostEx
                         sink_node_id = jidx;
                         m_graph->outputNodeId = jid;
                     }
-                    
+
                     auto jprocid = jnodestate["procid"].toString();
                     auto uproc = xenakios::XapFactory::getInstance().createFromID(jprocid);
                     if (uproc)
                     {
                         uproc->GetHostExtension = [this](const char *extid) -> void * {
                             if (strcmp(extid, "com.xenakios.xupic-test-extension") == 0)
-                                return (void *)(IHostExtension*)this;
+                                return (void *)(IHostExtension *)this;
                             return nullptr;
                         };
                         auto proc = uproc.get();
