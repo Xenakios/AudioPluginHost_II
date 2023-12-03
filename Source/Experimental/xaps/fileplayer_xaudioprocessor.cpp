@@ -115,10 +115,10 @@ class FilePlayerEditor : public juce::Component,
         m_file_comp.setBounds(0, 150, getWidth(), 25);
         if (m_par_comps.size() == 0)
             return;
-        int h = 25;
+        int h = 35;
         for (int i = 0; i < m_par_comps.size(); ++i)
         {
-            m_par_comps[i]->setBounds(0, 175 + h * i, getWidth(), 22);
+            m_par_comps[i]->setBounds(5, 175 + h * i, getWidth() - 10, 30);
         }
     }
     void mouseDown(const juce::MouseEvent &ev) override
@@ -165,7 +165,7 @@ class FilePlayerEditor : public juce::Component,
 bool FilePlayerProcessor::guiCreate(const char *api, bool isFloating) noexcept
 {
     m_editor = std::make_unique<FilePlayerEditor>(this);
-    m_editor->setSize(1000, 400);
+    m_editor->setSize(1000, 500);
     return true;
 }
 

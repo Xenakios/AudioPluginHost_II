@@ -110,6 +110,7 @@ class FilePlayerProcessor : public XAPWithJuceGUI, public juce::Thread
                 .withRange(-3.0f, 2.0f)
                 .withDefault(0.0)
                 .withATwoToTheBFormatting(1, 1, "x")
+                .withDecimalPlaces(3)
                 .withFlags(CLAP_PARAM_IS_AUTOMATABLE | CLAP_PARAM_IS_MODULATABLE)
                 .withName("Playrate")
                 .withID((clap_id)ParamIds::Playrate));

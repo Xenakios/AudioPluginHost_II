@@ -18,7 +18,7 @@ class XapSlider : public juce::Component
     ParamDesc m_pardesc;
     bool m_is_bipolar = false;
     std::vector<double> m_snap_positions;
-
+    std::vector<std::pair<juce::KeyPress, double>> keypress_to_step;
   public:
     XapSlider(bool isHorizontal, ParamDesc pdesc) : m_pardesc(pdesc)
     {
@@ -33,17 +33,48 @@ class XapSlider : public juce::Component
         m_snap_positions.resize(9);
         for (int i = 0; i < 9; ++i)
             m_snap_positions[i] = m_min_value + (m_max_value - m_min_value) / 8 * i;
+        double step = (m_max_value - m_min_value) / 50;
+        if (m_pardesc.type == ParamDesc::BOOL)
+            step = 1;
+        keypress_to_step.emplace_back(
+            juce::KeyPress(juce::KeyPress::leftKey, juce::ModifierKeys::noModifiers, 0), -step);
+        keypress_to_step.emplace_back(
+            juce::KeyPress(juce::KeyPress::rightKey, juce::ModifierKeys::noModifiers, 0), step);
+        keypress_to_step.emplace_back(
+            juce::KeyPress(juce::KeyPress::leftKey, juce::ModifierKeys::shiftModifier, 0),
+            -step * 0.1);
+        keypress_to_step.emplace_back(
+            juce::KeyPress(juce::KeyPress::rightKey, juce::ModifierKeys::shiftModifier, 0),
+            step * 0.1);
         setWantsKeyboardFocus(true);
     }
     bool keyPressed(const juce::KeyPress &key) override
     {
         auto c = key.getTextCharacter();
+        std::optional<double> val;
         if (c >= '1' && c <= '9')
         {
             int slot = c - 49;
-            setValue(m_snap_positions[slot], true);
+            val = m_snap_positions[slot];
+        }
+        if (c == '0')
+            val = m_default_value;
+        if (val)
+        {
+            setValue(*val, true);
             return true;
         }
+        
+        for (auto &e : keypress_to_step)
+        {
+            if (e.first == key)
+            {
+                double val = m_value + e.second;
+                setValue(val, true);
+                return true;
+            }
+        }
+
         return false;
     }
     void paint(juce::Graphics &g) override
@@ -138,7 +169,9 @@ class XapSlider : public juce::Component
     }
     void setValue(double v, bool notify = false)
     {
-        m_value = v;
+        if (v == m_value)
+            return;
+        m_value = juce::jlimit(m_min_value, m_max_value, v);
         if (notify && OnValueChanged)
             OnValueChanged();
         repaint();
