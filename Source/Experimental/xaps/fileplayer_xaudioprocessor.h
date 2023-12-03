@@ -43,7 +43,7 @@ class FilePlayerProcessor : public XAPWithJuceGUI, public juce::Thread
         bool gate = false;
         std::string filename;
     };
-    // Note that this isn't *strictly* realtime safe since it uses a spinlock inside, 
+    // Note that this isn't *strictly* realtime safe since it uses a spinlock inside,
     // but we are not expecting lots of contention
     choc::fifo::SingleReaderMultipleWriterFIFO<FilePlayerMessage> messages_to_ui;
     choc::fifo::SingleReaderSingleWriterFIFO<FilePlayerMessage> messages_from_ui;
@@ -137,7 +137,7 @@ class FilePlayerProcessor : public XAPWithJuceGUI, public juce::Thread
                 .asFloat()
                 .withRange(0.0f, 1.0f)
                 .withDefault(0.0)
-                .withLinearScaleFormatting("%")
+                .withLinearScaleFormatting("%", 100.0f)
                 .withFlags(CLAP_PARAM_IS_AUTOMATABLE | CLAP_PARAM_IS_MODULATABLE)
                 .withName("Loop start")
                 .withID((clap_id)ParamIds::LoopStart));
@@ -146,7 +146,7 @@ class FilePlayerProcessor : public XAPWithJuceGUI, public juce::Thread
                 .asFloat()
                 .withRange(0.0f, 1.0f)
                 .withDefault(1.0)
-                .withLinearScaleFormatting("%")
+                .withLinearScaleFormatting("%", 100.0f)
                 .withFlags(CLAP_PARAM_IS_AUTOMATABLE | CLAP_PARAM_IS_MODULATABLE)
                 .withName("Loop end")
                 .withID((clap_id)ParamIds::LoopEnd));
@@ -161,7 +161,7 @@ class FilePlayerProcessor : public XAPWithJuceGUI, public juce::Thread
         messages_from_ui.reset(256);
         messages_to_io.reset(8);
         messages_from_io.reset(8);
-        
+
         for (auto &pd : paramDescriptions)
         {
             FilePlayerMessage msg;
@@ -278,7 +278,6 @@ class FilePlayerProcessor : public XAPWithJuceGUI, public juce::Thread
                 m_triggered_mode = aev->value >= 0.5;
                 m_trigger_active = false;
             }
-                
         }
         if (ev->type == CLAP_EVENT_PARAM_MOD)
         {
@@ -295,12 +294,12 @@ class FilePlayerProcessor : public XAPWithJuceGUI, public juce::Thread
             //     m_loop_end = aev->value;
         }
     }
-    
+
     void handleMessagesFromIO();
-    
+
     // must only be called from audio thread
     void handleMessagesFromUI();
-    
+
     clap_process_status process(const clap_process *process) noexcept override;
 };
 static xenakios::RegisterXap reg_fileplayer{"File Player", "com.xenakios.fileplayer", []() {

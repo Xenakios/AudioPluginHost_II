@@ -173,7 +173,6 @@ static xenakios::RegisterXap reg_tonegen{"Tone Generator", "Internal",
 class XAPGain : public XAPWithJuceGUI
 {
   public:
-    std::vector<clap_param_info> m_param_infos;
     juce::dsp::Gain<float> m_gain_proc;
     double m_volume = 0.0f;
     double m_volume_mod = 0.0f;
@@ -182,13 +181,25 @@ class XAPGain : public XAPWithJuceGUI
         Volume = 42,
         Smoothing = 666
     };
+    using ParamDesc = xenakios::ParamDesc;
     XAPGain()
     {
-        m_param_infos.push_back(
-            makeParamInfo((clap_id)ParamIds::Volume, "Gain", -96.0, 0.0, -12.0,
-                          CLAP_PARAM_IS_AUTOMATABLE | CLAP_PARAM_IS_MODULATABLE));
-        m_param_infos.push_back(makeParamInfo((clap_id)ParamIds::Smoothing, "Smoothing length", 0.0,
-                                              1.0, 0.02, CLAP_PARAM_IS_AUTOMATABLE));
+        paramDescriptions.push_back(
+            ParamDesc()
+                .asDecibel()
+                .withRange(-96.0, 12.0)
+                .withDefault(-12.0)
+                .withFlags(CLAP_PARAM_IS_AUTOMATABLE | CLAP_PARAM_IS_MODULATABLE)
+                .withName("Volume")
+                .withID((clap_id)ParamIds::Volume));
+        paramDescriptions.push_back(ParamDesc()
+                                        .asDecibel()
+                                        .withRange(0.0, 1.0)
+                                        .withDefault(0.02)
+                                        .withFlags(CLAP_PARAM_IS_AUTOMATABLE)
+                                        .withName("Smoothing length")
+                                        .withUnit("seconds")
+                                        .withID((clap_id)ParamIds::Smoothing));
     }
     bool getDescriptor(clap_plugin_descriptor *desc) const override
     {
@@ -232,12 +243,14 @@ class XAPGain : public XAPWithJuceGUI
         m_gain_proc.prepare({sampleRate, maxFrameCount, 2});
         m_gain_proc.setRampDurationSeconds(0.01);
         return true;
-        
     }
-    uint32_t paramsCount() const noexcept override { return m_param_infos.size(); }
+    uint32_t paramsCount() const noexcept override { return paramDescriptions.size(); }
     bool paramsInfo(uint32_t paramIndex, clap_param_info *info) const noexcept override
     {
-        *info = m_param_infos[paramIndex];
+        if (paramIndex >= paramDescriptions.size())
+            return false;
+        const auto &pd = paramDescriptions[paramIndex];
+        pd.template toClapParamInfo<CLAP_NAME_SIZE>(info);
         return true;
     }
     void handleEvent(const clap_event_header *ev)
@@ -333,8 +346,9 @@ class XAPGain : public XAPWithJuceGUI
             {
                 auto pev = makeClapParameterValueEvent(0, msg.paramId, msg.value);
                 handleEvent((const clap_event_header *)&pev);
-                // should also add these into output events, but since we don't
-                // have automation recording yet in the host...
+                process->out_events->try_push(process->out_events,
+                                              reinterpret_cast<const clap_event_header *>(&pev));
+                
             }
         }
         auto inEvents = process->in_events;

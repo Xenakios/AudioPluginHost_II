@@ -428,8 +428,10 @@ class NodeGraphComponent : public juce::Component, public juce::Timer
             if (n->isActiveInGraph)
             {
                 g.setColour(juce::Colours::darkorange);
-                g.fillRect(nodebounds.getX(), nodebounds.getY(), 10, 10);
             }
+            else
+                g.setColour(juce::Colours::darkred);
+            g.fillRect(nodebounds.getX(), nodebounds.getY() + nodebounds.getHeight() / 2, 10, 10);
             g.setColour(juce::Colours::white);
             g.drawText(n->processorName, nodebounds, juce::Justification::centred);
             g.setColour(juce::Colours::green);
