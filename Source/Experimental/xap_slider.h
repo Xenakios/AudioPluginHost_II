@@ -19,6 +19,8 @@ class XapSlider : public juce::Component
     bool m_is_bipolar = false;
     std::vector<double> m_snap_positions;
     std::vector<std::pair<juce::KeyPress, double>> keypress_to_step;
+    double m_param_step = 0.0;
+
   public:
     XapSlider(bool isHorizontal, ParamDesc pdesc) : m_pardesc(pdesc)
     {
@@ -33,20 +35,38 @@ class XapSlider : public juce::Component
         m_snap_positions.resize(9);
         for (int i = 0; i < 9; ++i)
             m_snap_positions[i] = m_min_value + (m_max_value - m_min_value) / 8 * i;
-        double step = (m_max_value - m_min_value) / 50;
+        m_param_step = (m_max_value - m_min_value) / 50;
         if (m_pardesc.type == ParamDesc::BOOL)
-            step = 1;
+            m_param_step = 1;
         keypress_to_step.emplace_back(
-            juce::KeyPress(juce::KeyPress::leftKey, juce::ModifierKeys::noModifiers, 0), -step);
+            juce::KeyPress(juce::KeyPress::leftKey, juce::ModifierKeys::noModifiers, 0),
+            -m_param_step);
         keypress_to_step.emplace_back(
-            juce::KeyPress(juce::KeyPress::rightKey, juce::ModifierKeys::noModifiers, 0), step);
+            juce::KeyPress(juce::KeyPress::rightKey, juce::ModifierKeys::noModifiers, 0),
+            m_param_step);
         keypress_to_step.emplace_back(
             juce::KeyPress(juce::KeyPress::leftKey, juce::ModifierKeys::shiftModifier, 0),
-            -step * 0.1);
+            -m_param_step * 0.1);
         keypress_to_step.emplace_back(
             juce::KeyPress(juce::KeyPress::rightKey, juce::ModifierKeys::shiftModifier, 0),
-            step * 0.1);
+            m_param_step * 0.1);
         setWantsKeyboardFocus(true);
+    }
+    void mouseWheelMove(const juce::MouseEvent &event,
+                        const juce::MouseWheelDetails &wheel) override
+    {
+        double delta = 0.0;
+        if (wheel.deltaY < 0)
+            delta = -m_param_step;
+        else
+            delta = m_param_step;
+        if (event.mods.isShiftDown())
+        {
+            if (event.mods.isCommandDown())
+                delta *= 2.0;
+            else delta *= 0.1;
+        }
+        setValue(m_value + delta, true);
     }
     bool keyPressed(const juce::KeyPress &key) override
     {
@@ -64,7 +84,7 @@ class XapSlider : public juce::Component
             setValue(*val, true);
             return true;
         }
-        
+
         for (auto &e : keypress_to_step)
         {
             if (e.first == key)
