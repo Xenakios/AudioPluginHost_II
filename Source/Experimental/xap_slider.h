@@ -108,8 +108,10 @@ class XapSlider : public juce::Component
         g.fillAll(juce::Colours::black);
         g.setColour(juce::Colours::darkgrey);
         g.setFont(m_font);
+        g.setFont(getHeight() * 0.5);
         if (!m_err_msg.isEmpty())
         {
+
             g.setColour(juce::Colours::red);
             g.drawText(m_err_msg, 0, 0, getWidth(), getHeight(), juce::Justification::centred);
             return;
@@ -171,7 +173,7 @@ class XapSlider : public juce::Component
             auto v = m_pardesc.valueFromString(m_ed.getText().toStdString(), err);
             if (v)
             {
-                setValue(*v);
+                setValue(*v, true);
             }
             else
             {
