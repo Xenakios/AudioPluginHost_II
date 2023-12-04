@@ -147,7 +147,7 @@ class XapSlider : public juce::Component
         auto partext = m_pardesc.valueToString(m_value);
         if (partext)
         {
-            g.drawText(*partext, 5, 0, getWidth() - 10, getHeight(), juce::Justification::centred);
+            g.drawText(*partext, 5, 0, getWidth() - 10, getHeight(), juce::Justification::centredRight);
         }
     }
     void mouseDoubleClick(const MouseEvent &event) override
@@ -179,7 +179,7 @@ class XapSlider : public juce::Component
             {
                 m_err_msg = err;
                 repaint();
-                juce::Timer::callAfterDelay(2000, [this]() {
+                juce::Timer::callAfterDelay(3000, [this]() {
                     m_err_msg = "";
                     repaint();
                 });
