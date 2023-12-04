@@ -107,6 +107,13 @@ class XapSlider : public juce::Component
     {
         g.fillAll(juce::Colours::black);
         g.setColour(juce::Colours::darkgrey);
+        g.setFont(m_font);
+        if (!m_err_msg.isEmpty())
+        {
+            g.setColour(juce::Colours::red);
+            g.drawText(m_err_msg, 0, 0, getWidth(), getHeight(), juce::Justification::centred);
+            return;
+        }
         double xforvalue =
             juce::jmap<double>(m_value, m_min_value, m_max_value, 2.0, getWidth() - 4.0);
         if (!m_is_bipolar)
@@ -132,7 +139,7 @@ class XapSlider : public juce::Component
         g.setColour(juce::Colours::lightgrey);
         g.drawRect(2, 0, getWidth() - 4, getHeight());
         g.setColour(juce::Colours::white);
-        g.setFont(m_font);
+
         g.drawText(m_labeltxt, 5, 0, getWidth() - 10, getHeight(),
                    juce::Justification::centredLeft);
         auto partext = m_pardesc.valueToString(m_value);
@@ -163,11 +170,22 @@ class XapSlider : public juce::Component
             std::string err;
             auto v = m_pardesc.valueFromString(m_ed.getText().toStdString(), err);
             if (v)
+            {
                 setValue(*v);
-            else DBG(err);
+            }
+            else
+            {
+                m_err_msg = err;
+                repaint();
+                juce::Timer::callAfterDelay(2000, [this]() {
+                    m_err_msg = "";
+                    repaint();
+                });
+            }
             m_ed.setVisible(false);
         };
     }
+    juce::String m_err_msg;
     void mouseDown(const juce::MouseEvent &ev) override
     {
         if (ev.mods.isRightButtonDown())
