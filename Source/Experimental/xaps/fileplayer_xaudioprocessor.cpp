@@ -283,6 +283,29 @@ void FilePlayerProcessor::handleMessagesFromIO()
     }
 }
 
+bool FilePlayerProcessor::activate(double sampleRate, uint32_t minFrameCount,
+                                   uint32_t maxFrameCount) noexcept
+{
+    m_sr = sampleRate;
+    juce::dsp::ProcessSpec spec;
+    spec.maximumBlockSize = maxFrameCount;
+    spec.numChannels = 2;
+    spec.sampleRate = sampleRate;
+    m_gain_proc.prepare(spec);
+    m_gain_proc.setRampDurationSeconds(0.01);
+
+    m_buf_playpos = 0;
+
+    m_stretch.presetDefault(2, sampleRate);
+    m_work_buf.setSize(2, maxFrameCount * 16);
+    m_work_buf.clear();
+    for (auto &rs : m_resamplers)
+        rs.reset();
+    m_resampler_work_buf.resize(maxFrameCount * 32);
+
+    return true;
+}
+
 clap_process_status FilePlayerProcessor::process(const clap_process *process) noexcept
 {
     handleMessagesFromUI();

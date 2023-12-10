@@ -83,22 +83,20 @@ class XapSlider : public juce::Component
         }
         if (c == '0')
             val = m_default_value;
-        if (val)
-        {
-            setValue(*val, true);
-            return true;
-        }
 
         for (auto &e : keypress_to_step)
         {
             if (e.first == key)
             {
-                double val = m_value + e.second;
-                setValue(val, true);
-                return true;
+                val = m_value + e.second;
+                break;
             }
         }
-
+        if (val)
+        {
+            setValue(*val, true);
+            return true;
+        }
         return false;
     }
     juce::Font m_font;
@@ -109,8 +107,8 @@ class XapSlider : public juce::Component
     {
         g.fillAll(juce::Colours::black);
         g.setColour(juce::Colours::darkgrey);
-        g.setFont(m_font);
-        g.setFont(getHeight() * 0.5);
+        g.setFont(m_font.withHeight(getHeight() * 0.5f));
+        // g.setFont(getHeight() * 0.5);
         if (!m_err_msg.isEmpty())
         {
 
