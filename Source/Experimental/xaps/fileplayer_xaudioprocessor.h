@@ -92,6 +92,7 @@ class FilePlayerProcessor : public XAPWithJuceGUI, public juce::Thread
     static constexpr double minRate = -3.0;
     static constexpr double maxRate = 2.0;
     using ParamDesc = xenakios::ParamDesc;
+    ParamDesc::FeatureState m_fs_pitch;
     ~FilePlayerProcessor() override { stopThread(5000); }
     FilePlayerProcessor() : juce::Thread("filerplayeriothread")
     {
@@ -114,13 +115,14 @@ class FilePlayerProcessor : public XAPWithJuceGUI, public juce::Thread
                 .withFlags(CLAP_PARAM_IS_AUTOMATABLE | CLAP_PARAM_IS_MODULATABLE)
                 .withName("Playrate")
                 .withID((clap_id)ParamIds::Playrate));
+        m_fs_pitch.isExtended = false;
         paramDescriptions.push_back(
             ParamDesc()
                 .asFloat()
                 .extendable()
                 .withRange(-12.0f, 12.0f)
                 .withDefault(0.0)
-                .withExtendFactors(4.0f, 4.0f)
+                .withExtendFactors(4.0f)
                 .withLinearScaleFormatting("semitones")
                 .withFlags(CLAP_PARAM_IS_AUTOMATABLE | CLAP_PARAM_IS_MODULATABLE)
                 .withName("Pitch")

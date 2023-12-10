@@ -20,9 +20,11 @@ class XapSlider : public juce::Component
     std::vector<double> m_snap_positions;
     std::vector<std::pair<juce::KeyPress, double>> keypress_to_step;
     double m_param_step = 0.0;
+    ParamDesc::FeatureState *m_fstate = nullptr;
 
   public:
-    XapSlider(bool isHorizontal, ParamDesc pdesc) : m_pardesc(pdesc)
+    XapSlider(bool isHorizontal, ParamDesc pdesc, ParamDesc::FeatureState *fstate = nullptr)
+        : m_pardesc(pdesc), m_fstate(fstate)
     {
         m_value = pdesc.defaultVal;
         m_default_value = m_value;
@@ -144,10 +146,11 @@ class XapSlider : public juce::Component
 
         g.drawText(m_labeltxt, 5, 0, getWidth() - 10, getHeight(),
                    juce::Justification::centredLeft);
-        auto partext = m_pardesc.valueToString(m_value);
+        auto partext = valueToString(m_value);
         if (partext)
         {
-            g.drawText(*partext, 5, 0, getWidth() - 10, getHeight(), juce::Justification::centredRight);
+            g.drawText(*partext, 5, 0, getWidth() - 10, getHeight(),
+                       juce::Justification::centredRight);
         }
     }
     void mouseDoubleClick(const MouseEvent &event) override
@@ -157,12 +160,19 @@ class XapSlider : public juce::Component
             OnValueChanged();
         repaint();
     }
+    std::optional<std::string> valueToString(float v)
+    {
+        ParamDesc::FeatureState fs;
+        if (m_fstate)
+            fs = *m_fstate;
+        return m_pardesc.valueToString(v, fs);
+    }
     void showTextEditor()
     {
         m_ed.setVisible(true);
         m_ed.grabKeyboardFocus();
         m_ed.setBounds(getWidth() / 2, 0, 80, getHeight());
-        auto txt = m_pardesc.valueToString(m_value);
+        auto txt = valueToString(m_value);
         if (txt)
             m_ed.setText(*txt);
         else
@@ -194,6 +204,14 @@ class XapSlider : public juce::Component
         {
             juce::PopupMenu menu;
             menu.addItem("Edit value...", [this]() { showTextEditor(); });
+            if (m_fstate)
+            {
+                menu.addItem("Extend range", true, m_fstate->isExtended, [this]() {
+                    m_fstate->isExtended = !m_fstate->isExtended;
+                    repaint();
+                });
+            }
+            /*
             juce::PopupMenu storemenu;
             for (int i = 0; i < m_snap_positions.size(); ++i)
             {
@@ -208,6 +226,7 @@ class XapSlider : public juce::Component
                                  [i, this]() { setValue(m_snap_positions[i], true); });
             }
             menu.addSubMenu("Load from", loadmenu);
+            */
             menu.showMenuAsync({});
             return;
         }
@@ -236,6 +255,7 @@ class XapSlider : public juce::Component
     }
     void setValue(double v, bool notify = false)
     {
+        // m_pdesc.
         if (v == m_value)
             return;
         m_value = juce::jlimit(m_min_value, m_max_value, v);

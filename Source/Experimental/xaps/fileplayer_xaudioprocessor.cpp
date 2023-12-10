@@ -44,7 +44,10 @@ class FilePlayerEditor : public juce::Component,
 
         for (int i = 0; i < m_proc->paramDescriptions.size(); ++i)
         {
-            auto comp = std::make_unique<XapSlider>(true, m_proc->paramDescriptions[i]);
+            ParamDesc::FeatureState *pfs = nullptr;
+            if (m_proc->paramDescriptions[i].id == (clap_id)FilePlayerProcessor::ParamIds::Pitch)
+                pfs = &m_proc->m_fs_pitch;
+            auto comp = std::make_unique<XapSlider>(true, m_proc->paramDescriptions[i], pfs);
             comp->m_font = m_font;
             comp->OnValueChanged = [this, pslider = comp.get(), i]() {
                 FilePlayerProcessor::FilePlayerMessage msg;
@@ -59,6 +62,7 @@ class FilePlayerEditor : public juce::Component,
         }
         startTimer(100);
     }
+
     juce::String m_cur_file_text{"No file loaded"};
     double m_file_playpos = 0.0;
     double m_offlineprogress = -1.0;
