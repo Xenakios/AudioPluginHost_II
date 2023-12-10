@@ -360,8 +360,10 @@ clap_process_status FilePlayerProcessor::process(const clap_process *process) no
     if (preserve_pitch)
     {
         double pshift = m_pitch;
+        if (m_fs_pitch.isExtended)
+            pshift *= pitchExtendFactor;
         pshift += m_pitch_mod;
-        pshift = std::clamp(pshift, -12.0, 12.0);
+        pshift = std::clamp(pshift, -48.0, 48.0);
         double pitchratio = std::pow(2.0, pshift / 12.0);
         m_stretch.setTransposeFactor(pitchratio * compensrate);
         rate *= compensrate;

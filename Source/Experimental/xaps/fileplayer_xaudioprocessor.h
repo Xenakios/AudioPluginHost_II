@@ -91,6 +91,7 @@ class FilePlayerProcessor : public XAPWithJuceGUI, public juce::Thread
     void guiDestroy() noexcept override { m_editor = nullptr; }
     static constexpr double minRate = -3.0;
     static constexpr double maxRate = 2.0;
+    static constexpr double pitchExtendFactor = 4.0;
     using ParamDesc = xenakios::ParamDesc;
     ParamDesc::FeatureState m_fs_pitch;
     ~FilePlayerProcessor() override { stopThread(5000); }
@@ -122,7 +123,7 @@ class FilePlayerProcessor : public XAPWithJuceGUI, public juce::Thread
                 .extendable()
                 .withRange(-12.0f, 12.0f)
                 .withDefault(0.0)
-                .withExtendFactors(4.0f)
+                .withExtendFactors(pitchExtendFactor)
                 .withLinearScaleFormatting("semitones")
                 .withFlags(CLAP_PARAM_IS_AUTOMATABLE | CLAP_PARAM_IS_MODULATABLE)
                 .withName("Pitch")
