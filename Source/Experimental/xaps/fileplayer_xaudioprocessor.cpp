@@ -464,7 +464,7 @@ clap_process_status FilePlayerProcessor::process(const clap_process *process) no
         {
             to_rs_buf[i * 2 + 0] = getxfadedsample(filebuf[0], m_buf_playpos, loop_start_samples,
                                                    loop_end_samples, xfadelen);
-            to_rs_buf[i * 2 + 1] = getxfadedsample(filebuf[0], m_buf_playpos, loop_start_samples,
+            to_rs_buf[i * 2 + 1] = getxfadedsample(filebuf[1], m_buf_playpos, loop_start_samples,
                                                    loop_end_samples, xfadelen);
             ++m_buf_playpos;
             if (m_buf_playpos >= loop_end_samples)
