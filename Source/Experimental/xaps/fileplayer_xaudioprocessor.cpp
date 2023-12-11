@@ -350,6 +350,10 @@ bool FilePlayerProcessor::activate(double sampleRate, uint32_t minFrameCount,
     m_work_buf.clear();
     m_rs_out_buf.resize(maxFrameCount * 4);
     m_wresampler.Reset();
+    double *dummy = nullptr;
+    m_wresampler.SetRates(sampleRate,sampleRate);
+    int wanted = m_wresampler.ResamplePrepare(maxFrameCount, 2, &dummy);
+    DBG("inited WDL resampler " << wanted);
     return true;
 }
 
@@ -426,7 +430,7 @@ clap_process_status FilePlayerProcessor::process(const clap_process *process) no
         float s1 = srcbuf[temp];
         return s0 * xfadegain + s1 * (1.0f - xfadegain);
     };
-    int xfadelen = 22050;
+    int xfadelen = 4000;
     if (preserve_pitch)
     {
         double pshift = m_pitch;
@@ -474,7 +478,6 @@ clap_process_status FilePlayerProcessor::process(const clap_process *process) no
                 process->audio_outputs[0].data32[ch][j] = m_rs_out_buf[j * 2 + ch];
             }
         }
-        
     }
     m_gain_proc.setGainDecibels(m_volume);
     juce::dsp::AudioBlock<float> block(process->audio_outputs[0].data32, 2, process->frames_count);
