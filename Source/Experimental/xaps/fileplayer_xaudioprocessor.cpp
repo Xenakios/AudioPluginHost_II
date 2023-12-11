@@ -32,6 +32,9 @@ class WaveFormComponent : public juce::Component, public juce::ChangeListener
             double xcor = juce::jmap<double>(m_filepos, 0.0, 1.0, 0.0, getWidth());
             g.drawLine(xcor, 0, xcor, getHeight());
         }
+        g.setColour(juce::Colours::white);
+        g.setFont(m_font.withHeight(20));
+        g.drawText(m_text, 0, 0, getWidth(), getHeight(), juce::Justification::topLeft);
     }
     std::function<void(double)> OnSeek;
     juce::AudioFormatManager m_afman;
@@ -86,6 +89,8 @@ class FilePlayerEditor : public juce::Component,
         presetFiles.add(R"(C:\MusicAudio\sourcesamples\songs\chrono.wav)");
         presetFiles.add(R"(C:\MusicAudio\sourcesamples\there was a time .wav)");
         presetFiles.add(R"(C:\MusicAudio\sourcesamples\_Fails_to_load.wav)");
+        presetFiles.add(R"(C:\MusicAudio\sourcesamples\test_signals\440hz_sine_0db.wav)");
+        
         m_file_comp.setRecentlyUsedFilenames(presetFiles);
         m_afman.registerBasicFormats();
 
@@ -117,7 +122,7 @@ class FilePlayerEditor : public juce::Component,
     }
 
     juce::String m_cur_file_text{"No file loaded"};
-    
+
     double m_offlineprogress = -1.0;
     void timerCallback() override
     {
@@ -129,18 +134,16 @@ class FilePlayerEditor : public juce::Component,
                 if (!msg.filename.empty())
                 {
                     juce::File f(msg.filename);
-                    m_cur_file_text = f.getFileName();
-
                     m_wavecomponent.m_thumb->setSource(new juce::FileInputSource(f));
+                    m_wavecomponent.setTextToDisplay(f.getFileName());
                 }
                 m_offlineprogress = -1.0;
                 repaint();
             }
             if (msg.opcode == FilePlayerProcessor::FilePlayerMessage::Opcode::FileLoadError)
             {
-                m_offlineprogress = -1.0;
-                m_cur_file_text = "Error loading file";
-                repaint();
+                m_wavecomponent.m_thumb->setSource(nullptr);
+                m_wavecomponent.setTextToDisplay("Error loading file");
             }
             if (msg.opcode == FilePlayerProcessor::FilePlayerMessage::Opcode::OfflineProgress)
             {
@@ -151,7 +154,6 @@ class FilePlayerEditor : public juce::Component,
             if (msg.opcode == FilePlayerProcessor::FilePlayerMessage::Opcode::FilePlayPosition)
             {
                 m_wavecomponent.setFilePosition(msg.value);
-                
             }
             if (msg.opcode == FilePlayerProcessor::FilePlayerMessage::Opcode::ParamChange)
             {
@@ -163,6 +165,13 @@ class FilePlayerEditor : public juce::Component,
                     {
                         m_triggered_mode = msg.value;
                     }
+                    if (msg.parid == (clap_id)FilePlayerProcessor::ParamIds::PreservePitch)
+                    {
+                        auto pitchcomp =
+                            mapParToComponent[(clap_id)FilePlayerProcessor::ParamIds::Pitch];
+                        pitchcomp->setEnabled(msg.value >= 0.5);
+                        jassert(pitchcomp->isEnabled() == msg.value >= 0.5);
+                    }
                 }
             }
         }
@@ -170,7 +179,7 @@ class FilePlayerEditor : public juce::Component,
             m_file_comp.setEnabled(true);
     }
     bool m_triggered_mode = false;
-    
+
     void resized() override
     {
         juce::FlexBox flex;
@@ -193,10 +202,7 @@ class FilePlayerEditor : public juce::Component,
         msg.value = newpos;
         m_proc->messages_from_ui.push(msg);
     }
-    void paint(juce::Graphics &g) override
-    {
-        
-    }
+    void paint(juce::Graphics &g) override {}
 
   private:
     FilePlayerProcessor *m_proc = nullptr;
@@ -422,7 +428,7 @@ clap_process_status FilePlayerProcessor::process(const clap_process *process) no
         float s1 = srcbuf[temp];
         return s0 * xfadegain + s1 * (1.0f - xfadegain);
     };
-    int xfadelen = 4000;
+    int xfadelen = 22050;
     if (preserve_pitch)
     {
         double pshift = m_pitch;
@@ -469,7 +475,7 @@ clap_process_status FilePlayerProcessor::process(const clap_process *process) no
                 m_resamplers[ch].process(rate, wbuf[ch], process->audio_outputs[0].data32[ch],
                                          process->frames_count, samplestopush, 0);
         }
-        jassert(consumed[0] == consumed[1]);
+        // jassert(consumed[0] == consumed[1]);
         m_buf_playpos = (cachedpos + consumed[0]);
         if (m_buf_playpos >= loop_end_samples)
         {

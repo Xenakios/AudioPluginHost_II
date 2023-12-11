@@ -41,6 +41,7 @@ include_directories(
     libs/fmt/include
     libs/sst-jucegui/include
     libs/concurrentqueue
+    libs/WDL
 )
 
 juce_add_gui_app(AudioPluginHost2
@@ -109,7 +110,7 @@ target_sources(ConsoleAppExample
         Source/Experimental/xaps/fileplayer_xaudioprocessor.cpp
         Source/Experimental/xaps/clap_xaudioprocessor.cpp
         Source/Experimental/xaudioprocessor.cpp
-        
+        Source/Experimental/wdl_resampler_adapter.cpp
         Source/Plugins/noise-plethora/random.cpp
         Source/Plugins/noise-plethora/teensy/effect_freeverb.cpp
         Source/Plugins/noise-plethora/teensy/effect_bitcrusher.cpp
@@ -129,6 +130,7 @@ target_sources(ConsoleAppExample
         libs/sst-jucegui/src/sst/jucegui/components/ComponentBase.cpp
         libs/sst-jucegui/src/sst/jucegui/style/StyleSheet.cpp
         libs/sst-jucegui/src/sst/jucegui/style/StyleAndSettingsConsumer.cpp
+        libs/WDL/WDL/resample.cpp
         )
     
 # add_subdirectory(libs/fmt EXCLUDE_FROM_ALL)

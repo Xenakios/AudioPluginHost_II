@@ -55,6 +55,10 @@ class XapSlider : public juce::Component
         setWantsKeyboardFocus(true);
         addChildComponent(m_ed);
     }
+    void enablementChanged() override
+    {
+        repaint();
+    }
     void mouseWheelMove(const juce::MouseEvent &event,
                         const juce::MouseWheelDetails &wheel) override
     {
@@ -105,7 +109,13 @@ class XapSlider : public juce::Component
     void focusLost(juce::Component::FocusChangeType cause) override { repaint(); }
     void paint(juce::Graphics &g) override
     {
-        g.fillAll(juce::Colours::black);
+        if (isEnabled())
+            g.fillAll(juce::Colours::black);
+        else 
+        {
+            g.fillAll(juce::Colours::pink);
+            return;
+        }
         g.setColour(juce::Colours::darkgrey);
         g.setFont(m_font.withHeight(getHeight() * 0.5f));
         // g.setFont(getHeight() * 0.5);
@@ -256,7 +266,6 @@ class XapSlider : public juce::Component
     }
     void setValue(double v, bool notify = false)
     {
-        // m_pdesc.
         if (v == m_value)
             return;
         m_value = juce::jlimit(m_min_value, m_max_value, v);

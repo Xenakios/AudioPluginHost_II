@@ -6,10 +6,13 @@
 #include "../xap_utils.h"
 #include "../xapfactory.h"
 #include "containers/choc_SingleReaderMultipleWriterFIFO.h"
+#include "../wdl_resampler_adapter.h"
+// #include "WDL/resample.h"
 
 class FilePlayerProcessor : public XAPWithJuceGUI, public juce::Thread
 {
   public:
+    xenakios::Resampler m_wresampler{true};
     double m_sr = 44100;
     std::atomic<bool> m_running_offline{false};
     juce::AudioBuffer<float> m_file_buf;
