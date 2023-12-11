@@ -12,6 +12,7 @@
 class FilePlayerProcessor : public XAPWithJuceGUI, public juce::Thread
 {
   public:
+    std::vector<double> m_rs_out_buf;
     xenakios::Resampler m_wresampler{true};
     double m_sr = 44100;
     std::atomic<bool> m_running_offline{false};
@@ -20,8 +21,8 @@ class FilePlayerProcessor : public XAPWithJuceGUI, public juce::Thread
     juce::AudioBuffer<float> m_work_buf;
     int m_buf_playpos = 0;
     signalsmith::stretch::SignalsmithStretch<float> m_stretch;
-    std::array<juce::LagrangeInterpolator, 2> m_resamplers;
-    std::vector<float> m_resampler_work_buf;
+    
+    
     double m_file_sample_rate = 1.0;
     double m_temp_file_sample_rate = 1.0;
     struct FilePlayerMessage

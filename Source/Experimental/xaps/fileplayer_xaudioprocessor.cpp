@@ -90,7 +90,7 @@ class FilePlayerEditor : public juce::Component,
         presetFiles.add(R"(C:\MusicAudio\sourcesamples\there was a time .wav)");
         presetFiles.add(R"(C:\MusicAudio\sourcesamples\_Fails_to_load.wav)");
         presetFiles.add(R"(C:\MusicAudio\sourcesamples\test_signals\440hz_sine_0db.wav)");
-        
+
         m_file_comp.setRecentlyUsedFilenames(presetFiles);
         m_afman.registerBasicFormats();
 
@@ -348,10 +348,8 @@ bool FilePlayerProcessor::activate(double sampleRate, uint32_t minFrameCount,
     m_stretch.presetDefault(2, sampleRate);
     m_work_buf.setSize(2, maxFrameCount * 16);
     m_work_buf.clear();
-    for (auto &rs : m_resamplers)
-        rs.reset();
-    m_resampler_work_buf.resize(maxFrameCount * 32);
-
+    m_rs_out_buf.resize(maxFrameCount * 4);
+    m_wresampler.Reset();
     return true;
 }
 
@@ -455,32 +453,28 @@ clap_process_status FilePlayerProcessor::process(const clap_process *process) no
     }
     else
     {
-        rate *= compensrate;
-        int samplestopush = process->frames_count * rate;
-        int consumed[2] = {0, 0};
-        samplestopush += 1;
+        m_wresampler.SetRates(m_file_sample_rate, m_sr / rate);
+        double *to_rs_buf = nullptr;
+        int samplestopush = m_wresampler.ResamplePrepare(process->frames_count, 2, &to_rs_buf);
         for (int i = 0; i < samplestopush; ++i)
         {
-            wbuf[0][i] = getxfadedsample(filebuf[0], m_buf_playpos, loop_start_samples,
-                                         loop_end_samples, xfadelen);
-            wbuf[1][i] = getxfadedsample(filebuf[1], m_buf_playpos, loop_start_samples,
-                                         loop_end_samples, xfadelen);
+            to_rs_buf[i * 2 + 0] = getxfadedsample(filebuf[0], m_buf_playpos, loop_start_samples,
+                                                   loop_end_samples, xfadelen);
+            to_rs_buf[i * 2 + 1] = getxfadedsample(filebuf[0], m_buf_playpos, loop_start_samples,
+                                                   loop_end_samples, xfadelen);
             ++m_buf_playpos;
             if (m_buf_playpos >= loop_end_samples)
                 m_buf_playpos = loop_start_samples;
         }
+        m_wresampler.ResampleOut(m_rs_out_buf.data(), samplestopush, process->frames_count, 2);
         for (int ch = 0; ch < 2; ++ch)
         {
-            consumed[ch] =
-                m_resamplers[ch].process(rate, wbuf[ch], process->audio_outputs[0].data32[ch],
-                                         process->frames_count, samplestopush, 0);
+            for (int j = 0; j < process->frames_count; ++j)
+            {
+                process->audio_outputs[0].data32[ch][j] = m_rs_out_buf[j * 2 + ch];
+            }
         }
-        // jassert(consumed[0] == consumed[1]);
-        m_buf_playpos = (cachedpos + consumed[0]);
-        if (m_buf_playpos >= loop_end_samples)
-        {
-            m_buf_playpos = loop_start_samples;
-        }
+        
     }
     m_gain_proc.setGainDecibels(m_volume);
     juce::dsp::AudioBlock<float> block(process->audio_outputs[0].data32, 2, process->frames_count);
