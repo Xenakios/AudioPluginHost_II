@@ -221,7 +221,6 @@ class FilePlayerProcessor : public XAPWithJuceGUI, public juce::Thread
     }
     bool paramsValue(clap_id paramId, double *value) noexcept override
     {
-        return false;
         std::optional<double> result;
         if (paramId == (clap_id)ParamIds::Volume)
             result = m_volume;
@@ -239,6 +238,7 @@ class FilePlayerProcessor : public XAPWithJuceGUI, public juce::Thread
             result = m_triggered_mode;
         if (result)
         {
+            *value = *result;
             return true;
         }
         return false;

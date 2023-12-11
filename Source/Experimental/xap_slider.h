@@ -55,13 +55,12 @@ class XapSlider : public juce::Component
         setWantsKeyboardFocus(true);
         addChildComponent(m_ed);
     }
-    void enablementChanged() override
-    {
-        repaint();
-    }
+    void enablementChanged() override { repaint(); }
     void mouseWheelMove(const juce::MouseEvent &event,
                         const juce::MouseWheelDetails &wheel) override
     {
+        if (!isEnabled())
+            return;
         double delta = 0.0;
         if (wheel.deltaY < 0)
             delta = -m_param_step;
@@ -78,6 +77,8 @@ class XapSlider : public juce::Component
     }
     bool keyPressed(const juce::KeyPress &key) override
     {
+        if (!isEnabled())
+            return false;
         auto c = key.getTextCharacter();
         std::optional<double> val;
         if (c >= '1' && c <= '9')
@@ -109,16 +110,17 @@ class XapSlider : public juce::Component
     void focusLost(juce::Component::FocusChangeType cause) override { repaint(); }
     void paint(juce::Graphics &g) override
     {
-        if (isEnabled())
-            g.fillAll(juce::Colours::black);
-        else 
-        {
-            g.fillAll(juce::Colours::pink);
-            return;
-        }
+        g.fillAll(juce::Colours::black);
         g.setColour(juce::Colours::darkgrey);
         g.setFont(m_font.withHeight(getHeight() * 0.5f));
-        // g.setFont(getHeight() * 0.5);
+        if (!isEnabled())
+        {
+            g.setColour(juce::Colours::lightgrey);
+            g.drawRect(2, 0, getWidth() - 4, getHeight());
+            g.setColour(juce::Colours::grey);
+            g.drawText("NOT AVAILABLE", 0, 0, getWidth(), getHeight(), juce::Justification::centred);
+            return;
+        }
         if (!m_err_msg.isEmpty())
         {
 
@@ -128,20 +130,7 @@ class XapSlider : public juce::Component
         }
         double xforvalue =
             juce::jmap<double>(m_value, m_min_value, m_max_value, 2.0, getWidth() - 4.0);
-        if (!m_is_bipolar)
-        {
-            // g.fillRect(2.0, 0.0, xforvalue, getHeight());
-        }
-        else
-        {
-            double xforzero =
-                juce::jmap<double>(0.0, m_min_value, m_max_value, 2.0, getWidth() - 4.0);
-
-            // if (xforvalue < xforzero)
-            //     g.fillRect(xforvalue, 0.0, xforzero - xforvalue, getHeight());
-            // else
-            //     g.fillRect(xforzero, 0.0, xforvalue - xforzero, getHeight());
-        }
+        
         if (hasKeyboardFocus(false))
             g.setColour(juce::Colours::cyan);
         else
@@ -163,6 +152,8 @@ class XapSlider : public juce::Component
     }
     void mouseDoubleClick(const MouseEvent &event) override
     {
+        if (!isEnabled())
+            return;
         m_value = m_default_value;
         if (OnValueChanged)
             OnValueChanged();
@@ -211,6 +202,8 @@ class XapSlider : public juce::Component
     juce::String m_err_msg;
     void mouseDown(const juce::MouseEvent &ev) override
     {
+        if (!isEnabled())
+            return;
         if (ev.mods.isRightButtonDown())
         {
             juce::PopupMenu menu;
@@ -247,6 +240,8 @@ class XapSlider : public juce::Component
     }
     void mouseDrag(const juce::MouseEvent &ev) override
     {
+        if (!isEnabled())
+            return;
         m_value = juce::jmap<double>(ev.x, 2, getWidth() - 4, m_min_value, m_max_value);
         m_value = juce::jlimit(m_min_value, m_max_value, m_value);
         if (OnValueChanged)
@@ -261,6 +256,8 @@ class XapSlider : public juce::Component
     }
     void mouseUp(const juce::MouseEvent &ev) override
     {
+        if (!isEnabled())
+            return;
         m_mousedown = false;
         repaint();
     }

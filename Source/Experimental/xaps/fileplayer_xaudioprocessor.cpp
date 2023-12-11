@@ -126,6 +126,11 @@ class FilePlayerEditor : public juce::Component,
     double m_offlineprogress = -1.0;
     void timerCallback() override
     {
+        double v = 0.0;
+        if (m_proc->paramsValue((clap_id)FilePlayerProcessor::ParamIds::PreservePitch, &v))
+        {
+            mapParToComponent[(clap_id)FilePlayerProcessor::ParamIds::Pitch]->setEnabled(v >= 0.5);
+        }
         FilePlayerProcessor::FilePlayerMessage msg;
         while (m_proc->messages_to_ui.pop(msg))
         {
@@ -164,13 +169,6 @@ class FilePlayerEditor : public juce::Component,
                     if (msg.parid == (clap_id)FilePlayerProcessor::ParamIds::TriggeredMode)
                     {
                         m_triggered_mode = msg.value;
-                    }
-                    if (msg.parid == (clap_id)FilePlayerProcessor::ParamIds::PreservePitch)
-                    {
-                        auto pitchcomp =
-                            mapParToComponent[(clap_id)FilePlayerProcessor::ParamIds::Pitch];
-                        pitchcomp->setEnabled(msg.value >= 0.5);
-                        jassert(pitchcomp->isEnabled() == msg.value >= 0.5);
                     }
                 }
             }
@@ -351,7 +349,7 @@ bool FilePlayerProcessor::activate(double sampleRate, uint32_t minFrameCount,
     m_rs_out_buf.resize(maxFrameCount * 4);
     m_wresampler.Reset();
     double *dummy = nullptr;
-    m_wresampler.SetRates(sampleRate,sampleRate);
+    m_wresampler.SetRates(sampleRate, sampleRate);
     int wanted = m_wresampler.ResamplePrepare(maxFrameCount, 2, &dummy);
     DBG("inited WDL resampler " << wanted);
     return true;
