@@ -178,7 +178,10 @@ class XapSlider : public juce::Component
         m_ed.selectAll();
         m_ed.onReturnKey = [this]() {
             std::string err;
-            auto v = m_pardesc.valueFromString(m_ed.getText().toStdString(), err);
+            ParamDesc::FeatureState fs;
+            if (m_fstate)
+                fs = *m_fstate;
+            auto v = m_pardesc.valueFromString(m_ed.getText().toStdString(), err, fs);
             if (v)
             {
                 setValue(*v, true);

@@ -29,6 +29,7 @@ class FilePlayerProcessor : public XAPWithJuceGUI, public juce::Thread
             ParamBegin,
             ParamChange,
             ParamEnd,
+            ParamFeatureStateChanged,
             RequestFileChange,
             FileChanged,
             OfflineProgress,

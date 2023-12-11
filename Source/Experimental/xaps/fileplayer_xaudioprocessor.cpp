@@ -1,6 +1,58 @@
 #include "fileplayer_xaudioprocessor.h"
 #include "../xap_slider.h"
 
+class WaveFormComponent : public juce::Component, public juce::ChangeListener
+{
+  public:
+    WaveFormComponent() : m_thumb_cache(50)
+    {
+        m_afman.registerBasicFormats();
+        m_thumb = std::make_unique<juce::AudioThumbnail>(128, m_afman, m_thumb_cache);
+        m_thumb->addChangeListener(this);
+    }
+    void mouseDown(const juce::MouseEvent &ev) override
+    {
+        double newpos = juce::jmap<double>(ev.x, 0.0, getWidth(), 0.0, 1.0);
+        newpos = juce::jlimit<double>(0.0, 1.0, newpos);
+        if (OnSeek)
+            OnSeek(newpos);
+    }
+    void changeListenerCallback(juce::ChangeBroadcaster *source) override { repaint(); }
+    juce::Font m_font;
+
+    void paint(juce::Graphics &g) override
+    {
+        g.fillAll(juce::Colours::black);
+        if (m_thumb->getTotalLength() > 0.0)
+        {
+            g.setColour(juce::Colours::darkgrey);
+            m_thumb->drawChannels(g, juce::Rectangle<int>(0, 0, getWidth(), getHeight()), 0.0,
+                                  m_thumb->getTotalLength(), 1.0f);
+            g.setColour(juce::Colours::white);
+            double xcor = juce::jmap<double>(m_filepos, 0.0, 1.0, 0.0, getWidth());
+            g.drawLine(xcor, 0, xcor, getHeight());
+        }
+    }
+    std::function<void(double)> OnSeek;
+    juce::AudioFormatManager m_afman;
+    juce::AudioThumbnailCache m_thumb_cache;
+    std::unique_ptr<juce::AudioThumbnail> m_thumb;
+    void setFilePosition(double pos)
+    {
+        m_filepos = pos;
+        repaint();
+    }
+    void setTextToDisplay(juce::String txt)
+    {
+        m_text = txt;
+        repaint();
+    }
+
+  private:
+    double m_filepos = -1.0;
+    juce::String m_text;
+};
+
 class FilePlayerEditor : public juce::Component,
                          public juce::Timer,
                          public juce::FilenameComponentListener,
@@ -8,8 +60,8 @@ class FilePlayerEditor : public juce::Component,
 {
   public:
     void changeListenerCallback(juce::ChangeBroadcaster *source) override { repaint(); }
-    juce::AudioThumbnailCache m_thumb_cache;
-    std::unique_ptr<juce::AudioThumbnail> m_thumb;
+
+    WaveFormComponent m_wavecomponent;
     void filenameComponentChanged(juce::FilenameComponent *fc) override
     {
         DBG(fc->getCurrentFile().getFullPathName());
@@ -24,7 +76,7 @@ class FilePlayerEditor : public juce::Component,
     juce::AudioFormatManager m_afman;
     juce::Font m_font;
     FilePlayerEditor(FilePlayerProcessor *proc)
-        : m_thumb_cache(100), m_proc(proc),
+        : m_proc(proc),
           m_file_comp("", juce::File(), false, false, false, "*.wav", "", "Choose audio file")
     {
         auto monospace = juce::Font::getDefaultMonospacedFontName();
@@ -36,8 +88,9 @@ class FilePlayerEditor : public juce::Component,
         presetFiles.add(R"(C:\MusicAudio\sourcesamples\_Fails_to_load.wav)");
         m_file_comp.setRecentlyUsedFilenames(presetFiles);
         m_afman.registerBasicFormats();
-        m_thumb = std::make_unique<juce::AudioThumbnail>(128, m_afman, m_thumb_cache);
-        m_thumb->addChangeListener(this);
+
+        addAndMakeVisible(m_wavecomponent);
+        m_wavecomponent.m_font = m_font;
 
         addAndMakeVisible(m_file_comp);
         m_file_comp.addListener(this);
@@ -64,7 +117,7 @@ class FilePlayerEditor : public juce::Component,
     }
 
     juce::String m_cur_file_text{"No file loaded"};
-    double m_file_playpos = 0.0;
+    
     double m_offlineprogress = -1.0;
     void timerCallback() override
     {
@@ -78,7 +131,7 @@ class FilePlayerEditor : public juce::Component,
                     juce::File f(msg.filename);
                     m_cur_file_text = f.getFileName();
 
-                    m_thumb->setSource(new juce::FileInputSource(f));
+                    m_wavecomponent.m_thumb->setSource(new juce::FileInputSource(f));
                 }
                 m_offlineprogress = -1.0;
                 repaint();
@@ -97,8 +150,8 @@ class FilePlayerEditor : public juce::Component,
             }
             if (msg.opcode == FilePlayerProcessor::FilePlayerMessage::Opcode::FilePlayPosition)
             {
-                m_file_playpos = msg.value;
-                repaint(0, 0, getWidth(), m_wave_h);
+                m_wavecomponent.setFilePosition(msg.value);
+                
             }
             if (msg.opcode == FilePlayerProcessor::FilePlayerMessage::Opcode::ParamChange)
             {
@@ -117,17 +170,19 @@ class FilePlayerEditor : public juce::Component,
             m_file_comp.setEnabled(true);
     }
     bool m_triggered_mode = false;
-    int m_wave_h = 148;
+    
     void resized() override
     {
-        m_file_comp.setBounds(0, 150, getWidth(), 25);
-        if (m_par_comps.size() == 0)
-            return;
-        int h = 35;
+        juce::FlexBox flex;
+        float margin = 5.0f;
+        flex.flexDirection = juce::FlexBox::Direction::column;
+        flex.items.add(juce::FlexItem(m_wavecomponent).withFlex(4.0).withMargin(margin));
+        flex.items.add(juce::FlexItem(m_file_comp).withFlex(1.0).withMargin(margin));
         for (int i = 0; i < m_par_comps.size(); ++i)
         {
-            m_par_comps[i]->setBounds(5, 175 + h * i, getWidth() - 10, 30);
+            flex.items.add(juce::FlexItem(*m_par_comps[i]).withFlex(1.0).withMargin(margin));
         }
+        flex.performLayout(getBounds());
     }
     void mouseDown(const juce::MouseEvent &ev) override
     {
@@ -140,25 +195,7 @@ class FilePlayerEditor : public juce::Component,
     }
     void paint(juce::Graphics &g) override
     {
-        g.setColour(juce::Colours::black);
-        g.fillRect(0, 0, getWidth(), m_wave_h);
-        g.setColour(juce::Colours::darkgrey);
-        juce::String txt = m_cur_file_text;
-        if (m_thumb->getTotalLength() > 0.0 && m_cur_file_text != "Error loading file")
-        {
-            m_thumb->drawChannels(g, juce::Rectangle<int>(0, 0, getWidth(), m_wave_h), 0.0,
-                                  m_thumb->getTotalLength(), 1.0f);
-            g.setColour(juce::Colours::white);
-            double xcor = juce::jmap<double>(m_file_playpos, 0.0, 1.0, 0.0, getWidth());
-            g.drawLine(xcor, 0.0, xcor, m_wave_h);
-            if (m_proc->m_triggered_mode)
-                txt += " (Press mouse over waveform to play)";
-        }
-        if (m_offlineprogress >= 0.0)
-            txt = "Processing " + juce::String(m_offlineprogress * 100, 1) + "%";
-        g.setColour(juce::Colours::white);
-        g.setFont(20);
-        g.drawText(txt, 0, 0, getWidth(), m_wave_h, juce::Justification::topLeft);
+        
     }
 
   private:
@@ -252,7 +289,13 @@ void FilePlayerProcessor::handleMessagesFromUI()
             auto pev = xenakios::make_event_param_value(0, msg.parid, msg.value, nullptr);
             handleEvent((const clap_event_header *)&pev, true);
         }
-
+        if (msg.opcode == FilePlayerMessage::Opcode::ParamFeatureStateChanged)
+        {
+            if (msg.parid == (clap_id)ParamIds::Pitch)
+            {
+                m_fs_pitch.isExtended = msg.value >= 0.5;
+            }
+        }
         if (msg.opcode == FilePlayerMessage::Opcode::FilePlayPosition)
         {
             if (m_file_buf.getNumSamples() > 0)
