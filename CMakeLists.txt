@@ -44,15 +44,6 @@ include_directories(
     libs/WDL
 )
 
-juce_add_gui_app(AudioPluginHost2
-    BUNDLE_ID                       com.juce.pluginhost
-    ICON_BIG                        "${CMAKE_CURRENT_SOURCE_DIR}/Source/JUCEAppIcon.png"
-    MICROPHONE_PERMISSION_ENABLED   TRUE
-    PLUGINHOST_AU                   TRUE)
-
-juce_generate_juce_header(AudioPluginHost2)
-
-
 juce_add_plugin(AudioPlayer
     # VERSION ...                               # Set this if the plugin version is different to the project version
     # ICON_BIG ...                              # ICON_* arguments specify a path to an image file to use as an icon for the Standalone
@@ -85,19 +76,7 @@ target_compile_definitions(AudioPlayer
         JUCE_VST3_CAN_REPLACE_VST2=0
         _USE_MATH_DEFINES=1)
 
-
-target_sources(AudioPluginHost2 PRIVATE
-    Source/AudioGraph/xaudiograph.cpp
-    Source/HostStartup.cpp
-    Source/Plugins/ARAPlugin.cpp
-    Source/Plugins/IOConfigurationWindow.cpp
-    Source/Plugins/InternalPlugins.cpp
-    Source/Plugins/AudioFilePlayerPlugin.cpp
-    Source/Plugins/PluginGraph.cpp
-    Source/UI/GraphEditorPanel.cpp
-    Source/UI/MainHostWindow.cpp)
-
-    juce_add_console_app(ConsoleAppExample
+juce_add_console_app(ConsoleAppExample
     PRODUCT_NAME "Console App Example") 
 juce_generate_juce_header(ConsoleAppExample)
 target_sources(ConsoleAppExample
@@ -167,39 +146,6 @@ juce_add_binary_data(AudioPluginHostData SOURCES
     Assets/reverb_ir.wav
     Assets/singing.ogg)
 
-target_compile_definitions(AudioPluginHost2 PRIVATE
-    JUCE_ALSA=1
-    JUCE_CONTENT_SHARING=1
-    JUCE_DIRECTSOUND=1
-    JUCE_DISABLE_CAUTIOUS_PARAMETER_ID_CHECKING=1
-    JUCE_PLUGINHOST_LADSPA=1
-    JUCE_PLUGINHOST_LV2=1
-    JUCE_PLUGINHOST_VST3=1
-    JUCE_PLUGINHOST_VST=0
-    JUCE_PLUGINHOST_ARA=0
-    JUCE_USE_CAMERA=0
-    JUCE_USE_CDBURNER=0
-    JUCE_USE_CDREADER=0
-    JUCE_USE_CURL=0
-    JUCE_USE_FLAC=0
-    JUCE_USE_OGGVORBIS=1
-    JUCE_VST3_HOST_CROSS_PLATFORM_UID=1
-    JUCE_WASAPI=1
-    JUCE_WEB_BROWSER=0
-    JUCE_DISPLAY_SPLASH_SCREEN=0
-
-    PIP_JUCE_EXAMPLES_DIRECTORY_STRING="${JUCE_SOURCE_DIR}/examples")
-
-target_link_libraries(AudioPluginHost2 PRIVATE
-    AudioPluginHostData
-    juce::juce_audio_utils
-    juce::juce_cryptography
-    juce::juce_dsp
-    juce::juce_opengl
-    juce::juce_recommended_config_flags
-    
-    juce::juce_recommended_warning_flags)
-
 target_link_libraries(AudioPlayer PRIVATE
     AudioPluginHostData
     juce::juce_audio_utils
@@ -210,4 +156,4 @@ target_link_libraries(AudioPlayer PRIVATE
     
     juce::juce_recommended_warning_flags)
 # juce::juce_recommended_lto_flags
-juce_add_bundle_resources_directory(AudioPluginHost2 Assets)
+# juce_add_bundle_resources_directory(AudioPluginHost2 Assets)
