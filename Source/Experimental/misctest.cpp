@@ -14,6 +14,7 @@
 #include "../Plugins/noise-plethora/plugins/Banks.hpp"
 #include "xapdsp.h"
 #include "audio/choc_AudioFileFormat_WAV.h"
+#include "sst/basic-blocks/modulators/SimpleLFO.h"
 
 class object_t
 {
@@ -235,6 +236,34 @@ inline void test_pipe()
     std::cout << output[0] << " " << output[1] << "\n";
 }
 
+template <size_t BLOCK_SIZE> struct SRProvider
+{
+    static constexpr size_t BLOCK_SIZE_OS = BLOCK_SIZE * 2;
+    double samplerate = 44100;
+    alignas(32) float table_envrate_linear[512];
+    void initTables()
+    {
+        double dsamplerate_os = samplerate * 2;
+        for (int i = 0; i < 512; ++i)
+        {
+            double k =
+                dsamplerate_os * pow(2.0, (((double)i - 256.0) / 16.0)) / (double)BLOCK_SIZE_OS;
+            table_envrate_linear[i] = (float)(1.f / k);
+        }
+    }
+    float envelope_rate_linear_nowrap(float x)
+    {
+        x *= 16.f;
+        x += 256.f;
+        int e = std::clamp<int>((int)x, 0, 0x1ff - 1);
+
+        float a = x - (float)e;
+
+        return (1 - a) * table_envrate_linear[e & 0x1ff] +
+               a * table_envrate_linear[(e + 1) & 0x1ff];
+    }
+};
+
 void test_np_code()
 {
     std::shared_ptr<NoisePlethoraPlugin> plug;
@@ -252,9 +281,9 @@ void test_np_code()
             ++k;
         }
     }
-    int plugIndex = 0;
-    std::cout << "which to creare?\n";
-    std::cin >> plugIndex;
+    int plugIndex = 4;
+    // std::cout << "which to creare?\n";
+    // std::cin >> plugIndex;
     plug = MyFactory::Instance()->Create(availablePlugins[plugIndex]);
     if (!plug)
     {
@@ -262,33 +291,47 @@ void test_np_code()
         return;
     }
     std::cout << "created " << availablePlugins[plugIndex] << "\n";
-    double sr = 44100;
+    constexpr int BLOCK_SIZE = 64;
+    SRProvider<BLOCK_SIZE> srprovider;
+    srprovider.samplerate = 44100;
+    srprovider.initTables();
+    using LFOType = sst::basic_blocks::modulators::SimpleLFO<SRProvider<BLOCK_SIZE>, BLOCK_SIZE>;
+    LFOType lfo1(&srprovider, 0);
+    LFOType lfo2(&srprovider, 1);
     StereoSimperSVF filter;
     filter.init();
     StereoSimperSVF dcblocker;
-    dcblocker.setCoeff(0.0, 0.01, 1.0 / sr);
+    dcblocker.setCoeff(0.0, 0.01, 1.0 / srprovider.samplerate);
     dcblocker.init();
-    int outlen = sr * 10;
+    int outlen = srprovider.samplerate * 30;
+    unsigned int numoutchans = 4;
     choc::audio::AudioFileProperties outfileprops;
     outfileprops.formatName = "WAV";
     outfileprops.bitDepth = choc::audio::BitDepth::float32;
-    outfileprops.numChannels = 2;
-    outfileprops.sampleRate = sr;
+    outfileprops.numChannels = numoutchans;
+    outfileprops.sampleRate = srprovider.samplerate;
     choc::audio::WAVAudioFileFormat<true> wavformat;
     auto writer = wavformat.createWriter(
         R"(C:\develop\AudioPluginHost_mk2\audio\noise_plethora_out_03.wav)", outfileprops);
-    choc::buffer::ChannelArrayBuffer<float> buf{2, (unsigned int)outlen};
+    choc::buffer::ChannelArrayBuffer<float> buf{numoutchans, (unsigned int)outlen};
     buf.clear();
     plug->init();
-    plug->m_sr = sr;
-    std::minstd_rand0 rng;
-    std::uniform_real_distribution<float> whitenoise{-1.0f, 1.0f};
+    plug->m_sr = srprovider.samplerate;
+    int lfocounter = 0;
     for (int i = 0; i < outlen; ++i)
     {
-        float p0 = 0.5 + 0.5 * std::sin(2 * 3.141592653 / sr * i * 0.3);
-        float p1 = 0.5 + 0.5 * std::sin(2 * 3.141592653 / sr * i * 0.4);
-        float fcutoff = 84.0 + 5.0 * std::sin(2 * 3.141592653 / sr * i * 0.2);
-        filter.setCoeff(fcutoff, 0.7, 1.0 / sr);
+        if (lfocounter == 0)
+        {
+            lfo1.process_block(0.5f, 0.5f, LFOType::Shape::SH_NOISE, false);
+            lfo2.process_block(2.6f, 0.8f, LFOType::Shape::SH_NOISE, false);
+        }
+        ++lfocounter;
+        if (lfocounter == BLOCK_SIZE)
+            lfocounter = 0;
+        float p0 = 0.5 + 0.5 * lfo1.outputBlock[0];
+        float p1 = 0.5 + 0.5 * lfo2.outputBlock[0];
+        float fcutoff = 96.0; // + 5.0 * std::sin(2 * 3.141592653 / sr * i * 0.2);
+        filter.setCoeff(fcutoff, 0.7, 1.0 / srprovider.samplerate);
         plug->process(p0, p1);
         float outL = plug->processGraph();
         float outR = outL;
@@ -296,6 +339,8 @@ void test_np_code()
         filter.step<StereoSimperSVF::LP>(filter, outL, outR);
         buf.getSample(0, i) = outL;
         buf.getSample(1, i) = outR;
+        buf.getSample(2, i) = p0;
+        buf.getSample(3, i) = p1;
     }
     writer->appendFrames(buf.getView());
 }
