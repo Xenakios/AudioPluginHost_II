@@ -10,6 +10,10 @@
 #include "xap_utils.h"
 #include "concurrentqueue.h"
 #include <chrono>
+#include "../Plugins/noise-plethora/plugins/NoisePlethoraPlugin.hpp"
+#include "../Plugins/noise-plethora/plugins/Banks.hpp"
+#include "xapdsp.h"
+#include "audio/choc_AudioFileFormat_WAV.h"
 
 class object_t
 {
@@ -231,9 +235,74 @@ inline void test_pipe()
     std::cout << output[0] << " " << output[1] << "\n";
 }
 
+void test_np_code()
+{
+    std::shared_ptr<NoisePlethoraPlugin> plug;
+    std::string plugToCreate = "satanWorkout";
+    std::unordered_map<int, std::string> availablePlugins;
+    int k = 0;
+    for (int i = 0; i < numBanks; ++i)
+    {
+        auto &bank = getBankForIndex(i);
+        std::cout << "bank " << i << "\n";
+        for (int j = 0; j < programsPerBank; ++j)
+        {
+            std::cout << "\t" << bank.getProgramName(j) << "\n";
+            availablePlugins[k] = bank.getProgramName(j);
+            ++k;
+        }
+    }
+    plug = MyFactory::Instance()->Create(availablePlugins[0]);
+    if (!plug)
+    {
+        std::cout << "could not create plugin\n";
+        return;
+    }
+
+    double sr = 44100;
+    StereoSimperSVF filter;
+    filter.init();
+    StereoSimperSVF dcblocker;
+    dcblocker.setCoeff(0.0, 0.01, 1.0 / sr);
+    dcblocker.init();
+    int outlen = sr * 5;
+    choc::audio::AudioFileProperties outfileprops;
+    outfileprops.formatName = "WAV";
+    outfileprops.bitDepth = choc::audio::BitDepth::float32;
+    outfileprops.numChannels = 2;
+    outfileprops.sampleRate = sr;
+    choc::audio::WAVAudioFileFormat<true> wavformat;
+    auto writer = wavformat.createWriter(
+        R"(C:\develop\AudioPluginHost_mk2\audio\noise_plethora_out_03.wav)",
+        outfileprops);
+    choc::buffer::ChannelArrayBuffer<float> buf{2, (unsigned int)outlen};
+    buf.clear();
+    plug->init();
+    plug->m_sr = sr;
+    std::minstd_rand0 rng;
+    std::uniform_real_distribution<float> whitenoise{-1.0f, 1.0f};
+    for (int i = 0; i < outlen; ++i)
+    {
+        float p0 = 0.5 + 0.5 * std::sin(2 * 3.141592653 / sr * i * 0.3);
+        float p1 = 0.5 + 0.5 * std::sin(2 * 3.141592653 / sr * i * 0.4);
+        float fcutoff = 84.0 + 12.0 * std::sin(2 * 3.141592653 / sr * i * 4.0);
+        filter.setCoeff(fcutoff, 0.7, 1.0 / sr);
+        plug->process(p0, p1);
+        float outL = plug->processGraph();
+        float outR = outL;
+        dcblocker.step<StereoSimperSVF::HP>(dcblocker, outL, outR);
+        filter.step<StereoSimperSVF::LP>(filter, outL, outR);
+        buf.getSample(0, i) = outL;
+        buf.getSample(1, i) = outR;
+        
+    }
+    writer->appendFrames(buf.getView());
+}
+
 int main()
 {
-    test_pipe();
+    test_np_code();
+    // test_pipe();
     // test_moody();
     // test_auto();
     //  test_alt_event_list();

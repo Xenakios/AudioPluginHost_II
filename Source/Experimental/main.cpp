@@ -11,8 +11,7 @@
 #include "xaps/xap_notegenerator.h"
 #include "xaps/xap_modulator.h"
 #include "xclapeventlist.h"
-#include "../Plugins/noise-plethora/plugins/NoisePlethoraPlugin.hpp"
-#include "../Plugins/noise-plethora/plugins/Banks.hpp"
+
 #include "xaudiograph.h"
 #include "xapdsp.h"
 #include <sst/jucegui/components/Knob.h>
@@ -1541,67 +1540,7 @@ inline void testNewEventList()
     printXList(elist);
 }
 
-void test_np_code()
-{
-    std::shared_ptr<NoisePlethoraPlugin> plug;
-    std::string plugToCreate = "satanWorkout";
-    std::unordered_map<int, std::string> availablePlugins;
-    int k = 0;
-    for (int i = 0; i < numBanks; ++i)
-    {
-        auto &bank = getBankForIndex(i);
-        std::cout << "bank " << i << "\n";
-        for (int j = 0; j < programsPerBank; ++j)
-        {
-            std::cout << "\t" << bank.getProgramName(j) << "\n";
-            availablePlugins[k] = bank.getProgramName(j);
-            ++k;
-        }
-    }
-    plug = MyFactory::Instance()->Create(availablePlugins[0]);
-    if (!plug)
-    {
-        std::cout << "could not create plugin\n";
-        return;
-    }
 
-    double sr = 44100;
-    StereoSimperSVF filter;
-    filter.init();
-    StereoSimperSVF dcblocker;
-    dcblocker.setCoeff(0.0, 0.01, 1.0 / sr);
-    dcblocker.init();
-    int outlen = sr * 10;
-    juce::File outfile(
-        R"(C:\develop\AudioPluginHost_mk2\Source\Experimental\audio\noise_plethora_out_02.wav)");
-    outfile.deleteFile();
-    auto ostream = outfile.createOutputStream();
-    juce::WavAudioFormat wav;
-    auto writer = wav.createWriterFor(ostream.release(), sr, 2, 32, {}, 0);
-    juce::AudioBuffer<float> buf(2, outlen);
-    buf.clear();
-
-    plug->init();
-    plug->m_sr = sr;
-    std::minstd_rand0 rng;
-    std::uniform_real_distribution<float> whitenoise{-1.0f, 1.0f};
-    for (int i = 0; i < outlen; ++i)
-    {
-        float p0 = 0.5 + 0.5 * std::sin(2 * 3.141592653 / sr * i * 0.3);
-        float p1 = 0.5 + 0.5 * std::sin(2 * 3.141592653 / sr * i * 0.4);
-        float fcutoff = 84.0 + 12.0 * std::sin(2 * 3.141592653 / sr * i * 4.0);
-        filter.setCoeff(fcutoff, 0.7, 1.0 / sr);
-        plug->process(p0, p1);
-        float outL = plug->processGraph();
-        float outR = outL;
-        dcblocker.step<StereoSimperSVF::HP>(dcblocker, outL, outR);
-        filter.step<StereoSimperSVF::LP>(filter, outL, outR);
-        buf.setSample(0, i, outL);
-        buf.setSample(1, i, outR);
-    }
-    writer->writeFromAudioSampleBuffer(buf, 0, outlen);
-    delete writer;
-}
 
 template <typename ContType> inline void test_keyvaluemap(int iters, std::string benchname)
 {
