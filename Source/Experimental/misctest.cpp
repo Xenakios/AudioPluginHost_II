@@ -247,25 +247,28 @@ void test_np_code()
         std::cout << "bank " << i << "\n";
         for (int j = 0; j < programsPerBank; ++j)
         {
-            std::cout << "\t" << bank.getProgramName(j) << "\n";
+            std::cout << "\t" << bank.getProgramName(j) << "\t\t" << k << "\n";
             availablePlugins[k] = bank.getProgramName(j);
             ++k;
         }
     }
-    plug = MyFactory::Instance()->Create(availablePlugins[0]);
+    int plugIndex = 0;
+    std::cout << "which to creare?\n";
+    std::cin >> plugIndex;
+    plug = MyFactory::Instance()->Create(availablePlugins[plugIndex]);
     if (!plug)
     {
         std::cout << "could not create plugin\n";
         return;
     }
-
+    std::cout << "created " << availablePlugins[plugIndex] << "\n";
     double sr = 44100;
     StereoSimperSVF filter;
     filter.init();
     StereoSimperSVF dcblocker;
     dcblocker.setCoeff(0.0, 0.01, 1.0 / sr);
     dcblocker.init();
-    int outlen = sr * 5;
+    int outlen = sr * 10;
     choc::audio::AudioFileProperties outfileprops;
     outfileprops.formatName = "WAV";
     outfileprops.bitDepth = choc::audio::BitDepth::float32;
@@ -273,8 +276,7 @@ void test_np_code()
     outfileprops.sampleRate = sr;
     choc::audio::WAVAudioFileFormat<true> wavformat;
     auto writer = wavformat.createWriter(
-        R"(C:\develop\AudioPluginHost_mk2\audio\noise_plethora_out_03.wav)",
-        outfileprops);
+        R"(C:\develop\AudioPluginHost_mk2\audio\noise_plethora_out_03.wav)", outfileprops);
     choc::buffer::ChannelArrayBuffer<float> buf{2, (unsigned int)outlen};
     buf.clear();
     plug->init();
@@ -285,7 +287,7 @@ void test_np_code()
     {
         float p0 = 0.5 + 0.5 * std::sin(2 * 3.141592653 / sr * i * 0.3);
         float p1 = 0.5 + 0.5 * std::sin(2 * 3.141592653 / sr * i * 0.4);
-        float fcutoff = 84.0 + 12.0 * std::sin(2 * 3.141592653 / sr * i * 4.0);
+        float fcutoff = 84.0 + 5.0 * std::sin(2 * 3.141592653 / sr * i * 0.2);
         filter.setCoeff(fcutoff, 0.7, 1.0 / sr);
         plug->process(p0, p1);
         float outL = plug->processGraph();
@@ -294,7 +296,6 @@ void test_np_code()
         filter.step<StereoSimperSVF::LP>(filter, outL, outR);
         buf.getSample(0, i) = outL;
         buf.getSample(1, i) = outR;
-        
     }
     writer->appendFrames(buf.getView());
 }
