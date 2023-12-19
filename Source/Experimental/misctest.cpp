@@ -322,7 +322,7 @@ void test_np_code()
     {
         if (lfocounter == 0)
         {
-            lfo1.process_block(0.5f, 0.5f, LFOType::Shape::SH_NOISE, false);
+            lfo1.process_block(0.5f, 0.5f, LFOType::Shape::SINE, false);
             lfo2.process_block(2.6f, 0.8f, LFOType::Shape::SH_NOISE, false);
         }
         ++lfocounter;
@@ -337,8 +337,8 @@ void test_np_code()
         float outR = outL;
         dcblocker.step<StereoSimperSVF::HP>(dcblocker, outL, outR);
         filter.step<StereoSimperSVF::LP>(filter, outL, outR);
-        buf.getSample(0, i) = outL;
-        buf.getSample(1, i) = outR;
+        buf.getSample(0, i) = outL * 0.5;
+        buf.getSample(1, i) = outR * 0.5;
         buf.getSample(2, i) = p0;
         buf.getSample(3, i) = p1;
     }
