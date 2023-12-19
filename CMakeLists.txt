@@ -44,38 +44,6 @@ include_directories(
     libs/WDL
 )
 
-juce_add_plugin(AudioPlayer
-    # VERSION ...                               # Set this if the plugin version is different to the project version
-    # ICON_BIG ...                              # ICON_* arguments specify a path to an image file to use as an icon for the Standalone
-    # ICON_SMALL ...
-    COMPANY_NAME Xenakios                          # Specify the name of the plugin's author
-    IS_SYNTH FALSE                       # Is this a synth or an effect?
-    NEEDS_MIDI_INPUT FALSE               # Does the plugin need midi input?
-    # NEEDS_MIDI_OUTPUT TRUE/FALSE              # Does the plugin need midi output?
-    # IS_MIDI_EFFECT TRUE/FALSE                 # Is this plugin a MIDI effect?
-    # EDITOR_WANTS_KEYBOARD_FOCUS TRUE/FALSE    # Does the editor need keyboard focus?
-    COPY_PLUGIN_AFTER_BUILD TRUE        # Should the plugin be installed to a default location after building?
-    PLUGIN_MANUFACTURER_CODE XenA               # A four-character manufacturer id with at least one upper-case character
-    PLUGIN_CODE Dbgb                            # A unique four-character plugin id with exactly one upper-case character
-                                                # GarageBand 10.3 requires the first letter to be upper-case, and the remaining letters to be lower-case
-    FORMATS VST3 Standalone                  # The formats to build. Other valid formats are: AAX Unity VST AU AUv3
-    PRODUCT_NAME "AudioPlayer")        # The name of the final executable, which can differ from the target name
-
-    juce_generate_juce_header(AudioPlayer)
-
-target_sources(AudioPlayer PRIVATE
-    Source/Plugins/AudioFilePlayerPlugin.cpp)
-
-target_compile_definitions(AudioPlayer
-    PUBLIC
-        # JUCE_WEB_BROWSER and JUCE_USE_CURL would be on by default, but you might not need them.
-        JUCE_WEB_BROWSER=0  # If you remove this, add `NEEDS_WEB_BROWSER TRUE` to the `juce_add_plugin` call
-        JUCE_USE_CURL=0     # If you remove this, add `NEEDS_CURL TRUE` to the `juce_add_plugin` call
-        JUCE_DISPLAY_SPLASH_SCREEN=0
-        JUCE_PLUGINHOST_VST3=0
-        JUCE_VST3_CAN_REPLACE_VST2=0
-        _USE_MATH_DEFINES=1)
-
 juce_add_console_app(ConsoleAppExample
     PRODUCT_NAME "Console App Example") 
 juce_generate_juce_header(ConsoleAppExample)
@@ -112,11 +80,9 @@ target_sources(ConsoleAppExample
         libs/WDL/WDL/resample.cpp
         )
     
-# add_subdirectory(libs/fmt EXCLUDE_FROM_ALL)
-add_subdirectory(libs/fmt)
 
-add_executable(TestingProgram Source/Experimental/misctest.cpp)
-
+# for "reasons", this is still a console app even though a GUI app is built from it
+# we should have a separate real console app and a real GUI app
 target_compile_definitions(ConsoleAppExample
 PRIVATE
     # JUCE_WEB_BROWSER and JUCE_USE_CURL would be on by default, but you might not need them.
@@ -138,6 +104,9 @@ target_link_libraries(ConsoleAppExample
         # juce::juce_recommended_warning_flags)
 )    
 
+# add_subdirectory(libs/fmt EXCLUDE_FROM_ALL)
+add_subdirectory(libs/fmt)
+
 juce_add_binary_data(AudioPluginHostData SOURCES
     Assets/cassette_recorder.wav
     Assets/cello.wav
@@ -146,14 +115,8 @@ juce_add_binary_data(AudioPluginHostData SOURCES
     Assets/reverb_ir.wav
     Assets/singing.ogg)
 
-target_link_libraries(AudioPlayer PRIVATE
-    AudioPluginHostData
-    juce::juce_audio_utils
-    juce::juce_cryptography
-    juce::juce_dsp
-    juce::juce_opengl
-    juce::juce_recommended_config_flags
-    
-    juce::juce_recommended_warning_flags)
+# this is used for simple C++ testing/experimenting stuff without Juce
+add_executable(TestingProgram Source/Experimental/misctest.cpp)
+
 # juce::juce_recommended_lto_flags
 # juce_add_bundle_resources_directory(AudioPluginHost2 Assets)
