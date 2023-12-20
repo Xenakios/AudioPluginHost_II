@@ -359,7 +359,6 @@ template <size_t BLOCK_SIZE = 64> class Envelope
             std::cout << "update current point index to " << currentPointIndex << " at tpos " << t
                       << "\n";
         }
-            
     }
     // interpolate_mode :
     // 0 : sample accurately interpolates into the outputBlock
@@ -376,7 +375,7 @@ template <size_t BLOCK_SIZE = 64> class Envelope
         {
             updateCurrentPointIndex(timepos);
         }
-            
+
         int index0 = currentPointIndex;
         assert(index0 >= 0);
         auto &pt0 = getPointSafe(index0);
@@ -519,7 +518,7 @@ void test_np_code()
     LFOType lfo2(&srprovider, 1);
     LFOType lfo3(&srprovider, 2);
 
-    Envelope<BLOCK_SIZE> filtenv{{{0.0, 0.0}, {2.0, 0.0}, {3.0, 90.0}, {10.0, 48.0}}};
+    Envelope<BLOCK_SIZE> filtenv{{{0.0, 0.0}, {2.0, 48.0}, {3.0, 90.0}, {8.0, 80.0}, {10.0, 48.0}}};
     /*
     filtenv.addPoint({0.0, 0.0});
     filtenv.addPoint({2.0, 0.0});
@@ -529,13 +528,13 @@ void test_np_code()
     */
 
     Envelope<BLOCK_SIZE> volenv;
-    volenv.addPoint({0.0, 0.0});
-    volenv.addPoint({1.0, 1.0});
-    volenv.addPoint({5.0, 0.8, EnvelopePoint::Shape::Hold});
-    volenv.addPoint({6.000, 0.0, EnvelopePoint::Shape::Hold});
+    volenv.addPoint({0.0, -100.0});
+    volenv.addPoint({1.0, 0});
+    volenv.addPoint({5.0, -3, EnvelopePoint::Shape::Hold});
+    volenv.addPoint({6.000, -100, EnvelopePoint::Shape::Linear});
     // volenv.addPoint({5.005, 1.0});
-    volenv.addPoint({9.0, 1.0});
-    volenv.addPoint({10.0, 0.0});
+    volenv.addPoint({9.0, 0.0});
+    volenv.addPoint({10.0, -100.0});
     volenv.sortPoints();
 
     StereoSimperSVF filter;
@@ -544,7 +543,7 @@ void test_np_code()
     dcblocker.setCoeff(12.0, 0.01, 1.0 / srprovider.samplerate);
     dcblocker.init();
     int outlen = srprovider.samplerate * 30;
-    unsigned int numoutchans = 4;
+    unsigned int numoutchans = 6;
     choc::audio::AudioFileProperties outfileprops;
     outfileprops.formatName = "WAV";
     outfileprops.bitDepth = choc::audio::BitDepth::float32;
@@ -563,19 +562,21 @@ void test_np_code()
 
     for (int i = 0; i < outlen; ++i)
     {
+        double pos_in_secs = i / outfileprops.sampleRate;
+        pos_in_secs = std::fmod(pos_in_secs, 10.0);
         if (lfocounter == 0)
         {
             lfo1.process_block(0.5f, 0.0f, LFOType::Shape::SINE, false);
             lfo2.process_block(2.6f, 0.8f, LFOType::Shape::SH_NOISE, false);
             lfo3.process_block(-0.43f, 0.0f, LFOType::Shape::SINE, false);
             // float fcutoff = 84.0 + 9.0 * lfo3.outputBlock[0];
-            filtenv.processBlock(i / outfileprops.sampleRate, outfileprops.sampleRate, 2);
+            filtenv.processBlock(pos_in_secs, outfileprops.sampleRate, 2);
 
             float fcutoff = filtenv.outputBlock[0];
             filter.setCoeff(fcutoff, 0.7, 1.0 / srprovider.samplerate);
-            volenv.processBlock(i / outfileprops.sampleRate, outfileprops.sampleRate, 0);
+            volenv.processBlock(pos_in_secs, outfileprops.sampleRate, 0);
         }
-        float gain = volenv.outputBlock[lfocounter];
+        float gain = xenakios::decibelsToGain(volenv.outputBlock[lfocounter]);
         ++lfocounter;
         if (lfocounter == BLOCK_SIZE)
             lfocounter = 0;
@@ -587,10 +588,12 @@ void test_np_code()
         float outR = outL;
         dcblocker.step<StereoSimperSVF::HP>(dcblocker, outL, outR);
         filter.step<StereoSimperSVF::LP>(filter, outL, outR);
-        chansdata[0][i] = gain; // outL * gain;
+        chansdata[0][i] = outL * gain;
         chansdata[1][i] = outR * gain;
         chansdata[2][i] = p0;
         chansdata[3][i] = p1;
+        chansdata[4][i] = xenakios::mapvalue(filtenv.outputBlock[0], 0.0f, 100.0f, 0.0f, 1.0f);
+        chansdata[5][i] = gain;
     }
     writer->appendFrames(buf.getView());
 }

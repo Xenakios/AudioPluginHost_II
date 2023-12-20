@@ -32,6 +32,12 @@ Type mapvalue(Type sourceValue, Type sourceRangeMin, Type sourceRangeMax, Type t
                                 (sourceRangeMax - sourceRangeMin);
 }
 
+template <typename Type>
+static Type decibelsToGain(Type decibels, Type minusInfinityDb = Type(-100))
+{
+    return decibels > minusInfinityDb ? std::pow(Type(10.0), decibels * Type(0.05)) : Type();
+}
+
 struct CrossThreadMessage
 {
     CrossThreadMessage() {}
