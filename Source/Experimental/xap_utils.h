@@ -21,7 +21,16 @@ template <typename T> inline clap_id to_clap_id(T x) { return static_cast<clap_i
 namespace xenakios
 {
 
-
+/** Remaps a value from a source range to a target range. */
+template <typename Type>
+Type mapvalue(Type sourceValue, Type sourceRangeMin, Type sourceRangeMax, Type targetRangeMin,
+              Type targetRangeMax)
+{
+    // jassert (! approximatelyEqual (sourceRangeMax, sourceRangeMin)); // mapping from a range of
+    // zero will produce NaN!
+    return targetRangeMin + ((targetRangeMax - targetRangeMin) * (sourceValue - sourceRangeMin)) /
+                                (sourceRangeMax - sourceRangeMin);
+}
 
 struct CrossThreadMessage
 {
@@ -139,8 +148,6 @@ class SortingEventList
     bool sorted = false;
 };
 
-
-
 inline clap_event_param_gesture make_event_param_gesture(uint32_t time, clap_id paramid,
                                                          bool is_begin)
 {
@@ -235,7 +242,6 @@ make_event_note_expression(uint32_t time, clap_note_expression net, int16_t port
     result.value = value;
     return result;
 }
-
 
 inline void pushParamEvent(clap::helpers::EventList &elist, bool is_mod, uint32_t timeStamp,
                            clap_id paramId, double value)

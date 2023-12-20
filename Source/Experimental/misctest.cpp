@@ -273,9 +273,11 @@ template <size_t BLOCK_SIZE = 64> class Envelope
 {
   public:
     float outputBlock[BLOCK_SIZE];
-    Envelope()
+    Envelope(std::optional<double> defaultValue = {})
     {
         m_points.reserve(16);
+        if (defaultValue)
+            addPoint({0.0, *defaultValue});
         for (int i = 0; i < BLOCK_SIZE; ++i)
             outputBlock[i] = 0.0f;
     }
@@ -284,10 +286,29 @@ template <size_t BLOCK_SIZE = 64> class Envelope
         m_points.push_back(pt);
         m_sorted = false;
     }
+    void removeEnvelopePointAtIndex(size_t index) { m_points.erase(m_points.begin() + index); }
+    // use carefully, only when you are going to add new at least one point right after this
     void clearAllPoints()
     {
         m_points.clear();
         m_sorted = false;
+    }
+    // value = normalized 0..1 position in the envelope segment
+    static double getShapedValue(double value, EnvelopePoint::Shape shape, double p0, double p1)
+    {
+        if (shape == EnvelopePoint::Shape::Linear)
+            return value;
+        // holds the value for 99% the segment length, then ramps to the next value
+        // literal sudden jump is almost never useful, but we might want to support that too...
+        if (shape == EnvelopePoint::Shape::Hold)
+        {
+            // we might want to somehow make this work based on samples/time,
+            // but percentage will have to work for now
+            if (value < 0.99)
+                return 0.0;
+            return xenakios::mapvalue(value, 0.99, 1.0, 0.0, 1.0);
+        }
+        return value;
     }
     size_t getNumPoints() const { return m_points.size(); }
     // int because we want to allow negative index...
@@ -310,7 +331,8 @@ template <size_t BLOCK_SIZE = 64> class Envelope
     // 0 : sample accurately interpolates into the outputBlock
     // 1 : fills the output block with the same sampled value from the envelope at the timepos
     // 2 : sets only the first outputBlock element into the sampled value from the envelope at the
-    // timepos, useful if you know you are never going to care about about the other array elements
+    // timepos, useful if you really know you are never going to care about about the other array
+    // elements
     void processBlock(double timepos, double samplerate, int interpolate_mode)
     {
         // behavior would be undefined if the envelope points are not sorted or if no points
@@ -348,12 +370,14 @@ template <size_t BLOCK_SIZE = 64> class Envelope
                 {
                     outputBlock[i] = outvalue;
                 }
-            } else
+            }
+            else
                 outputBlock[0] = outvalue;
-            
+
             return;
         }
         const double invsr = 1.0 / samplerate;
+        auto shape = pt0.getShape();
         for (int i = 0; i < BLOCK_SIZE; ++i)
         {
             double outvalue = x0;
@@ -363,10 +387,14 @@ template <size_t BLOCK_SIZE = 64> class Envelope
             else
             {
                 double ydiff = y1 - y0;
-                outvalue = y0 + ydiff * ((1.0 / xdiff * (timepos - x0)));
+                double normpos = ((1.0 / xdiff * (timepos - x0)));
+                normpos = Envelope::getShapedValue(normpos, shape, 0.0, 0.0);
+                outvalue = y0 + ydiff * normpos;
             }
             outputBlock[i] = outvalue;
             timepos += invsr;
+            // we may get to the next envelope point within the block, so
+            // advance and update as needed
             if (timepos >= x1)
             {
                 ++index0;
@@ -376,6 +404,7 @@ template <size_t BLOCK_SIZE = 64> class Envelope
                 x1 = tpt1.getX();
                 y0 = tpt0.getY();
                 y1 = tpt1.getY();
+                shape = tpt0.getShape();
             }
         }
     }
@@ -468,9 +497,9 @@ void test_np_code()
     Envelope<BLOCK_SIZE> volenv;
     volenv.addPoint({0.0, 0.0});
     volenv.addPoint({1.0, 1.0});
-    volenv.addPoint({5.0, 1.0});
-    volenv.addPoint({5.001, 0.0});
-    volenv.addPoint({5.005, 1.0});
+    volenv.addPoint({5.0, 0.8, EnvelopePoint::Shape::Hold});
+    volenv.addPoint({6.000, 0.0});
+    // volenv.addPoint({5.005, 1.0});
     volenv.addPoint({9.0, 1.0});
     volenv.addPoint({10.0, 0.0});
     volenv.sortPoints();
@@ -507,7 +536,7 @@ void test_np_code()
             lfo3.process_block(-0.43f, 0.0f, LFOType::Shape::SINE, false);
             // float fcutoff = 84.0 + 9.0 * lfo3.outputBlock[0];
             filtenv.processBlock(i / outfileprops.sampleRate, outfileprops.sampleRate, 2);
-            // fcutoff = filtenv.getInterpolatedYFromX(i / outfileprops.sampleRate);
+
             float fcutoff = filtenv.outputBlock[0];
             filter.setCoeff(fcutoff, 0.7, 1.0 / srprovider.samplerate);
             volenv.processBlock(i / outfileprops.sampleRate, outfileprops.sampleRate, 0);
