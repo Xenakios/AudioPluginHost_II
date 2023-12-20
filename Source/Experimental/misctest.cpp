@@ -263,6 +263,13 @@ class EnvelopePoint
     Shape m_shape = Shape::Linear;
 };
 
+
+// Simple breakpoint envelope class, modelled after the SST LFO.
+// Output is always calculated into the outputBlock array.
+// For more efficiency the envelope may be sampled without full sample accurate interpolation
+// over the block size. Obviously that won't be ideal for things like volume or pan automation,
+// but can be used in cases where the fully interpolated values may not be needed, like
+// filter cutoffs.
 template <size_t BLOCK_SIZE = 64> class Envelope
 {
   public:
@@ -276,6 +283,11 @@ template <size_t BLOCK_SIZE = 64> class Envelope
     void addPoint(EnvelopePoint pt)
     {
         m_points.push_back(pt);
+        m_sorted = false;
+    }
+    void clearAllPoints()
+    {
+        m_points.clear();
         m_sorted = false;
     }
     size_t getNumPoints() const { return m_points.size(); }
@@ -295,85 +307,13 @@ template <size_t BLOCK_SIZE = 64> class Envelope
             [](const EnvelopePoint &a, const EnvelopePoint &b) { return a.getX() < b.getX(); });
         m_sorted = true;
     }
-    double getInterpolatedYFromX(double x)
+    // if full_interpolate true, fills output block with sample accurately interpolated output
+    // otherwise fills the block with the same sampled value, which might miss some tight envelope
+    // points etc
+    void processBlock(double timepos, double samplerate, bool full_interpolate)
     {
-        if (m_points.size() == 0)
-            return 0.0;
-        if (x < m_points.front().getX())
-            return m_points.front().getY();
-        if (x > m_points.back().getX())
-            return m_points.back().getY();
-        int index0 = 0;
-        for (int i = 0; i < m_points.size(); ++i)
-        {
-            if (x >= m_points[i].getX())
-            {
-                index0 = i;
-                // break;
-            }
-        }
-        auto &pt0 = getPointSafe(index0);
-        auto &pt1 = getPointSafe(index0 + 1);
-        double x0 = pt0.getX();
-        double x1 = pt1.getX();
-        double xdiff = x1 - x0;
-        double y0 = pt0.getY();
-        double y1 = pt1.getY();
-        if (xdiff < 0.00001)
-            return y1;
-        double ydiff = y1 - y0;
-        return y0 + ydiff * ((1.0 / xdiff * (x - x0)));
-        // return y0+(y1-y0)
-    }
-    struct Iterator
-    {
-        Iterator(Envelope &o) : owner(o) {}
-        Envelope &owner;
-        size_t nextIndex = 0;
-        double currentTime = 0.0;
-        void seek(double newTimeStamp)
-        {
-            for (size_t i = 0; i < owner.m_points.size(); ++i)
-            {
-                if (newTimeStamp >= owner.m_points[i].getX())
-                {
-                    nextIndex = i;
-                    break;
-                }
-            }
-            /*
-            auto eventData = owner.m_points.data();
-
-            while (nextIndex != 0 && eventData[nextIndex - 1].getX() >= newTimeStamp)
-                --nextIndex;
-
-            while (nextIndex < owner.m_points.size() && eventData[nextIndex].getX() < newTimeStamp)
-                ++nextIndex;
-
-            currentTime = newTimeStamp;
-            */
-        }
-        std::pair<size_t, size_t> readNextEvents(double duration)
-        {
-            auto start = nextIndex;
-            auto eventData = owner.m_points.data();
-            auto end = start;
-            auto total = owner.m_points.size();
-            auto endTime = currentTime + duration;
-            currentTime = endTime;
-
-            while (end < total && eventData[end].getX() < endTime)
-                ++end;
-
-            nextIndex = end;
-
-            return {start, end};
-        }
-    };
-    // if interpolate true, fills output block with sample accurately interpolated output
-    // otherwise fills the block with the same value
-    void processBlock(double timepos, double samplerate, bool interpolate)
-    {
+        // behavior would be undefined if the envelope points are not sorted or if no points
+        assert(m_sorted && m_points.size() > 0);
         // we should obviously cache the current index or something
         // but for now, just search for it each time
         int index0 = 0;
@@ -390,6 +330,23 @@ template <size_t BLOCK_SIZE = 64> class Envelope
         double x1 = pt1.getX();
         double y0 = pt0.getY();
         double y1 = pt1.getY();
+        if (!full_interpolate)
+        {
+            double outvalue = x0;
+            double xdiff = x1 - x0;
+            if (xdiff < 0.00001)
+                outvalue = y1;
+            else
+            {
+                double ydiff = y1 - y0;
+                outvalue = y0 + ydiff * ((1.0 / xdiff * (timepos - x0)));
+            }
+            for (int i = 0; i < BLOCK_SIZE; ++i)
+            {
+                outputBlock[i] = outvalue;
+            }
+            return;
+        }
         const double invsr = 1.0 / samplerate;
         for (int i = 0; i < BLOCK_SIZE; ++i)
         {
@@ -429,15 +386,6 @@ inline void test_envelope()
     env.addPoint({10.0, 1.0});
     env.addPoint({20.0, 0.25});
     env.sortPoints();
-    Envelope<64>::Iterator iter(env);
-
-    for (double x = 0.0; x < 25.0f; x += 2.0)
-    {
-        // iter.seek(x);
-        //  auto points = iter.readNextEvents(x);
-        double y = env.getInterpolatedYFromX(x);
-        std::cout << x << "\t" << y << "\n";
-    }
 }
 
 template <size_t BLOCK_SIZE> struct SRProvider
@@ -552,7 +500,7 @@ void test_np_code()
             lfo2.process_block(2.6f, 0.8f, LFOType::Shape::SH_NOISE, false);
             lfo3.process_block(-0.43f, 0.0f, LFOType::Shape::SINE, false);
             // float fcutoff = 84.0 + 9.0 * lfo3.outputBlock[0];
-            filtenv.processBlock(i / outfileprops.sampleRate, outfileprops.sampleRate, true);
+            filtenv.processBlock(i / outfileprops.sampleRate, outfileprops.sampleRate, false);
             // fcutoff = filtenv.getInterpolatedYFromX(i / outfileprops.sampleRate);
             float fcutoff = filtenv.outputBlock[0];
             filter.setCoeff(fcutoff, 0.7, 1.0 / srprovider.samplerate);
@@ -570,7 +518,7 @@ void test_np_code()
         float outR = outL;
         dcblocker.step<StereoSimperSVF::HP>(dcblocker, outL, outR);
         filter.step<StereoSimperSVF::LP>(filter, outL, outR);
-        chansdata[0][i] = outL * gain;
+        chansdata[0][i] = gain; // outL * gain;
         chansdata[1][i] = outR * gain;
         chansdata[2][i] = p0;
         chansdata[3][i] = p1;
