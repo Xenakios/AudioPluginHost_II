@@ -265,21 +265,28 @@ class EnvelopePoint
 
 // Simple breakpoint envelope class, modelled after the SST LFO.
 // Output is always calculated into the outputBlock array.
-// For more efficiency the envelope may be sampled without full sample accurate interpolation
-// over the block size. Obviously that won't be ideal for things like volume or pan automation,
-// but can be used in cases where the fully interpolated values may not be needed, like
-// filter cutoffs.
+// This aims to be as simple as possible, to allow composing
+// more complicated things elsewhere.
 template <size_t BLOCK_SIZE = 64> class Envelope
 {
   public:
     float outputBlock[BLOCK_SIZE];
-    Envelope(std::optional<double> defaultValue = {})
+    void clearOutputBlock()
     {
-        m_points.reserve(16);
-        if (defaultValue)
-            addPoint({0.0, *defaultValue});
         for (int i = 0; i < BLOCK_SIZE; ++i)
             outputBlock[i] = 0.0f;
+    }
+    Envelope(std::optional<double> defaultPointValue = {})
+    {
+        m_points.reserve(16);
+        if (defaultPointValue)
+            addPoint({0.0, *defaultPointValue});
+        clearOutputBlock();
+    }
+    Envelope(std::vector<EnvelopePoint> points) : m_points(std::move(points))
+    {
+        sortPoints();
+        clearOutputBlock();
     }
     void addPoint(EnvelopePoint pt)
     {
@@ -287,7 +294,7 @@ template <size_t BLOCK_SIZE = 64> class Envelope
         m_sorted = false;
     }
     void removeEnvelopePointAtIndex(size_t index) { m_points.erase(m_points.begin() + index); }
-    // use carefully, only when you are going to add new at least one point right after this
+    // use carefully, only when you are going to add at least one point right after this
     void clearAllPoints()
     {
         m_points.clear();
@@ -327,6 +334,33 @@ template <size_t BLOCK_SIZE = 64> class Envelope
             [](const EnvelopePoint &a, const EnvelopePoint &b) { return a.getX() < b.getX(); });
         m_sorted = true;
     }
+    int currentPointIndex = -1;
+    void updateCurrentPointIndex(double t)
+    {
+        int newIndex = currentPointIndex;
+        if (t < m_points.front().getX())
+            newIndex = 0;
+        else if (t > m_points.back().getX())
+            newIndex = m_points.size() - 1;
+        else
+        {
+            for (int i = 0; i < m_points.size(); ++i)
+            {
+                if (t >= m_points[i].getX())
+                {
+                    newIndex = i;
+                }
+            }
+        }
+
+        if (newIndex != currentPointIndex)
+        {
+            currentPointIndex = newIndex;
+            std::cout << "update current point index to " << currentPointIndex << " at tpos " << t
+                      << "\n";
+        }
+            
+    }
     // interpolate_mode :
     // 0 : sample accurately interpolates into the outputBlock
     // 1 : fills the output block with the same sampled value from the envelope at the timepos
@@ -337,16 +371,14 @@ template <size_t BLOCK_SIZE = 64> class Envelope
     {
         // behavior would be undefined if the envelope points are not sorted or if no points
         assert(m_sorted && m_points.size() > 0);
-        // we should obviously cache the current index or something
-        // but for now, just search for it each time
-        int index0 = 0;
-        for (int i = 0; i < m_points.size(); ++i)
+        if (currentPointIndex == -1 || timepos < m_points[currentPointIndex].getX() ||
+            timepos >= getPointSafe(currentPointIndex + 1).getX())
         {
-            if (timepos >= m_points[i].getX())
-            {
-                index0 = i;
-            }
+            updateCurrentPointIndex(timepos);
         }
+            
+        int index0 = currentPointIndex;
+        assert(index0 >= 0);
         auto &pt0 = getPointSafe(index0);
         auto &pt1 = getPointSafe(index0 + 1);
         double x0 = pt0.getX();
@@ -487,18 +519,20 @@ void test_np_code()
     LFOType lfo2(&srprovider, 1);
     LFOType lfo3(&srprovider, 2);
 
-    Envelope<BLOCK_SIZE> filtenv;
+    Envelope<BLOCK_SIZE> filtenv{{{0.0, 0.0}, {2.0, 0.0}, {3.0, 90.0}, {10.0, 48.0}}};
+    /*
     filtenv.addPoint({0.0, 0.0});
     filtenv.addPoint({2.0, 0.0});
     filtenv.addPoint({3.0, 90.0});
     filtenv.addPoint({10.0, 48.0});
     filtenv.sortPoints();
+    */
 
     Envelope<BLOCK_SIZE> volenv;
     volenv.addPoint({0.0, 0.0});
     volenv.addPoint({1.0, 1.0});
     volenv.addPoint({5.0, 0.8, EnvelopePoint::Shape::Hold});
-    volenv.addPoint({6.000, 0.0});
+    volenv.addPoint({6.000, 0.0, EnvelopePoint::Shape::Hold});
     // volenv.addPoint({5.005, 1.0});
     volenv.addPoint({9.0, 1.0});
     volenv.addPoint({10.0, 0.0});
