@@ -263,7 +263,6 @@ class EnvelopePoint
     Shape m_shape = Shape::Linear;
 };
 
-
 // Simple breakpoint envelope class, modelled after the SST LFO.
 // Output is always calculated into the outputBlock array.
 // For more efficiency the envelope may be sampled without full sample accurate interpolation
@@ -307,10 +306,12 @@ template <size_t BLOCK_SIZE = 64> class Envelope
             [](const EnvelopePoint &a, const EnvelopePoint &b) { return a.getX() < b.getX(); });
         m_sorted = true;
     }
-    // if full_interpolate true, fills output block with sample accurately interpolated output
-    // otherwise fills the block with the same sampled value, which might miss some tight envelope
-    // points etc
-    void processBlock(double timepos, double samplerate, bool full_interpolate)
+    // interpolate_mode :
+    // 0 : sample accurately interpolates into the outputBlock
+    // 1 : fills the output block with the same sampled value from the envelope at the timepos
+    // 2 : sets only the first outputBlock element into the sampled value from the envelope at the
+    // timepos, useful if you know you are never going to care about about the other array elements
+    void processBlock(double timepos, double samplerate, int interpolate_mode)
     {
         // behavior would be undefined if the envelope points are not sorted or if no points
         assert(m_sorted && m_points.size() > 0);
@@ -330,7 +331,7 @@ template <size_t BLOCK_SIZE = 64> class Envelope
         double x1 = pt1.getX();
         double y0 = pt0.getY();
         double y1 = pt1.getY();
-        if (!full_interpolate)
+        if (interpolate_mode > 0)
         {
             double outvalue = x0;
             double xdiff = x1 - x0;
@@ -341,10 +342,15 @@ template <size_t BLOCK_SIZE = 64> class Envelope
                 double ydiff = y1 - y0;
                 outvalue = y0 + ydiff * ((1.0 / xdiff * (timepos - x0)));
             }
-            for (int i = 0; i < BLOCK_SIZE; ++i)
+            if (interpolate_mode == 1)
             {
-                outputBlock[i] = outvalue;
-            }
+                for (int i = 0; i < BLOCK_SIZE; ++i)
+                {
+                    outputBlock[i] = outvalue;
+                }
+            } else
+                outputBlock[0] = outvalue;
+            
             return;
         }
         const double invsr = 1.0 / samplerate;
@@ -500,11 +506,11 @@ void test_np_code()
             lfo2.process_block(2.6f, 0.8f, LFOType::Shape::SH_NOISE, false);
             lfo3.process_block(-0.43f, 0.0f, LFOType::Shape::SINE, false);
             // float fcutoff = 84.0 + 9.0 * lfo3.outputBlock[0];
-            filtenv.processBlock(i / outfileprops.sampleRate, outfileprops.sampleRate, false);
+            filtenv.processBlock(i / outfileprops.sampleRate, outfileprops.sampleRate, 2);
             // fcutoff = filtenv.getInterpolatedYFromX(i / outfileprops.sampleRate);
             float fcutoff = filtenv.outputBlock[0];
             filter.setCoeff(fcutoff, 0.7, 1.0 / srprovider.samplerate);
-            volenv.processBlock(i / outfileprops.sampleRate, outfileprops.sampleRate, true);
+            volenv.processBlock(i / outfileprops.sampleRate, outfileprops.sampleRate, 0);
         }
         float gain = volenv.outputBlock[lfocounter];
         ++lfocounter;
