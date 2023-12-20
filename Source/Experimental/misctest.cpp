@@ -14,6 +14,7 @@
 #include "../Plugins/noise-plethora/plugins/Banks.hpp"
 #include "xapdsp.h"
 #include "audio/choc_AudioFileFormat_WAV.h"
+#include "containers/choc_NonAllocatingStableSort.h"
 #include "sst/basic-blocks/modulators/SimpleLFO.h"
 
 class object_t
@@ -236,6 +237,209 @@ inline void test_pipe()
     std::cout << output[0] << " " << output[1] << "\n";
 }
 
+class EnvelopePoint
+{
+  public:
+    enum class Shape
+    {
+        Linear,
+        Hold,
+        Last
+    };
+    EnvelopePoint() {}
+    EnvelopePoint(double x, double y, Shape s = Shape::Linear, double p0 = 0.0, double p1 = 0.0)
+        : m_x(x), m_y(y), m_shape(s), m_p0(p0), m_p1(p1)
+    {
+    }
+    double getX() const { return m_x; }
+    double getY() const { return m_y; }
+    Shape getShape() const { return m_shape; }
+
+  private:
+    double m_x = 0.0;
+    double m_y = 0.0;
+    double m_p0 = 0.0;
+    double m_p1 = 0.0;
+    Shape m_shape = Shape::Linear;
+};
+
+template <size_t BLOCK_SIZE = 64> class Envelope
+{
+  public:
+    float outputBlock[BLOCK_SIZE];
+    Envelope()
+    {
+        m_points.reserve(16);
+        for (int i = 0; i < BLOCK_SIZE; ++i)
+            outputBlock[i] = 0.0f;
+    }
+    void addPoint(EnvelopePoint pt)
+    {
+        m_points.push_back(pt);
+        m_sorted = false;
+    }
+    size_t getNumPoints() const { return m_points.size(); }
+    // int because we want to allow negative index...
+    const EnvelopePoint &getPointSafe(int index) const
+    {
+        if (index < 0)
+            return m_points.front();
+        if (index >= m_points.size())
+            return m_points.back();
+        return m_points[index];
+    }
+    void sortPoints()
+    {
+        choc::sorting::stable_sort(
+            m_points.begin(), m_points.end(),
+            [](const EnvelopePoint &a, const EnvelopePoint &b) { return a.getX() < b.getX(); });
+        m_sorted = true;
+    }
+    double getInterpolatedYFromX(double x)
+    {
+        if (m_points.size() == 0)
+            return 0.0;
+        if (x < m_points.front().getX())
+            return m_points.front().getY();
+        if (x > m_points.back().getX())
+            return m_points.back().getY();
+        int index0 = 0;
+        for (int i = 0; i < m_points.size(); ++i)
+        {
+            if (x >= m_points[i].getX())
+            {
+                index0 = i;
+                // break;
+            }
+        }
+        auto &pt0 = getPointSafe(index0);
+        auto &pt1 = getPointSafe(index0 + 1);
+        double x0 = pt0.getX();
+        double x1 = pt1.getX();
+        double xdiff = x1 - x0;
+        double y0 = pt0.getY();
+        double y1 = pt1.getY();
+        if (xdiff < 0.00001)
+            return y1;
+        double ydiff = y1 - y0;
+        return y0 + ydiff * ((1.0 / xdiff * (x - x0)));
+        // return y0+(y1-y0)
+    }
+    struct Iterator
+    {
+        Iterator(Envelope &o) : owner(o) {}
+        Envelope &owner;
+        size_t nextIndex = 0;
+        double currentTime = 0.0;
+        void seek(double newTimeStamp)
+        {
+            for (size_t i = 0; i < owner.m_points.size(); ++i)
+            {
+                if (newTimeStamp >= owner.m_points[i].getX())
+                {
+                    nextIndex = i;
+                    break;
+                }
+            }
+            /*
+            auto eventData = owner.m_points.data();
+
+            while (nextIndex != 0 && eventData[nextIndex - 1].getX() >= newTimeStamp)
+                --nextIndex;
+
+            while (nextIndex < owner.m_points.size() && eventData[nextIndex].getX() < newTimeStamp)
+                ++nextIndex;
+
+            currentTime = newTimeStamp;
+            */
+        }
+        std::pair<size_t, size_t> readNextEvents(double duration)
+        {
+            auto start = nextIndex;
+            auto eventData = owner.m_points.data();
+            auto end = start;
+            auto total = owner.m_points.size();
+            auto endTime = currentTime + duration;
+            currentTime = endTime;
+
+            while (end < total && eventData[end].getX() < endTime)
+                ++end;
+
+            nextIndex = end;
+
+            return {start, end};
+        }
+    };
+    // if interpolate true, fills output block with sample accurately interpolated output
+    // otherwise fills the block with the same value
+    void processBlock(double timepos, double samplerate, bool interpolate)
+    {
+        // we should obviously cache the current index or something
+        // but for now, just search for it each time
+        int index0 = 0;
+        for (int i = 0; i < m_points.size(); ++i)
+        {
+            if (timepos >= m_points[i].getX())
+            {
+                index0 = i;
+            }
+        }
+        auto &pt0 = getPointSafe(index0);
+        auto &pt1 = getPointSafe(index0 + 1);
+        double x0 = pt0.getX();
+        double x1 = pt1.getX();
+        double y0 = pt0.getY();
+        double y1 = pt1.getY();
+        const double invsr = 1.0 / samplerate;
+        for (int i = 0; i < BLOCK_SIZE; ++i)
+        {
+            double outvalue = x0;
+            double xdiff = x1 - x0;
+            if (xdiff < 0.00001)
+                outvalue = y1;
+            else
+            {
+                double ydiff = y1 - y0;
+                outvalue = y0 + ydiff * ((1.0 / xdiff * (timepos - x0)));
+            }
+            outputBlock[i] = outvalue;
+            timepos += invsr;
+            if (timepos >= x1)
+            {
+                ++index0;
+                auto &tpt0 = getPointSafe(index0);
+                auto &tpt1 = getPointSafe(index0 + 1);
+                x0 = tpt0.getX();
+                x1 = tpt1.getX();
+                y0 = tpt0.getY();
+                y1 = tpt1.getY();
+            }
+        }
+    }
+
+  private:
+    std::vector<EnvelopePoint> m_points;
+    bool m_sorted = false;
+};
+
+inline void test_envelope()
+{
+    Envelope<64> env;
+    env.addPoint({0.0, 0.1});
+    env.addPoint({10.0, 1.0});
+    env.addPoint({20.0, 0.25});
+    env.sortPoints();
+    Envelope<64>::Iterator iter(env);
+
+    for (double x = 0.0; x < 25.0f; x += 2.0)
+    {
+        // iter.seek(x);
+        //  auto points = iter.readNextEvents(x);
+        double y = env.getInterpolatedYFromX(x);
+        std::cout << x << "\t" << y << "\n";
+    }
+}
+
 template <size_t BLOCK_SIZE> struct SRProvider
 {
     static constexpr size_t BLOCK_SIZE_OS = BLOCK_SIZE * 2;
@@ -298,10 +502,29 @@ void test_np_code()
     using LFOType = sst::basic_blocks::modulators::SimpleLFO<SRProvider<BLOCK_SIZE>, BLOCK_SIZE>;
     LFOType lfo1(&srprovider, 0);
     LFOType lfo2(&srprovider, 1);
+    LFOType lfo3(&srprovider, 2);
+
+    Envelope<BLOCK_SIZE> filtenv;
+    filtenv.addPoint({0.0, 0.0});
+    filtenv.addPoint({2.0, 0.0});
+    filtenv.addPoint({3.0, 90.0});
+    filtenv.addPoint({10.0, 48.0});
+    filtenv.sortPoints();
+
+    Envelope<BLOCK_SIZE> volenv;
+    volenv.addPoint({0.0, 0.0});
+    volenv.addPoint({1.0, 1.0});
+    volenv.addPoint({5.0, 1.0});
+    volenv.addPoint({5.001, 0.0});
+    volenv.addPoint({5.005, 1.0});
+    volenv.addPoint({9.0, 1.0});
+    volenv.addPoint({10.0, 0.0});
+    volenv.sortPoints();
+
     StereoSimperSVF filter;
     filter.init();
     StereoSimperSVF dcblocker;
-    dcblocker.setCoeff(0.0, 0.01, 1.0 / srprovider.samplerate);
+    dcblocker.setCoeff(12.0, 0.01, 1.0 / srprovider.samplerate);
     dcblocker.init();
     int outlen = srprovider.samplerate * 30;
     unsigned int numoutchans = 4;
@@ -318,35 +541,46 @@ void test_np_code()
     plug->init();
     plug->m_sr = srprovider.samplerate;
     int lfocounter = 0;
+    // unsafe raw access but we know what we are doing ;-)
+    auto chansdata = buf.getView().data.channels;
+
     for (int i = 0; i < outlen; ++i)
     {
         if (lfocounter == 0)
         {
-            lfo1.process_block(0.5f, 0.5f, LFOType::Shape::SINE, false);
+            lfo1.process_block(0.5f, 0.0f, LFOType::Shape::SINE, false);
             lfo2.process_block(2.6f, 0.8f, LFOType::Shape::SH_NOISE, false);
+            lfo3.process_block(-0.43f, 0.0f, LFOType::Shape::SINE, false);
+            // float fcutoff = 84.0 + 9.0 * lfo3.outputBlock[0];
+            filtenv.processBlock(i / outfileprops.sampleRate, outfileprops.sampleRate, true);
+            // fcutoff = filtenv.getInterpolatedYFromX(i / outfileprops.sampleRate);
+            float fcutoff = filtenv.outputBlock[0];
+            filter.setCoeff(fcutoff, 0.7, 1.0 / srprovider.samplerate);
+            volenv.processBlock(i / outfileprops.sampleRate, outfileprops.sampleRate, true);
         }
+        float gain = volenv.outputBlock[lfocounter];
         ++lfocounter;
         if (lfocounter == BLOCK_SIZE)
             lfocounter = 0;
-        float p0 = 0.5 + 0.5 * lfo1.outputBlock[0];
-        float p1 = 0.5 + 0.5 * lfo2.outputBlock[0];
-        float fcutoff = 96.0; // + 5.0 * std::sin(2 * 3.141592653 / sr * i * 0.2);
-        filter.setCoeff(fcutoff, 0.7, 1.0 / srprovider.samplerate);
+        float p0 = 0.5 + 0.01 * lfo1.outputBlock[0];
+        float p1 = 0.5 + 0.05 * lfo2.outputBlock[0];
+        // float fcutoff =
         plug->process(p0, p1);
         float outL = plug->processGraph();
         float outR = outL;
         dcblocker.step<StereoSimperSVF::HP>(dcblocker, outL, outR);
         filter.step<StereoSimperSVF::LP>(filter, outL, outR);
-        buf.getSample(0, i) = outL * 0.5;
-        buf.getSample(1, i) = outR * 0.5;
-        buf.getSample(2, i) = p0;
-        buf.getSample(3, i) = p1;
+        chansdata[0][i] = outL * gain;
+        chansdata[1][i] = outR * gain;
+        chansdata[2][i] = p0;
+        chansdata[3][i] = p1;
     }
     writer->appendFrames(buf.getView());
 }
 
 int main()
 {
+    // test_envelope();
     test_np_code();
     // test_pipe();
     // test_moody();
