@@ -628,6 +628,7 @@ inline void test_lanczos()
                                                                 inprops.sampleRate);
 
         unsigned int startsample = inprops.sampleRate * 0.2;
+        unsigned int endsample = inprops.sampleRate * 0.25;
         unsigned int incounter = startsample;
         unsigned int outcounter = 0;
         choc::buffer::ChannelArrayBuffer<float> readbuf{inprops.numChannels,
@@ -656,14 +657,14 @@ inline void test_lanczos()
             rs.sro = inprops.sampleRate / rate * srcompratio;
             rs.dPhaseO = rs.sri / rs.sro;
             auto wanted = rs.inputsRequiredToGenerateOutputs(BLOCK_SIZE);
-            for (int i = 0; i < wanted; ++i)
+            for (size_t i = 0; i < wanted; ++i)
             {
                 if (inprops.numChannels == 1)
                     rs.push(readbuf.getSample(0, incounter), readbuf.getSample(0, incounter));
                 else
                     rs.push(readbuf.getSample(0, incounter), readbuf.getSample(1, incounter));
                 ++incounter;
-                if (incounter >= inprops.sampleRate * 0.5)
+                if (incounter >= endsample)
                     incounter = startsample;
             }
             rs.populateNext(rs_buf_0, rs_buf_1, BLOCK_SIZE);
