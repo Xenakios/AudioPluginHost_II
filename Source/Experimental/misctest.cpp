@@ -16,6 +16,7 @@
 #include "audio/choc_AudioFileFormat_WAV.h"
 #include "containers/choc_NonAllocatingStableSort.h"
 #include "sst/basic-blocks/modulators/SimpleLFO.h"
+#include "sst/basic-blocks/dsp/LanczosResampler.h"
 
 class object_t
 {
@@ -598,10 +599,82 @@ void test_np_code()
     writer->appendFrames(buf.getView());
 }
 
+inline void test_lanczos()
+{
+    const size_t BLOCK_SIZE = 32;
+
+    choc::audio::AudioFileFormatList aflist;
+    aflist.addFormat(std::make_unique<choc::audio::WAVAudioFileFormat<false>>());
+    auto reader = // aflist.createReader(R"(C:\MusicAudio\sourcesamples\count.wav)");
+        aflist.createReader(R"(C:\MusicAudio\sourcesamples\test_signals\440hz_sine_0db.wav)");
+    if (reader)
+    {
+        Envelope<BLOCK_SIZE> rate_env{
+            {{0.0, 36.0}, {2.5, -12.0}, {5.0, 0.0}, {5.1, 6.0}, {8.0, 6.0}, {10.0, -7.0}}};
+        auto inprops = reader->getProperties();
+        // std::cout << inprops.getDescription() << "\n";
+        sst::basic_blocks::dsp::LanczosResampler<BLOCK_SIZE> rs(inprops.sampleRate,
+                                                                inprops.sampleRate * 2);
+
+        unsigned int incounter = 0;
+        unsigned int outcounter = 0;
+        choc::buffer::ChannelArrayBuffer<float> readbuf{1, (unsigned int)inprops.numFrames};
+        readbuf.clear();
+        unsigned int outlenframes = 44100 * 12;
+        choc::buffer::ChannelArrayBuffer<float> outputbuf{1, (unsigned int)outlenframes + 64};
+        outputbuf.clear();
+        reader->readFrames(0, readbuf.getView());
+        float rs_buf_0[BLOCK_SIZE];
+        float rs_buf_1[BLOCK_SIZE];
+        while (outcounter < outlenframes)
+        {
+            double opossecs = outcounter / 44100.0;
+            rate_env.processBlock(opossecs, 44100, 2);
+            double semitonerate = rate_env.outputBlock[0];
+            double rate = std::pow(2.0, semitonerate / 12.0);
+            rs.sri = inprops.sampleRate;
+            rs.sro = inprops.sampleRate / rate;
+            rs.dPhaseO = rs.sri / rs.sro;
+            auto wanted = rs.inputsRequiredToGenerateOutputs(BLOCK_SIZE);
+            for (int i = 0; i < wanted; ++i)
+            {
+                rs.push(readbuf.getSample(0, incounter), readbuf.getSample(0, incounter));
+                ++incounter;
+                // if (incounter >= readbuf.getSize().numFrames)
+                if (incounter >= 22050)
+                    incounter = 0;
+            }
+            rs.populateNext(rs_buf_0, rs_buf_1, BLOCK_SIZE);
+            // rs.advanceReadPointer(wanted);
+            for (int i = 0; i < BLOCK_SIZE; ++i)
+            {
+                outputbuf.getSample(0, outcounter + i) = 0.9 * rs_buf_0[i];
+                // outputbuf.getSample(1, outcounter + i) = rs_buf_1[i];
+            }
+            outcounter += BLOCK_SIZE;
+        }
+        choc::audio::AudioFileProperties outfileprops;
+        outfileprops.formatName = "WAV";
+        outfileprops.bitDepth = choc::audio::BitDepth::float32;
+        outfileprops.numChannels = 1;
+        outfileprops.sampleRate = 44100;
+        choc::audio::WAVAudioFileFormat<true> wavformat;
+        auto writer = wavformat.createWriter(
+            R"(C:\MusicAudio\sourcesamples\test_signals\lanczos\lanczos1.wav)", outfileprops);
+        if (writer)
+        {
+            writer->appendFrames(outputbuf.getView());
+        }
+    }
+    else
+        std::cout << "Could not create reader\n";
+}
+
 int main()
 {
+    test_lanczos();
     // test_envelope();
-    test_np_code();
+    // test_np_code();
     // test_pipe();
     // test_moody();
     // test_auto();
