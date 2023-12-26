@@ -61,6 +61,7 @@ class FilePlayerProcessor : public XAPWithJuceGUI, public juce::Thread
     double m_rate_mod = 0.0;   // as above
     double m_pitch = 0.0;      // semitones
     double m_pitch_mod = 0.0;  // semitones
+    double m_tonality_limit = 0.0;
     double m_loop_start = 0.0; // proportion of whole file
     double m_loop_end = 1.0;
     bool m_triggered_mode = false;
@@ -73,6 +74,7 @@ class FilePlayerProcessor : public XAPWithJuceGUI, public juce::Thread
         Volume = 42,
         Playrate = 666,
         Pitch = 91155,
+        TonalityLimit = 207,
         PreservePitch = 6543,
         LoopStart = 3322,
         LoopEnd = 888777,
@@ -133,6 +135,15 @@ class FilePlayerProcessor : public XAPWithJuceGUI, public juce::Thread
                 .withFlags(CLAP_PARAM_IS_AUTOMATABLE | CLAP_PARAM_IS_MODULATABLE)
                 .withName("Pitch")
                 .withID((clap_id)ParamIds::Pitch));
+        paramDescriptions.push_back(
+            ParamDesc()
+                .asFloat()
+                .withRange(0.0f, 0.2f)
+                .withDefault(0.0)
+                .withLinearScaleFormatting("")
+                .withFlags(CLAP_PARAM_IS_AUTOMATABLE)
+                .withName("Tonality limit")
+                .withID((clap_id)ParamIds::TonalityLimit));
         paramDescriptions.push_back(
             ParamDesc()
                 .asBool()
@@ -236,6 +247,8 @@ class FilePlayerProcessor : public XAPWithJuceGUI, public juce::Thread
             result = m_loop_end;
         else if (paramId == (clap_id)ParamIds::TriggeredMode)
             result = m_triggered_mode;
+        else if (paramId == (clap_id)ParamIds::TonalityLimit)
+            result = m_tonality_limit;
         if (result)
         {
             *value = *result;
@@ -256,6 +269,8 @@ class FilePlayerProcessor : public XAPWithJuceGUI, public juce::Thread
                 m_rate = aev->value;
             if (aev->param_id == to_clap_id(ParamIds::Pitch))
                 m_pitch = aev->value;
+            if (aev->param_id == to_clap_id(ParamIds::TonalityLimit))
+                m_tonality_limit = aev->value;
             if (aev->param_id == to_clap_id(ParamIds::LoopStart))
                 m_loop_start = aev->value;
             if (aev->param_id == to_clap_id(ParamIds::LoopEnd))
