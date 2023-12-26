@@ -61,7 +61,7 @@ class FilePlayerProcessor : public XAPWithJuceGUI, public juce::Thread
     double m_rate_mod = 0.0;   // as above
     double m_pitch = 0.0;      // semitones
     double m_pitch_mod = 0.0;  // semitones
-    double m_tonality_limit = 0.0;
+    double m_tonality_limit = 1.0;
     double m_loop_start = 0.0; // proportion of whole file
     double m_loop_end = 1.0;
     bool m_triggered_mode = false;
@@ -138,9 +138,9 @@ class FilePlayerProcessor : public XAPWithJuceGUI, public juce::Thread
         paramDescriptions.push_back(
             ParamDesc()
                 .asFloat()
-                .withRange(0.0f, 0.2f)
-                .withDefault(0.0)
-                .withLinearScaleFormatting("")
+                .withRange(0.0f, 1.0f)
+                .withDefault(1.0)
+                .withLinearScaleFormatting("%",100.0f)
                 .withFlags(CLAP_PARAM_IS_AUTOMATABLE)
                 .withName("Tonality limit")
                 .withID((clap_id)ParamIds::TonalityLimit));

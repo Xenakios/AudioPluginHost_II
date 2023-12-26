@@ -437,7 +437,12 @@ clap_process_status FilePlayerProcessor::process(const clap_process *process) no
         pshift += m_pitch_mod;
         pshift = std::clamp(pshift, -48.0, 48.0);
         double pitchratio = std::pow(2.0, pshift / 12.0);
-        m_stretch.setTransposeFactor(pitchratio * compensrate, m_tonality_limit);
+        double tonlimit = m_tonality_limit;
+        if (tonlimit >= 0.0 && tonlimit < 0.9)
+            tonlimit = jmap<double>(tonlimit, 0.0, 0.9, 0.01, 0.1);
+        else
+            tonlimit = jmap<double>(tonlimit, 0.9, 1.0, 0.1, 1.0);
+        m_stretch.setTransposeFactor(pitchratio * compensrate, tonlimit);
         rate *= compensrate;
         int samplestopush = process->frames_count * rate;
         for (int i = 0; i < samplestopush; ++i)
