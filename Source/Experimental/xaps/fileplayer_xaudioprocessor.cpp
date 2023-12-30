@@ -96,6 +96,13 @@ class FilePlayerEditor : public juce::Component,
 
         addAndMakeVisible(m_wavecomponent);
         m_wavecomponent.m_font = m_font;
+        m_wavecomponent.OnSeek=[this](double pos)
+        {
+            FilePlayerProcessor::FilePlayerMessage msg;
+            msg.opcode = FilePlayerProcessor::FilePlayerMessage::Opcode::FilePlayPosition;
+            msg.value = pos;
+            m_proc->messages_from_ui.push(msg);
+        };
 
         addAndMakeVisible(m_file_comp);
         m_file_comp.addListener(this);
@@ -191,15 +198,7 @@ class FilePlayerEditor : public juce::Component,
         }
         flex.performLayout(getBounds());
     }
-    void mouseDown(const juce::MouseEvent &ev) override
-    {
-        double newpos = juce::jmap<double>(ev.x, 0.0, getWidth(), 0.0, 1.0);
-        newpos = juce::jlimit<double>(0.0, 1.0, newpos);
-        FilePlayerProcessor::FilePlayerMessage msg;
-        msg.opcode = FilePlayerProcessor::FilePlayerMessage::Opcode::FilePlayPosition;
-        msg.value = newpos;
-        m_proc->messages_from_ui.push(msg);
-    }
+    
     void paint(juce::Graphics &g) override {}
 
   private:
