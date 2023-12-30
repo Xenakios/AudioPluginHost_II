@@ -77,12 +77,11 @@ add_subdirectory(libs/fmt)
 project(cmaketest)
 add_subdirectory(libs/pybind11)
 pybind11_add_module(example Source/Experimental/pybindtest.cpp)
+target_link_libraries(example PRIVATE noiseplethora)
+target_compile_definitions(example PRIVATE _USE_MATH_DEFINES=1)
 
-# this is used for simple C++ testing/experimenting stuff without Juce
-add_executable(TestingProgram Source/Experimental/misctest.cpp)
-target_sources(TestingProgram
-    PRIVATE
-    Source/Plugins/noise-plethora/random.cpp
+add_library(noiseplethora
+        Source/Plugins/noise-plethora/random.cpp
         Source/Plugins/noise-plethora/teensy/effect_freeverb.cpp
         Source/Plugins/noise-plethora/teensy/effect_bitcrusher.cpp
         Source/Plugins/noise-plethora/teensy/effect_granular.cpp
@@ -96,6 +95,16 @@ target_sources(TestingProgram
         Source/Plugins/noise-plethora/teensy/synth_whitenoise.cpp
         Source/Plugins/noise-plethora/plugins/Banks.cpp
 )
+target_compile_definitions(noiseplethora PRIVATE _USE_MATH_DEFINES=1)
+
+# this is used for simple C++ testing/experimenting stuff without Juce
+add_executable(TestingProgram Source/Experimental/misctest.cpp)
+target_sources(TestingProgram
+    PRIVATE
+    
+)
 target_compile_definitions(TestingProgram PRIVATE _USE_MATH_DEFINES=1)
+target_link_libraries(TestingProgram PRIVATE noiseplethora)
+
 # juce::juce_recommended_lto_flags
 # juce_add_bundle_resources_directory(AudioPluginHost2 Assets)

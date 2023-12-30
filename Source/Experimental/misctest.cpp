@@ -485,7 +485,7 @@ template <size_t BLOCK_SIZE> struct SRProvider
 
 void test_np_code()
 {
-    std::shared_ptr<NoisePlethoraPlugin> plug;
+    std::unique_ptr<NoisePlethoraPlugin> plug;
     std::string plugToCreate = "satanWorkout";
     std::unordered_map<int, std::string> availablePlugins;
     int k = 0;
