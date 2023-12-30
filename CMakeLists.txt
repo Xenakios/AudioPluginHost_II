@@ -20,7 +20,10 @@ include_directories(
     libs/sst-jucegui/include
     libs/concurrentqueue
     libs/WDL
+    libs/pybind11/include
+    C:/Users/teemu/AppData/Local/Programs/Python/Python312/include
 )
+
 # for "reasons", this is still a console app even though a GUI app is built from it
 # we should have a separate real console app and a real GUI app
 juce_add_console_app(MainHostApp
@@ -70,6 +73,10 @@ target_link_libraries(MainHostApp
 
 # add_subdirectory(libs/fmt EXCLUDE_FROM_ALL)
 add_subdirectory(libs/fmt)
+
+project(cmaketest)
+add_subdirectory(libs/pybind11)
+pybind11_add_module(example Source/Experimental/pybindtest.cpp)
 
 # this is used for simple C++ testing/experimenting stuff without Juce
 add_executable(TestingProgram Source/Experimental/misctest.cpp)
