@@ -32,10 +32,12 @@ class XAPPlayer : public juce::AudioIODeviceCallback
             Nop,
             Shutdown,
             SwitchXAP,
-            DeleteXAP
+            DeleteXAP,
+            CPU_Usage,
         };
         OPCode op = OPCode::Nop;
         xenakios::XAudioProcessor *proc = nullptr; // switch to, send back to deletion
+        double val = 0.0;
     };
     choc::fifo::SingleReaderSingleWriterFIFO<CTMessage> from_ui_fifo;
     choc::fifo::SingleReaderSingleWriterFIFO<CTMessage> to_ui_fifo;
@@ -44,7 +46,7 @@ class XAPPlayer : public juce::AudioIODeviceCallback
     {
         // 128 should be enough, we have some problem already if the fifos need more
         from_ui_fifo.reset(128);
-        to_ui_fifo.reset(128);
+        to_ui_fifo.reset(1024);
     }
     std::atomic<bool> shutdownReady{false};
     void handleFromUIMessages()
@@ -81,6 +83,7 @@ class XAPPlayer : public juce::AudioIODeviceCallback
                                           const AudioIODeviceCallbackContext &context) override
     {
         jassert(m_output_ring_buf.size() >= numSamples * numOutputChannels);
+        double bench_t0 = juce::Time::getMillisecondCounterHiRes();
         handleFromUIMessages();
         if (!m_proc)
         {
@@ -136,6 +139,13 @@ class XAPPlayer : public juce::AudioIODeviceCallback
                 outputChannelData[i][j] = m_output_ring_buf.pop();
             }
         }
+        double bench_t1 = juce::Time::getMillisecondCounterHiRes();
+        double callbacklen = (numSamples / curSampleRate) * 1000.0;
+        double cpu_usage = (bench_t1 - bench_t0) / callbacklen;
+        CTMessage msg;
+        msg.op = CTMessage::OPCode::CPU_Usage;
+        msg.val = cpu_usage;
+        to_ui_fifo.push(msg);
         return;
         for (int i = 0; i < numOutputChannels; ++i)
         {
@@ -826,6 +836,38 @@ class MyContinuous : public sst::jucegui::data::Continuous
     std::string getLabel() const override { return "Test Parameter"; };
 };
 
+class CPUHistory
+{
+  public:
+    std::array<double, 1024> m_cpu_history;
+    int m_cpu_history_len = 128;
+    int m_cpu_history_pos = 0;
+    double m_cpu_median = 0.0;
+    double m_cpu_avg = 0.0;
+    double m_cpu_min = 0.0;
+    double m_cpu_max = 0.0;
+    CPUHistory() { std::fill(m_cpu_history.begin(), m_cpu_history.end(), 0.0); }
+    void pushUsage(double usage)
+    {
+        m_cpu_history[m_cpu_history_pos] = usage;
+        ++m_cpu_history_pos;
+        if (m_cpu_history_pos == m_cpu_history_len)
+        {
+            std::sort(m_cpu_history.begin(), m_cpu_history.begin() + m_cpu_history_len);
+            int index0 = std::floor(m_cpu_history_len / 2.0);
+            int index1 = std::ceil(m_cpu_history_len / 2.0);
+            m_cpu_median = (m_cpu_history[index0] + m_cpu_history[index1]) / 2;
+            double sum = 0.0;
+            for (size_t i = 0; i < m_cpu_history_len; ++i)
+                sum += m_cpu_history[i];
+            m_cpu_avg = sum / m_cpu_history_len;
+            m_cpu_min = m_cpu_history[0];
+            m_cpu_max = m_cpu_history[m_cpu_history_len - 1];
+            m_cpu_history_pos = 0;
+        }    
+    }
+};
+
 class MainComponent : public juce::Component, public juce::Timer, public IHostExtension
 {
   public:
@@ -850,11 +892,18 @@ class MainComponent : public juce::Component, public juce::Timer, public IHostEx
     juce::TextEditor m_log_ed;
     juce::TextButton m_plug_test_but;
     std::unique_ptr<NodeGraphComponent> m_graph_component;
+    
+    
+    CPUHistory m_cpu_history;
     void handleMessagesFromAudioThread()
     {
         XAPPlayer::CTMessage msg;
         while (m_player->to_ui_fifo.pop(msg))
         {
+            if (msg.op == XAPPlayer::CTMessage::OPCode::CPU_Usage)
+            {
+                m_cpu_history.pushUsage(msg.val);
+            }
             if (msg.op == XAPPlayer::CTMessage::OPCode::DeleteXAP)
             {
                 DBG("audio thread sent processor to delete " << (uint64_t)msg.proc);
@@ -873,7 +922,8 @@ class MainComponent : public juce::Component, public juce::Timer, public IHostEx
     void timerCallback() override
     {
         handleMessagesFromAudioThread();
-        int usage = m_aman.getCpuUsage() * 100.0;
+        // int usage = m_aman.getCpuUsage() * 100.0;
+        
         juce::String txt;
         if (m_graph && m_graph->m_last_touched_node)
         {
@@ -885,7 +935,13 @@ class MainComponent : public juce::Component, public juce::Timer, public IHostEx
             txt +=
                 lasttouchedparamname + " " + juce::String(m_graph->m_last_touched_param_value, 2);
         }
-        m_infolabel.setText("CPU " + juce::String(usage) + "% " + txt, juce::dontSendNotification);
+        juce::String usagetxt;
+        usagetxt += "CPU ";
+        usagetxt += juce::String((int)m_cpu_history.m_cpu_median * 100.0) + "% ";
+        usagetxt += juce::String((int)m_cpu_history.m_cpu_avg * 100.0) + "% ";
+        usagetxt += juce::String((int)m_cpu_history.m_cpu_min * 100.0) + "% ";
+        usagetxt += juce::String((int)m_cpu_history.m_cpu_max * 100.0) + "% ";
+        m_infolabel.setText(usagetxt + txt, juce::dontSendNotification);
     }
     std::string pathprefix = R"(C:\Program Files\Common Files\)";
     void addNoteGeneratorTestNodes()
@@ -970,6 +1026,7 @@ class MainComponent : public juce::Component, public juce::Timer, public IHostEx
     }
     MainComponent()
     {
+        
         xenakios::XapFactory::getInstance().scanClapPlugins();
         xenakios::XapFactory::getInstance().scanVST3Plugins();
         addAndMakeVisible(m_log_ed);
@@ -1539,8 +1596,6 @@ inline void testNewEventList()
     std::cout << "sorted\n";
     printXList(elist);
 }
-
-
 
 template <typename ContType> inline void test_keyvaluemap(int iters, std::string benchname)
 {
