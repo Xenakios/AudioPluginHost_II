@@ -69,9 +69,8 @@ class NoisePlethoraEngine
         dcblocker.init();
         for (int i = 0; i < outlen; ++i)
         {
-            // doesn't actually usually process, just set ups parameters...
             m_plug->process(p0, p1);
-            float outL = m_plug->processGraph();
+            float outL = m_plug->processGraph() * 0.5;
             float outR = outL;
             dcblocker.step<StereoSimperSVF::HP>(dcblocker, outL, outR);
             chansdata[0][i] = outL;
