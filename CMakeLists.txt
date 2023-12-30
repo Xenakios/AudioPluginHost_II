@@ -76,9 +76,10 @@ add_subdirectory(libs/fmt)
 
 project(cmaketest)
 add_subdirectory(libs/pybind11)
-pybind11_add_module(example Source/Experimental/pybindtest.cpp)
-target_link_libraries(example PRIVATE noiseplethora)
-target_compile_definitions(example PRIVATE _USE_MATH_DEFINES=1)
+pybind11_add_module(xenakios Source/Experimental/pybindtest.cpp)
+target_link_libraries(xenakios PRIVATE noiseplethora)
+target_compile_definitions(xenakios PRIVATE _USE_MATH_DEFINES=1)
+# install(TARGETS xenakios DESTINATION C:/Users/teemu/AppData/Local/Programs/Python/Python312/Lib/site-packages)
 
 add_library(noiseplethora
         Source/Plugins/noise-plethora/random.cpp

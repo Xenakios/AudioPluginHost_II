@@ -84,7 +84,8 @@ class NoisePlethoraEngine
 
 namespace py = pybind11;
 
-PYBIND11_MODULE(example, m)
+
+PYBIND11_MODULE(xenakios, m)
 {
     m.doc() = "pybind11 example plugin"; // optional module docstring
 
