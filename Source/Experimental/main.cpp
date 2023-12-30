@@ -839,15 +839,15 @@ class MyContinuous : public sst::jucegui::data::Continuous
 class CPUHistory
 {
   public:
-    std::array<double, 1024> m_cpu_history;
+    std::array<float, 1024> m_cpu_history;
     int m_cpu_history_len = 128;
     int m_cpu_history_pos = 0;
-    double m_cpu_median = 0.0;
-    double m_cpu_avg = 0.0;
-    double m_cpu_min = 0.0;
-    double m_cpu_max = 0.0;
+    float m_cpu_median = 0.0;
+    float m_cpu_avg = 0.0;
+    float m_cpu_min = 0.0;
+    float m_cpu_max = 0.0;
     CPUHistory() { std::fill(m_cpu_history.begin(), m_cpu_history.end(), 0.0); }
-    void pushUsage(double usage)
+    void pushUsage(float usage)
     {
         m_cpu_history[m_cpu_history_pos] = usage;
         ++m_cpu_history_pos;
