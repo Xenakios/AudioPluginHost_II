@@ -84,10 +84,9 @@ class NoisePlethoraEngine
 
 namespace py = pybind11;
 
-
 PYBIND11_MODULE(xenakios, m)
 {
-    m.doc() = "pybind11 example plugin"; // optional module docstring
+    m.doc() = "pybind11 xenakios plugin"; // optional module docstring
 
     m.def("add", &add, "A function that adds two numbers");
     m.def("avg", &avg, "average of list");
