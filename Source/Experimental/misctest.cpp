@@ -380,6 +380,7 @@ void test_np_code()
         plug->process(p0, p1);
         float outL = plug->processGraph();
         float outR = outL;
+        
         dcblocker.step<StereoSimperSVF::HP>(dcblocker, outL, outR);
         filter.step<StereoSimperSVF::LP>(filter, outL, outR);
         chansdata[0][i] = outL * gain;

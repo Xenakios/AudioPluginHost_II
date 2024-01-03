@@ -104,7 +104,8 @@ class NoisePlethoraEngine
             filter.step<StereoSimperSVF::LP>(filter, outL, outR);
             chansdata[0][i] = outL;
         }
-        writer->appendFrames(buf.getView());
+        if (!writer->appendFrames(buf.getView()))
+            throw std::runtime_error("Could not write output file");
     }
     void setEnvelope(size_t index, xenakios::Envelope<ENVBLOCKSIZE> env)
     {
@@ -120,7 +121,7 @@ class NoisePlethoraEngine
     std::unique_ptr<NoisePlethoraPlugin> m_plug;
     xenakios::Envelope<ENVBLOCKSIZE> m_p0_env{0.0};
     xenakios::Envelope<ENVBLOCKSIZE> m_p1_env{0.0};
-    xenakios::Envelope<ENVBLOCKSIZE> m_filt_env{100.0};
+    xenakios::Envelope<ENVBLOCKSIZE> m_filt_env{120.0};
 };
 
 namespace py = pybind11;
