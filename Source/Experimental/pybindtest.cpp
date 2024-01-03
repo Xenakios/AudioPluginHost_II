@@ -48,6 +48,7 @@ class NoisePlethoraEngine
         if (!m_plug)
             throw std::runtime_error("Plugin could not be created");
     }
+    double hipasscutoff = 12.0;
     void processToFile(std::string filename, double durinseconds, double p0, double p1)
     {
         m_p0_env.sortPoints();
@@ -70,7 +71,7 @@ class NoisePlethoraEngine
         m_plug->m_sr = sr;
         auto chansdata = buf.getView().data.channels;
         StereoSimperSVF dcblocker;
-        dcblocker.setCoeff(12.0, 0.01, 1.0 / sr);
+        dcblocker.setCoeff(hipasscutoff, 0.01, 1.0 / sr);
         dcblocker.init();
         int modcounter = 0;
         double mod_p0 = 0.0;
@@ -123,7 +124,8 @@ PYBIND11_MODULE(xenakios, m)
     m.def("list_plugins", &list_plugins, "print noise plethora plugins");
     py::class_<NoisePlethoraEngine>(m, "NoisePlethoraEngine")
         .def(py::init<const std::string &>())
-        .def("process_to_file", &NoisePlethoraEngine::processToFile)
+        .def("processToFile", &NoisePlethoraEngine::processToFile)
+        .def_readwrite("highpass",&NoisePlethoraEngine::hipasscutoff,"high pass filter cutoff, in semitones")
         .def("setEnvelope", &NoisePlethoraEngine::setEnvelope);
     py::class_<xenakios::EnvelopePoint>(m, "EnvelopePoint").def(py::init<double, double>());
     py::class_<xenakios::Envelope<ENVBLOCKSIZE>>(m, "Envelope")
