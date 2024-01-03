@@ -53,6 +53,7 @@ class NoisePlethoraEngine
     {
         m_p0_env.sortPoints();
         m_p1_env.sortPoints();
+        m_filt_env.sortPoints();
         double sr = 44100.0;
         unsigned int numoutchans = 1;
         choc::audio::AudioFileProperties outfileprops;
@@ -73,6 +74,9 @@ class NoisePlethoraEngine
         StereoSimperSVF dcblocker;
         dcblocker.setCoeff(hipasscutoff, 0.01, 1.0 / sr);
         dcblocker.init();
+        StereoSimperSVF filter;
+
+        filter.init();
         int modcounter = 0;
         double mod_p0 = 0.0;
         double mod_p1 = 0.0;
@@ -83,8 +87,10 @@ class NoisePlethoraEngine
                 double seconds = i / sr;
                 m_p0_env.processBlock(seconds, sr, 2);
                 m_p1_env.processBlock(seconds, sr, 2);
+                m_filt_env.processBlock(seconds, sr, 2);
                 mod_p0 = m_p0_env.outputBlock[0];
                 mod_p1 = m_p1_env.outputBlock[0];
+                filter.setCoeff(m_filt_env.outputBlock[0], 0.01, 1.0 / sr);
             }
             ++modcounter;
             if (modcounter == ENVBLOCKSIZE)
@@ -95,6 +101,7 @@ class NoisePlethoraEngine
             float outL = m_plug->processGraph() * 0.5;
             float outR = outL;
             dcblocker.step<StereoSimperSVF::HP>(dcblocker, outL, outR);
+            filter.step<StereoSimperSVF::LP>(filter, outL, outR);
             chansdata[0][i] = outL;
         }
         writer->appendFrames(buf.getView());
@@ -105,12 +112,15 @@ class NoisePlethoraEngine
             m_p0_env = env;
         if (index == 1)
             m_p1_env = env;
+        if (index == 2)
+            m_filt_env = env;
     }
 
   private:
     std::unique_ptr<NoisePlethoraPlugin> m_plug;
     xenakios::Envelope<ENVBLOCKSIZE> m_p0_env{0.0};
     xenakios::Envelope<ENVBLOCKSIZE> m_p1_env{0.0};
+    xenakios::Envelope<ENVBLOCKSIZE> m_filt_env{100.0};
 };
 
 namespace py = pybind11;
@@ -125,7 +135,8 @@ PYBIND11_MODULE(xenakios, m)
     py::class_<NoisePlethoraEngine>(m, "NoisePlethoraEngine")
         .def(py::init<const std::string &>())
         .def("processToFile", &NoisePlethoraEngine::processToFile)
-        .def_readwrite("highpass",&NoisePlethoraEngine::hipasscutoff,"high pass filter cutoff, in semitones")
+        .def_readwrite("highpass", &NoisePlethoraEngine::hipasscutoff,
+                       "high pass filter cutoff, in semitones")
         .def("setEnvelope", &NoisePlethoraEngine::setEnvelope);
     py::class_<xenakios::EnvelopePoint>(m, "EnvelopePoint").def(py::init<double, double>());
     py::class_<xenakios::Envelope<ENVBLOCKSIZE>>(m, "Envelope")
