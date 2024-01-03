@@ -7,6 +7,7 @@
 #include <iostream>
 #include "audio/choc_AudioFileFormat_WAV.h"
 #include "xapdsp.h"
+#include "xap_utils.h"
 
 int add(int i, int j) { return i + j; }
 
@@ -94,4 +95,8 @@ PYBIND11_MODULE(xenakios, m)
     py::class_<NoisePlethoraEngine>(m, "NoisePlethoraEngine")
         .def(py::init<const std::string &>())
         .def("process_to_file", &NoisePlethoraEngine::processToFile);
+    py::class_<xenakios::EnvelopePoint>(m, "EnvelopePoint").def(py::init<double, double>());
+    py::class_<xenakios::Envelope<128>>(m, "Envelope")
+        .def(py::init<std::vector<xenakios::EnvelopePoint>>())
+        .def("numPoints", &xenakios::Envelope<128>::getNumPoints);
 }
