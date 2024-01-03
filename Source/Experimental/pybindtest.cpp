@@ -37,6 +37,8 @@ void list_plugins()
     }
 }
 
+constexpr size_t ENVBLOCKSIZE = 64;
+
 class NoisePlethoraEngine
 {
   public:
@@ -48,6 +50,8 @@ class NoisePlethoraEngine
     }
     void processToFile(std::string filename, double durinseconds, double p0, double p1)
     {
+        m_p0_env.sortPoints();
+        m_p1_env.sortPoints();
         double sr = 44100.0;
         unsigned int numoutchans = 1;
         choc::audio::AudioFileProperties outfileprops;
@@ -68,9 +72,25 @@ class NoisePlethoraEngine
         StereoSimperSVF dcblocker;
         dcblocker.setCoeff(12.0, 0.01, 1.0 / sr);
         dcblocker.init();
+        int modcounter = 0;
+        double mod_p0 = 0.0;
+        double mod_p1 = 0.0;
         for (int i = 0; i < outlen; ++i)
         {
-            m_plug->process(p0, p1);
+            if (modcounter == 0)
+            {
+                double seconds = i / sr;
+                m_p0_env.processBlock(seconds, sr, 2);
+                m_p1_env.processBlock(seconds, sr, 2);
+                mod_p0 = m_p0_env.outputBlock[0];
+                mod_p1 = m_p1_env.outputBlock[0];
+            }
+            ++modcounter;
+            if (modcounter == ENVBLOCKSIZE)
+                modcounter = 0;
+            double finalp0 = std::clamp<double>(p0 + mod_p0, 0.0, 1.0);
+            double finalp1 = std::clamp<double>(p1 + mod_p1, 0.0, 1.0);
+            m_plug->process(finalp0, finalp1);
             float outL = m_plug->processGraph() * 0.5;
             float outR = outL;
             dcblocker.step<StereoSimperSVF::HP>(dcblocker, outL, outR);
@@ -78,9 +98,18 @@ class NoisePlethoraEngine
         }
         writer->appendFrames(buf.getView());
     }
+    void setEnvelope(size_t index, xenakios::Envelope<ENVBLOCKSIZE> env)
+    {
+        if (index == 0)
+            m_p0_env = env;
+        if (index == 1)
+            m_p1_env = env;
+    }
 
   private:
     std::unique_ptr<NoisePlethoraPlugin> m_plug;
+    xenakios::Envelope<ENVBLOCKSIZE> m_p0_env{0.0};
+    xenakios::Envelope<ENVBLOCKSIZE> m_p1_env{0.0};
 };
 
 namespace py = pybind11;
@@ -94,9 +123,12 @@ PYBIND11_MODULE(xenakios, m)
     m.def("list_plugins", &list_plugins, "print noise plethora plugins");
     py::class_<NoisePlethoraEngine>(m, "NoisePlethoraEngine")
         .def(py::init<const std::string &>())
-        .def("process_to_file", &NoisePlethoraEngine::processToFile);
+        .def("process_to_file", &NoisePlethoraEngine::processToFile)
+        .def("setEnvelope", &NoisePlethoraEngine::setEnvelope);
     py::class_<xenakios::EnvelopePoint>(m, "EnvelopePoint").def(py::init<double, double>());
-    py::class_<xenakios::Envelope<128>>(m, "Envelope")
+    py::class_<xenakios::Envelope<ENVBLOCKSIZE>>(m, "Envelope")
+        .def(py::init<>())
         .def(py::init<std::vector<xenakios::EnvelopePoint>>())
-        .def("numPoints", &xenakios::Envelope<128>::getNumPoints);
+        .def("numPoints", &xenakios::Envelope<ENVBLOCKSIZE>::getNumPoints)
+        .def("addPoint", &xenakios::Envelope<ENVBLOCKSIZE>::addPoint);
 }

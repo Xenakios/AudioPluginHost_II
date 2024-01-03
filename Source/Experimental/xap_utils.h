@@ -95,6 +95,13 @@ template <size_t BLOCK_SIZE = 64> class Envelope
         m_points.push_back(pt);
         m_sorted = false;
     }
+    /*
+    void addPoint(double x, double y)
+    {
+        m_points.emplace_back(x, y);
+        m_sorted = false;
+    }
+    */
     void removeEnvelopePointAtIndex(size_t index) { m_points.erase(m_points.begin() + index); }
     // use carefully, only when you are going to add at least one point right after this
     void clearAllPoints()

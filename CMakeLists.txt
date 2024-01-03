@@ -79,7 +79,12 @@ add_subdirectory(libs/pybind11)
 pybind11_add_module(xenakios Source/Experimental/pybindtest.cpp)
 target_link_libraries(xenakios PRIVATE noiseplethora)
 target_compile_definitions(xenakios PRIVATE _USE_MATH_DEFINES=1)
-# install(TARGETS xenakios DESTINATION C:/Users/teemu/AppData/Local/Programs/Python/Python312/Lib/site-packages)
+add_custom_command(TARGET xenakios POST_BUILD 
+  COMMAND "${CMAKE_COMMAND}" -E copy 
+     "$<TARGET_FILE:xenakios>"
+     "C:/Users/teemu/AppData/Local/Programs/Python/Python312/Lib/site-packages/$<TARGET_FILE_NAME:xenakios>" 
+  COMMENT "Copying to output directory")
+
 
 add_library(noiseplethora
         Source/Plugins/noise-plethora/random.cpp
