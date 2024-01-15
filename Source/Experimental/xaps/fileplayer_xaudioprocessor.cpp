@@ -470,12 +470,23 @@ clap_process_status FilePlayerProcessor::process(const clap_process *process) no
         }
         float *rsoutleft = &m_rs_out_buf[0];
         float *rsoutright = &m_rs_out_buf[m_rs_out_buf.size() / 2];
-        m_lanczos.populateNext(rsoutleft, rsoutright, process->frames_count);
-
+        auto produced = m_lanczos.populateNext(rsoutleft, rsoutright, process->frames_count);
+        jassert(produced == process->frames_count);
         for (int j = 0; j < process->frames_count; ++j)
         {
-            process->audio_outputs[0].data32[0][j] = rsoutleft[j];
-            process->audio_outputs[0].data32[1][j] = rsoutright[j];
+            float outl = rsoutleft[j];
+            float outr = rsoutright[j];
+            if (!std::isfinite(outl))
+                outl = 0.0f;
+            if (!std::isfinite(outr))
+                outr = 0.0f;
+            outl = std::clamp(outl, -2.0f, 2.0f);
+            outr = std::clamp(outr, -2.0f, 2.0f);
+            // jassert(rsoutleft[j] >= -2.0 && rsoutleft[j] < 2.0 && std::isfinite(rsoutleft[j]));
+            // jassert(rsoutright[j] >= -2.0 && rsoutright[j] < 2.0 &&
+            // std::isfinite(rsoutright[j]));
+            process->audio_outputs[0].data32[0][j] = outl;
+            process->audio_outputs[0].data32[1][j] = outr;
         }
     }
     m_gain_proc.setGainDecibels(m_volume);
