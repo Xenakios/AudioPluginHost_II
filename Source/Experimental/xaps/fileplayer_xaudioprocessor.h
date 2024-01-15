@@ -12,7 +12,7 @@ class FilePlayerProcessor : public XAPWithJuceGUI, public juce::Thread
 {
   public:
     std::vector<float> m_rs_out_buf;
-    sst::basic_blocks::dsp::LanczosResampler<128> m_lanczos{1.0, 1.0};
+    sst::basic_blocks::dsp::LanczosResampler<128> m_lanczos{44100.0f, 44100.0f};
     double m_sr = 44100;
     std::atomic<bool> m_running_offline{false};
     juce::AudioBuffer<float> m_file_buf;

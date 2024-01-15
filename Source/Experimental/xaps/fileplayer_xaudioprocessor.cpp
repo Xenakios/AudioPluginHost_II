@@ -344,8 +344,8 @@ bool FilePlayerProcessor::activate(double sampleRate, uint32_t minFrameCount,
     m_stretch.presetDefault(2, sampleRate);
     m_work_buf.setSize(2, maxFrameCount * 16);
     m_work_buf.clear();
-    m_rs_out_buf.resize(maxFrameCount * 4);
-
+    m_rs_out_buf.resize(2048);
+    std::fill(m_rs_out_buf.begin(), m_rs_out_buf.end(), 0.0f);
     return true;
 }
 
@@ -460,28 +460,35 @@ clap_process_status FilePlayerProcessor::process(const clap_process *process) no
         auto samplestopush = m_lanczos.inputsRequiredToGenerateOutputs(process->frames_count);
         for (size_t i = 0; i < samplestopush; ++i)
         {
-            m_lanczos.push(getxfadedsample(filebuf[0], m_buf_playpos, loop_start_samples,
-                                           loop_end_samples, xfadelen),
-                           getxfadedsample(filebuf[1], m_buf_playpos, loop_start_samples,
-                                           loop_end_samples, xfadelen));
+            float in0 = getxfadedsample(filebuf[0], m_buf_playpos, loop_start_samples,
+                                        loop_end_samples, xfadelen);
+            float in1 = getxfadedsample(filebuf[1], m_buf_playpos, loop_start_samples,
+                                        loop_end_samples, xfadelen);
+            // jassert(in0>=-2.0f && in0<=2.0);
+            // jassert(in1>=-2.0f && in1<=2.0);
+            m_lanczos.push(in0, in1);
             ++m_buf_playpos;
             if (m_buf_playpos >= loop_end_samples)
                 m_buf_playpos = loop_start_samples;
         }
         float *rsoutleft = &m_rs_out_buf[0];
-        float *rsoutright = &m_rs_out_buf[m_rs_out_buf.size() / 2];
+        float *rsoutright = &m_rs_out_buf[512];
         auto produced = m_lanczos.populateNext(rsoutleft, rsoutright, process->frames_count);
         jassert(produced == process->frames_count);
         for (int j = 0; j < process->frames_count; ++j)
         {
             float outl = rsoutleft[j];
             float outr = rsoutright[j];
+            // jassert(outl >= -2.0f && outl <= 2.0f);
+            // jassert(outr >= -2.0f && outr <= 2.0f);
+            /*
             if (!std::isfinite(outl))
                 outl = 0.0f;
             if (!std::isfinite(outr))
                 outr = 0.0f;
             outl = std::clamp(outl, -2.0f, 2.0f);
             outr = std::clamp(outr, -2.0f, 2.0f);
+            */
             // jassert(rsoutleft[j] >= -2.0 && rsoutleft[j] < 2.0 && std::isfinite(rsoutleft[j]));
             // jassert(rsoutright[j] >= -2.0 && rsoutright[j] < 2.0 &&
             // std::isfinite(rsoutright[j]));
