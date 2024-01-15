@@ -937,10 +937,10 @@ class MainComponent : public juce::Component, public juce::Timer, public IHostEx
         }
         juce::String usagetxt;
         usagetxt += "CPU ";
-        usagetxt += juce::String((int)m_cpu_history.m_cpu_median * 100.0) + "% ";
-        usagetxt += juce::String((int)m_cpu_history.m_cpu_avg * 100.0) + "% ";
-        usagetxt += juce::String((int)m_cpu_history.m_cpu_min * 100.0) + "% ";
-        usagetxt += juce::String((int)m_cpu_history.m_cpu_max * 100.0) + "% ";
+        usagetxt += juce::String((int)(m_cpu_history.m_cpu_median * 100.0)) + "% ";
+        usagetxt += juce::String((int)(m_cpu_history.m_cpu_avg * 100.0)) + "% ";
+        usagetxt += juce::String((int)(m_cpu_history.m_cpu_min * 100.0)) + "% ";
+        usagetxt += juce::String((int)(m_cpu_history.m_cpu_max * 100.0)) + "% ";
         m_infolabel.setText(usagetxt + txt, juce::dontSendNotification);
     }
     std::string pathprefix = R"(C:\Program Files\Common Files\)";

@@ -96,8 +96,7 @@ class FilePlayerEditor : public juce::Component,
 
         addAndMakeVisible(m_wavecomponent);
         m_wavecomponent.m_font = m_font;
-        m_wavecomponent.OnSeek=[this](double pos)
-        {
+        m_wavecomponent.OnSeek = [this](double pos) {
             FilePlayerProcessor::FilePlayerMessage msg;
             msg.opcode = FilePlayerProcessor::FilePlayerMessage::Opcode::FilePlayPosition;
             msg.value = pos;
@@ -198,7 +197,7 @@ class FilePlayerEditor : public juce::Component,
         }
         flex.performLayout(getBounds());
     }
-    
+
     void paint(juce::Graphics &g) override {}
 
   private:
@@ -346,11 +345,7 @@ bool FilePlayerProcessor::activate(double sampleRate, uint32_t minFrameCount,
     m_work_buf.setSize(2, maxFrameCount * 16);
     m_work_buf.clear();
     m_rs_out_buf.resize(maxFrameCount * 4);
-    m_wresampler.Reset();
-    double *dummy = nullptr;
-    m_wresampler.SetRates(sampleRate, sampleRate);
-    int wanted = m_wresampler.ResamplePrepare(maxFrameCount, 2, &dummy);
-    DBG("inited WDL resampler " << wanted);
+
     return true;
 }
 
@@ -459,26 +454,28 @@ clap_process_status FilePlayerProcessor::process(const clap_process *process) no
     }
     else
     {
-        m_wresampler.SetRates(m_file_sample_rate, m_sr / rate);
-        double *to_rs_buf = nullptr;
-        int samplestopush = m_wresampler.ResamplePrepare(process->frames_count, 2, &to_rs_buf);
-        for (int i = 0; i < samplestopush; ++i)
+        m_lanczos.sri = m_file_sample_rate;
+        m_lanczos.sro = m_sr / rate;
+        m_lanczos.dPhaseO = m_lanczos.sri / m_lanczos.sro;
+        auto samplestopush = m_lanczos.inputsRequiredToGenerateOutputs(process->frames_count);
+        for (size_t i = 0; i < samplestopush; ++i)
         {
-            to_rs_buf[i * 2 + 0] = getxfadedsample(filebuf[0], m_buf_playpos, loop_start_samples,
-                                                   loop_end_samples, xfadelen);
-            to_rs_buf[i * 2 + 1] = getxfadedsample(filebuf[1], m_buf_playpos, loop_start_samples,
-                                                   loop_end_samples, xfadelen);
+            m_lanczos.push(getxfadedsample(filebuf[0], m_buf_playpos, loop_start_samples,
+                                           loop_end_samples, xfadelen),
+                           getxfadedsample(filebuf[1], m_buf_playpos, loop_start_samples,
+                                           loop_end_samples, xfadelen));
             ++m_buf_playpos;
             if (m_buf_playpos >= loop_end_samples)
                 m_buf_playpos = loop_start_samples;
         }
-        m_wresampler.ResampleOut(m_rs_out_buf.data(), samplestopush, process->frames_count, 2);
-        for (int ch = 0; ch < 2; ++ch)
+        float *rsoutleft = &m_rs_out_buf[0];
+        float *rsoutright = &m_rs_out_buf[m_rs_out_buf.size() / 2];
+        m_lanczos.populateNext(rsoutleft, rsoutright, process->frames_count);
+
+        for (int j = 0; j < process->frames_count; ++j)
         {
-            for (int j = 0; j < process->frames_count; ++j)
-            {
-                process->audio_outputs[0].data32[ch][j] = m_rs_out_buf[j * 2 + ch];
-            }
+            process->audio_outputs[0].data32[0][j] = rsoutleft[j];
+            process->audio_outputs[0].data32[1][j] = rsoutright[j];
         }
     }
     m_gain_proc.setGainDecibels(m_volume);

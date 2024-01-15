@@ -119,9 +119,11 @@ class NoisePlethoraEngine
 
   private:
     std::unique_ptr<NoisePlethoraPlugin> m_plug;
+    using ENVTYPE = xenakios::Envelope<ENVBLOCKSIZE>;
     xenakios::Envelope<ENVBLOCKSIZE> m_p0_env{0.0};
     xenakios::Envelope<ENVBLOCKSIZE> m_p1_env{0.0};
     xenakios::Envelope<ENVBLOCKSIZE> m_filt_env{120.0};
+    std::array<ENVTYPE, 3> m_envs{ENVTYPE{0.0}, ENVTYPE{0.0}, ENVTYPE{120.0}};
 };
 
 namespace py = pybind11;

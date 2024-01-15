@@ -6,14 +6,13 @@
 #include "../xap_utils.h"
 #include "../xapfactory.h"
 #include "containers/choc_SingleReaderMultipleWriterFIFO.h"
-#include "../wdl_resampler_adapter.h"
-// #include "WDL/resample.h"
+#include "sst/basic-blocks/dsp/LanczosResampler.h"
 
 class FilePlayerProcessor : public XAPWithJuceGUI, public juce::Thread
 {
   public:
-    std::vector<double> m_rs_out_buf;
-    xenakios::Resampler m_wresampler{true};
+    std::vector<float> m_rs_out_buf;
+    sst::basic_blocks::dsp::LanczosResampler<128> m_lanczos{1.0, 1.0};
     double m_sr = 44100;
     std::atomic<bool> m_running_offline{false};
     juce::AudioBuffer<float> m_file_buf;
@@ -21,8 +20,7 @@ class FilePlayerProcessor : public XAPWithJuceGUI, public juce::Thread
     juce::AudioBuffer<float> m_work_buf;
     int m_buf_playpos = 0;
     signalsmith::stretch::SignalsmithStretch<float> m_stretch;
-    
-    
+
     double m_file_sample_rate = 1.0;
     double m_temp_file_sample_rate = 1.0;
     struct FilePlayerMessage
@@ -57,10 +55,10 @@ class FilePlayerProcessor : public XAPWithJuceGUI, public juce::Thread
     juce::dsp::Gain<float> m_gain_proc;
     double m_volume = 0.0f;
     double m_volume_mod = 0.0f;
-    double m_rate = 0.0;       // time octaves!
-    double m_rate_mod = 0.0;   // as above
-    double m_pitch = 0.0;      // semitones
-    double m_pitch_mod = 0.0;  // semitones
+    double m_rate = 0.0;      // time octaves!
+    double m_rate_mod = 0.0;  // as above
+    double m_pitch = 0.0;     // semitones
+    double m_pitch_mod = 0.0; // semitones
     double m_tonality_limit = 1.0;
     double m_loop_start = 0.0; // proportion of whole file
     double m_loop_end = 1.0;
@@ -135,15 +133,14 @@ class FilePlayerProcessor : public XAPWithJuceGUI, public juce::Thread
                 .withFlags(CLAP_PARAM_IS_AUTOMATABLE | CLAP_PARAM_IS_MODULATABLE)
                 .withName("Pitch")
                 .withID((clap_id)ParamIds::Pitch));
-        paramDescriptions.push_back(
-            ParamDesc()
-                .asFloat()
-                .withRange(0.0f, 1.0f)
-                .withDefault(1.0)
-                .withLinearScaleFormatting("%",100.0f)
-                .withFlags(CLAP_PARAM_IS_AUTOMATABLE)
-                .withName("Tonality limit")
-                .withID((clap_id)ParamIds::TonalityLimit));
+        paramDescriptions.push_back(ParamDesc()
+                                        .asFloat()
+                                        .withRange(0.0f, 1.0f)
+                                        .withDefault(1.0)
+                                        .withLinearScaleFormatting("%", 100.0f)
+                                        .withFlags(CLAP_PARAM_IS_AUTOMATABLE)
+                                        .withName("Tonality limit")
+                                        .withID((clap_id)ParamIds::TonalityLimit));
         paramDescriptions.push_back(
             ParamDesc()
                 .asBool()
@@ -220,7 +217,7 @@ class FilePlayerProcessor : public XAPWithJuceGUI, public juce::Thread
     }
     bool activate(double sampleRate, uint32_t minFrameCount,
                   uint32_t maxFrameCount) noexcept override;
-    
+
     uint32_t paramsCount() const noexcept override { return paramDescriptions.size(); }
     bool paramsInfo(uint32_t paramIndex, clap_param_info *info) const noexcept override
     {

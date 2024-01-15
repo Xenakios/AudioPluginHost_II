@@ -16,7 +16,7 @@ class ClapEventList
   public:
     static constexpr size_t maxEventSize = std::max(
         {sizeof(clap_event_note), sizeof(clap_event_note_expression),
-         sizeof(clap_event_param_value), sizeof(clap_event_param_mod), sizeof(clap_event_trigger),
+         sizeof(clap_event_param_value), sizeof(clap_event_param_mod),
          sizeof(clap_event_midi), sizeof(clap_event_transport), sizeof(clap_event_midi2)});
     ClapEventList()
     {

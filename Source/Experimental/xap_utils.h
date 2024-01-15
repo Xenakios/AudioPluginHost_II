@@ -165,8 +165,8 @@ template <size_t BLOCK_SIZE = 64> class Envelope
         if (newIndex != currentPointIndex)
         {
             currentPointIndex = newIndex;
-            std::cout << "update current point index to " << currentPointIndex << " at tpos " << t
-                      << "\n";
+            //std::cout << "update current point index to " << currentPointIndex << " at tpos " << t
+            //          << "\n";
         }
     }
     // interpolate_mode :
