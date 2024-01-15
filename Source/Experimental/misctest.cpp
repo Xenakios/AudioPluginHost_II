@@ -380,7 +380,7 @@ void test_np_code()
         plug->process(p0, p1);
         float outL = plug->processGraph();
         float outR = outL;
-        
+
         dcblocker.step<StereoSimperSVF::HP>(dcblocker, outL, outR);
         filter.step<StereoSimperSVF::LP>(filter, outL, outR);
         chansdata[0][i] = outL * gain;
@@ -488,9 +488,47 @@ inline void test_lanczos()
         std::cout << "Could not create reader\n";
 }
 
+template <size_t Size> class LookUpTable
+{
+  public:
+    LookUpTable(std::function<float(float)> func, float minv, float maxv)
+        : m_minv(minv), m_maxv(maxv)
+    {
+        for (size_t i = 0; i < Size; ++i)
+            m_table[i] = func(xenakios::mapvalue<float>(i, 0, Size - 1, minv, maxv));
+        m_table[Size] = m_table[Size - 1];
+    }
+    float operator()(float x)
+    {
+        if (x < m_minv)
+            return m_table[0];
+        else if (x > m_maxv)
+            return m_table.back();
+        size_t index0 = xenakios::mapvalue<float>(x, m_minv, m_maxv, 0, Size - 1);
+        size_t index1 = index0 + 1;
+        float y0 = m_table[index0];
+        float y1 = m_table[index1];
+        float frac = x - (int)x;
+        return y0 + (y1 - y0) * frac;
+    }
+
+  private:
+    std::array<float, Size + 1> m_table;
+    float m_minv = 0.0f;
+    float m_maxv = 1.0f;
+};
+
+inline void test_fb_osc()
+{
+    LookUpTable<128> tab{[](float x) { return x; }, -1.0f, 1.0f};
+    for (double x = -1.1; x < 1.1; x += 0.1)
+        std::cout << x << "\t" << tab(x) << "\n";
+}
+
 int main()
 {
-    test_lanczos();
+    test_fb_osc();
+    // test_lanczos();
     // test_envelope();
     // test_np_code();
     // test_pipe();
