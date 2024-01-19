@@ -8,6 +8,88 @@
 #include "containers/choc_SingleReaderMultipleWriterFIFO.h"
 #include "sst/basic-blocks/dsp/LanczosResampler.h"
 
+inline float getXFadedSampleFromBuffer(const float *srcbuf, int index, int start, int end,
+                                       int xfadelen)
+{
+    // not within xfade region so just return original sample
+    int xfadestart = end - xfadelen;
+    if (index >= start && index < xfadestart)
+        return srcbuf[index];
+
+    float xfadegain = juce::jmap<float>(index, xfadestart, end - 1, 1.0f, 0.0f);
+    jassert(xfadegain >= 0.0f && xfadegain <= 1.0);
+    float s0 = srcbuf[index];
+    int temp = index - xfadestart + (start - xfadelen);
+    if (temp < 0)
+        return s0 * xfadegain;
+    jassert(temp >= 0 && temp < end);
+    float s1 = srcbuf[temp];
+    return s0 * xfadegain + s1 * (1.0f - xfadegain);
+};
+
+class ResamplerEngine
+{
+  public:
+    ResamplerEngine() {}
+    void prepare(double samplerate, int maxblocksize)
+    {
+        m_sr = samplerate;
+        m_rs_out_buf.resize(2048);
+        std::fill(m_rs_out_buf.begin(), m_rs_out_buf.end(), 0.0f);
+    }
+    void processBlock(float **outbuffer, int numFrames, int numOutchans)
+    {
+        jassert(m_file_buf);
+        jassert(m_loop_end > 4000);
+        m_lanczos.sri = m_source_sr;
+        m_lanczos.sro = m_sr / m_play_rate;
+        m_lanczos.dPhaseO = m_lanczos.sri / m_lanczos.sro;
+        auto samplestopush = m_lanczos.inputsRequiredToGenerateOutputs(numFrames);
+        auto filebuf = m_file_buf->getArrayOfReadPointers();
+        for (size_t i = 0; i < samplestopush; ++i)
+        {
+            float in0 = getXFadedSampleFromBuffer(filebuf[0], m_buf_playpos, m_loop_start,
+                                        m_loop_end, m_xfadelen);
+            float in1 = getXFadedSampleFromBuffer(filebuf[1], m_buf_playpos, m_loop_start,
+                                        m_loop_end, m_xfadelen);
+            // jassert(in0>=-2.0f && in0<=2.0);
+            // jassert(in1>=-2.0f && in1<=2.0);
+            m_lanczos.push(in0, in1);
+            ++m_buf_playpos;
+            if (m_buf_playpos >= m_loop_end)
+                m_buf_playpos = m_loop_start;
+        }
+        float *rsoutleft = &m_rs_out_buf[0];
+        float *rsoutright = &m_rs_out_buf[512];
+        auto produced = m_lanczos.populateNext(rsoutleft, rsoutright, numFrames);
+        jassert(produced == numFrames);
+        for (int j = 0; j < numFrames; ++j)
+        {
+            float outl = rsoutleft[j];
+            float outr = rsoutright[j];
+            outbuffer[0][j] = outl;
+            outbuffer[1][j] = outr;
+        }
+    }
+    void setSourceBuffer(juce::AudioBuffer<float> *buf, double sr)
+    {
+        m_source_sr = sr;
+        m_file_buf = buf;
+    }
+    int m_loop_start = 0;
+    int m_loop_end = 0;
+    int m_xfadelen = 4000;
+    double m_play_rate = 1.0;
+    int m_buf_playpos = 0;
+  private:
+    juce::AudioBuffer<float> *m_file_buf = nullptr;
+    std::vector<float> m_rs_out_buf;
+    sst::basic_blocks::dsp::LanczosResampler<128> m_lanczos{44100.0f, 44100.0f};
+    double m_sr = 44100;
+    double m_source_sr = 44100;
+    
+};
+
 class FilePlayerProcessor : public XAPWithJuceGUI, public juce::Thread
 {
   public:

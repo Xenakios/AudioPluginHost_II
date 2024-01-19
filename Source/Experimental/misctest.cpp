@@ -491,6 +491,14 @@ inline void test_lanczos()
 template <size_t Size> class LookUpTable
 {
   public:
+    LookUpTable(std::array<float, Size> tab)
+    {
+        for (size_t i = 0; i < Size; ++i)
+            m_table[i] = tab[i];
+        m_minv = -1.0f;
+        m_maxv = 1.0f;
+        m_table[Size] = m_table[Size - 1];
+    }
     LookUpTable(std::function<float(float)> func, float minv, float maxv)
         : m_minv(minv), m_maxv(maxv)
     {
@@ -508,21 +516,61 @@ template <size_t Size> class LookUpTable
         size_t index1 = index0 + 1;
         float y0 = m_table[index0];
         float y1 = m_table[index1];
-        float frac = x - (int)x;
+        float frac = x - std::round(x);
         return y0 + (y1 - y0) * frac;
     }
+    std::array<float, Size + 1> m_table;
 
   private:
-    std::array<float, Size + 1> m_table;
     float m_minv = 0.0f;
     float m_maxv = 1.0f;
 };
 
 inline void test_fb_osc()
 {
-    LookUpTable<128> tab{[](float x) { return x; }, -1.0f, 1.0f};
-    for (double x = -1.1; x < 1.1; x += 0.1)
-        std::cout << x << "\t" << tab(x) << "\n";
+    double outsr = 44100;
+    choc::audio::AudioFileProperties outfileprops;
+    outfileprops.formatName = "WAV";
+    outfileprops.bitDepth = choc::audio::BitDepth::float32;
+    outfileprops.numChannels = 1;
+    outfileprops.sampleRate = outsr;
+    choc::audio::WAVAudioFileFormat<true> wavformat;
+    auto writer = wavformat.createWriter(
+        R"(C:\MusicAudio\sourcesamples\test_signals\lanczos\fb_osc01.wav)", outfileprops);
+    int outlenframes = outsr * 5.0;
+    choc::buffer::ChannelArrayBuffer<float> outputbuf{outfileprops.numChannels,
+                                                      (unsigned int)outlenframes + 64};
+    outputbuf.clear();
+
+    LookUpTable<128> tab{[](float x) { return -x; }, -1.0f, 1.0f};
+    std::mt19937 rng(9);
+    std::uniform_int_distribution<int> dist(0, 127);
+    std::uniform_real_distribution<float> distf(-1.0f, 1.0f);
+    for (int i = 0; i < 32; ++i)
+        tab.m_table[dist(rng)] = distf(rng);
+    float s0 = 0.065f;
+    const size_t delaylen = 256;
+    SimpleRingBuffer<float, delaylen> delay;
+    for (size_t i = 0; i < delaylen; ++i)
+        delay.push(0.00f);
+    float fb = 0.0f;
+    for (int i = 0; i < outlenframes; ++i)
+    {
+
+        float in = delay.pop() + fb;
+        in = std::clamp(in, -1.0f, 1.0f);
+        float s1 = tab(in);
+        // assert(s1 >= -1.0f && s1 < 1.0f);
+        // std::cout << s0 << "\n";
+        outputbuf.getSample(0, i) = s1 * 0.5;
+        delay.push(s1);
+        fb = s0 * -0.3;
+        s0 = s1;
+    }
+    if (writer)
+    {
+        writer->appendFrames(outputbuf.getView());
+    }
 }
 
 int main()
