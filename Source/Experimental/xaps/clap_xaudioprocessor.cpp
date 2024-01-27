@@ -6,6 +6,7 @@ ClapPluginFormatProcessor::ClapPluginFormatProcessor(std::string plugfilename, i
 {
     auto get_extension_lambda = [](const struct clap_host *host, const char *eid) -> const void * {
         // DBG("plugin requested host extension " << eid);
+        std::cout << "plugin requested host extension " << eid << "\n";
         #ifdef JUCE_CORE_H_INCLUDED
         if (!strcmp(eid, CLAP_EXT_THREAD_CHECK))
         {
@@ -15,6 +16,20 @@ ClapPluginFormatProcessor::ClapPluginFormatProcessor(std::string plugfilename, i
             };
             ext_thcheck.is_main_thread = [](const clap_host *) {
                 return juce::MessageManager::getInstance()->isThisTheMessageThread();
+            };
+            return &ext_thcheck;
+        }
+        #else
+        if (!strcmp(eid, CLAP_EXT_THREAD_CHECK))
+        {
+            static clap_host_thread_check ext_thcheck;
+            ext_thcheck.is_audio_thread = [](const clap_host *host_) {
+                auto claphost = (ClapPluginFormatProcessor *)host_->host_data;
+                return std::this_thread::get_id() == claphost->audiothread_id;
+            };
+            ext_thcheck.is_main_thread = [](const clap_host *host_) {
+                auto claphost = (ClapPluginFormatProcessor *)host_->host_data;
+                return std::this_thread::get_id() == claphost->mainthread_id;
             };
             return &ext_thcheck;
         }
@@ -28,7 +43,8 @@ ClapPluginFormatProcessor::ClapPluginFormatProcessor(std::string plugfilename, i
                 if (claphost->m_host_ext)
                     claphost->m_host_ext->log(msg);
             };
-            return &ext_log;
+            return nullptr;
+            // return &ext_log;
         }
         if (!strcmp(eid, CLAP_EXT_GUI))
         {
@@ -70,6 +86,12 @@ ClapPluginFormatProcessor::ClapPluginFormatProcessor(std::string plugfilename, i
         // this is going to make a heap allocation...
         juce::MessageManager::callAsync(
             [claphost]() { claphost->m_plug->on_main_thread(claphost->m_plug); });
+    };
+    #else
+    xen_host_info.request_callback = [](const struct clap_host *host_) {
+        std::cout << "plug requested callback on main thread\n";
+        auto claphost = (ClapPluginFormatProcessor *)host_->host_data;
+        claphost->m_plug->on_main_thread(claphost->m_plug);
     };
     #endif
     xen_host_info.request_process = [](const struct clap_host *host) {};

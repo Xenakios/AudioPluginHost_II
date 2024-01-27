@@ -8,136 +8,9 @@
 #include "containers/choc_SingleReaderSingleWriterFIFO.h"
 #include "../xap_utils.h"
 #include "../xap_extensions.h"
+#include <thread>
 
-#ifdef JUCE_CORE_H_INCLUDED
-class ClapJuceMembers
-{
-  public:
-    std::unique_ptr<juce::Component> m_generic_editor;
-    // if external plugin doesn't implement GUI, we'll use our generic editor,
-    bool implementsGui() const noexcept override { return true; }
-    bool guiCreate(const char *api, bool isFloating) noexcept override
-    {
-        if (!m_ext_gui)
-        {
-            m_generic_editor = std::make_unique<xenakios::GenericEditor>(*this);
-            return true;
-        }
-        if (m_ext_gui)
-        {
-            return m_ext_gui->create(m_plug, "win32", false);
-        }
-        return false;
-    }
-    void guiDestroy() noexcept override
-    {
-        m_generic_editor = nullptr;
-        if (m_ext_gui)
-        {
-            m_ext_gui->destroy(m_plug);
-        }
-    }
-    // virtual bool guiIsApiSupported(const char *api, bool isFloating) noexcept { return false; }
-    // virtual bool guiGetPreferredApi(const char **api, bool *is_floating) noexcept { return false;
-    // }
-
-    // virtual bool guiSetScale(double scale) noexcept { return false; }
-    bool guiShow() noexcept override
-    {
-        if (m_ext_gui)
-        {
-            return m_ext_gui->show(m_plug);
-        }
-        return true;
-    }
-    bool guiHide() noexcept override
-    {
-        if (m_ext_gui)
-        {
-            return m_ext_gui->hide(m_plug);
-        }
-        return true;
-    }
-    bool guiGetSize(uint32_t *width, uint32_t *height) noexcept override
-    {
-        if (m_generic_editor)
-        {
-            *width = m_generic_editor->getWidth();
-            *height = m_generic_editor->getHeight();
-            return true;
-        }
-        if (m_ext_gui)
-        {
-            return m_ext_gui->get_size(m_plug, width, height);
-        }
-        return false;
-    }
-    bool guiCanResize() const noexcept override
-    {
-        if (m_generic_editor)
-            return true;
-        if (m_ext_gui)
-        {
-            return m_ext_gui->can_resize(m_plug);
-        }
-        return false;
-    }
-    // virtual bool guiGetResizeHints(clap_gui_resize_hints_t *hints) noexcept { return false; }
-    bool guiAdjustSize(uint32_t *width, uint32_t *height) noexcept override
-    {
-        if (m_generic_editor)
-            return guiGetSize(width, height);
-        if (m_ext_gui)
-        {
-            return m_ext_gui->adjust_size(m_plug, width, height);
-        }
-        return false;
-    }
-    bool guiSetSize(uint32_t width, uint32_t height) noexcept override
-    {
-        if (m_generic_editor)
-        {
-            m_generic_editor->setSize(width, height);
-            return true;
-        }
-        if (m_ext_gui)
-        {
-            uint32_t w = width;
-            uint32_t h = height;
-            if (guiAdjustSize(&w, &h))
-            {
-                return m_ext_gui->set_size(m_plug, w, h);
-            }
-        }
-        return false;
-    }
-    // virtual void guiSuggestTitle(const char *title) noexcept {}
-    bool guiSetParent(const clap_window *window) noexcept override
-    {
-        auto parent = (juce::Component *)window->ptr;
-        // we only support attaching the GenericEditor to Juce components
-        if (m_generic_editor && std::string(window->api) == "JUCECOMPONENT")
-        {
-            parent->addAndMakeVisible(*m_generic_editor);
-            return true;
-        }
-        if (m_ext_gui)
-        {
-            clap_window win;
-            win.api = "win32";
-            win.win32 = parent->getWindowHandle();
-            return m_ext_gui->set_parent(m_plug, &win);
-        }
-        return false;
-    }
-};
-#else
-class ClapJuceMembers
-{
-};
-#endif
-
-class ClapPluginFormatProcessor : public xenakios::XAudioProcessor, public ClapJuceMembers
+class ClapPluginFormatProcessor : public xenakios::XAudioProcessor
 {
     choc::file::DynamicLibrary m_plugdll;
     clap_plugin_entry_t *m_entry = nullptr;
@@ -196,6 +69,8 @@ class ClapPluginFormatProcessor : public xenakios::XAudioProcessor, public ClapJ
             m_processingStarted = false;
         }
     }
+    std::thread::id mainthread_id;
+    std::thread::id audiothread_id;
     IHostExtension *m_host_ext = nullptr;
     ClapPluginFormatProcessor(std::string plugfilename, int plugindex);
 
@@ -317,4 +192,123 @@ class ClapPluginFormatProcessor : public xenakios::XAudioProcessor, public ClapJ
     {
         m_ext_gui = (clap_plugin_gui *)m_plug->get_extension(m_plug, CLAP_EXT_GUI);
     }
+#ifdef JUCE_CORE_H_INCLUDED
+    std::unique_ptr<juce::Component> m_generic_editor;
+    // if external plugin doesn't implement GUI, we'll use our generic editor,
+    bool implementsGui() const noexcept override { return true; }
+    bool guiCreate(const char *api, bool isFloating) noexcept override
+    {
+        if (!m_ext_gui)
+        {
+            m_generic_editor = std::make_unique<xenakios::GenericEditor>(*this);
+            return true;
+        }
+        if (m_ext_gui)
+        {
+            return m_ext_gui->create(m_plug, "win32", false);
+        }
+        return false;
+    }
+    void guiDestroy() noexcept override
+    {
+        m_generic_editor = nullptr;
+        if (m_ext_gui)
+        {
+            m_ext_gui->destroy(m_plug);
+        }
+    }
+    // virtual bool guiIsApiSupported(const char *api, bool isFloating) noexcept { return false; }
+    // virtual bool guiGetPreferredApi(const char **api, bool *is_floating) noexcept { return false;
+    // }
+
+    // virtual bool guiSetScale(double scale) noexcept { return false; }
+    bool guiShow() noexcept override
+    {
+        if (m_ext_gui)
+        {
+            return m_ext_gui->show(m_plug);
+        }
+        return true;
+    }
+    bool guiHide() noexcept override
+    {
+        if (m_ext_gui)
+        {
+            return m_ext_gui->hide(m_plug);
+        }
+        return true;
+    }
+    bool guiGetSize(uint32_t *width, uint32_t *height) noexcept override
+    {
+        if (m_generic_editor)
+        {
+            *width = m_generic_editor->getWidth();
+            *height = m_generic_editor->getHeight();
+            return true;
+        }
+        if (m_ext_gui)
+        {
+            return m_ext_gui->get_size(m_plug, width, height);
+        }
+        return false;
+    }
+    bool guiCanResize() const noexcept override
+    {
+        if (m_generic_editor)
+            return true;
+        if (m_ext_gui)
+        {
+            return m_ext_gui->can_resize(m_plug);
+        }
+        return false;
+    }
+    // virtual bool guiGetResizeHints(clap_gui_resize_hints_t *hints) noexcept { return false; }
+    bool guiAdjustSize(uint32_t *width, uint32_t *height) noexcept override
+    {
+        if (m_generic_editor)
+            return guiGetSize(width, height);
+        if (m_ext_gui)
+        {
+            return m_ext_gui->adjust_size(m_plug, width, height);
+        }
+        return false;
+    }
+    bool guiSetSize(uint32_t width, uint32_t height) noexcept override
+    {
+        if (m_generic_editor)
+        {
+            m_generic_editor->setSize(width, height);
+            return true;
+        }
+        if (m_ext_gui)
+        {
+            uint32_t w = width;
+            uint32_t h = height;
+            if (guiAdjustSize(&w, &h))
+            {
+                return m_ext_gui->set_size(m_plug, w, h);
+            }
+        }
+        return false;
+    }
+    // virtual void guiSuggestTitle(const char *title) noexcept {}
+    bool guiSetParent(const clap_window *window) noexcept override
+    {
+        auto parent = (juce::Component *)window->ptr;
+        // we only support attaching the GenericEditor to Juce components
+        if (m_generic_editor && std::string(window->api) == "JUCECOMPONENT")
+        {
+            parent->addAndMakeVisible(*m_generic_editor);
+            return true;
+        }
+        if (m_ext_gui)
+        {
+            clap_window win;
+            win.api = "win32";
+            win.win32 = parent->getWindowHandle();
+            return m_ext_gui->set_parent(m_plug, &win);
+        }
+        return false;
+    }
+#endif
 };

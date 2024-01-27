@@ -873,11 +873,7 @@ class MainComponent : public juce::Component, public juce::Timer, public IHostEx
   public:
     void SayHello() override { m_log_ed.insertTextAtCaret("Hello from extension"); }
     void log(const char *msg) override { m_log_ed.insertTextAtCaret(msg); }
-    void setNodeCanvasProperty(int propIndex, juce::var v) override
-    {
-        if (propIndex == 0)
-            m_graph_component->m_backgroundcolor = juce::Colour{(uint32_t)(int)v};
-    }
+    
     std::vector<std::unique_ptr<XapWindow>> m_xap_windows;
     juce::AudioDeviceManager m_aman;
     std::unique_ptr<XAPGraph> m_graph;
