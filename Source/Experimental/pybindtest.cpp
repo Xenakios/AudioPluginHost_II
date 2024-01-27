@@ -186,7 +186,6 @@ class ClapProcessingEngine
             clap_process cp;
             memset(&cp, 0, sizeof(clap_process));
             cp.frames_count = procblocksize;
-
             cp.audio_inputs_count = 1;
             choc::buffer::ChannelArrayBuffer<float> ibuf{2, (unsigned int)procblocksize};
             ibuf.clear();
@@ -269,9 +268,11 @@ class ClapProcessingEngine
             renderloopfinished = true;
         });
         using namespace std::chrono_literals;
+        // fake event loop to flush the on main thread requests from the plugin
         while (!renderloopfinished)
         {
             m_plug->runMainThreadTasks();
+            // might be needlessly short sleep
             std::this_thread::sleep_for(1ms);
         }
         th.join();

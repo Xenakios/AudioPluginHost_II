@@ -7,7 +7,7 @@ ClapPluginFormatProcessor::ClapPluginFormatProcessor(std::string plugfilename, i
     on_main_thread_fifo.reset(256);
     auto get_extension_lambda = [](const struct clap_host *host, const char *eid) -> const void * {
         // DBG("plugin requested host extension " << eid);
-        std::cout << "plugin requested host extension " << eid << "\n";
+        // std::cout << "plugin requested host extension " << eid << "\n";
 #ifdef JUCE_CORE_H_INCLUDED
         if (!strcmp(eid, CLAP_EXT_THREAD_CHECK))
         {
