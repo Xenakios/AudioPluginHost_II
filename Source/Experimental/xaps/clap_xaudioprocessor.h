@@ -69,8 +69,20 @@ class ClapPluginFormatProcessor : public xenakios::XAudioProcessor
             m_processingStarted = false;
         }
     }
-    std::thread::id mainthread_id;
-    std::thread::id audiothread_id;
+    static std::thread::id& mainthread_id()
+    {
+        static std::thread::id id;
+        return id;
+    }
+    choc::fifo::SingleReaderSingleWriterFIFO<std::function<void()>> on_main_thread_fifo;
+    void runMainThreadTasks()
+    {
+        std::function<void()> task;
+        while (on_main_thread_fifo.pop(task))
+        {
+            task();
+        }
+    }
     IHostExtension *m_host_ext = nullptr;
     ClapPluginFormatProcessor(std::string plugfilename, int plugindex);
 

@@ -165,10 +165,11 @@ class ClapProcessingEngine
     }
     ClapProcessingEngine(std::string plugfilename, int plugindex)
     {
+        ClapPluginFormatProcessor::mainthread_id() = std::this_thread::get_id();
         m_plug = std::make_unique<ClapPluginFormatProcessor>(plugfilename, plugindex);
         if (m_plug)
         {
-            m_plug->mainthread_id = std::this_thread::get_id();
+
             clap_plugin_descriptor desc;
             if (m_plug->getDescriptor(&desc))
             {
@@ -178,10 +179,10 @@ class ClapProcessingEngine
     }
     void processToFile(std::string filename, double duration, double samplerate)
     {
-        
+        int procblocksize = 512;
+        std::atomic<bool> renderloopfinished{false};
+        m_plug->activate(samplerate, procblocksize, procblocksize);
         std::thread th([&] {
-            m_plug->audiothread_id = std::this_thread::get_id();
-            int procblocksize = 512;
             clap_process cp;
             memset(&cp, 0, sizeof(clap_process));
             cp.frames_count = procblocksize;
@@ -224,7 +225,6 @@ class ClapProcessingEngine
             cp.in_events = list_in.clapInputEvents();
             cp.out_events = list_out.clapOutputEvents();
 
-            m_plug->activate(samplerate, procblocksize, procblocksize);
             std::cout << "plug activated\n";
             m_plug->startProcessing();
             int outcounter = 0;
@@ -266,9 +266,16 @@ class ClapProcessingEngine
             m_plug->stopProcessing();
             writer->flush();
             std::cout << "\nfinished\n";
+            renderloopfinished = true;
         });
+        using namespace std::chrono_literals;
+        while (!renderloopfinished)
+        {
+            m_plug->runMainThreadTasks();
+            std::this_thread::sleep_for(1ms);
+        }
         th.join();
-        //std::this_thread::get_id
+        
     }
 };
 
