@@ -1,10 +1,12 @@
 #include "clap_xaudioprocessor.h"
+#include <iostream>
 
 ClapPluginFormatProcessor::ClapPluginFormatProcessor(std::string plugfilename, int plugindex)
     : m_plugdll(plugfilename)
 {
     auto get_extension_lambda = [](const struct clap_host *host, const char *eid) -> const void * {
         // DBG("plugin requested host extension " << eid);
+        #ifdef JUCE_CORE_H_INCLUDED
         if (!strcmp(eid, CLAP_EXT_THREAD_CHECK))
         {
             static clap_host_thread_check ext_thcheck;
@@ -16,6 +18,7 @@ ClapPluginFormatProcessor::ClapPluginFormatProcessor(std::string plugfilename, i
             };
             return &ext_thcheck;
         }
+        #endif
         if (!strcmp(eid, CLAP_EXT_LOG))
         {
             static clap_host_log ext_log;
@@ -58,15 +61,17 @@ ClapPluginFormatProcessor::ClapPluginFormatProcessor(std::string plugfilename, i
 
     xen_host_info.host_data = this;
     xen_host_info.get_extension = get_extension_lambda;
+    #ifdef JUCE_CORE_H_INCLUDED
     xen_host_info.request_callback = [](const struct clap_host *host_) {
         auto claphost = (ClapPluginFormatProcessor *)host_->host_data;
         // Note that this is risky because the processor could be
         // destroyed before the callback happens...
-        // Also, this is might be called from the audio thread, and
+        // Also, this might be called from the audio thread, and
         // this is going to make a heap allocation...
         juce::MessageManager::callAsync(
             [claphost]() { claphost->m_plug->on_main_thread(claphost->m_plug); });
     };
+    #endif
     xen_host_info.request_process = [](const struct clap_host *host) {};
     xen_host_info.request_restart = [](const struct clap_host *host) {
 
@@ -104,6 +109,7 @@ ClapPluginFormatProcessor::ClapPluginFormatProcessor(std::string plugfilename, i
                     // create parameter infos for generic GUI
                     auto numparams = m_ext_params->count(m_plug);
                     paramDescriptions.reserve(numparams);
+                    using ParamDesc = sst::basic_blocks::params::ParamMetaData;
                     for (int i = 0; i < numparams; ++i)
                     {
                         clap_param_info pinfo;
@@ -138,7 +144,7 @@ ClapPluginFormatProcessor::~ClapPluginFormatProcessor()
     if (m_plug)
     {
         // it would be an error if the processing has not already been stopped at this point!
-        jassert(!m_processingStarted);
+        assert(!m_processingStarted);
         // if (m_processingStarted)
         //     m_plug->stop_processing(m_plug);
         if (m_activated.load())
@@ -182,7 +188,7 @@ bool ClapPluginFormatProcessor::activate(double sampleRate, uint32_t minFrameCou
 clap_process_status ClapPluginFormatProcessor::process(const clap_process *process) noexcept
 {
     // everything pointless if we don't have the plugin instance
-    jassert(m_plug);
+    assert(m_plug);
     // could maybe just call our own startProcessing here?
     if (!m_processingStarted)
     {
@@ -193,7 +199,7 @@ clap_process_status ClapPluginFormatProcessor::process(const clap_process *proce
         else
         {
             // plugin didn't start processing, fatal error
-            jassert(false);
+            assert(false);
         }
     }
     // we need a copy to be able to switch the used event list because the passed in process

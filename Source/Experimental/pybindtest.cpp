@@ -8,6 +8,7 @@
 #include "audio/choc_AudioFileFormat_WAV.h"
 #include "xapdsp.h"
 #include "xap_utils.h"
+#include "xaps/clap_xaudioprocessor.h"
 
 int add(int i, int j) { return i + j; }
 
@@ -126,6 +127,25 @@ class NoisePlethoraEngine
     std::array<ENVTYPE, 3> m_envs{ENVTYPE{0.0}, ENVTYPE{0.0}, ENVTYPE{120.0}};
 };
 
+class ClapProcessingEngine
+{
+    std::unique_ptr<ClapPluginFormatProcessor> m_plug;
+
+  public:
+    ClapProcessingEngine(std::string plugfilename, int plugindex)
+    {
+        m_plug = std::make_unique<ClapPluginFormatProcessor>(plugfilename, plugindex);
+        if (m_plug)
+        {
+            clap_plugin_descriptor desc;
+            if (m_plug->getDescriptor(&desc))
+            {
+                std::cout << "created : " << desc.name << "\n";
+            }
+        }
+    }
+};
+
 namespace py = pybind11;
 
 PYBIND11_MODULE(xenakios, m)
@@ -135,6 +155,8 @@ PYBIND11_MODULE(xenakios, m)
     m.def("add", &add, "A function that adds two numbers");
     m.def("avg", &avg, "average of list");
     m.def("list_plugins", &list_plugins, "print noise plethora plugins");
+    py::class_<ClapProcessingEngine>(m, "ClapEngine")
+        .def(py::init<const std::string &,int>());
     py::class_<NoisePlethoraEngine>(m, "NoisePlethoraEngine")
         .def(py::init<const std::string &>())
         .def("processToFile", &NoisePlethoraEngine::processToFile)
