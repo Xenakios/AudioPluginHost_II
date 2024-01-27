@@ -136,19 +136,39 @@ class ClapEventSequencer
 {
 
   public:
-    xenakios::SortingEventList m_evlist;
+    union clap_multi_event
+    {
+        clap_event_header_t header;
+        clap_event_note note;
+        clap_event_midi_t midi;
+        clap_event_midi2_t midi2;
+        clap_event_param_value_t param;
+        clap_event_param_mod_t parammod;
+        clap_event_param_gesture_t paramgest;
+        clap_event_note_expression_t noteexpression;
+        clap_event_transport_t transport;
+    };
+    struct Event
+    {
+        Event() {}
+        template<typename EType>
+        Event(double time, EType* e) : timestamp(time), event(*(clap_multi_event*)e) {}
+        double timestamp = 0.0;
+        clap_multi_event event;
+    };
+    std::vector<Event> m_evlist;
     ClapEventSequencer() {}
     void addNoteOn(double time, int port, int channel, int key, double velo, int note_id)
     {
         auto ev =
-            xenakios::make_event_note(time, CLAP_EVENT_NOTE_ON, port, channel, key, note_id, velo);
-        m_evlist.pushEvent(&ev);
+            xenakios::make_event_note(0, CLAP_EVENT_NOTE_ON, port, channel, key, note_id, velo);
+        m_evlist.push_back(Event(time, &ev));
     }
     void addNoteOff(double time, int port, int channel, int key, double velo, int note_id)
     {
         auto ev =
-            xenakios::make_event_note(time, CLAP_EVENT_NOTE_OFF, port, channel, key, note_id, velo);
-        m_evlist.pushEvent(&ev);
+            xenakios::make_event_note(0, CLAP_EVENT_NOTE_OFF, port, channel, key, note_id, velo);
+        m_evlist.push_back(Event(time, &ev));
     }
 };
 
@@ -161,7 +181,7 @@ class ClapProcessingEngine
     void setSequencer(ClapEventSequencer seq)
     {
         m_seq = seq;
-        m_seq.m_evlist.sortEvents();
+        // m_seq.m_evlist.sortEvents();
     }
     ClapProcessingEngine(std::string plugfilename, int plugindex)
     {
@@ -276,7 +296,6 @@ class ClapProcessingEngine
             std::this_thread::sleep_for(1ms);
         }
         th.join();
-        
     }
 };
 
