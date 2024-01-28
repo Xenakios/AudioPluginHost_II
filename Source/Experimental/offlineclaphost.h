@@ -7,6 +7,7 @@
 #include "xapdsp.h"
 #include "xap_utils.h"
 #include "xaps/clap_xaudioprocessor.h"
+#include "containers/choc_Span.h"
 
 class ClapEventSequence
 {
@@ -50,8 +51,58 @@ class ClapEventSequence
             xenakios::make_event_note(0, CLAP_EVENT_NOTE_OFF, port, channel, key, note_id, velo);
         m_evlist.push_back(Event(time, &ev));
     }
-    // std::vector<SeqEvent> m_seq_events;
-    // void addEvent(SeqEvent e) { m_seq_events.push_back(e); }
+    struct Iterator
+    {
+        /// Creates an iterator positioned at the start of the sequence.
+        Iterator(const ClapEventSequence &s) : owner(s) {}
+        Iterator(const Iterator &) = default;
+        Iterator(Iterator &&) = default;
+
+        /// Seeks the iterator to the given time
+
+        void setTime(double newTimeStamp)
+        {
+            auto eventData = owner.m_evlist.data();
+
+            while (nextIndex != 0 && eventData[nextIndex - 1].timestamp >= newTimeStamp)
+                --nextIndex;
+
+            while (nextIndex < owner.m_evlist.size() &&
+                   eventData[nextIndex].timestamp < newTimeStamp)
+                ++nextIndex;
+
+            currentTime = newTimeStamp;
+        }
+
+        /// Returns the current iterator time
+        double getTime() const noexcept { return currentTime; }
+
+        /// Returns a set of events which lie between the current time, up to (but not
+        /// including) the given duration. This function then increments the iterator to
+        /// set its current time to the end of this block.
+
+        choc::span<const ClapEventSequence::Event> readNextEvents(double duration)
+        {
+            auto start = nextIndex;
+            auto eventData = owner.m_evlist.data();
+            auto end = start;
+            auto total = owner.m_evlist.size();
+            auto endTime = currentTime + duration;
+            currentTime = endTime;
+
+            while (end < total && eventData[end].timestamp < endTime)
+                ++end;
+
+            nextIndex = end;
+
+            return {eventData + start, eventData + end};
+        }
+
+      private:
+        const ClapEventSequence &owner;
+        double currentTime = 0;
+        size_t nextIndex = 0;
+    };
 };
 
 class ClapProcessingEngine
@@ -67,6 +118,7 @@ class ClapProcessingEngine
     }
     ClapProcessingEngine(std::string plugfilename, int plugindex)
     {
+
         ClapPluginFormatProcessor::mainthread_id() = std::this_thread::get_id();
         m_plug = std::make_unique<ClapPluginFormatProcessor>(plugfilename, plugindex);
         if (m_plug)
@@ -81,10 +133,12 @@ class ClapProcessingEngine
     }
     void processToFile(std::string filename, double duration, double samplerate)
     {
+        m_seq.sortEvents();
         int procblocksize = 512;
         std::atomic<bool> renderloopfinished{false};
         m_plug->activate(samplerate, procblocksize, procblocksize);
         std::thread th([&] {
+            ClapEventSequence::Iterator eviter(m_seq);
             clap_process cp;
             memset(&cp, 0, sizeof(clap_process));
             cp.frames_count = procblocksize;
@@ -142,8 +196,19 @@ class ClapProcessingEngine
             //     choc::buffer::SeparateChannelLayout<float>(cp.audio_outputs->data32));
             // bufferview.clear();
             bool offsent = false;
+            eviter.setTime(0.0);
             while (outcounter < outlensamples)
             {
+                auto blockevts = eviter.readNextEvents(procblocksize / samplerate);
+                for (auto &e : blockevts)
+                {
+                    auto ecopy = e.event;
+                    ecopy.header.time = (e.timestamp * samplerate) - outcounter;
+                    list_in.push((const clap_event_header *)&ecopy);
+                    std::cout << "sent event type " << e.event.header.type << " at samplepos "
+                              << outcounter + ecopy.header.time << "\n";
+                }
+                /*
                 if (outcounter == 0)
                 {
                     auto ev = xenakios::make_event_note(0, CLAP_EVENT_NOTE_ON, 0, 0, 60, -1, 1.0);
@@ -157,6 +222,7 @@ class ClapProcessingEngine
                     offsent = true;
                     std::cout << "sent off at " << outcounter << "\n";
                 }
+                */
                 m_plug->process(&cp);
                 list_out.clear();
                 list_in.clear();

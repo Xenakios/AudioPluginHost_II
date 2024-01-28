@@ -578,6 +578,13 @@ inline void test_offline_clap()
 {
     ClapProcessingEngine eng{R"(C:\Program Files\Common Files\CLAP\Surge Synth Team\Surge XT.clap)",
                              0};
+    eng.m_seq.addNoteOn(0.0, 0, 0, 60, 1.0, -1);
+    eng.m_seq.addNoteOff(1.0, 0, 0, 60, 1.0, -1);
+    eng.m_seq.addNoteOn(1.0, 0, 0, 64, 1.0, -1);
+    eng.m_seq.addNoteOff(2.0, 0, 0, 64, 1.0, -1);
+    eng.m_seq.addNoteOn(2.0, 0, 0, 67, 1.0, -1);
+    eng.m_seq.addNoteOff(3.0, 0, 0, 67, 1.0, -1);
+    eng.m_seq.sortEvents();
     eng.processToFile(R"(C:\develop\AudioPluginHost_mk2\audio\clap_offline01.wav)", 5.0, 44100.0);
 }
 
