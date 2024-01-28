@@ -150,6 +150,8 @@ class ClapProcessingEngine
                 std::cout << "created : " << desc.name << "\n";
             }
         }
+        else
+            throw std::runtime_error("Could not create CLAP plugin");
     }
     void processToFile(std::string filename, double duration, double samplerate)
     {
@@ -222,8 +224,8 @@ class ClapProcessingEngine
                     auto ecopy = e.event;
                     ecopy.header.time = (e.timestamp * samplerate) - outcounter;
                     list_in.push((const clap_event_header *)&ecopy);
-                    std::cout << "sent event type " << e.event.header.type << " at samplepos "
-                              << outcounter + ecopy.header.time << "\n";
+                    // std::cout << "sent event type " << e.event.header.type << " at samplepos "
+                    //           << outcounter + ecopy.header.time << "\n";
                 }
 
                 m_plug->process(&cp);
@@ -237,7 +239,7 @@ class ClapProcessingEngine
             }
             m_plug->stopProcessing();
             writer->flush();
-            std::cout << "\nfinished\n";
+            std::cout << "finished\n";
             renderloopfinished = true;
         });
         using namespace std::chrono_literals;
@@ -245,8 +247,7 @@ class ClapProcessingEngine
         while (!renderloopfinished)
         {
             m_plug->runMainThreadTasks();
-            // might be needlessly short sleep
-            std::this_thread::sleep_for(1ms);
+            std::this_thread::sleep_for(5ms);
         }
         th.join();
     }

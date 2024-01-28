@@ -168,6 +168,14 @@ PYBIND11_MODULE(xenakios, m)
         .def(py::init<>())
         .def("addNoteOn", &ClapEventSequence::addNoteOn)
         .def("addNoteOff", &ClapEventSequence::addNoteOff);
+    
+    py::module m_const =
+        m.def_submodule("constants", "Constants");
+
+    #define C(x) m_const.attr(#x) = py::int_((int)(x));
+    C(CLAP_NOTE_EXPRESSION_TUNING);
+    C(CLAP_NOTE_EXPRESSION_PAN);
+    C(CLAP_NOTE_EXPRESSION_VOLUME);
 
     py::class_<ClapProcessingEngine>(m, "ClapEngine")
         .def(py::init<const std::string &, int>())
