@@ -8,7 +8,7 @@
 #include "audio/choc_AudioFileFormat_WAV.h"
 #include "xapdsp.h"
 #include "xap_utils.h"
-#include "xaps/clap_xaudioprocessor.h"
+#include "offlineclaphost.h"
 
 int add(int i, int j) { return i + j; }
 
@@ -130,174 +130,29 @@ class NoisePlethoraEngine
 struct SeqEvent
 {
     SeqEvent() {}
+    SeqEvent asNote(double timestamp, int etype, int port, int channel, int key, double velo,
+                    int note_id = -1)
+    {
+        SeqEvent result;
+        result.timestamp = timestamp;
+        auto ev = (clap_event_note *)result.data;
+        ev->header.flags = 0;
+        ev->header.size = sizeof(clap_event_note);
+        ev->header.space_id = CLAP_CORE_EVENT_SPACE_ID;
+        ev->header.time = 0;
+        ev->header.type = etype;
+        ev->port_index = port;
+        ev->channel = channel;
+        ev->key = key;
+        ev->velocity = velo;
+        ev->note_id = note_id;
+        return result;
+    }
+    double timestamp = 0.0;
+    std::byte data[128];
 };
 
-class ClapEventSequencer
-{
 
-  public:
-    union clap_multi_event
-    {
-        clap_event_header_t header;
-        clap_event_note note;
-        clap_event_midi_t midi;
-        clap_event_midi2_t midi2;
-        clap_event_param_value_t param;
-        clap_event_param_mod_t parammod;
-        clap_event_param_gesture_t paramgest;
-        clap_event_note_expression_t noteexpression;
-        clap_event_transport_t transport;
-    };
-    struct Event
-    {
-        Event() {}
-        template<typename EType>
-        Event(double time, EType* e) : timestamp(time), event(*(clap_multi_event*)e) {}
-        double timestamp = 0.0;
-        clap_multi_event event;
-    };
-    std::vector<Event> m_evlist;
-    ClapEventSequencer() {}
-    void addNoteOn(double time, int port, int channel, int key, double velo, int note_id)
-    {
-        auto ev =
-            xenakios::make_event_note(0, CLAP_EVENT_NOTE_ON, port, channel, key, note_id, velo);
-        m_evlist.push_back(Event(time, &ev));
-    }
-    void addNoteOff(double time, int port, int channel, int key, double velo, int note_id)
-    {
-        auto ev =
-            xenakios::make_event_note(0, CLAP_EVENT_NOTE_OFF, port, channel, key, note_id, velo);
-        m_evlist.push_back(Event(time, &ev));
-    }
-};
-
-class ClapProcessingEngine
-{
-    std::unique_ptr<ClapPluginFormatProcessor> m_plug;
-
-  public:
-    ClapEventSequencer m_seq;
-    void setSequencer(ClapEventSequencer seq)
-    {
-        m_seq = seq;
-        // m_seq.m_evlist.sortEvents();
-    }
-    ClapProcessingEngine(std::string plugfilename, int plugindex)
-    {
-        ClapPluginFormatProcessor::mainthread_id() = std::this_thread::get_id();
-        m_plug = std::make_unique<ClapPluginFormatProcessor>(plugfilename, plugindex);
-        if (m_plug)
-        {
-
-            clap_plugin_descriptor desc;
-            if (m_plug->getDescriptor(&desc))
-            {
-                std::cout << "created : " << desc.name << "\n";
-            }
-        }
-    }
-    void processToFile(std::string filename, double duration, double samplerate)
-    {
-        int procblocksize = 512;
-        std::atomic<bool> renderloopfinished{false};
-        m_plug->activate(samplerate, procblocksize, procblocksize);
-        std::thread th([&] {
-            clap_process cp;
-            memset(&cp, 0, sizeof(clap_process));
-            cp.frames_count = procblocksize;
-            cp.audio_inputs_count = 1;
-            choc::buffer::ChannelArrayBuffer<float> ibuf{2, (unsigned int)procblocksize};
-            ibuf.clear();
-            clap_audio_buffer inbufs[1];
-            inbufs[0].channel_count = 2;
-            inbufs[0].constant_mask = 0;
-            inbufs[0].latency = 0;
-            auto ichansdata = ibuf.getView().data.channels;
-            inbufs[0].data32 = (float **)ichansdata;
-            cp.audio_inputs = inbufs;
-
-            cp.audio_outputs_count = 1;
-            choc::buffer::ChannelArrayBuffer<float> buf{2, (unsigned int)procblocksize};
-            buf.clear();
-            clap_audio_buffer outbufs[1];
-            outbufs[0].channel_count = 2;
-            outbufs[0].constant_mask = 0;
-            outbufs[0].latency = 0;
-            auto chansdata = buf.getView().data.channels;
-            outbufs[0].data32 = (float **)chansdata;
-            cp.audio_outputs = outbufs;
-
-            clap_event_transport transport;
-            memset(&transport, 0, sizeof(clap_event_transport));
-            cp.transport = &transport;
-            transport.tempo = 120;
-            transport.header.flags = 0;
-            transport.header.size = sizeof(clap_event_transport);
-            transport.header.space_id = CLAP_CORE_EVENT_SPACE_ID;
-            transport.header.time = 0;
-            transport.header.type = CLAP_EVENT_TRANSPORT;
-            transport.flags = CLAP_TRANSPORT_IS_PLAYING;
-
-            clap::helpers::EventList list_in;
-            clap::helpers::EventList list_out;
-            cp.in_events = list_in.clapInputEvents();
-            cp.out_events = list_out.clapOutputEvents();
-
-            std::cout << "plug activated\n";
-            m_plug->startProcessing();
-            int outcounter = 0;
-            int outlensamples = duration * samplerate;
-            choc::audio::AudioFileProperties outfileprops;
-            outfileprops.formatName = "WAV";
-            outfileprops.bitDepth = choc::audio::BitDepth::float32;
-            outfileprops.numChannels = 2;
-            outfileprops.sampleRate = samplerate;
-            choc::audio::WAVAudioFileFormat<true> wavformat;
-            auto writer = wavformat.createWriter(filename, outfileprops);
-
-            // choc::buffer::ChannelArrayView<float> bufferview(
-            //     choc::buffer::SeparateChannelLayout<float>(cp.audio_outputs->data32));
-            // bufferview.clear();
-            bool offsent = false;
-            while (outcounter < outlensamples)
-            {
-                if (outcounter == 0)
-                {
-                    auto ev = xenakios::make_event_note(0, CLAP_EVENT_NOTE_ON, 0, 0, 60, -1, 1.0);
-                    list_in.push((const clap_event_header *)&ev);
-                }
-                if (outcounter >= outlensamples / 2 && offsent == false)
-                {
-                    auto ev = xenakios::make_event_note(0, CLAP_EVENT_NOTE_OFF, 0, 0, 60, -1, 1.0);
-                    list_in.push((const clap_event_header *)&ev);
-                    offsent = true;
-                }
-                m_plug->process(&cp);
-                list_out.clear();
-                list_in.clear();
-                writer->appendFrames(buf.getView());
-                std::cout << outcounter << " ";
-                cp.steady_time = outcounter;
-
-                outcounter += procblocksize;
-            }
-            m_plug->stopProcessing();
-            writer->flush();
-            std::cout << "\nfinished\n";
-            renderloopfinished = true;
-        });
-        using namespace std::chrono_literals;
-        // fake event loop to flush the on main thread requests from the plugin
-        while (!renderloopfinished)
-        {
-            m_plug->runMainThreadTasks();
-            // might be needlessly short sleep
-            std::this_thread::sleep_for(1ms);
-        }
-        th.join();
-    }
-};
 
 namespace py = pybind11;
 
@@ -309,10 +164,10 @@ PYBIND11_MODULE(xenakios, m)
     m.def("avg", &avg, "average of list");
     m.def("list_plugins", &list_plugins, "print noise plethora plugins");
 
-    py::class_<ClapEventSequencer>(m, "ClapSequence")
+    py::class_<ClapEventSequence>(m, "ClapSequence")
         .def(py::init<>())
-        .def("addNoteOn", &ClapEventSequencer::addNoteOn)
-        .def("addNoteOff", &ClapEventSequencer::addNoteOff);
+        .def("addNoteOn", &ClapEventSequence::addNoteOn)
+        .def("addNoteOff", &ClapEventSequence::addNoteOff);
 
     py::class_<ClapProcessingEngine>(m, "ClapEngine")
         .def(py::init<const std::string &, int>())

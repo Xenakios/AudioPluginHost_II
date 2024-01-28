@@ -17,6 +17,7 @@
 #include "containers/choc_NonAllocatingStableSort.h"
 #include "sst/basic-blocks/modulators/SimpleLFO.h"
 #include "sst/basic-blocks/dsp/LanczosResampler.h"
+#include "offlineclaphost.h"
 
 class object_t
 {
@@ -573,9 +574,17 @@ inline void test_fb_osc()
     }
 }
 
+inline void test_offline_clap()
+{
+    ClapProcessingEngine eng{R"(C:\Program Files\Common Files\CLAP\Surge Synth Team\Surge XT.clap)",
+                             0};
+    eng.processToFile(R"(C:\develop\AudioPluginHost_mk2\audio\clap_offline01.wav)", 5.0, 44100.0);
+}
+
 int main()
 {
-    test_fb_osc();
+    test_offline_clap();
+    // test_fb_osc();
     // test_lanczos();
     // test_envelope();
     // test_np_code();

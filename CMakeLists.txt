@@ -107,7 +107,10 @@ add_library(noiseplethora
 target_compile_definitions(noiseplethora PRIVATE _USE_MATH_DEFINES=1)
 
 # this is used for simple C++ testing/experimenting stuff without Juce
-add_executable(TestingProgram Source/Experimental/misctest.cpp)
+add_executable(TestingProgram 
+    Source/Experimental/misctest.cpp 
+    Source/Experimental/xaps/clap_xaudioprocessor.cpp
+    )
 target_sources(TestingProgram
     PRIVATE
     
