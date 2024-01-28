@@ -57,6 +57,20 @@ class ClapEventSequence
         auto ev = xenakios::make_event_note_expression(0, net, port, channel, key, note_id, amt);
         m_evlist.push_back(Event(time, &ev));
     }
+    void addMIDI1Message(double time, int port, uint8_t b0, uint8_t b1, uint8_t b2)
+    {
+        clap_event_midi ev;
+        ev.header.flags = 0;
+        ev.header.size = sizeof(clap_event_midi);
+        ev.header.space_id = CLAP_CORE_EVENT_SPACE_ID;
+        ev.header.time = 0;
+        ev.header.type = CLAP_EVENT_MIDI;
+        ev.port_index = port;
+        ev.data[0] = b0;
+        ev.data[1] = b1;
+        ev.data[2] = b2;
+        m_evlist.push_back(Event(time, &ev));
+    }
     struct Iterator
     {
         /// Creates an iterator positioned at the start of the sequence.
@@ -143,6 +157,8 @@ class ClapProcessingEngine
         int procblocksize = 512;
         std::atomic<bool> renderloopfinished{false};
         m_plug->activate(samplerate, procblocksize, procblocksize);
+        // even offline, do the processing in another another thread because things
+        // can get complicated with plugins like Surge XT because of the thread checks
         std::thread th([&] {
             ClapEventSequence::Iterator eviter(m_seq);
             clap_process cp;

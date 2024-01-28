@@ -580,13 +580,14 @@ inline void test_offline_clap()
                              0};
     eng.m_seq.addNoteOn(0.0, 0, 0, 60, 1.0, -1);
     eng.m_seq.addNoteExpression(0.0, 0, 0, 60, -1, CLAP_NOTE_EXPRESSION_PAN, 0.0);
-    eng.m_seq.addNoteOff(1.0, 0, 0, 60, 1.0, -1);
+    eng.m_seq.addNoteOff(9.9, 0, 0, 60, 1.0, -1);
     eng.m_seq.addNoteOn(1.0, 0, 0, 64, 1.0, -1);
     eng.m_seq.addNoteExpression(1.0, 0, 0, 64, -1, CLAP_NOTE_EXPRESSION_PAN, 1.0);
     eng.m_seq.addNoteOff(2.0, 0, 0, 64, 1.0, -1);
     eng.m_seq.addNoteOn(2.0, 0, 0, 67, 1.0, -1);
     eng.m_seq.addNoteOff(3.0, 0, 0, 67, 1.0, -1);
-    eng.processToFile(R"(C:\develop\AudioPluginHost_mk2\audio\clap_offline01.wav)", 5.0, 44100.0);
+    eng.m_seq.addMIDI1Message(9.0, 0, 176, 120, 0);
+    eng.processToFile(R"(C:\develop\AudioPluginHost_mk2\audio\clap_offline01.wav)", 10.0, 44100.0);
 }
 
 int main()
