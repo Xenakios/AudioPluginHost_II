@@ -51,6 +51,12 @@ class ClapEventSequence
             xenakios::make_event_note(0, CLAP_EVENT_NOTE_OFF, port, channel, key, note_id, velo);
         m_evlist.push_back(Event(time, &ev));
     }
+    void addNoteExpression(double time, int port, int channel, int key, int note_id, int net,
+                           double amt)
+    {
+        auto ev = xenakios::make_event_note_expression(0, net, port, channel, key, note_id, amt);
+        m_evlist.push_back(Event(time, &ev));
+    }
     struct Iterator
     {
         /// Creates an iterator positioned at the start of the sequence.
@@ -191,11 +197,6 @@ class ClapProcessingEngine
             outfileprops.sampleRate = samplerate;
             choc::audio::WAVAudioFileFormat<true> wavformat;
             auto writer = wavformat.createWriter(filename, outfileprops);
-
-            // choc::buffer::ChannelArrayView<float> bufferview(
-            //     choc::buffer::SeparateChannelLayout<float>(cp.audio_outputs->data32));
-            // bufferview.clear();
-            bool offsent = false;
             eviter.setTime(0.0);
             while (outcounter < outlensamples)
             {
@@ -208,21 +209,7 @@ class ClapProcessingEngine
                     std::cout << "sent event type " << e.event.header.type << " at samplepos "
                               << outcounter + ecopy.header.time << "\n";
                 }
-                /*
-                if (outcounter == 0)
-                {
-                    auto ev = xenakios::make_event_note(0, CLAP_EVENT_NOTE_ON, 0, 0, 60, -1, 1.0);
-                    list_in.push((const clap_event_header *)&ev);
-                    std::cout << "sent on at " << outcounter << "\n";
-                }
-                if (outcounter >= outlensamples / 2 && offsent == false)
-                {
-                    auto ev = xenakios::make_event_note(0, CLAP_EVENT_NOTE_OFF, 0, 0, 60, -1, 1.0);
-                    list_in.push((const clap_event_header *)&ev);
-                    offsent = true;
-                    std::cout << "sent off at " << outcounter << "\n";
-                }
-                */
+
                 m_plug->process(&cp);
                 list_out.clear();
                 list_in.clear();
