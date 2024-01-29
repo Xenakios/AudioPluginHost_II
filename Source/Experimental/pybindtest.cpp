@@ -146,13 +146,17 @@ struct SeqEvent
         ev->key = key;
         ev->velocity = velo;
         ev->note_id = note_id;
+        struct vec
+        {
+            float x;
+            float y;
+        };
         return result;
     }
+    
     double timestamp = 0.0;
     std::byte data[128];
 };
-
-
 
 namespace py = pybind11;
 
@@ -167,15 +171,19 @@ PYBIND11_MODULE(xenakios, m)
     py::class_<ClapEventSequence>(m, "ClapSequence")
         .def(py::init<>())
         .def("addNoteOn", &ClapEventSequence::addNoteOn)
-        .def("addNoteOff", &ClapEventSequence::addNoteOff);
-    
-    py::module m_const =
-        m.def_submodule("constants", "Constants");
+        .def("addNoteOff", &ClapEventSequence::addNoteOff)
+        .def("addNoteExpression", &ClapEventSequence::addNoteExpression);
 
-    #define C(x) m_const.attr(#x) = py::int_((int)(x));
+    py::module m_const = m.def_submodule("constants", "Constants");
+
+#define C(x) m_const.attr(#x) = py::int_((int)(x));
     C(CLAP_NOTE_EXPRESSION_TUNING);
     C(CLAP_NOTE_EXPRESSION_PAN);
     C(CLAP_NOTE_EXPRESSION_VOLUME);
+    C(CLAP_NOTE_EXPRESSION_VIBRATO);
+    C(CLAP_NOTE_EXPRESSION_BRIGHTNESS);
+    C(CLAP_NOTE_EXPRESSION_PRESSURE);
+    C(CLAP_NOTE_EXPRESSION_EXPRESSION);
 
     py::class_<ClapProcessingEngine>(m, "ClapEngine")
         .def(py::init<const std::string &, int>())
@@ -193,5 +201,6 @@ PYBIND11_MODULE(xenakios, m)
         .def(py::init<>())
         .def(py::init<std::vector<xenakios::EnvelopePoint>>())
         .def("numPoints", &xenakios::Envelope<ENVBLOCKSIZE>::getNumPoints)
-        .def("addPoint", &xenakios::Envelope<ENVBLOCKSIZE>::addPoint);
+        .def("addPoint", &xenakios::Envelope<ENVBLOCKSIZE>::addPoint)
+        .def("getValueAtPosition",&xenakios::Envelope<ENVBLOCKSIZE>::getValueAtPosition);
 }
