@@ -224,6 +224,7 @@ template <size_t BLOCK_SIZE = 64> class Envelope
 
             return;
         }
+        assert(samplerate > 0.0);
         const double invsr = 1.0 / samplerate;
         auto shape = pt0.getShape();
         for (int i = 0; i < BLOCK_SIZE; ++i)

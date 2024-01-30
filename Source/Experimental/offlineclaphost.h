@@ -8,6 +8,7 @@
 #include "xap_utils.h"
 #include "xaps/clap_xaudioprocessor.h"
 #include "containers/choc_Span.h"
+#include "sst/basic-blocks/modulators/SimpleLFO.h"
 
 class ClapEventSequence
 {
@@ -56,6 +57,16 @@ class ClapEventSequence
     {
         auto ev = xenakios::make_event_note_expression(0, net, port, channel, key, note_id, amt);
         m_evlist.push_back(Event(time, &ev));
+    }
+    void addParameterEvent(bool ismod, double time, int port, int channel, int key, int note_id,
+                           uint32_t par_id, double value)
+    {
+        if (ismod)
+        {
+            auto ev = xenakios::make_event_param_mod(0, par_id, value, nullptr, port, channel, key,
+                                                     note_id, 0);
+            m_evlist.push_back(Event(time, &ev));
+        }
     }
     void addMIDI1Message(double time, int port, uint8_t b0, uint8_t b1, uint8_t b2)
     {
@@ -125,6 +136,52 @@ class ClapEventSequence
     };
 };
 
+template <size_t BLOCK_SIZE> class SimpleLFO
+{
+  public:
+    static constexpr size_t BLOCK_SIZE_OS = BLOCK_SIZE * 2;
+    double samplerate = 44100;
+    alignas(32) float table_envrate_linear[512];
+    void initTables()
+    {
+        double dsamplerate_os = samplerate * 2;
+        for (int i = 0; i < 512; ++i)
+        {
+            double k =
+                dsamplerate_os * pow(2.0, (((double)i - 256.0) / 16.0)) / (double)BLOCK_SIZE_OS;
+            table_envrate_linear[i] = (float)(1.f / k);
+        }
+    }
+    float envelope_rate_linear_nowrap(float x)
+    {
+        x *= 16.f;
+        x += 256.f;
+        int e = std::clamp<int>((int)x, 0, 0x1ff - 1);
+
+        float a = x - (float)e;
+
+        return (1 - a) * table_envrate_linear[e & 0x1ff] +
+               a * table_envrate_linear[(e + 1) & 0x1ff];
+    }
+    sst::basic_blocks::modulators::SimpleLFO<SimpleLFO, BLOCK_SIZE> m_lfo;
+    SimpleLFO(double sr) : samplerate(sr), m_lfo(this) { initTables(); }
+};
+
+inline void generateNoteExpressionsFromEnvelope(ClapEventSequence &targetSeq,
+                                                xenakios::Envelope<64> &sourceEnvelope,
+                                                double eventsStartTime, double duration,
+                                                double granularity, int net, int port, int chan,
+                                                int key, int note_id)
+{
+    double t = eventsStartTime;
+    while (t < duration + granularity + eventsStartTime)
+    {
+        double v = sourceEnvelope.getValueAtPosition(t - eventsStartTime, 0.0);
+        targetSeq.addNoteExpression(t, port, chan, key, note_id, net, v);
+        t += granularity;
+    }
+}
+
 class ClapProcessingEngine
 {
     std::unique_ptr<ClapPluginFormatProcessor> m_plug;
@@ -138,12 +195,10 @@ class ClapProcessingEngine
     }
     ClapProcessingEngine(std::string plugfilename, int plugindex)
     {
-
         ClapPluginFormatProcessor::mainthread_id() = std::this_thread::get_id();
         m_plug = std::make_unique<ClapPluginFormatProcessor>(plugfilename, plugindex);
         if (m_plug)
         {
-
             clap_plugin_descriptor desc;
             if (m_plug->getDescriptor(&desc))
             {
@@ -152,6 +207,19 @@ class ClapProcessingEngine
         }
         else
             throw std::runtime_error("Could not create CLAP plugin");
+    }
+    std::map<std::string, clap_id> getParameters()
+    {
+        std::map<std::string, clap_id> result;
+        for (size_t i = 0; i < m_plug->paramsCount(); ++i)
+        {
+            clap_param_info pinfo;
+            if (m_plug->paramsInfo(i, &pinfo))
+            {
+                result[std::string(pinfo.name)] = pinfo.id;
+            }
+        }
+        return result;
     }
     void processToFile(std::string filename, double duration, double samplerate)
     {

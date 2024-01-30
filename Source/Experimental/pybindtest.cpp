@@ -153,7 +153,7 @@ struct SeqEvent
         };
         return result;
     }
-    
+
     double timestamp = 0.0;
     std::byte data[128];
 };
@@ -172,6 +172,7 @@ PYBIND11_MODULE(xenakios, m)
         .def(py::init<>())
         .def("addNoteOn", &ClapEventSequence::addNoteOn)
         .def("addNoteOff", &ClapEventSequence::addNoteOff)
+        .def("addParameterEvent", &ClapEventSequence::addParameterEvent)
         .def("addNoteExpression", &ClapEventSequence::addNoteExpression);
 
     py::module m_const = m.def_submodule("constants", "Constants");
@@ -188,6 +189,7 @@ PYBIND11_MODULE(xenakios, m)
     py::class_<ClapProcessingEngine>(m, "ClapEngine")
         .def(py::init<const std::string &, int>())
         .def("setSequence", &ClapProcessingEngine::setSequencer)
+        .def("getParameters", &ClapProcessingEngine::getParameters)
         .def("processToFile", &ClapProcessingEngine::processToFile);
 
     py::class_<NoisePlethoraEngine>(m, "NoisePlethoraEngine")
@@ -202,5 +204,9 @@ PYBIND11_MODULE(xenakios, m)
         .def(py::init<std::vector<xenakios::EnvelopePoint>>())
         .def("numPoints", &xenakios::Envelope<ENVBLOCKSIZE>::getNumPoints)
         .def("addPoint", &xenakios::Envelope<ENVBLOCKSIZE>::addPoint)
-        .def("getValueAtPosition",&xenakios::Envelope<ENVBLOCKSIZE>::getValueAtPosition);
+        .def("getValueAtPosition", &xenakios::Envelope<ENVBLOCKSIZE>::getValueAtPosition);
+    m.def("generateNoteExpressionsFromEnvelope", &generateNoteExpressionsFromEnvelope, "",
+          py::arg("targetSequence"), py::arg("sourceEnvelope"), py::arg("eventsStartTime"),
+          py::arg("duration"),py::arg("granularity"),py::arg("noteExpressionType"),py::arg("port"),
+          py::arg("channel"),py::arg("key"),py::arg("note_id"));
 }
