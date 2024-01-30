@@ -170,9 +170,11 @@ PYBIND11_MODULE(xenakios, m)
 
     py::class_<ClapEventSequence>(m, "ClapSequence")
         .def(py::init<>())
+        .def("getNumEvents", &ClapEventSequence::getNumEvents)
         .def("addNoteOn", &ClapEventSequence::addNoteOn)
         .def("addNoteOff", &ClapEventSequence::addNoteOff)
         .def("addParameterEvent", &ClapEventSequence::addParameterEvent)
+        .def("addProgramChange", &ClapEventSequence::addProgramChange)
         .def("addNoteExpression", &ClapEventSequence::addNoteExpression);
 
     py::module m_const = m.def_submodule("constants", "Constants");
@@ -207,6 +209,7 @@ PYBIND11_MODULE(xenakios, m)
         .def("getValueAtPosition", &xenakios::Envelope<ENVBLOCKSIZE>::getValueAtPosition);
     m.def("generateNoteExpressionsFromEnvelope", &generateNoteExpressionsFromEnvelope, "",
           py::arg("targetSequence"), py::arg("sourceEnvelope"), py::arg("eventsStartTime"),
-          py::arg("duration"),py::arg("granularity"),py::arg("noteExpressionType"),py::arg("port"),
-          py::arg("channel"),py::arg("key"),py::arg("note_id"));
+          py::arg("duration"), py::arg("granularity"), py::arg("noteExpressionType"),
+          py::arg("port"), py::arg("channel"), py::arg("key"), py::arg("note_id"));
+    m.def("generateParameterEventsFromEnvelope", &generateParameterEventsFromEnvelope);
 }

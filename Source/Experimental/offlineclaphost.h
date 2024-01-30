@@ -40,6 +40,10 @@ class ClapEventSequence
     std::vector<Event> m_evlist;
     ClapEventSequence() {}
     void sortEvents() { choc::sorting::stable_sort(m_evlist.begin(), m_evlist.end()); }
+    size_t getNumEvents() const
+    {
+        return m_evlist.size();
+    }
     void addNoteOn(double time, int port, int channel, int key, double velo, int note_id)
     {
         auto ev =
@@ -67,6 +71,26 @@ class ClapEventSequence
                                                      note_id, 0);
             m_evlist.push_back(Event(time, &ev));
         }
+        else
+        {
+            auto ev = xenakios::make_event_param_value(0, par_id, value, nullptr, port, channel,
+                                                       key, note_id, 0);
+            m_evlist.push_back(Event(time, &ev));
+        }
+    }
+    void addProgramChange(double time, int port, int channel, int program)
+    {
+        clap_event_midi ev;
+        ev.header.flags = 0;
+        ev.header.size = sizeof(clap_event_midi);
+        ev.header.space_id = CLAP_CORE_EVENT_SPACE_ID;
+        ev.header.time = 0;
+        ev.header.type = CLAP_EVENT_MIDI;
+        ev.port_index = port;
+        ev.data[0] = 0xc0 + (channel % 16);
+        ev.data[1] = program & 0x7f;
+        ev.data[2] = 0;
+        m_evlist.push_back(Event(time, &ev));
     }
     void addMIDI1Message(double time, int port, uint8_t b0, uint8_t b1, uint8_t b2)
     {
@@ -178,6 +202,21 @@ inline void generateNoteExpressionsFromEnvelope(ClapEventSequence &targetSeq,
     {
         double v = sourceEnvelope.getValueAtPosition(t - eventsStartTime, 0.0);
         targetSeq.addNoteExpression(t, port, chan, key, note_id, net, v);
+        t += granularity;
+    }
+}
+
+inline void generateParameterEventsFromEnvelope(bool is_mod, ClapEventSequence &targetSeq,
+                                                xenakios::Envelope<64> &sourceEnvelope,
+                                                double eventsStartTime, double duration,
+                                                double granularity, clap_id parid, int port,
+                                                int chan, int key, int note_id)
+{
+    double t = eventsStartTime;
+    while (t < duration + granularity + eventsStartTime)
+    {
+        double v = sourceEnvelope.getValueAtPosition(t - eventsStartTime, 0.0);
+        targetSeq.addParameterEvent(is_mod, t, port, chan, key, note_id, parid, v);
         t += granularity;
     }
 }
