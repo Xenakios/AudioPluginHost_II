@@ -322,5 +322,91 @@ class ClapPluginFormatProcessor : public xenakios::XAudioProcessor
         }
         return false;
     }
+#else
+    // if external plugin doesn't implement GUI, we'll use our generic editor,
+    bool implementsGui() const noexcept override { return true; }
+    bool guiCreate(const char *api, bool isFloating) noexcept override
+    {
+        if (m_ext_gui)
+        {
+            return m_ext_gui->create(m_plug, "win32", false);
+        }
+        return false;
+    }
+    void guiDestroy() noexcept override
+    {
+        if (m_ext_gui)
+        {
+            m_ext_gui->destroy(m_plug);
+        }
+    }
+    
+    bool guiShow() noexcept override
+    {
+        if (m_ext_gui)
+        {
+            return m_ext_gui->show(m_plug);
+        }
+        return true;
+    }
+    bool guiHide() noexcept override
+    {
+        if (m_ext_gui)
+        {
+            return m_ext_gui->hide(m_plug);
+        }
+        return true;
+    }
+    bool guiGetSize(uint32_t *width, uint32_t *height) noexcept override
+    {
+        
+        if (m_ext_gui)
+        {
+            return m_ext_gui->get_size(m_plug, width, height);
+        }
+        return false;
+    }
+    bool guiCanResize() const noexcept override
+    {
+        if (m_ext_gui)
+        {
+            return m_ext_gui->can_resize(m_plug);
+        }
+        return false;
+    }
+    // virtual bool guiGetResizeHints(clap_gui_resize_hints_t *hints) noexcept { return false; }
+    bool guiAdjustSize(uint32_t *width, uint32_t *height) noexcept override
+    {
+        if (m_ext_gui)
+        {
+            return m_ext_gui->adjust_size(m_plug, width, height);
+        }
+        return false;
+    }
+    bool guiSetSize(uint32_t width, uint32_t height) noexcept override
+    {
+        if (m_ext_gui)
+        {
+            uint32_t w = width;
+            uint32_t h = height;
+            if (guiAdjustSize(&w, &h))
+            {
+                return m_ext_gui->set_size(m_plug, w, h);
+            }
+        }
+        return false;
+    }
+    
+    bool guiSetParent(const clap_window *window) noexcept override
+    {
+        if (m_ext_gui)
+        {
+            clap_window win;
+            win.api = "win32";
+            win.win32 = window->win32;
+            return m_ext_gui->set_parent(m_plug, &win);
+        }
+        return false;
+    }
 #endif
 };

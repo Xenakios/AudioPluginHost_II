@@ -9,6 +9,8 @@
 #include "xaps/clap_xaudioprocessor.h"
 #include "containers/choc_Span.h"
 #include "sst/basic-blocks/modulators/SimpleLFO.h"
+#include "gui/choc_DesktopWindow.h"
+#include "gui/choc_MessageLoop.h"
 
 class ClapEventSequence
 {
@@ -40,10 +42,7 @@ class ClapEventSequence
     std::vector<Event> m_evlist;
     ClapEventSequence() {}
     void sortEvents() { choc::sorting::stable_sort(m_evlist.begin(), m_evlist.end()); }
-    size_t getNumEvents() const
-    {
-        return m_evlist.size();
-    }
+    size_t getNumEvents() const { return m_evlist.size(); }
     void addNoteOn(double time, int port, int channel, int key, double velo, int note_id)
     {
         auto ev =
@@ -357,5 +356,33 @@ class ClapProcessingEngine
             std::this_thread::sleep_for(5ms);
         }
         th.join();
+    }
+    void openPluginGUIBlocking()
+    {
+        m_plug->mainthread_id() = std::this_thread::get_id();
+        choc::ui::setWindowsDPIAwareness(); // For Windows, we need to tell the OS we're
+                                            // high-DPI-aware
+        m_plug->guiCreate("win32", false);
+        uint32_t pw = 0;
+        uint32_t ph = 0;
+        m_plug->guiGetSize(&pw, &ph);
+        choc::ui::DesktopWindow window({100, 100, (int)pw, (int)ph});
+
+        window.setWindowTitle("CHOC Window");
+        window.setResizable(true);
+        window.setMinimumSize(300, 300);
+        window.setMaximumSize(1500, 1200);
+        window.windowClosed = [this] {
+            m_plug->guiDestroy();
+            choc::messageloop::stop();
+        };
+
+        clap_window clapwin;
+        clapwin.api = "win32";
+        clapwin.win32 = window.getWindowHandle();
+        m_plug->guiSetParent(&clapwin);
+        m_plug->guiShow();
+        window.toFront();
+        choc::messageloop::run();
     }
 };

@@ -10,9 +10,11 @@ def generate_expression_curve(dur, granularity, seq, net, port, chan, key, notei
 
 def test_clap():
     p = xenakios.ClapEngine(r'C:\Program Files\Common Files\CLAP\Surge Synth Team\Surge XT.clap',0)
-    pars = p.getParameters()
-    print(pars)
-    # return
+    p.showGUIBlocking()
+    
+    # pars = p.getParameters()
+    # print(pars)
+    return
     # 3484083994 global volume
     seq = xenakios.ClapSequence()
     mastvolenv = xenakios.Envelope()

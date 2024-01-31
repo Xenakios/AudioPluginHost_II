@@ -192,6 +192,7 @@ PYBIND11_MODULE(xenakios, m)
         .def(py::init<const std::string &, int>())
         .def("setSequence", &ClapProcessingEngine::setSequencer)
         .def("getParameters", &ClapProcessingEngine::getParameters)
+        .def("showGUIBlocking", &ClapProcessingEngine::openPluginGUIBlocking)
         .def("processToFile", &ClapProcessingEngine::processToFile);
 
     py::class_<NoisePlethoraEngine>(m, "NoisePlethoraEngine")

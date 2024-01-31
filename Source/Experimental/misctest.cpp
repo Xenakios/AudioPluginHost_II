@@ -18,6 +18,10 @@
 #include "sst/basic-blocks/modulators/SimpleLFO.h"
 #include "sst/basic-blocks/dsp/LanczosResampler.h"
 #include "offlineclaphost.h"
+#include "gui/choc_DesktopWindow.h"
+#include "gui/choc_MessageLoop.h"
+#include "gui/choc_WebView.h"
+#include "text/choc_Files.h"
 
 class object_t
 {
@@ -590,9 +594,61 @@ inline void test_offline_clap()
     eng.processToFile(R"(C:\develop\AudioPluginHost_mk2\audio\clap_offline01.wav)", 10.0, 44100.0);
 }
 
+inline void test_clap_gui_choc()
+{
+    auto plug = std::make_unique<ClapPluginFormatProcessor>(
+        R"(C:\Program Files\Common Files\CLAP\Conduit.clap)", 0);
+    plug->mainthread_id() = std::this_thread::get_id();
+    choc::ui::setWindowsDPIAwareness(); // For Windows, we need to tell the OS we're high-DPI-aware
+    plug->guiCreate("win32", false);
+    uint32_t pw = 0;
+    uint32_t ph = 0;
+    plug->guiGetSize(&pw, &ph);
+    choc::ui::DesktopWindow window({100, 100, (int)pw, (int)ph + 80});
+
+    window.setWindowTitle("CHOC Window");
+    window.setResizable(true);
+    window.setMinimumSize(pw, ph + 80);
+    window.setMaximumSize(1920, ph + 101);
+    window.windowClosed = [&plug] {
+        plug->guiDestroy();
+        choc::messageloop::stop();
+    };
+    choc::ui::WebView webview;
+    // auto html = choc::file::loadFileAsString(R"(C:\develop\AudioPluginHost_mk2\htmltest.html)");
+    // webview.setHTML(html);
+    webview.navigate(R"(C:\develop\AudioPluginHost_mk2\htmltest.html)");
+    window.setContent(webview.getViewHandle());
+
+    webview.bind("onSliderMoved", [](const choc::value::ValueView &args) -> choc::value::Value {
+        //auto message = "eventCallbackFn() called with args: " + choc::json::toString(args);
+        //auto foo = args[0]["bpm"];
+        auto parid = args[0]["id"].get<int>();
+        auto value = args[0]["value"].get<double>();
+        std::cout << "par " << parid << " changed to " << value << std::endl;
+        
+        
+        // std::cout << bpm << " ";
+        // This just shows how to invoke an async callback
+        // choc::messageloop::postMessage(
+        //    [bpm] { std::cout << bpm << std::endl; });
+
+        return choc::value::Value{};
+    });
+
+    clap_window clapwin;
+    clapwin.api = "win32";
+    clapwin.win32 = window.getWindowHandle();
+    plug->guiSetParent(&clapwin);
+    plug->guiShow();
+    window.toFront();
+    choc::messageloop::run();
+}
+
 int main()
 {
-    test_offline_clap();
+    test_clap_gui_choc();
+    // test_offline_clap();
     // test_fb_osc();
     // test_lanczos();
     // test_envelope();
