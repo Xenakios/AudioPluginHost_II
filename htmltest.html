@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+    <body style="background-color:rgb(70, 66, 66);">
+        <div id="slidersdiv"></div>
+    </body>
+    <script>
+    var slid1 = document.createElement("input");
+    slid1.type = "range";
+    slid1.id = 0
+    slid1.addEventListener("input", updateValue);
+    document.getElementById("slidersdiv").appendChild(slid1);
+    
+    var slid2 = document.createElement("input");
+    slid2.type = "range";
+    slid2.id = 1
+    slid2.addEventListener("input", updateValue);
+    document.getElementById("slidersdiv").appendChild(slid2);
+
+    function updateValue(e) 
+    {
+        onSliderMoved({id : e.target.id, value : e.target.value})
+    }
+
+    
+    </script>
+</html>
