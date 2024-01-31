@@ -6,7 +6,9 @@
     <script>
     var slid1 = document.createElement("input");
     slid1.type = "range";
-    slid1.id = 0
+    slid1.id = 0;
+    slid1.min = 10;
+    slid1.max = 480;
     slid1.addEventListener("input", updateValue);
     document.getElementById("slidersdiv").appendChild(slid1);
     

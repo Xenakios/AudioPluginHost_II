@@ -596,9 +596,12 @@ inline void test_offline_clap()
 
 inline void test_clap_gui_choc()
 {
+    ClapPluginFormatProcessor::mainthread_id() = std::this_thread::get_id();
     auto plug = std::make_unique<ClapPluginFormatProcessor>(
         R"(C:\Program Files\Common Files\CLAP\Conduit.clap)", 0);
-    plug->mainthread_id() = std::this_thread::get_id();
+    clap::helpers::EventList flushOutList;
+    clap::helpers::EventList flushInList;
+
     choc::ui::setWindowsDPIAwareness(); // For Windows, we need to tell the OS we're high-DPI-aware
     plug->guiCreate("win32", false);
     uint32_t pw = 0;
@@ -615,27 +618,36 @@ inline void test_clap_gui_choc()
         choc::messageloop::stop();
     };
     choc::ui::WebView webview;
-    // auto html = choc::file::loadFileAsString(R"(C:\develop\AudioPluginHost_mk2\htmltest.html)");
-    // webview.setHTML(html);
     webview.navigate(R"(C:\develop\AudioPluginHost_mk2\htmltest.html)");
     window.setContent(webview.getViewHandle());
 
     webview.bind("onSliderMoved", [](const choc::value::ValueView &args) -> choc::value::Value {
-        //auto message = "eventCallbackFn() called with args: " + choc::json::toString(args);
-        //auto foo = args[0]["bpm"];
+        // note that things could get messed up here because the choc functions can throw
+        // exceptions, so we should maybe have a try catch block here...but we should
+        // just know this will work, really.
         auto parid = args[0]["id"].get<int>();
         auto value = args[0]["value"].get<double>();
         std::cout << "par " << parid << " changed to " << value << std::endl;
-        
-        
-        // std::cout << bpm << " ";
-        // This just shows how to invoke an async callback
         // choc::messageloop::postMessage(
         //    [bpm] { std::cout << bpm << std::endl; });
-
         return choc::value::Value{};
     });
-
+    choc::messageloop::Timer flushTimer{
+        1000, [&plug, &flushOutList, &flushInList]() {
+            plug->paramsFlush(flushInList.clapInputEvents(), flushOutList.clapOutputEvents());
+            for (size_t i = 0; i < flushOutList.size(); ++i)
+            {
+                auto ev = flushOutList.get(i);
+                if (ev->type == CLAP_EVENT_PARAM_VALUE)
+                {
+                    auto pev = (clap_event_param_value *)ev;
+                    std::cout << "param " << pev->param_id << " changed to " << pev->value
+                              << std::endl;
+                }
+            }
+            flushOutList.clear();
+            return true;
+        }};
     clap_window clapwin;
     clapwin.api = "win32";
     clapwin.win32 = window.getWindowHandle();
