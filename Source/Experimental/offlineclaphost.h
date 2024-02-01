@@ -385,4 +385,26 @@ class ClapProcessingEngine
         window.toFront();
         choc::messageloop::run();
     }
+    std::unique_ptr<choc::ui::DesktopWindow> m_desktopwindow;
+    void openPersistentWindow(std::string title)
+    {
+        std::thread th([this,title]()
+        {
+            // choc::messageloop::initialise();
+            choc::ui::setWindowsDPIAwareness();
+            m_desktopwindow =
+                std::make_unique<choc::ui::DesktopWindow>(choc::ui::Bounds{100, 100, 300, 200});
+            m_desktopwindow->setWindowTitle(title);
+            m_desktopwindow->toFront();
+            m_desktopwindow->windowClosed = [this] 
+            { 
+                std::cout << "window closed\n";
+                choc::messageloop::stop(); 
+            };
+            choc::messageloop::run();
+            std::cout << "finished message loop\n",
+            m_desktopwindow = nullptr;
+        });
+        th.detach();
+    }
 };
