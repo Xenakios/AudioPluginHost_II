@@ -9,6 +9,7 @@
 #include "xapdsp.h"
 #include "xap_utils.h"
 #include "offlineclaphost.h"
+#include "dejavurandom.h"
 
 int add(int i, int j) { return i + j; }
 
@@ -188,12 +189,17 @@ PYBIND11_MODULE(xenakios, m)
     C(CLAP_NOTE_EXPRESSION_PRESSURE);
     C(CLAP_NOTE_EXPRESSION_EXPRESSION);
 
+    py::class_<DejaVuRandom>(m, "DejaVuRandom")
+        .def(py::init<unsigned int>())
+        .def("setLoopLength", &DejaVuRandom::setLoopLength)
+        .def("setDejaVu", &DejaVuRandom::setDejaVu);
+
     py::class_<ClapProcessingEngine>(m, "ClapEngine")
         .def(py::init<const std::string &, int>())
         .def("setSequence", &ClapProcessingEngine::setSequencer)
         .def("getParameters", &ClapProcessingEngine::getParameters)
         .def("showGUIBlocking", &ClapProcessingEngine::openPluginGUIBlocking)
-        .def("openWindow",&ClapProcessingEngine::openPersistentWindow)
+        .def("openWindow", &ClapProcessingEngine::openPersistentWindow)
         .def("processToFile", &ClapProcessingEngine::processToFile);
 
     py::class_<NoisePlethoraEngine>(m, "NoisePlethoraEngine")

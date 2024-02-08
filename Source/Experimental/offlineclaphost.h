@@ -105,6 +105,7 @@ class ClapEventSequence
         ev.data[2] = b2;
         m_evlist.push_back(Event(time, &ev));
     }
+    
     struct Iterator
     {
         /// Creates an iterator positioned at the start of the sequence.

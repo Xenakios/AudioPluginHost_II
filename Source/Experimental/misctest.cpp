@@ -657,9 +657,60 @@ inline void test_clap_gui_choc()
     choc::messageloop::run();
 }
 
+inline void test_seq_event_chase()
+{
+    ClapEventSequence seq;
+    for (int i = 0; i < 8; ++i)
+    {
+        seq.addNoteOn(i * 0.1, 0, 0, 60 + i, 1.0, -1);
+        seq.addNoteOff(5.0 + i * 0.1, 0, 0, 60 + i, 1.0, -1);
+    }
+    seq.addNoteOn(0.0, 0, 0, 48, 1.0, -1);
+    seq.addNoteOff(10.0, 0, 0, 48, 1.0, -1);
+    seq.addNoteOn(6.0, 0, 0, 41, 1.0, -1);
+    seq.addNoteOff(7.0, 0, 0, 41, 1.0, -1);
+    seq.sortEvents();
+
+    double seekpos = 6.0;
+    ClapEventSequence::Iterator it(seq);
+    it.setTime(0.0);
+    auto evtsspan = it.readNextEvents(seekpos);
+    choc::span<ClapEventSequence::Event> allspan{seq.m_evlist};
+    for (auto i = evtsspan.begin(); i != evtsspan.end(); ++i)
+    {
+        if (i->event.header.type == CLAP_EVENT_NOTE_ON)
+        {
+            auto noteonev = (const clap_event_note *)&i->event;
+            for (auto j = i + 1; j != allspan.end(); ++j)
+            {
+                if (j->event.header.type == CLAP_EVENT_NOTE_OFF ||
+                    j->event.header.type == CLAP_EVENT_NOTE_CHOKE)
+                {
+                    auto noteoffev = (const clap_event_note *)&j->event;
+                    if (j->timestamp >= seekpos && (noteoffev->port_index == noteonev->port_index &&
+                                                    noteoffev->channel == noteonev->channel &&
+                                                    noteoffev->key == noteonev->key &&
+                                                    noteoffev->note_id == noteonev->note_id))
+                    {
+                        std::cout << "note off for " << noteonev->key
+                                  << " is past seek position at " << j->timestamp << "\n";
+                    }
+                }
+            }
+        }
+    }
+}
+
+inline void test_umap()
+{
+    std::map<std::tuple<int,int,int,int,int>, double> map;
+}
+
 int main()
 {
-    test_clap_gui_choc();
+    test_umap();
+    // test_seq_event_chase();
+    // test_clap_gui_choc();
     // test_offline_clap();
     // test_fb_osc();
     // test_lanczos();
