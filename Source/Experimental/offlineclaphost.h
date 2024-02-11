@@ -221,16 +221,27 @@ inline void generateParameterEventsFromEnvelope(bool is_mod, ClapEventSequence &
     }
 }
 
-xenakios::Envelope<64> generateEnvelopeFromLFO(double rate, double deform, int shape, double envlen,
+inline xenakios::Envelope<64> generateEnvelopeFromLFO(double rate, double deform, int shape, double envlen,
                                                double envgranul)
 {
-    xenakios::Envelope<64> result;
-    SimpleLFO<64> lfo{44100.0};
-    double t = 0.0;
-    while (t < envlen + envgranul)
+    double sr = 44100.0;
+    constexpr size_t blocklen = 64;
+    xenakios::Envelope<blocklen> result;
+    SimpleLFO<blocklen> lfo{sr};
+    int outpos = 0;
+    int outlen = sr * envlen;
+    int granlen = envgranul * sr;
+    int granpos = 0;
+    while (outpos < outlen)
     {
-        
-        t += envgranul;
+        lfo.m_lfo.process_block(rate, deform, shape, false);
+        granpos += blocklen;
+        if (granpos >= granlen)
+        {
+            granpos = 0;
+            result.addPoint({outpos / sr, lfo.m_lfo.outputBlock[0]});
+        }
+        outpos += blocklen;
     }
     return result;
 }

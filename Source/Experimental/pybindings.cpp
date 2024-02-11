@@ -179,7 +179,7 @@ PYBIND11_MODULE(xenakios, m)
         .def(py::init<unsigned int>())
         .def("setLoopLength", &DejaVuRandom::setLoopLength)
         .def("setDejaVu", &DejaVuRandom::setDejaVu)
-        .def("nextFloat",&DejaVuRandom::nextFloatInRange)
+        .def("nextFloat", &DejaVuRandom::nextFloatInRange)
         .def("nextInt", &DejaVuRandom::nextIntInRange);
 
     py::class_<ClapProcessingEngine>(m, "ClapEngine")
@@ -196,16 +196,22 @@ PYBIND11_MODULE(xenakios, m)
         .def_readwrite("highpass", &NoisePlethoraEngine::hipasscutoff,
                        "high pass filter cutoff, in semitones")
         .def("setEnvelope", &NoisePlethoraEngine::setEnvelope);
-    py::class_<xenakios::EnvelopePoint>(m, "EnvelopePoint").def(py::init<double, double>());
+    py::class_<xenakios::EnvelopePoint>(m, "EnvelopePoint")
+        .def(py::init<double, double>())
+        .def("getX", &xenakios::EnvelopePoint::getX)
+        .def("getY", &xenakios::EnvelopePoint::getY);
     py::class_<xenakios::Envelope<ENVBLOCKSIZE>>(m, "Envelope")
         .def(py::init<>())
         .def(py::init<std::vector<xenakios::EnvelopePoint>>())
         .def("numPoints", &xenakios::Envelope<ENVBLOCKSIZE>::getNumPoints)
         .def("addPoint", &xenakios::Envelope<ENVBLOCKSIZE>::addPoint)
+        .def("getPoint",&xenakios::Envelope<ENVBLOCKSIZE>::getPointSafe)
         .def("getValueAtPosition", &xenakios::Envelope<ENVBLOCKSIZE>::getValueAtPosition);
+    
     m.def("generateNoteExpressionsFromEnvelope", &generateNoteExpressionsFromEnvelope, "",
           py::arg("targetSequence"), py::arg("sourceEnvelope"), py::arg("eventsStartTime"),
           py::arg("duration"), py::arg("granularity"), py::arg("noteExpressionType"),
           py::arg("port"), py::arg("channel"), py::arg("key"), py::arg("note_id"));
     m.def("generateParameterEventsFromEnvelope", &generateParameterEventsFromEnvelope);
+    m.def("generateEnvelopeFromLFO", &generateEnvelopeFromLFO);
 }
