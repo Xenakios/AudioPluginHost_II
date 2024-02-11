@@ -54,9 +54,15 @@ def test_clap():
     print(f"sequence has {seq.getNumEvents()} events")
     p.processToFile("clap_out02.wav",61.0,44100)
 
-test_clap()
+# test_clap()
 
-# print(xenakios.constants.CLAP_NOTE_EXPRESSION_PAN)
+def test_dejavu():
+    dejavu = xenakios.DejaVuRandom(1)
+    dejavu.setDejaVu(0.45)
+    for i in range(10):
+        print(dejavu.nextInt(0,3),end =" ")
+
+test_dejavu()
 
 def test_plethora():
     xenakios.list_plugins()

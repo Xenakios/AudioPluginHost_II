@@ -192,7 +192,9 @@ PYBIND11_MODULE(xenakios, m)
     py::class_<DejaVuRandom>(m, "DejaVuRandom")
         .def(py::init<unsigned int>())
         .def("setLoopLength", &DejaVuRandom::setLoopLength)
-        .def("setDejaVu", &DejaVuRandom::setDejaVu);
+        .def("setDejaVu", &DejaVuRandom::setDejaVu)
+        .def("nextFloat",&DejaVuRandom::nextFloatInRange)
+        .def("nextInt", &DejaVuRandom::nextIntInRange);
 
     py::class_<ClapProcessingEngine>(m, "ClapEngine")
         .def(py::init<const std::string &, int>())

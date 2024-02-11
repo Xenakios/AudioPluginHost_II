@@ -22,7 +22,7 @@ class DejaVuRandom
     int m_loop_len = 8;
     float m_deja_vu = 0.0;
     std::uniform_real_distribution<float> m_dist{0.0f, 1.0f};
-    bool m_deja_vu_enabled = false;
+    bool m_deja_vu_enabled = true;
 
   public:
     DejaVuRandom(unsigned int seed) : m_rng(seed)
