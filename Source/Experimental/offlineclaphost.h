@@ -105,7 +105,7 @@ class ClapEventSequence
         ev.data[2] = b2;
         m_evlist.push_back(Event(time, &ev));
     }
-    
+
     struct Iterator
     {
         /// Creates an iterator positioned at the start of the sequence.
@@ -219,6 +219,20 @@ inline void generateParameterEventsFromEnvelope(bool is_mod, ClapEventSequence &
         targetSeq.addParameterEvent(is_mod, t, port, chan, key, note_id, parid, v);
         t += granularity;
     }
+}
+
+xenakios::Envelope<64> generateEnvelopeFromLFO(double rate, double deform, int shape, double envlen,
+                                               double envgranul)
+{
+    xenakios::Envelope<64> result;
+    SimpleLFO<64> lfo{44100.0};
+    double t = 0.0;
+    while (t < envlen + envgranul)
+    {
+        
+        t += envgranul;
+    }
+    return result;
 }
 
 class ClapProcessingEngine
@@ -389,22 +403,19 @@ class ClapProcessingEngine
     std::unique_ptr<choc::ui::DesktopWindow> m_desktopwindow;
     void openPersistentWindow(std::string title)
     {
-        std::thread th([this,title]()
-        {
+        std::thread th([this, title]() {
             // choc::messageloop::initialise();
             choc::ui::setWindowsDPIAwareness();
             m_desktopwindow =
                 std::make_unique<choc::ui::DesktopWindow>(choc::ui::Bounds{100, 100, 300, 200});
             m_desktopwindow->setWindowTitle(title);
             m_desktopwindow->toFront();
-            m_desktopwindow->windowClosed = [this] 
-            { 
+            m_desktopwindow->windowClosed = [this] {
                 std::cout << "window closed\n";
-                choc::messageloop::stop(); 
+                choc::messageloop::stop();
             };
             choc::messageloop::run();
-            std::cout << "finished message loop\n",
-            m_desktopwindow = nullptr;
+            std::cout << "finished message loop\n", m_desktopwindow = nullptr;
         });
         th.detach();
     }

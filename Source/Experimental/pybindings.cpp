@@ -11,18 +11,6 @@
 #include "offlineclaphost.h"
 #include "dejavurandom.h"
 
-int add(int i, int j) { return i + j; }
-
-std::optional<double> avg(std::vector<double> &v)
-{
-    if (v.size() == 0)
-        return {};
-    double sum = 0.0;
-    for (auto &e : v)
-        sum += e;
-    return sum / v.size();
-}
-
 void list_plugins()
 {
     int k = 0;
@@ -165,8 +153,6 @@ PYBIND11_MODULE(xenakios, m)
 {
     m.doc() = "pybind11 xenakios plugin"; // optional module docstring
 
-    m.def("add", &add, "A function that adds two numbers");
-    m.def("avg", &avg, "average of list");
     m.def("list_plugins", &list_plugins, "print noise plethora plugins");
 
     py::class_<ClapEventSequence>(m, "ClapSequence")

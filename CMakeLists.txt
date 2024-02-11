@@ -77,7 +77,7 @@ add_subdirectory(libs/fmt)
 project(cmaketest)
 add_subdirectory(libs/pybind11)
 pybind11_add_module(xenakios 
-    Source/Experimental/pybindtest.cpp
+    Source/Experimental/pybindings.cpp
     Source/Experimental/xaps/clap_xaudioprocessor.cpp
 )
 target_link_libraries(xenakios PRIVATE noiseplethora)
