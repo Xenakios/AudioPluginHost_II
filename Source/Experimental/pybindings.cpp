@@ -50,11 +50,23 @@ constexpr size_t ENVBLOCKSIZE = 64;
 class NoisePlethoraEngine
 {
   public:
-    NoisePlethoraEngine(std::string plugintouse)
+    NoisePlethoraEngine()
     {
-        m_plug = MyFactory::Instance()->Create(plugintouse);
-        if (!m_plug)
-            throw std::runtime_error("Plugin could not be created");
+        int k = 0;
+        for (int i = 0; i < numBanks; ++i)
+        {
+            auto &bank = getBankForIndex(i);
+            std::cout << "bank " << i << "\n";
+            for (int j = 0; j < programsPerBank; ++j)
+            {
+                auto progname = bank.getProgramName(j);
+                std::cout << "\t" << progname << "\t\t" << k << "\n";
+                // availablePlugins[k] = bank.getProgramName(j);
+                ++k;
+                auto p = MyFactory::Instance()->Create(progname);
+                m_plugs.push_back(std::move(p));
+            }
+        }
     }
     double hipasscutoff = 12.0;
     void processToFile(std::string filename, double durinseconds)
@@ -73,8 +85,12 @@ class NoisePlethoraEngine
         int outlen = durinseconds * sr;
         choc::buffer::ChannelArrayBuffer<float> buf{numoutchans, (unsigned int)outlen};
         buf.clear();
-        m_plug->init();
-        m_plug->m_sr = sr;
+        for (auto &p : m_plugs)
+        {
+            p->init();
+            p->m_sr = sr;
+        }
+        auto m_plug = m_plugs[0].get();
         auto chansdata = buf.getView().data.channels;
         StereoSimperSVF dcblocker;
         dcblocker.setCoeff(hipasscutoff, 0.01, 1.0 / sr);
@@ -124,6 +140,12 @@ class NoisePlethoraEngine
                         {
                             filt_resonance = pev->value;
                         }
+                        if (pev->param_id == 5)
+                        {
+                            int pindex = pev->value;
+                            pindex = std::clamp(pindex, 0, (int)m_plugs.size());
+                            m_plug = m_plugs[pindex].get();
+                        }
                     }
                 }
                 filter.setCoeff(filt_cut_off, filt_resonance, 1.0 / sr);
@@ -151,7 +173,7 @@ class NoisePlethoraEngine
     }
 
   private:
-    std::unique_ptr<NoisePlethoraPlugin> m_plug;
+    std::vector<std::unique_ptr<NoisePlethoraPlugin>> m_plugs;
     ClapEventSequence m_seq;
     SignalSmoother m_gain_smoother;
 };
@@ -231,7 +253,7 @@ PYBIND11_MODULE(xenakios, m)
         .def("processToFile", &ClapProcessingEngine::processToFile);
 
     py::class_<NoisePlethoraEngine>(m, "NoisePlethoraEngine")
-        .def(py::init<const std::string &>())
+        .def(py::init<>())
         .def("processToFile", &NoisePlethoraEngine::processToFile)
         .def_readwrite("highpass", &NoisePlethoraEngine::hipasscutoff,
                        "high pass filter cutoff, in semitones")
