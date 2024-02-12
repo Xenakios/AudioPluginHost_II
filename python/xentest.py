@@ -108,7 +108,10 @@ def test_plethora2():
     seq.addParameterEvent(False, 0.0, -1, -1, -1, -1, 5, 3)
     seq.addParameterEvent(False, 1.5, -1, -1, -1, -1, 5, 0)
     seq.addParameterEvent(False, 6.22, -1, -1, -1, -1, 5, 20)
-    seq.addParameterEvent(False, 8.5, -1, -1, -1, -1, 5, 10)
+    t = 10
+    while t<30.0:
+        seq.addParameterEvent(False, t, -1, -1, -1, -1, 5, random.randint(0,29))
+        t = t + 0.5
 
     t = 0.0
     while t<10:
@@ -123,6 +126,6 @@ def test_plethora2():
     
     p.setSequence(seq)
     p.highpass = 12
-    p.processToFile(f"npclap01.wav",10.0)
+    p.processToFile(f"npclap01.wav",30.0)
 
 test_plethora2()
