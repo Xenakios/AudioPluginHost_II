@@ -89,17 +89,25 @@ def test_plethora():
     #    p.process_to_file(f"out{i}.wav",1.0,0.1,i*0.2)
 
 def test_plethora2():
+    xenakios.list_plugins()
     p = xenakios.NoisePlethoraEngine("radioOhNo")
     seq = xenakios.ClapSequence()
     seq.addParameterEvent(False, 0.0, -1, -1, -1, -1, 0, 0.5)
     seq.addParameterEvent(False, 1.0, -1, -1, -1, -1, 0, 0.0)
     seq.addParameterEvent(False, 2.0, -1, -1, -1, -1, 0, 0.9)
+    seq.addParameterEvent(False, 7.6, -1, -1, -1, -1, 0, 0.3)
     seq.addParameterEvent(False, 0.0, -1, -1, -1, -1, 1, 0.5)
     seq.addParameterEvent(False, 5.0, -1, -1, -1, -1, 1, 0.2)
+
+    seq.addParameterEvent(False, 0.0, -1, -1, -1, -1, 3, -20.0)
+    seq.addParameterEvent(False, 1.0, -1, -1, -1, -1, 3, -6.0)
+    seq.addParameterEvent(False, 5.0, -1, -1, -1, -1, 3, -12.0)
+    seq.addParameterEvent(False, 5.5, -1, -1, -1, -1, 3, -3.0)
+    seq.addParameterEvent(False, 7.8, -1, -1, -1, -1, 3, -11.0)
     t = 0.0
     while t<10:
-        seq.addParameterEvent(False, t, -1, -1, -1, -1, 2, 70.0+36.0* math.sin(t*2))
-        t = t + 0.1
+        # seq.addParameterEvent(False, t, -1, -1, -1, -1, 2, 90.0+10.0* math.sin(t*4))
+        t = t + 0.01
     
     p.setSequence(seq)
     p.highpass = 12

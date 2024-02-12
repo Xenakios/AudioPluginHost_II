@@ -27,6 +27,24 @@ void list_plugins()
     }
 }
 
+class SignalSmoother
+{
+  public:
+    SignalSmoother() {}
+    inline double process(double in)
+    {
+        double result = in + m_slope * (m_history - in);
+        m_history = result;
+        return result;
+    }
+    void setSlope(double x) { m_slope = x; }
+    double getSlope() const { return m_slope; }
+
+  private:
+    float m_history = 0.0f;
+    float m_slope = 0.999f;
+};
+
 constexpr size_t ENVBLOCKSIZE = 64;
 
 class NoisePlethoraEngine
@@ -68,20 +86,23 @@ class NoisePlethoraEngine
         double mod_p0 = 0.0;
         double mod_p1 = 0.0;
         double filt_cut_off = 120.0;
+        double volume = -6.0;
         ClapEventSequence::Iterator eviter(m_seq);
         eviter.setTime(0.0);
+        m_gain_smoother.setSlope(0.999);
         for (int i = 0; i < outlen; ++i)
         {
             if (modcounter == 0)
             {
                 auto evts = eviter.readNextEvents(ENVBLOCKSIZE / sr);
                 double seconds = i / sr;
-                for(auto& e : evts)
+                for (auto &e : evts)
                 {
                     if (e.event.header.type == CLAP_EVENT_PARAM_VALUE)
                     {
-                        auto pev = (clap_event_param_value*)&e.event;
-                        // std::cout << seconds << " param value " << pev->param_id << " " << pev->value << "\n";
+                        auto pev = (clap_event_param_value *)&e.event;
+                        // std::cout << seconds << " param value " << pev->param_id << " " <<
+                        // pev->value << "\n";
                         if (pev->param_id == 0)
                         {
                             mod_p0 = pev->value;
@@ -94,6 +115,10 @@ class NoisePlethoraEngine
                         {
                             filt_cut_off = pev->value;
                         }
+                        if (pev->param_id == 3)
+                        {
+                            volume = pev->value;
+                        }
                     }
                 }
                 filter.setCoeff(filt_cut_off, 0.01, 1.0 / sr);
@@ -102,7 +127,8 @@ class NoisePlethoraEngine
             if (modcounter == ENVBLOCKSIZE)
                 modcounter = 0;
             m_plug->process(mod_p0, mod_p1);
-            float outL = m_plug->processGraph() * 0.5;
+            double gain = m_gain_smoother.process(xenakios::decibelsToGain(volume));
+            float outL = m_plug->processGraph() * gain;
             float outR = outL;
             dcblocker.step<StereoSimperSVF::HP>(dcblocker, outL, outR);
             filter.step<StereoSimperSVF::LP>(filter, outL, outR);
@@ -111,7 +137,7 @@ class NoisePlethoraEngine
         if (!writer->appendFrames(buf.getView()))
             throw std::runtime_error("Could not write output file");
     }
-    
+
     void setSequence(ClapEventSequence seq)
     {
         m_seq = seq;
@@ -121,6 +147,7 @@ class NoisePlethoraEngine
   private:
     std::unique_ptr<NoisePlethoraPlugin> m_plug;
     ClapEventSequence m_seq;
+    SignalSmoother m_gain_smoother;
 };
 
 struct SeqEvent
@@ -203,13 +230,12 @@ PYBIND11_MODULE(xenakios, m)
         .def_readwrite("highpass", &NoisePlethoraEngine::hipasscutoff,
                        "high pass filter cutoff, in semitones")
         .def("setSequence", &NoisePlethoraEngine::setSequence);
-        
-    
+
     py::class_<xenakios::EnvelopePoint>(m, "EnvelopePoint")
         .def(py::init<double, double>())
         .def("getX", &xenakios::EnvelopePoint::getX)
         .def("getY", &xenakios::EnvelopePoint::getY);
-    
+
     py::class_<xenakios::Envelope<ENVBLOCKSIZE>>(m, "Envelope")
         .def(py::init<>())
         .def(py::init<std::vector<xenakios::EnvelopePoint>>())
