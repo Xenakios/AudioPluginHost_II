@@ -87,6 +87,7 @@ class NoisePlethoraEngine
         double mod_p1 = 0.0;
         double filt_cut_off = 120.0;
         double volume = -6.0;
+        double filt_resonance = 0.01;
         ClapEventSequence::Iterator eviter(m_seq);
         eviter.setTime(0.0);
         m_gain_smoother.setSlope(0.999);
@@ -119,9 +120,13 @@ class NoisePlethoraEngine
                         {
                             volume = pev->value;
                         }
+                        if (pev->param_id == 4)
+                        {
+                            filt_resonance = pev->value;
+                        }
                     }
                 }
-                filter.setCoeff(filt_cut_off, 0.01, 1.0 / sr);
+                filter.setCoeff(filt_cut_off, filt_resonance, 1.0 / sr);
             }
             ++modcounter;
             if (modcounter == ENVBLOCKSIZE)
@@ -132,6 +137,7 @@ class NoisePlethoraEngine
             float outR = outL;
             dcblocker.step<StereoSimperSVF::HP>(dcblocker, outL, outR);
             filter.step<StereoSimperSVF::LP>(filter, outL, outR);
+            outL = std::clamp(outL, -1.0f, 1.0f);
             chansdata[0][i] = outL;
         }
         if (!writer->appendFrames(buf.getView()))

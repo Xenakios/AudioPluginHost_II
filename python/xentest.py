@@ -90,7 +90,7 @@ def test_plethora():
 
 def test_plethora2():
     xenakios.list_plugins()
-    p = xenakios.NoisePlethoraEngine("radioOhNo")
+    p = xenakios.NoisePlethoraEngine("existencelsPain")
     seq = xenakios.ClapSequence()
     seq.addParameterEvent(False, 0.0, -1, -1, -1, -1, 0, 0.5)
     seq.addParameterEvent(False, 1.0, -1, -1, -1, -1, 0, 0.0)
@@ -104,9 +104,16 @@ def test_plethora2():
     seq.addParameterEvent(False, 5.0, -1, -1, -1, -1, 3, -12.0)
     seq.addParameterEvent(False, 5.5, -1, -1, -1, -1, 3, -3.0)
     seq.addParameterEvent(False, 7.8, -1, -1, -1, -1, 3, -11.0)
+    
     t = 0.0
     while t<10:
-        # seq.addParameterEvent(False, t, -1, -1, -1, -1, 2, 90.0+10.0* math.sin(t*4))
+        seq.addParameterEvent(False, t, -1, -1, -1, -1, 4, 0.70)
+        seq.addParameterEvent(False, t + 0.1, -1, -1, -1, -1, 4, 0.01)
+        t = t + 0.3
+
+    t = 0.0
+    while t<10:
+        seq.addParameterEvent(False, t, -1, -1, -1, -1, 2, 90.0+10.0* math.sin(t*4))
         t = t + 0.01
     
     p.setSequence(seq)
