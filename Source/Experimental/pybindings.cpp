@@ -39,11 +39,8 @@ class NoisePlethoraEngine
             throw std::runtime_error("Plugin could not be created");
     }
     double hipasscutoff = 12.0;
-    void processToFile(std::string filename, double durinseconds, double p0, double p1)
+    void processToFile(std::string filename, double durinseconds)
     {
-        m_p0_env.sortPoints();
-        m_p1_env.sortPoints();
-        m_filt_env.sortPoints();
         double sr = 44100.0;
         unsigned int numoutchans = 1;
         choc::audio::AudioFileProperties outfileprops;
@@ -70,24 +67,41 @@ class NoisePlethoraEngine
         int modcounter = 0;
         double mod_p0 = 0.0;
         double mod_p1 = 0.0;
+        double filt_cut_off = 120.0;
+        ClapEventSequence::Iterator eviter(m_seq);
+        eviter.setTime(0.0);
         for (int i = 0; i < outlen; ++i)
         {
             if (modcounter == 0)
             {
+                auto evts = eviter.readNextEvents(ENVBLOCKSIZE / sr);
                 double seconds = i / sr;
-                m_p0_env.processBlock(seconds, sr, 2);
-                m_p1_env.processBlock(seconds, sr, 2);
-                m_filt_env.processBlock(seconds, sr, 2);
-                mod_p0 = m_p0_env.outputBlock[0];
-                mod_p1 = m_p1_env.outputBlock[0];
-                filter.setCoeff(m_filt_env.outputBlock[0], 0.01, 1.0 / sr);
+                for(auto& e : evts)
+                {
+                    if (e.event.header.type == CLAP_EVENT_PARAM_VALUE)
+                    {
+                        auto pev = (clap_event_param_value*)&e.event;
+                        // std::cout << seconds << " param value " << pev->param_id << " " << pev->value << "\n";
+                        if (pev->param_id == 0)
+                        {
+                            mod_p0 = pev->value;
+                        }
+                        if (pev->param_id == 1)
+                        {
+                            mod_p1 = pev->value;
+                        }
+                        if (pev->param_id == 2)
+                        {
+                            filt_cut_off = pev->value;
+                        }
+                    }
+                }
+                filter.setCoeff(filt_cut_off, 0.01, 1.0 / sr);
             }
             ++modcounter;
             if (modcounter == ENVBLOCKSIZE)
                 modcounter = 0;
-            double finalp0 = std::clamp<double>(p0 + mod_p0, 0.0, 1.0);
-            double finalp1 = std::clamp<double>(p1 + mod_p1, 0.0, 1.0);
-            m_plug->process(finalp0, finalp1);
+            m_plug->process(mod_p0, mod_p1);
             float outL = m_plug->processGraph() * 0.5;
             float outR = outL;
             dcblocker.step<StereoSimperSVF::HP>(dcblocker, outL, outR);
@@ -97,23 +111,16 @@ class NoisePlethoraEngine
         if (!writer->appendFrames(buf.getView()))
             throw std::runtime_error("Could not write output file");
     }
-    void setEnvelope(size_t index, xenakios::Envelope<ENVBLOCKSIZE> env)
+    
+    void setSequence(ClapEventSequence seq)
     {
-        if (index == 0)
-            m_p0_env = env;
-        if (index == 1)
-            m_p1_env = env;
-        if (index == 2)
-            m_filt_env = env;
+        m_seq = seq;
+        m_seq.sortEvents();
     }
 
   private:
     std::unique_ptr<NoisePlethoraPlugin> m_plug;
-    using ENVTYPE = xenakios::Envelope<ENVBLOCKSIZE>;
-    xenakios::Envelope<ENVBLOCKSIZE> m_p0_env{0.0};
-    xenakios::Envelope<ENVBLOCKSIZE> m_p1_env{0.0};
-    xenakios::Envelope<ENVBLOCKSIZE> m_filt_env{120.0};
-    std::array<ENVTYPE, 3> m_envs{ENVTYPE{0.0}, ENVTYPE{0.0}, ENVTYPE{120.0}};
+    ClapEventSequence m_seq;
 };
 
 struct SeqEvent
@@ -195,19 +202,22 @@ PYBIND11_MODULE(xenakios, m)
         .def("processToFile", &NoisePlethoraEngine::processToFile)
         .def_readwrite("highpass", &NoisePlethoraEngine::hipasscutoff,
                        "high pass filter cutoff, in semitones")
-        .def("setEnvelope", &NoisePlethoraEngine::setEnvelope);
+        .def("setSequence", &NoisePlethoraEngine::setSequence);
+        
+    
     py::class_<xenakios::EnvelopePoint>(m, "EnvelopePoint")
         .def(py::init<double, double>())
         .def("getX", &xenakios::EnvelopePoint::getX)
         .def("getY", &xenakios::EnvelopePoint::getY);
+    
     py::class_<xenakios::Envelope<ENVBLOCKSIZE>>(m, "Envelope")
         .def(py::init<>())
         .def(py::init<std::vector<xenakios::EnvelopePoint>>())
         .def("numPoints", &xenakios::Envelope<ENVBLOCKSIZE>::getNumPoints)
         .def("addPoint", &xenakios::Envelope<ENVBLOCKSIZE>::addPoint)
-        .def("getPoint",&xenakios::Envelope<ENVBLOCKSIZE>::getPointSafe)
+        .def("getPoint", &xenakios::Envelope<ENVBLOCKSIZE>::getPointSafe)
         .def("getValueAtPosition", &xenakios::Envelope<ENVBLOCKSIZE>::getValueAtPosition);
-    
+
     m.def("generateNoteExpressionsFromEnvelope", &generateNoteExpressionsFromEnvelope, "",
           py::arg("targetSequence"), py::arg("sourceEnvelope"), py::arg("eventsStartTime"),
           py::arg("duration"), py::arg("granularity"), py::arg("noteExpressionType"),

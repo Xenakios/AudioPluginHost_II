@@ -62,7 +62,7 @@ def test_dejavu():
     for i in range(10):
         print(dejavu.nextInt(0,3),end =" ")
 
-test_dejavu()
+# test_dejavu()
 
 def test_plethora():
     xenakios.list_plugins()
@@ -87,3 +87,22 @@ def test_plethora():
     p.processToFile(f"out043.wav",10.0,0.5,0.5)
     # for i in range(0,5):
     #    p.process_to_file(f"out{i}.wav",1.0,0.1,i*0.2)
+
+def test_plethora2():
+    p = xenakios.NoisePlethoraEngine("radioOhNo")
+    seq = xenakios.ClapSequence()
+    seq.addParameterEvent(False, 0.0, -1, -1, -1, -1, 0, 0.5)
+    seq.addParameterEvent(False, 1.0, -1, -1, -1, -1, 0, 0.0)
+    seq.addParameterEvent(False, 2.0, -1, -1, -1, -1, 0, 0.9)
+    seq.addParameterEvent(False, 0.0, -1, -1, -1, -1, 1, 0.5)
+    seq.addParameterEvent(False, 5.0, -1, -1, -1, -1, 1, 0.2)
+    t = 0.0
+    while t<10:
+        seq.addParameterEvent(False, t, -1, -1, -1, -1, 2, 70.0+36.0* math.sin(t*2))
+        t = t + 0.1
+    
+    p.setSequence(seq)
+    p.highpass = 12
+    p.processToFile(f"npclap01.wav",10.0)
+
+test_plethora2()
