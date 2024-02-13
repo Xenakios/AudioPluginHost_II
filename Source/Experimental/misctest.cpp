@@ -17,6 +17,7 @@
 #include "containers/choc_NonAllocatingStableSort.h"
 #include "sst/basic-blocks/modulators/SimpleLFO.h"
 #include "sst/basic-blocks/dsp/LanczosResampler.h"
+#include "sst/basic-blocks/mod-matrix/ModMatrix.h"
 #include "offlineclaphost.h"
 #include "gui/choc_DesktopWindow.h"
 #include "gui/choc_MessageLoop.h"
@@ -701,14 +702,191 @@ inline void test_seq_event_chase()
     }
 }
 
-inline void test_umap()
+using namespace sst::basic_blocks::mod_matrix;
+
+struct Config
 {
-    std::map<std::tuple<int,int,int,int,int>, double> map;
+    struct SourceIdentifier
+    {
+        enum SI
+        {
+            LFO1,
+            LFO2,
+            LFO3,
+            LFO4,
+            BKENV1,
+            BKENV2,
+            BKENV3,
+            BKENV4
+        } src{LFO1};
+        int index0{0};
+        int index1{0};
+
+        bool operator==(const SourceIdentifier &other) const
+        {
+            return src == other.src && index0 == other.index0 && index1 == other.index1;
+        }
+    };
+
+    struct TargetIdentifier
+    {
+        int baz{0};
+        uint32_t nm{};
+        int16_t depthPosition{-1};
+
+        bool operator==(const TargetIdentifier &other) const
+        {
+            return baz == other.baz && nm == other.nm && depthPosition == other.depthPosition;
+        }
+    };
+
+    using CurveIdentifier = int;
+
+    static bool isTargetModMatrixDepth(const TargetIdentifier &t) 
+    { 
+        return t.depthPosition >= 0; 
+    }
+    static size_t getTargetModMatrixElement(const TargetIdentifier &t)
+    {
+        assert(isTargetModMatrixDepth(t));
+        return (size_t)t.depthPosition;
+    }
+
+    using RoutingExtraPayload = int;
+
+    static constexpr bool IsFixedMatrix{true};
+    static constexpr size_t FixedMatrixSize{16};
+};
+
+template <> struct std::hash<Config::SourceIdentifier>
+{
+    std::size_t operator()(const Config::SourceIdentifier &s) const noexcept
+    {
+        auto h1 = std::hash<int>{}((int)s.src);
+        auto h2 = std::hash<int>{}((int)s.index0);
+        auto h3 = std::hash<int>{}((int)s.index1);
+        return h1 ^ (h2 << 1) ^ (h3 << 2);
+    }
+};
+
+template <> struct std::hash<Config::TargetIdentifier>
+{
+    std::size_t operator()(const Config::TargetIdentifier &s) const noexcept
+    {
+        auto h1 = std::hash<int>{}((int)s.baz);
+        auto h2 = std::hash<uint32_t>{}((int)s.nm);
+
+        return h1 ^ (h2 << 1);
+    }
+};
+
+inline void test_mod_matrix()
+{
+    FixedMatrix<Config> m;
+    FixedMatrix<Config>::RoutingTable rt;
+    auto source0 = Config::SourceIdentifier{Config::SourceIdentifier::SI::LFO1};
+    auto source1 = Config::SourceIdentifier{Config::SourceIdentifier::SI::LFO2};
+    auto source2 = Config::SourceIdentifier{Config::SourceIdentifier::SI::LFO3};
+    auto source3 = Config::SourceIdentifier{Config::SourceIdentifier::SI::LFO4};
+    auto source4 = Config::SourceIdentifier{Config::SourceIdentifier::SI::BKENV1};
+
+    auto target0 = Config::TargetIdentifier{0};
+    auto target1 = Config::TargetIdentifier{1};
+    auto target2 = Config::TargetIdentifier{2};
+    auto target3 = Config::TargetIdentifier{3};
+    auto target4 = Config::TargetIdentifier{4};
+    auto target5 = Config::TargetIdentifier{5, 0, 0};
+
+    float sourceValues[5] = {0.0f, 0.0f, 0.0f, 0.0f, 1.0f};
+    m.bindSourceValue(source0, sourceValues[0]);
+    m.bindSourceValue(source1, sourceValues[1]);
+    m.bindSourceValue(source2, sourceValues[2]);
+    m.bindSourceValue(source3, sourceValues[3]);
+    m.bindSourceValue(source4, sourceValues[4]);
+
+    float targetValues[6] = {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f};
+    m.bindTargetBaseValue(target0, targetValues[0]);
+    m.bindTargetBaseValue(target1, targetValues[1]);
+    m.bindTargetBaseValue(target2, targetValues[2]);
+    m.bindTargetBaseValue(target3, targetValues[3]);
+    m.bindTargetBaseValue(target4, targetValues[4]);
+    m.bindTargetBaseValue(target5, targetValues[5]);
+
+    rt.updateRoutingAt(0, source1, source4, {}, target0, 1.0);
+    rt.updateRoutingAt(1, source0, target0, 0.1);
+    rt.updateRoutingAt(2, source0, target1, 1.0);
+    rt.updateRoutingAt(3, source1, target2, 1.0);
+    rt.updateRoutingAt(4, source2, target3, 0.3);
+    // rt.updateRoutingAt(5, source3, target3, 0.3);
+    // rt.updateRoutingAt(6, source1, target3, 0.4);
+    // rt.updateRoutingAt(7, source4, target4, 2.0);
+    // rt.updateRoutingAt(8, source2, target4, 0.5);
+    
+    //rt.updateRoutingAt(5, source4, target5, 1.0);
+
+    m.prepare(rt);
+
+    constexpr size_t blocklen = 64;
+    double sr = 44100;
+    SimpleLFO<blocklen> lfo1{sr};
+    SimpleLFO<blocklen> lfo2{sr};
+    SimpleLFO<blocklen> lfo3{sr};
+    SimpleLFO<blocklen> lfo4{sr};
+
+    xenakios::Envelope<blocklen> env1;
+    env1.addPoint({0.0, 0.0});
+    env1.addPoint({0.5, 0.0});
+    env1.addPoint({1.0, 1.0});
+    env1.addPoint({1.5, 0.0});
+    env1.addPoint({2.0, 0.0});
+    env1.sortPoints();
+
+    int outcounter = 0;
+    int outlen = sr * 2.0;
+
+    choc::audio::AudioFileProperties outfileprops;
+    outfileprops.formatName = "WAV";
+    outfileprops.bitDepth = choc::audio::BitDepth::float32;
+    outfileprops.numChannels = 4;
+    outfileprops.sampleRate = sr;
+    choc::audio::WAVAudioFileFormat<true> wavformat;
+    auto writer = wavformat.createWriter(
+        R"(C:\MusicAudio\sourcesamples\test_signals\lanczos\sst_modmatrix01.wav)", outfileprops);
+
+    choc::buffer::ChannelArrayBuffer<float> outputbuf{outfileprops.numChannels,
+                                                      (unsigned int)outlen + 64};
+    outputbuf.clear();
+    auto chansdata = outputbuf.getView().data.channels;
+    while (outcounter < outlen)
+    {
+        double secs = outcounter / sr;
+        env1.processBlock(secs, sr, 2);
+        lfo1.m_lfo.process_block(1.0, 0.0, 0, false);
+        lfo2.m_lfo.process_block(3.5, 0.0, 0, false);
+        lfo3.m_lfo.process_block(2.5, 0.0, 4, false);
+        lfo4.m_lfo.process_block(3.1, 0.0, 4, false);
+        sourceValues[0] = lfo1.m_lfo.outputBlock[0];
+        sourceValues[1] = lfo2.m_lfo.outputBlock[0];
+        sourceValues[2] = lfo3.m_lfo.outputBlock[0];
+        sourceValues[3] = lfo4.m_lfo.outputBlock[0];
+        sourceValues[4] = env1.outputBlock[0];
+        m.process();
+        for (int i = 0; i < blocklen; ++i)
+        {
+            chansdata[0][outcounter + i] = m.getTargetValue(target0);
+            chansdata[1][outcounter + i] = m.getTargetValue(target1);
+            chansdata[2][outcounter + i] = m.getTargetValue(target2);
+            chansdata[3][outcounter + i] = m.getTargetValue(target3);
+            // chansdata[4][outcounter + i] = m.getTargetValue(target4);
+        }
+        outcounter += blocklen;
+    }
+    writer->appendFrames(outputbuf.getView());
 }
 
 int main()
 {
-    test_umap();
+    test_mod_matrix();
     // test_seq_event_chase();
     // test_clap_gui_choc();
     // test_offline_clap();
