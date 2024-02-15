@@ -821,7 +821,7 @@ inline void test_mod_matrix()
 inline void test_mod_matrix_pyt()
 {
     MultiModulator mm{44100.0};
-    mm.setTargetAsParameter(0, false, 666);
+    mm.setOutputAsParameter(0, false, 666);
 }
 
 int main()
