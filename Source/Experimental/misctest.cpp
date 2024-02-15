@@ -702,81 +702,6 @@ inline void test_seq_event_chase()
     }
 }
 
-using namespace sst::basic_blocks::mod_matrix;
-
-struct Config
-{
-    struct SourceIdentifier
-    {
-        enum SI
-        {
-            LFO1,
-            LFO2,
-            LFO3,
-            LFO4,
-            BKENV1,
-            BKENV2,
-            BKENV3,
-            BKENV4
-        } src{LFO1};
-        int index0{0};
-        int index1{0};
-
-        bool operator==(const SourceIdentifier &other) const
-        {
-            return src == other.src && index0 == other.index0 && index1 == other.index1;
-        }
-    };
-
-    struct TargetIdentifier
-    {
-        int baz{0};
-        uint32_t nm{};
-        int16_t depthPosition{-1};
-
-        bool operator==(const TargetIdentifier &other) const
-        {
-            return baz == other.baz && nm == other.nm && depthPosition == other.depthPosition;
-        }
-    };
-
-    using CurveIdentifier = int;
-
-    static bool isTargetModMatrixDepth(const TargetIdentifier &t) { return t.depthPosition >= 0; }
-    static size_t getTargetModMatrixElement(const TargetIdentifier &t)
-    {
-        assert(isTargetModMatrixDepth(t));
-        return (size_t)t.depthPosition;
-    }
-
-    using RoutingExtraPayload = int;
-
-    static constexpr bool IsFixedMatrix{true};
-    static constexpr size_t FixedMatrixSize{16};
-};
-
-template <> struct std::hash<Config::SourceIdentifier>
-{
-    std::size_t operator()(const Config::SourceIdentifier &s) const noexcept
-    {
-        auto h1 = std::hash<int>{}((int)s.src);
-        auto h2 = std::hash<int>{}((int)s.index0);
-        auto h3 = std::hash<int>{}((int)s.index1);
-        return h1 ^ (h2 << 1) ^ (h3 << 2);
-    }
-};
-
-template <> struct std::hash<Config::TargetIdentifier>
-{
-    std::size_t operator()(const Config::TargetIdentifier &s) const noexcept
-    {
-        auto h1 = std::hash<int>{}((int)s.baz);
-        auto h2 = std::hash<uint32_t>{}((int)s.nm);
-
-        return h1 ^ (h2 << 1);
-    }
-};
-
 inline void test_mod_matrix()
 {
     FixedMatrix<Config> m;
@@ -832,12 +757,9 @@ inline void test_mod_matrix()
 
     constexpr size_t blocklen = 64;
     constexpr double sr = 44100;
-    std::array<SimpleLFO<blocklen>, 4> lfos
-    {
-        sr,sr,sr,sr
-    };
-    
-    std::array<xenakios::Envelope<blocklen>,4> envs;
+    std::array<SimpleLFO<blocklen>, 4> lfos{sr, sr, sr, sr};
+
+    std::array<xenakios::Envelope<blocklen>, 4> envs;
     envs[0].addPoint({0.0, 0.0});
     envs[0].addPoint({0.25, 1.0});
     envs[0].addPoint({0.5, 0.0});
@@ -896,9 +818,16 @@ inline void test_mod_matrix()
     writer->appendFrames(outputbuf.getView());
 }
 
+inline void test_mod_matrix_pyt()
+{
+    MultiModulator mm{44100.0};
+    mm.setTargetAsParameter(0, false, 666);
+}
+
 int main()
 {
-    test_mod_matrix();
+    test_mod_matrix_pyt();
+    // test_mod_matrix();
     // test_seq_event_chase();
     // test_clap_gui_choc();
     // test_offline_clap();

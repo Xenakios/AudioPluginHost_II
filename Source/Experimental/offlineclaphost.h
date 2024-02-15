@@ -11,6 +11,7 @@
 #include "sst/basic-blocks/modulators/SimpleLFO.h"
 #include "gui/choc_DesktopWindow.h"
 #include "gui/choc_MessageLoop.h"
+#include "sst/basic-blocks/mod-matrix/ModMatrix.h"
 
 class ClapEventSequence
 {
@@ -188,6 +189,9 @@ template <size_t BLOCK_SIZE> class SimpleLFO
                a * table_envrate_linear[(e + 1) & 0x1ff];
     }
     sst::basic_blocks::modulators::SimpleLFO<SimpleLFO, BLOCK_SIZE> m_lfo;
+    double rate = 0.0;
+    double deform = 0.0;
+    int shape = 0;
     SimpleLFO(double sr) : samplerate(sr), m_lfo(this) { initTables(); }
 };
 
@@ -221,8 +225,8 @@ inline void generateParameterEventsFromEnvelope(bool is_mod, ClapEventSequence &
     }
 }
 
-inline xenakios::Envelope<64> generateEnvelopeFromLFO(double rate, double deform, int shape, double envlen,
-                                               double envgranul)
+inline xenakios::Envelope<64> generateEnvelopeFromLFO(double rate, double deform, int shape,
+                                                      double envlen, double envgranul)
 {
     double sr = 44100.0;
     constexpr size_t blocklen = 64;
@@ -245,6 +249,210 @@ inline xenakios::Envelope<64> generateEnvelopeFromLFO(double rate, double deform
     }
     return result;
 }
+
+using namespace sst::basic_blocks::mod_matrix;
+
+struct Config
+{
+    struct SourceIdentifier
+    {
+        enum SI
+        {
+            LFO1,
+            LFO2,
+            LFO3,
+            LFO4,
+            BKENV1,
+            BKENV2,
+            BKENV3,
+            BKENV4
+        } src{LFO1};
+        int index0{0};
+        int index1{0};
+
+        bool operator==(const SourceIdentifier &other) const
+        {
+            return src == other.src && index0 == other.index0 && index1 == other.index1;
+        }
+    };
+
+    struct TargetIdentifier
+    {
+        int baz{0};
+        uint32_t nm{};
+        int16_t depthPosition{-1};
+
+        bool operator==(const TargetIdentifier &other) const
+        {
+            return baz == other.baz && nm == other.nm && depthPosition == other.depthPosition;
+        }
+    };
+
+    using CurveIdentifier = int;
+
+    static bool isTargetModMatrixDepth(const TargetIdentifier &t) { return t.depthPosition >= 0; }
+    static size_t getTargetModMatrixElement(const TargetIdentifier &t)
+    {
+        assert(isTargetModMatrixDepth(t));
+        return (size_t)t.depthPosition;
+    }
+
+    using RoutingExtraPayload = int;
+
+    static constexpr bool IsFixedMatrix{true};
+    static constexpr size_t FixedMatrixSize{16};
+};
+
+template <> struct std::hash<Config::SourceIdentifier>
+{
+    std::size_t operator()(const Config::SourceIdentifier &s) const noexcept
+    {
+        auto h1 = std::hash<int>{}((int)s.src);
+        auto h2 = std::hash<int>{}((int)s.index0);
+        auto h3 = std::hash<int>{}((int)s.index1);
+        return h1 ^ (h2 << 1) ^ (h3 << 2);
+    }
+};
+
+template <> struct std::hash<Config::TargetIdentifier>
+{
+    std::size_t operator()(const Config::TargetIdentifier &s) const noexcept
+    {
+        auto h1 = std::hash<int>{}((int)s.baz);
+        auto h2 = std::hash<uint32_t>{}((int)s.nm);
+
+        return h1 ^ (h2 << 1);
+    }
+};
+
+class MultiModulator
+{
+  public:
+    MultiModulator(double sampleRate) : sr(sampleRate)
+    {
+        sources[0] = {Config::SourceIdentifier::SI::LFO1};
+        sources[1] = {Config::SourceIdentifier::SI::LFO2};
+        sources[2] = {Config::SourceIdentifier::SI::LFO3};
+        sources[3] = {Config::SourceIdentifier::SI::LFO4};
+        sources[4] = {Config::SourceIdentifier::SI::BKENV1};
+        sources[5] = {Config::SourceIdentifier::SI::BKENV2};
+        sources[6] = {Config::SourceIdentifier::SI::BKENV3};
+        sources[7] = {Config::SourceIdentifier::SI::BKENV4};
+        for (size_t i = 0; i < targets.size(); ++i)
+        {
+            targets[i] = Config::TargetIdentifier{(int)i};
+        }
+        targets[5] = Config::TargetIdentifier{5, 0, 0};
+        targets[6] = Config::TargetIdentifier{6, 0, 1};
+        std::fill(sourceValues.begin(), sourceValues.end(), 0.0f);
+        for (size_t i = 0; i < sourceValues.size(); ++i)
+        {
+            m.bindSourceValue(sources[i], sourceValues[i]);
+        }
+        std::fill(targetValues.begin(), targetValues.end(), 0.0f);
+        for (size_t i = 0; i < targetValues.size(); ++i)
+        {
+            m.bindTargetBaseValue(targets[i], targetValues[i]);
+        }
+        for (auto &l : lfos)
+        {
+            l.samplerate = sampleRate;
+            l.initTables();
+        }
+        for (auto &e : outputprops)
+            e = OutputProps();
+    }
+    void applyToSequence(ClapEventSequence &destSeq, double startTime, double duration)
+    {
+        m.prepare(rt);
+        double tpos = startTime;
+        double gran = (blocklen / sr) * 4;
+        while (tpos < startTime + duration)
+        {
+            size_t i = 0;
+            for (auto &lfo : lfos)
+            {
+                lfo.m_lfo.process_block(lfo.rate, lfo.deform, lfo.shape, false);
+                sourceValues[i] = lfo.m_lfo.outputBlock[0];
+                ++i;
+            }
+            for (auto &env : envs)
+            {
+                env.processBlock(tpos, sr, 2);
+                sourceValues[i] = env.outputBlock[0];
+            }
+            m.process();
+            for (i = 0; i < outputprops.size(); ++i)
+            {
+                double dv = m.getTargetValue(targets[i]);
+                const auto &oprop = outputprops[i];
+                if (oprop.type == CLAP_EVENT_PARAM_VALUE)
+                {
+                    destSeq.addParameterEvent(false, tpos, -1, -1, -1, -1, oprop.paramid, dv);
+                }
+                if (oprop.type == CLAP_EVENT_PARAM_MOD)
+                {
+                    destSeq.addParameterEvent(true, tpos, -1, -1, -1, -1, oprop.paramid, dv);
+                }
+                if (oprop.type == CLAP_EVENT_NOTE_EXPRESSION)
+                {
+                    destSeq.addNoteExpression(tpos, oprop.port, oprop.channel, oprop.key,
+                                              oprop.note_id, oprop.expid, dv);
+                }
+            }
+            tpos += gran;
+        }
+    }
+    void setOutputAsParameter(size_t index, bool ismod, clap_id parid)
+    {
+        outputprops[index].paramid = parid;
+        if (ismod)
+            outputprops[index].type = CLAP_EVENT_PARAM_MOD;
+        else
+            outputprops[index].type = CLAP_EVENT_PARAM_VALUE;
+    }
+    void setOutputAsNoteExpression(size_t index, int net, int port, int channel, int key,
+                                   int note_id)
+    {
+        outputprops[index].expid = net;
+        outputprops[index].port = port;
+        outputprops[index].channel = channel;
+        outputprops[index].key = key;
+        outputprops[index].note_id = note_id;
+        outputprops[index].type = CLAP_EVENT_NOTE_EXPRESSION;
+    }
+    void setConnection(size_t slotIndex, size_t sourceIndex, size_t targetIndex, double depth)
+    {
+        rt.updateRoutingAt(slotIndex, sources[sourceIndex], targets[targetIndex], depth);
+    }
+    void setLFOProps(size_t index, double rate, double deform, int shape)
+    {
+        lfos[index].rate = rate;
+        lfos[index].deform = deform;
+        lfos[index].shape = shape;
+    }
+    double sr = 44100.0;
+    FixedMatrix<Config> m;
+    FixedMatrix<Config>::RoutingTable rt;
+    std::array<Config::SourceIdentifier, 8> sources;
+    std::array<Config::TargetIdentifier, 16> targets;
+    std::array<float, 8> sourceValues;
+    std::array<float, 16> targetValues;
+    static constexpr size_t blocklen = 64;
+    std::array<SimpleLFO<blocklen>, 4> lfos{44100, 44100, 44100, 44100};
+    std::array<xenakios::Envelope<blocklen>, 4> envs;
+    struct OutputProps
+    {
+        int type = -1;
+        clap_id paramid = CLAP_INVALID_ID;
+        clap_note_expression expid = -1;
+        int port = -1;
+        int channel = -1;
+        int key = -1;
+        int note_id = -1;
+    };
+    std::array<OutputProps, 8> outputprops;
+};
 
 class ClapProcessingEngine
 {
