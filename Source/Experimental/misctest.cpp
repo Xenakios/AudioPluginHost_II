@@ -801,7 +801,6 @@ inline void test_mod_matrix()
 
     std::array<float, 8> sourceValues;
     std::fill(sourceValues.begin(), sourceValues.end(), 0.0f);
-    sourceValues[4] = 1.0;
     for (size_t i = 0; i < sourceValues.size(); ++i)
     {
         m.bindSourceValue(sources[i], sourceValues[i]);
@@ -816,11 +815,12 @@ inline void test_mod_matrix()
 
     // rt.updateRoutingAt(0, sources[0], targets[0], 0.1);
     // rt.updateRoutingAt(1, sources[1], target0, 0.1);
-    rt.updateRoutingAt(0, sources[0], sources[5], {}, targets[0], 1.0);
-    rt.updateRoutingAt(1, sources[1], sources[4], {}, targets[0], 1.0);
+    rt.updateRoutingAt(0, sources[0], sources[5], {}, targets[0], 0.8);
+    rt.updateRoutingAt(1, sources[1], sources[4], {}, targets[0], 0.2);
     rt.updateRoutingAt(2, sources[0], targets[1], 1.0);
     rt.updateRoutingAt(3, sources[1], targets[2], 1.0);
-    rt.updateRoutingAt(4, sources[2], targets[3], 0.3);
+    rt.updateRoutingAt(4, sources[2], targets[3], 0.6);
+    rt.updateRoutingAt(5, sources[1], targets[3], 0.3);
     // rt.updateRoutingAt(5, source3, target3, 0.3);
     // rt.updateRoutingAt(6, source1, target3, 0.4);
     // rt.updateRoutingAt(7, source4, target4, 2.0);
@@ -831,14 +831,15 @@ inline void test_mod_matrix()
     m.prepare(rt);
 
     constexpr size_t blocklen = 64;
-    double sr = 44100;
-    SimpleLFO<blocklen> lfo1{sr};
-    SimpleLFO<blocklen> lfo2{sr};
-    SimpleLFO<blocklen> lfo3{sr};
-    SimpleLFO<blocklen> lfo4{sr};
-
+    constexpr double sr = 44100;
+    std::array<SimpleLFO<blocklen>, 4> lfos
+    {
+        sr,sr,sr,sr
+    };
+    
     std::array<xenakios::Envelope<blocklen>,4> envs;
     envs[0].addPoint({0.0, 0.0});
+    envs[0].addPoint({0.25, 1.0});
     envs[0].addPoint({0.5, 0.0});
     envs[0].addPoint({1.0, 1.0});
     envs[0].addPoint({1.5, 0.0});
@@ -846,7 +847,7 @@ inline void test_mod_matrix()
     envs[0].sortPoints();
 
     envs[1].addPoint({0.0, 1.0});
-    envs[1].addPoint({1.0, 0.0});
+    envs[1].addPoint({1.0, -1.0});
     envs[1].addPoint({2.0, 1.0});
     envs[1].sortPoints();
 
@@ -871,14 +872,14 @@ inline void test_mod_matrix()
         double secs = outcounter / sr;
         envs[0].processBlock(secs, sr, 2);
         envs[1].processBlock(secs, sr, 2);
-        lfo1.m_lfo.process_block(1.0, 0.0, 0, false);
-        lfo2.m_lfo.process_block(3.5, 0.0, 0, false);
-        lfo3.m_lfo.process_block(2.5, 0.0, 4, false);
-        lfo4.m_lfo.process_block(3.1, 0.0, 4, false);
-        sourceValues[0] = lfo1.m_lfo.outputBlock[0];
-        sourceValues[1] = lfo2.m_lfo.outputBlock[0];
-        sourceValues[2] = lfo3.m_lfo.outputBlock[0];
-        sourceValues[3] = lfo4.m_lfo.outputBlock[0];
+        lfos[0].m_lfo.process_block(1.0, 0.0, 0, false);
+        lfos[1].m_lfo.process_block(4.75, 0.0, 0, false);
+        lfos[2].m_lfo.process_block(2.5, 0.0, 4, false);
+        lfos[3].m_lfo.process_block(3.1, 0.0, 4, false);
+        sourceValues[0] = lfos[0].m_lfo.outputBlock[0];
+        sourceValues[1] = lfos[1].m_lfo.outputBlock[0];
+        sourceValues[2] = lfos[2].m_lfo.outputBlock[0];
+        sourceValues[3] = lfos[3].m_lfo.outputBlock[0];
         sourceValues[4] = envs[0].outputBlock[0];
         sourceValues[5] = envs[1].outputBlock[0];
         m.process();
