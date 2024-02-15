@@ -742,10 +742,7 @@ struct Config
 
     using CurveIdentifier = int;
 
-    static bool isTargetModMatrixDepth(const TargetIdentifier &t) 
-    { 
-        return t.depthPosition >= 0; 
-    }
+    static bool isTargetModMatrixDepth(const TargetIdentifier &t) { return t.depthPosition >= 0; }
     static size_t getTargetModMatrixElement(const TargetIdentifier &t)
     {
         assert(isTargetModMatrixDepth(t));
@@ -784,45 +781,52 @@ inline void test_mod_matrix()
 {
     FixedMatrix<Config> m;
     FixedMatrix<Config>::RoutingTable rt;
-    auto source0 = Config::SourceIdentifier{Config::SourceIdentifier::SI::LFO1};
-    auto source1 = Config::SourceIdentifier{Config::SourceIdentifier::SI::LFO2};
-    auto source2 = Config::SourceIdentifier{Config::SourceIdentifier::SI::LFO3};
-    auto source3 = Config::SourceIdentifier{Config::SourceIdentifier::SI::LFO4};
-    auto source4 = Config::SourceIdentifier{Config::SourceIdentifier::SI::BKENV1};
+    std::array<Config::SourceIdentifier, 8> sources;
+    sources[0] = {Config::SourceIdentifier::SI::LFO1};
+    sources[1] = {Config::SourceIdentifier::SI::LFO2};
+    sources[2] = {Config::SourceIdentifier::SI::LFO3};
+    sources[3] = {Config::SourceIdentifier::SI::LFO4};
+    sources[4] = {Config::SourceIdentifier::SI::BKENV1};
+    sources[5] = {Config::SourceIdentifier::SI::BKENV2};
+    sources[6] = {Config::SourceIdentifier::SI::BKENV3};
+    sources[7] = {Config::SourceIdentifier::SI::BKENV4};
 
-    auto target0 = Config::TargetIdentifier{0};
-    auto target1 = Config::TargetIdentifier{1};
-    auto target2 = Config::TargetIdentifier{2};
-    auto target3 = Config::TargetIdentifier{3};
-    auto target4 = Config::TargetIdentifier{4};
-    auto target5 = Config::TargetIdentifier{5, 0, 0};
+    std::array<Config::TargetIdentifier, 8> targets;
+    for (size_t i = 0; i < targets.size(); ++i)
+    {
+        targets[i] = Config::TargetIdentifier{(int)i};
+    }
+    targets[5] = Config::TargetIdentifier{5, 0, 0};
+    targets[6] = Config::TargetIdentifier{6, 0, 1};
 
-    float sourceValues[5] = {0.0f, 0.0f, 0.0f, 0.0f, 1.0f};
-    m.bindSourceValue(source0, sourceValues[0]);
-    m.bindSourceValue(source1, sourceValues[1]);
-    m.bindSourceValue(source2, sourceValues[2]);
-    m.bindSourceValue(source3, sourceValues[3]);
-    m.bindSourceValue(source4, sourceValues[4]);
+    std::array<float, 8> sourceValues;
+    std::fill(sourceValues.begin(), sourceValues.end(), 0.0f);
+    sourceValues[4] = 1.0;
+    for (size_t i = 0; i < sourceValues.size(); ++i)
+    {
+        m.bindSourceValue(sources[i], sourceValues[i]);
+    }
 
-    float targetValues[6] = {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f};
-    m.bindTargetBaseValue(target0, targetValues[0]);
-    m.bindTargetBaseValue(target1, targetValues[1]);
-    m.bindTargetBaseValue(target2, targetValues[2]);
-    m.bindTargetBaseValue(target3, targetValues[3]);
-    m.bindTargetBaseValue(target4, targetValues[4]);
-    m.bindTargetBaseValue(target5, targetValues[5]);
-    
-    rt.updateRoutingAt(0, source1, source4, {}, target0, 1.0);
-    rt.updateRoutingAt(1, source0, target0, 0.1);
-    rt.updateRoutingAt(2, source0, target1, 1.0);
-    rt.updateRoutingAt(3, source1, target2, 1.0);
-    rt.updateRoutingAt(4, source2, target3, 0.3);
+    std::array<float, 8> targetValues;
+    std::fill(targetValues.begin(), targetValues.end(), 0.0f);
+    for (size_t i = 0; i < targetValues.size(); ++i)
+    {
+        m.bindTargetBaseValue(targets[i], targetValues[i]);
+    }
+
+    // rt.updateRoutingAt(0, sources[0], targets[0], 0.1);
+    // rt.updateRoutingAt(1, sources[1], target0, 0.1);
+    rt.updateRoutingAt(0, sources[0], sources[5], {}, targets[0], 1.0);
+    rt.updateRoutingAt(1, sources[1], sources[4], {}, targets[0], 1.0);
+    rt.updateRoutingAt(2, sources[0], targets[1], 1.0);
+    rt.updateRoutingAt(3, sources[1], targets[2], 1.0);
+    rt.updateRoutingAt(4, sources[2], targets[3], 0.3);
     // rt.updateRoutingAt(5, source3, target3, 0.3);
     // rt.updateRoutingAt(6, source1, target3, 0.4);
     // rt.updateRoutingAt(7, source4, target4, 2.0);
     // rt.updateRoutingAt(8, source2, target4, 0.5);
-    
-    //rt.updateRoutingAt(5, source4, target5, 1.0);
+
+    // rt.updateRoutingAt(5, source4, target5, 1.0);
 
     m.prepare(rt);
 
@@ -833,13 +837,18 @@ inline void test_mod_matrix()
     SimpleLFO<blocklen> lfo3{sr};
     SimpleLFO<blocklen> lfo4{sr};
 
-    xenakios::Envelope<blocklen> env1;
-    env1.addPoint({0.0, 0.0});
-    env1.addPoint({0.5, 0.0});
-    env1.addPoint({1.0, 1.0});
-    env1.addPoint({1.5, 0.0});
-    env1.addPoint({2.0, 0.0});
-    env1.sortPoints();
+    std::array<xenakios::Envelope<blocklen>,4> envs;
+    envs[0].addPoint({0.0, 0.0});
+    envs[0].addPoint({0.5, 0.0});
+    envs[0].addPoint({1.0, 1.0});
+    envs[0].addPoint({1.5, 0.0});
+    envs[0].addPoint({2.0, 0.0});
+    envs[0].sortPoints();
+
+    envs[1].addPoint({0.0, 1.0});
+    envs[1].addPoint({1.0, 0.0});
+    envs[1].addPoint({2.0, 1.0});
+    envs[1].sortPoints();
 
     int outcounter = 0;
     int outlen = sr * 2.0;
@@ -860,7 +869,8 @@ inline void test_mod_matrix()
     while (outcounter < outlen)
     {
         double secs = outcounter / sr;
-        env1.processBlock(secs, sr, 2);
+        envs[0].processBlock(secs, sr, 2);
+        envs[1].processBlock(secs, sr, 2);
         lfo1.m_lfo.process_block(1.0, 0.0, 0, false);
         lfo2.m_lfo.process_block(3.5, 0.0, 0, false);
         lfo3.m_lfo.process_block(2.5, 0.0, 4, false);
@@ -869,14 +879,15 @@ inline void test_mod_matrix()
         sourceValues[1] = lfo2.m_lfo.outputBlock[0];
         sourceValues[2] = lfo3.m_lfo.outputBlock[0];
         sourceValues[3] = lfo4.m_lfo.outputBlock[0];
-        sourceValues[4] = env1.outputBlock[0];
+        sourceValues[4] = envs[0].outputBlock[0];
+        sourceValues[5] = envs[1].outputBlock[0];
         m.process();
         for (int i = 0; i < blocklen; ++i)
         {
-            chansdata[0][outcounter + i] = m.getTargetValue(target0);
-            chansdata[1][outcounter + i] = m.getTargetValue(target1);
-            chansdata[2][outcounter + i] = m.getTargetValue(target2);
-            chansdata[3][outcounter + i] = m.getTargetValue(target3);
+            chansdata[0][outcounter + i] = m.getTargetValue(targets[0]);
+            chansdata[1][outcounter + i] = m.getTargetValue(targets[1]);
+            chansdata[2][outcounter + i] = m.getTargetValue(targets[2]);
+            chansdata[3][outcounter + i] = m.getTargetValue(targets[3]);
             // chansdata[4][outcounter + i] = m.getTargetValue(target4);
         }
         outcounter += blocklen;
