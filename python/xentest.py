@@ -131,24 +131,50 @@ def test_plethora2():
 # test_plethora2()
     
 def test_plethora3():
-    outdur = 10.0
+    outdur = 20.0
     p = xenakios.NoisePlethoraEngine()
     seq = xenakios.ClapSequence()
-    seq.addParameterEvent(False, 0.0, -1, -1, -1, -1, 0, 0.5)
-    seq.addParameterEvent(False, 0.0, -1, -1, -1, -1, 1, 0.9)
+    seq.addParameterEvent(False, 0.0, -1, -1, -1, -1, 0, 0.2)
+    seq.addParameterEvent(False, 5.0, -1, -1, -1, -1, 0, 0.1)
+    seq.addParameterEvent(False, 10.0, -1, -1, -1, -1, 0, 0.33)
+    seq.addParameterEvent(False, 12.0, -1, -1, -1, -1, 0, 0.99)
+    seq.addParameterEvent(False, 13.0, -1, -1, -1, -1, 0, 0.01)
+    seq.addParameterEvent(False, 14.2, -1, -1, -1, -1, 0, 0.22)
+    seq.addParameterEvent(False, 15.2, -1, -1, -1, -1, 0, 0.45)
+    seq.addParameterEvent(False, 15.2, -1, -1, -1, -1, 1, 0.45)
+    
+    seq.addParameterEvent(False, 0.0, -1, -1, -1, -1, 1, 0.6)
     seq.addParameterEvent(False, 0.0, -1, -1, -1, -1, 3, -12.0)
-    seq.addParameterEvent(False, 0.0, -1, -1, -1, -1, 5, 1)
+    seq.addParameterEvent(False, 0.0, -1, -1, -1, -1, 5, 2)
+    seq.addParameterEvent(False, 0.0, -1, -1, -1, -1, 2, 84.0)
+    seq.addParameterEvent(False, 0.0, -1, -1, -1, -1, 4, 0.5)
+    seq.addParameterEvent(False, 5.4, -1, -1, -1, -1, 5, 3)
+    seq.addParameterEvent(False, 6.6, -1, -1, -1, -1, 5, 2)
+    seq.addParameterEvent(False, 14.0, -1, -1, -1, -1, 5, 4)
+    seq.addParameterEvent(False, 14.5, -1, -1, -1, -1, 5, 5)
+    seq.addParameterEvent(False, 15.0, -1, -1, -1, -1, 5, 6)
+    seq.addParameterEvent(False, 15.5, -1, -1, -1, -1, 5, 7)
+
     mm = xenakios.MultiModulator(44100.0)
+    
     mm.setLFOProps(0, 0.0, 0.0, 3)
-    mm.setLFOProps(1, 1.0, 0.0, 4)
+    mm.setLFOProps(1, 1.1, 0.0, 4)
+    mm.setLFOProps(2, 3.5, 0.0, 5)
+    mm.setLFOProps(3, 2.0, -0.8, 4)
+
     mm.setConnection(0, 0, 0, 1.0)
     mm.setConnection(1, 1, 1, 1.0)
+    mm.setConnection(2, 2, 2, 1.0)
+    mm.setConnection(3, 3, 3, 1.0)
     # mm.setConnection(2, 0, 1, 1.0)
     # mm.setConnection(1, 1, 0, 0.1)
     mm.setOutputAsParameterModulation(0, 3, -11.0)
-    mm.setOutputAsParameterModulation(1, 0, -0.5)
+    # mm.setOutputAsParameterModulation(1, 0, 0.4)
+    mm.setOutputAsParameterModulation(2, 2, 18.0)
+    mm.setOutputAsParameterModulation(3, 4, 0.4)
+    
     mm.applyToSequence(seq, 0.0, outdur)
     p.setSequence(seq)
-    p.processToFile(f"npclap02.wav", 10.0)
+    p.processToFile(f"npclap02.wav", outdur)
 
 test_plethora3()

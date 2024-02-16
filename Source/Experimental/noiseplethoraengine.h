@@ -97,9 +97,11 @@ class NoisePlethoraEngine
         double mod_p0 = 0.0;
         double mod_p1 = 0.0;
         double filt_cut_off = 120.0;
+        double filt_modulation = 0.0;
         double volume = -6.0;
         double volume_mod = 0.0;
         double filt_resonance = 0.01;
+        double filt_res_mod = 0.0;
         ClapEventSequence::Iterator eviter(m_seq);
         eviter.setTime(0.0);
         m_gain_smoother.setSlope(0.999);
@@ -123,9 +125,17 @@ class NoisePlethoraEngine
                         {
                             mod_p1 = pev->amount;
                         }
+                        if (pev->param_id == 2)
+                        {
+                            filt_modulation = pev->amount;
+                        }
                         if (pev->param_id == 3)
                         {
                             volume_mod = pev->amount;
+                        }
+                        if (pev->param_id == 4)
+                        {
+                            filt_res_mod = pev->amount;
                         }
                     }
                     if (e.event.header.type == CLAP_EVENT_PARAM_VALUE)
@@ -160,7 +170,10 @@ class NoisePlethoraEngine
                         }
                     }
                 }
-                filter.setCoeff(filt_cut_off, filt_resonance, 1.0 / sr);
+                double final_cutoff =
+                    std::clamp<double>(filt_cut_off + filt_modulation, 0.0, 130.0);
+                double final_reson = std::clamp<double>(filt_resonance + filt_res_mod, 0.01, 0.99);
+                filter.setCoeff(final_cutoff, final_reson, 1.0 / sr);
             }
             ++modcounter;
             if (modcounter == ENVBLOCKSIZE)
@@ -174,7 +187,7 @@ class NoisePlethoraEngine
             float outR = outL;
             dcblocker.step<StereoSimperSVF::HP>(dcblocker, outL, outR);
             filter.step<StereoSimperSVF::LP>(filter, outL, outR);
-            outL = std::clamp(outL, -1.0f, 1.0f);
+            outL = std::clamp(outL, -0.95f, 0.95f);
             chansdata[0][i] = outL;
         }
         if (!writer->appendFrames(buf.getView()))
