@@ -23,6 +23,7 @@
 #include "gui/choc_MessageLoop.h"
 #include "gui/choc_WebView.h"
 #include "text/choc_Files.h"
+#include "noiseplethoraengine.h"
 
 class object_t
 {
@@ -820,8 +821,16 @@ inline void test_mod_matrix()
 
 inline void test_mod_matrix_pyt()
 {
+    NoisePlethoraEngine plet;
+    ClapEventSequence seq;
+    seq.addParameterEvent(false, 0.0, -1, -1, -1, -1, 0, 0.5);
+    seq.addParameterEvent(false, 0.0, -1, -1, -1, -1, 1, 0.5);
     MultiModulator mm{44100.0};
-    mm.setOutputAsParameter(0, false, 666);
+    mm.setOutputAsParameterModulation(0, 0, 0.5);
+    mm.setConnection(0, 0, 0, 1.0);
+    mm.applyToSequence(seq, 0.0, 10.0);
+    plet.setSequence(seq);
+    plet.processToFile(R"(C:\develop\AudioPluginHost_mk2\npclap02.wav)", 10.0);
 }
 
 int main()

@@ -366,7 +366,7 @@ class MultiModulator
     {
         m.prepare(rt);
         double tpos = startTime;
-        double gran = (blocklen / sr) * 4;
+        double gran = (blocklen / sr);
         while (tpos < startTime + duration)
         {
             size_t i = 0;
@@ -378,8 +378,12 @@ class MultiModulator
             }
             for (auto &env : envs)
             {
-                env.processBlock(tpos, sr, 2);
-                sourceValues[i] = env.outputBlock[0];
+                if (env.getNumPoints() > 0)
+                {
+                    env.processBlock(tpos, sr, 2);
+                    sourceValues[i] = env.outputBlock[0];
+                }
+                ++i;
             }
             m.process();
             for (i = 0; i < outputprops.size(); ++i)
@@ -388,10 +392,14 @@ class MultiModulator
                 const auto &oprop = outputprops[i];
                 if (oprop.type == CLAP_EVENT_PARAM_VALUE)
                 {
+                    std::cout << "should not be\n";
+                    dv = xenakios::mapvalue<double>(dv, -1.0, 1.0, oprop.minval, oprop.maxval);
+                    dv = std::clamp<double>(dv, oprop.minval, oprop.maxval);
                     destSeq.addParameterEvent(false, tpos, -1, -1, -1, -1, oprop.paramid, dv);
                 }
                 if (oprop.type == CLAP_EVENT_PARAM_MOD)
                 {
+                    dv *= oprop.mod_depth;
                     destSeq.addParameterEvent(true, tpos, -1, -1, -1, -1, oprop.paramid, dv);
                 }
                 if (oprop.type == CLAP_EVENT_NOTE_EXPRESSION)
@@ -403,13 +411,18 @@ class MultiModulator
             tpos += gran;
         }
     }
-    void setOutputAsParameter(size_t index, bool ismod, clap_id parid)
+    void setOutputAsParameter(size_t index, clap_id parid, double minval, double maxval)
     {
         outputprops[index].paramid = parid;
-        if (ismod)
-            outputprops[index].type = CLAP_EVENT_PARAM_MOD;
-        else
-            outputprops[index].type = CLAP_EVENT_PARAM_VALUE;
+        outputprops[index].type = CLAP_EVENT_PARAM_VALUE;
+        outputprops[index].minval = minval;
+        outputprops[index].maxval = maxval;
+    }
+    void setOutputAsParameterModulation(size_t index, clap_id parid, double depth)
+    {
+        outputprops[index].paramid = parid;
+        outputprops[index].type = CLAP_EVENT_PARAM_MOD;
+        outputprops[index].mod_depth = depth;
     }
     void setOutputAsNoteExpression(size_t index, int net, int port, int channel, int key,
                                    int note_id)
@@ -427,6 +440,8 @@ class MultiModulator
     }
     void setLFOProps(size_t index, double rate, double deform, int shape)
     {
+        if (index >= lfos.size())
+            throw std::runtime_error("LFO index must be 0..3");
         lfos[index].rate = rate;
         lfos[index].deform = deform;
         lfos[index].shape = shape;
@@ -450,6 +465,9 @@ class MultiModulator
         int channel = -1;
         int key = -1;
         int note_id = -1;
+        double minval = 0.0;
+        double maxval = 1.0;
+        double mod_depth = 0.0;
     };
     std::array<OutputProps, 8> outputprops;
 };

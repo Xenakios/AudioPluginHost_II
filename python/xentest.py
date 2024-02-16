@@ -128,4 +128,27 @@ def test_plethora2():
     p.highpass = 12
     p.processToFile(f"npclap01.wav",30.0)
 
-test_plethora2()
+# test_plethora2()
+    
+def test_plethora3():
+    outdur = 10.0
+    p = xenakios.NoisePlethoraEngine()
+    seq = xenakios.ClapSequence()
+    seq.addParameterEvent(False, 0.0, -1, -1, -1, -1, 0, 0.5)
+    seq.addParameterEvent(False, 0.0, -1, -1, -1, -1, 1, 0.9)
+    seq.addParameterEvent(False, 0.0, -1, -1, -1, -1, 3, -12.0)
+    seq.addParameterEvent(False, 0.0, -1, -1, -1, -1, 5, 1)
+    mm = xenakios.MultiModulator(44100.0)
+    mm.setLFOProps(0, 0.0, 0.0, 3)
+    mm.setLFOProps(1, 1.0, 0.0, 4)
+    mm.setConnection(0, 0, 0, 1.0)
+    mm.setConnection(1, 1, 1, 1.0)
+    # mm.setConnection(2, 0, 1, 1.0)
+    # mm.setConnection(1, 1, 0, 0.1)
+    mm.setOutputAsParameterModulation(0, 3, -11.0)
+    mm.setOutputAsParameterModulation(1, 0, -0.5)
+    mm.applyToSequence(seq, 0.0, outdur)
+    p.setSequence(seq)
+    p.processToFile(f"npclap02.wav", 10.0)
+
+test_plethora3()

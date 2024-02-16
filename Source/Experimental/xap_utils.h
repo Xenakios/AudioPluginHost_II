@@ -423,9 +423,9 @@ inline clap_event_param_mod make_event_param_mod(uint32_t time, clap_id paramid,
 {
     clap_event_param_mod result;
     result.header.flags = flags;
-    result.header.size = sizeof(clap_event_param_value);
+    result.header.size = sizeof(clap_event_param_mod);
     result.header.space_id = CLAP_CORE_EVENT_SPACE_ID;
-    result.header.type = CLAP_EVENT_PARAM_VALUE;
+    result.header.type = CLAP_EVENT_PARAM_MOD;
     result.header.time = time;
     result.param_id = paramid;
     result.amount = amount;
