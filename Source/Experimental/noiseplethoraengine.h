@@ -102,6 +102,18 @@ class NoisePlethoraEngine
         double volume_mod = 0.0;
         double filt_resonance = 0.01;
         double filt_res_mod = 0.0;
+        std::unordered_map<int, double *> idtoparpmap;
+        idtoparpmap[0] = &p0;
+        idtoparpmap[1] = &p1;
+        idtoparpmap[2] = &filt_cut_off;
+        idtoparpmap[3] = &volume;
+        idtoparpmap[4] = &filt_resonance;
+        std::unordered_map<int, double *> idtoparmodpmap;
+        idtoparmodpmap[0] = &mod_p0;
+        idtoparmodpmap[1] = &mod_p1;
+        idtoparmodpmap[2] = &filt_modulation;
+        idtoparmodpmap[3] = &volume_mod;
+        idtoparmodpmap[4] = &filt_res_mod;
         ClapEventSequence::Iterator eviter(m_seq);
         eviter.setTime(0.0);
         m_gain_smoother.setSlope(0.999);
@@ -116,51 +128,19 @@ class NoisePlethoraEngine
                     if (e.event.header.type == CLAP_EVENT_PARAM_MOD)
                     {
                         auto pev = (const clap_event_param_mod *)&e.event;
-                        if (pev->param_id == 0)
+                        auto it = idtoparmodpmap.find(pev->param_id);
+                        if (it != idtoparmodpmap.end())
                         {
-                            // std::cout << "mod param 0 " << pev->amount << "\n";
-                            mod_p0 = pev->amount;
-                        }
-                        if (pev->param_id == 1)
-                        {
-                            mod_p1 = pev->amount;
-                        }
-                        if (pev->param_id == 2)
-                        {
-                            filt_modulation = pev->amount;
-                        }
-                        if (pev->param_id == 3)
-                        {
-                            volume_mod = pev->amount;
-                        }
-                        if (pev->param_id == 4)
-                        {
-                            filt_res_mod = pev->amount;
+                            *(it->second) = pev->amount;
                         }
                     }
                     if (e.event.header.type == CLAP_EVENT_PARAM_VALUE)
                     {
                         auto pev = (const clap_event_param_value *)&e.event;
-                        if (pev->param_id == 0)
+                        auto it = idtoparpmap.find(pev->param_id);
+                        if (it != idtoparpmap.end())
                         {
-                            std::cout << "set param 0 " << pev->value << "\n";
-                            p0 = pev->value;
-                        }
-                        if (pev->param_id == 1)
-                        {
-                            p1 = pev->value;
-                        }
-                        if (pev->param_id == 2)
-                        {
-                            filt_cut_off = pev->value;
-                        }
-                        if (pev->param_id == 3)
-                        {
-                            volume = pev->value;
-                        }
-                        if (pev->param_id == 4)
-                        {
-                            filt_resonance = pev->value;
+                            *(it->second) = pev->value;
                         }
                         if (pev->param_id == 5)
                         {
