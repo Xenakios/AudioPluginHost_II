@@ -41,9 +41,14 @@ class ClapEventSequence
         bool operator<(const Event &other) { return timestamp < other.timestamp; }
     };
     std::vector<Event> m_evlist;
-    ClapEventSequence() {}
+    ClapEventSequence() 
+    {
+        m_evlist.reserve(4096);
+    }
     void sortEvents() { choc::sorting::stable_sort(m_evlist.begin(), m_evlist.end()); }
     size_t getNumEvents() const { return m_evlist.size(); }
+    // should be fairly accurate, despite the name of the method
+    size_t getApproxSizeInBytes() const { return m_evlist.capacity() * sizeof(Event); }
     void addNoteOn(double time, int port, int channel, int key, double velo, int note_id)
     {
         auto ev =

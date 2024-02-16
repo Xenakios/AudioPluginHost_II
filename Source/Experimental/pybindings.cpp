@@ -11,38 +11,6 @@
 #include "dejavurandom.h"
 #include "noiseplethoraengine.h"
 
-
-struct SeqEvent
-{
-    SeqEvent() {}
-    SeqEvent asNote(double timestamp, int etype, int port, int channel, int key, double velo,
-                    int note_id = -1)
-    {
-        SeqEvent result;
-        result.timestamp = timestamp;
-        auto ev = (clap_event_note *)result.data;
-        ev->header.flags = 0;
-        ev->header.size = sizeof(clap_event_note);
-        ev->header.space_id = CLAP_CORE_EVENT_SPACE_ID;
-        ev->header.time = 0;
-        ev->header.type = etype;
-        ev->port_index = port;
-        ev->channel = channel;
-        ev->key = key;
-        ev->velocity = velo;
-        ev->note_id = note_id;
-        struct vec
-        {
-            float x;
-            float y;
-        };
-        return result;
-    }
-
-    double timestamp = 0.0;
-    std::byte data[128];
-};
-
 namespace py = pybind11;
 
 PYBIND11_MODULE(xenakios, m)
@@ -54,6 +22,7 @@ PYBIND11_MODULE(xenakios, m)
     py::class_<ClapEventSequence>(m, "ClapSequence")
         .def(py::init<>())
         .def("getNumEvents", &ClapEventSequence::getNumEvents)
+        .def("getSizeInBytes", &ClapEventSequence::getApproxSizeInBytes)
         .def("addNoteOn", &ClapEventSequence::addNoteOn)
         .def("addNoteOff", &ClapEventSequence::addNoteOff)
         .def("addParameterEvent", &ClapEventSequence::addParameterEvent)

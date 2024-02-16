@@ -198,7 +198,6 @@ class NoisePlethoraEngine
     {
         m_seq = seq;
         m_seq.sortEvents();
-        std::cout << "set sequence with " << m_seq.getNumEvents() << " events\n";
     }
 
   private:

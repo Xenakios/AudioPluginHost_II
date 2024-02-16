@@ -175,6 +175,8 @@ def test_plethora3():
     
     mm.applyToSequence(seq, 0.0, outdur)
     p.setSequence(seq)
+    print(f'sequence size is {seq.getSizeInBytes()/1024.0/1024.0} megabytes')
+    print(f'sequence has {seq.getNumEvents()} events')
     p.processToFile(f"npclap02.wav", outdur)
 
 test_plethora3()
