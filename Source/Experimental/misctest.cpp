@@ -851,37 +851,47 @@ inline void test_plethora_synth()
     for (int i = 0; i < 2; ++i)
     {
         synth.m_seq.addParameterEvent(false, 0.0, -1, i, -1, -1,
-                                      (uint32_t)NoisePlethoraSynth::ParamIDs::Mute, 0.0);
+                                      (uint32_t)NoisePlethoraSynth::ParamIDs::Enabled, 1.0);
     }
     for (int i = 0; i < 2; ++i)
     {
         synth.m_seq.addParameterEvent(false, 5.0, -1, i, -1, -1,
-                                      (uint32_t)NoisePlethoraSynth::ParamIDs::Mute, 1.0);
+                                      (uint32_t)NoisePlethoraSynth::ParamIDs::Enabled, 0.0);
         synth.m_seq.addParameterEvent(false, 6.0, -1, i, -1, -1,
-                                      (uint32_t)NoisePlethoraSynth::ParamIDs::Mute, 0.0);
+                                      (uint32_t)NoisePlethoraSynth::ParamIDs::Enabled, 1.0);
     }
     synth.m_seq.addParameterEvent(false, 14.0, -1, 2, -1, -1,
-                                  (uint32_t)NoisePlethoraSynth::ParamIDs::Mute, 0.0);
+                                  (uint32_t)NoisePlethoraSynth::ParamIDs::Enabled, 1.0);
     synth.m_seq.addParameterEvent(false, 14.0, -1, 2, -1, -1,
                                   (uint32_t)NoisePlethoraSynth::ParamIDs::Algo, 7.0);
     double t = 14.0;
     std::mt19937 rng;
-    std::uniform_real_distribution<float> dist(0.0f,1.0f);
+    std::uniform_real_distribution<float> dist(0.0f, 1.0f);
     while (t < 30.0)
     {
         synth.m_seq.addParameterEvent(false, t, -1, 2, -1, -1,
-                                  (uint32_t)NoisePlethoraSynth::ParamIDs::X, dist(rng));
+                                      (uint32_t)NoisePlethoraSynth::ParamIDs::X, dist(rng));
         synth.m_seq.addParameterEvent(false, t, -1, 2, -1, -1,
-                                  (uint32_t)NoisePlethoraSynth::ParamIDs::Y, dist(rng));
+                                      (uint32_t)NoisePlethoraSynth::ParamIDs::Y, dist(rng));
+        synth.m_seq.addParameterEvent(false, t, -1, 2, -1, -1,
+                                      (uint32_t)NoisePlethoraSynth::ParamIDs::FiltCutoff,
+                                      24.0 + 100.0 * dist(rng));
+        if (t >= 25.0)
+        {
+            synth.m_seq.addParameterEvent(false, t, -1, 2, -1, -1,
+                                          (uint32_t)NoisePlethoraSynth::ParamIDs::Pan, dist(rng));
+            synth.m_seq.addParameterEvent(false, t + 0.1, -1, 2, -1, -1,
+                                          (uint32_t)NoisePlethoraSynth::ParamIDs::Pan, dist(rng));
+        }
         t += 0.2;
     }
     synth.m_seq.addParameterEvent(false, 28.0, -1, 2, -1, -1,
-                                  (uint32_t)NoisePlethoraSynth::ParamIDs::Mute, 1.0);
+                                  (uint32_t)NoisePlethoraSynth::ParamIDs::Enabled, 0.0);
 
     for (int i = 0; i < 2; ++i)
     {
         synth.m_seq.addParameterEvent(false, 19.0, -1, i, -1, -1,
-                                      (uint32_t)NoisePlethoraSynth::ParamIDs::Mute, 1.0);
+                                      (uint32_t)NoisePlethoraSynth::ParamIDs::Enabled, 0.0);
     }
 
     synth.m_seq.addParameterEvent(false, 0.0, -1, -1, -1, -1,

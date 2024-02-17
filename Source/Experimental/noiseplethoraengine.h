@@ -243,12 +243,12 @@ class NoisePlethoraSynth
                             v->basevalues.filtcutoff = pev->value;
                         else if (pev->param_id == (uint32_t)ParamIDs::FiltResonance)
                             v->basevalues.filtreson = pev->value;
-                        else if (pev->param_id == (uint32_t)ParamIDs::Mute)
+                        else if (pev->param_id == (uint32_t)ParamIDs::Enabled)
                         {
                             if (pev->value >= 0.5f)
-                                v->deactivate();
-                            else
                                 v->activate();
+                            else
+                                v->deactivate();
                         }
                     }
                 }
@@ -300,7 +300,7 @@ class NoisePlethoraSynth
         FiltResonance,
         Algo,
         Pan,
-        Mute
+        Enabled
     };
 
   private:
