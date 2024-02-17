@@ -53,7 +53,6 @@ class NoisePlethoraVoice
         float filtreson = 0.01;
         float algo = 0.0f;
         float pan = 0.5f;
-        
     };
     VoiceParams basevalues;
     VoiceParams modvalues;
@@ -103,8 +102,14 @@ class NoisePlethoraVoice
             p->m_sr = m_sr;
         }
     }
-    void activate()
+    double velocity = 1.0;
+    void activate(int port_, int chan_, int key_, int id_, double velo)
     {
+        velocity = velo;
+        port_id = port_;
+        chan = chan_;
+        key = key_;
+        note_id = id_;
         envstate = EnvelopeState::Attack;
         env_counter = 0;
     }
@@ -222,6 +227,20 @@ class NoisePlethoraSynth
         bool paramsWereUpdated = false;
         for (auto &ev : seqevents)
         {
+            if (ev.event.header.type == CLAP_EVENT_NOTE_ON ||
+                ev.event.header.type == CLAP_EVENT_NOTE_OFF)
+            {
+                auto nev = (const clap_event_note *)&ev.event;
+                if (nev->channel >= 0 && nev->channel < m_voices.size())
+                {
+                    auto v = m_voices[nev->channel].get();
+                    if (nev->header.type == CLAP_EVENT_NOTE_ON)
+                        v->activate(nev->port_index, nev->channel, nev->key, nev->note_id,
+                                    nev->velocity);
+                    if (nev->header.type == CLAP_EVENT_NOTE_OFF)
+                        v->deactivate();
+                }
+            }
             if (ev.event.header.type == CLAP_EVENT_PARAM_VALUE)
             {
                 auto pev = (const clap_event_param_value *)&ev.event;
@@ -243,16 +262,10 @@ class NoisePlethoraSynth
                             v->basevalues.filtcutoff = pev->value;
                         else if (pev->param_id == (uint32_t)ParamIDs::FiltResonance)
                             v->basevalues.filtreson = pev->value;
-                        else if (pev->param_id == (uint32_t)ParamIDs::Enabled)
-                        {
-                            if (pev->value >= 0.5f)
-                                v->activate();
-                            else
-                                v->deactivate();
-                        }
-                    }
+                                        }
                 }
             }
+
             if (ev.event.header.type == CLAP_EVENT_PARAM_MOD)
             {
                 auto pev = (const clap_event_param_mod *)&ev.event;
@@ -299,8 +312,7 @@ class NoisePlethoraSynth
         FiltCutoff,
         FiltResonance,
         Algo,
-        Pan,
-        Enabled
+        Pan
     };
 
   private:

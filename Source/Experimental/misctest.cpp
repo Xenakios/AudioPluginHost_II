@@ -850,18 +850,14 @@ inline void test_plethora_synth()
     // if channel is -1, all voices affected, otherwise channel determines target voice
     for (int i = 0; i < 2; ++i)
     {
-        synth.m_seq.addParameterEvent(false, 0.0, -1, i, -1, -1,
-                                      (uint32_t)NoisePlethoraSynth::ParamIDs::Enabled, 1.0);
+        synth.m_seq.addNoteOn(0.0, -1, i, -1, 1.0, -1);
     }
     for (int i = 0; i < 2; ++i)
     {
-        synth.m_seq.addParameterEvent(false, 5.0, -1, i, -1, -1,
-                                      (uint32_t)NoisePlethoraSynth::ParamIDs::Enabled, 0.0);
-        synth.m_seq.addParameterEvent(false, 6.0, -1, i, -1, -1,
-                                      (uint32_t)NoisePlethoraSynth::ParamIDs::Enabled, 1.0);
+        synth.m_seq.addNoteOff(5.0, -1, i, -1, 0.0, -1);
+        synth.m_seq.addNoteOn(6.0, -1, i, -1, 0.0, -1);
     }
-    synth.m_seq.addParameterEvent(false, 14.0, -1, 2, -1, -1,
-                                  (uint32_t)NoisePlethoraSynth::ParamIDs::Enabled, 1.0);
+    synth.m_seq.addNoteOn(14.0, -1, 2, -1, 1.0, -1);
     synth.m_seq.addParameterEvent(false, 14.0, -1, 2, -1, -1,
                                   (uint32_t)NoisePlethoraSynth::ParamIDs::Algo, 7.0);
     double t = 14.0;
@@ -885,13 +881,11 @@ inline void test_plethora_synth()
         }
         t += 0.2;
     }
-    synth.m_seq.addParameterEvent(false, 28.0, -1, 2, -1, -1,
-                                  (uint32_t)NoisePlethoraSynth::ParamIDs::Enabled, 0.0);
+    synth.m_seq.addNoteOff(28.0, -1, 2, -1, 1.0, -1);
 
     for (int i = 0; i < 2; ++i)
     {
-        synth.m_seq.addParameterEvent(false, 19.0, -1, i, -1, -1,
-                                      (uint32_t)NoisePlethoraSynth::ParamIDs::Enabled, 0.0);
+        synth.m_seq.addNoteOff(19.0, -1, i, -1, 1.0, -1);
     }
 
     synth.m_seq.addParameterEvent(false, 0.0, -1, -1, -1, -1,
