@@ -848,6 +848,42 @@ inline void test_plethora_synth()
         R"(C:\MusicAudio\sourcesamples\test_signals\lanczos\npsynth1.wav)", outfileprops);
     NoisePlethoraSynth synth;
     // if channel is -1, all voices affected, otherwise channel determines target voice
+    for (int i = 0; i < 2; ++i)
+    {
+        synth.m_seq.addParameterEvent(false, 0.0, -1, i, -1, -1,
+                                      (uint32_t)NoisePlethoraSynth::ParamIDs::Mute, 0.0);
+    }
+    for (int i = 0; i < 2; ++i)
+    {
+        synth.m_seq.addParameterEvent(false, 5.0, -1, i, -1, -1,
+                                      (uint32_t)NoisePlethoraSynth::ParamIDs::Mute, 1.0);
+        synth.m_seq.addParameterEvent(false, 6.0, -1, i, -1, -1,
+                                      (uint32_t)NoisePlethoraSynth::ParamIDs::Mute, 0.0);
+    }
+    synth.m_seq.addParameterEvent(false, 14.0, -1, 2, -1, -1,
+                                  (uint32_t)NoisePlethoraSynth::ParamIDs::Mute, 0.0);
+    synth.m_seq.addParameterEvent(false, 14.0, -1, 2, -1, -1,
+                                  (uint32_t)NoisePlethoraSynth::ParamIDs::Algo, 7.0);
+    double t = 14.0;
+    std::mt19937 rng;
+    std::uniform_real_distribution<float> dist(0.0f,1.0f);
+    while (t < 30.0)
+    {
+        synth.m_seq.addParameterEvent(false, t, -1, 2, -1, -1,
+                                  (uint32_t)NoisePlethoraSynth::ParamIDs::X, dist(rng));
+        synth.m_seq.addParameterEvent(false, t, -1, 2, -1, -1,
+                                  (uint32_t)NoisePlethoraSynth::ParamIDs::Y, dist(rng));
+        t += 0.2;
+    }
+    synth.m_seq.addParameterEvent(false, 28.0, -1, 2, -1, -1,
+                                  (uint32_t)NoisePlethoraSynth::ParamIDs::Mute, 1.0);
+
+    for (int i = 0; i < 2; ++i)
+    {
+        synth.m_seq.addParameterEvent(false, 19.0, -1, i, -1, -1,
+                                      (uint32_t)NoisePlethoraSynth::ParamIDs::Mute, 1.0);
+    }
+
     synth.m_seq.addParameterEvent(false, 0.0, -1, -1, -1, -1,
                                   (uint32_t)NoisePlethoraSynth::ParamIDs::FiltResonance, 0.3);
     synth.m_seq.addParameterEvent(false, 0.0, -1, -1, -1, -1,
@@ -872,7 +908,7 @@ inline void test_plethora_synth()
                                   (uint32_t)NoisePlethoraSynth::ParamIDs::Y, 0.23);
     synth.m_seq.addParameterEvent(false, 4.0, -1, -1, -1, -1,
                                   (uint32_t)NoisePlethoraSynth::ParamIDs::Volume, -9);
-    double t = 5.0;
+
     while (t < 20.0)
     {
         double mod = 6.0 * std::sin(2 * 3.1415926 * t * 2.0);
@@ -908,7 +944,7 @@ inline void test_plethora_synth()
         t += 0.05;
     }
     synth.m_seq.addParameterEvent(true, t, -1, -1, -1, -1,
-                                      (uint32_t)NoisePlethoraSynth::ParamIDs::Pan, 0.0);
+                                  (uint32_t)NoisePlethoraSynth::ParamIDs::Pan, 0.0);
     synth.m_seq.addParameterEvent(false, 5.0, -1, -1, -1, -1,
                                   (uint32_t)NoisePlethoraSynth::ParamIDs::Algo, 1);
     synth.m_seq.addParameterEvent(false, 7.1, -1, 0, -1, -1,
@@ -930,7 +966,7 @@ inline void test_plethora_synth()
     synth.m_seq.addParameterEvent(false, 11.0, -1, 1, -1, -1,
                                   (uint32_t)NoisePlethoraSynth::ParamIDs::Pan, 0.0);
     synth.prepare(sr, bufSize);
-    size_t outLen = sr * 20.0;
+    size_t outLen = sr * 30.0;
     size_t outCounter = 0;
     while (outCounter < outLen)
     {

@@ -53,9 +53,21 @@ class NoisePlethoraVoice
         float filtreson = 0.01;
         float algo = 0.0f;
         float pan = 0.5f;
+        
     };
     VoiceParams basevalues;
     VoiceParams modvalues;
+    enum class EnvelopeState
+    {
+        Idle,
+        Attack,
+        Sustain,
+        Release
+    };
+    EnvelopeState envstate = EnvelopeState::Idle;
+    double env_attack = 0.01;
+    double env_release = 1.0;
+    int env_counter = 0;
     NoisePlethoraVoice()
     {
         modvalues.algo = 0;
@@ -91,9 +103,22 @@ class NoisePlethoraVoice
             p->m_sr = m_sr;
         }
     }
+    void activate()
+    {
+        envstate = EnvelopeState::Attack;
+        env_counter = 0;
+    }
+    void deactivate()
+    {
+        envstate = EnvelopeState::Release;
+        env_counter = 0;
+    }
+
     // must accumulate into the buffer, precleared by the synth before processing the first voice
     void process(choc::buffer::ChannelArrayView<float> destBuf)
     {
+        if (envstate == EnvelopeState::Idle)
+            return;
         int safealgo = std::clamp<float>(basevalues.algo, 0, (int)m_plugs.size() - 1);
         auto plug = m_plugs[safealgo].get();
         // set params, doesn't actually process audio
@@ -106,14 +131,41 @@ class NoisePlethoraVoice
         filter.setCoeff(totalcutoff, totalreson, 1.0 / m_sr);
         // might want to reflect instead so that voices don't get stuck at the stereo sides
         double totalpan = std::clamp(basevalues.pan + modvalues.pan, 0.0f, 1.0f);
+        int attlensamples = env_attack * m_sr;
+        int rellensamples = env_release * m_sr;
         for (size_t i = 0; i < destBuf.size.numFrames; ++i)
         {
             double smoothedgain = m_gain_smoother.process(gain);
             double smoothedpan = m_pan_smoother.process(totalpan);
             // does expensive calculation, so might want to use tables or something instead
             sst::basic_blocks::dsp::pan_laws::monoEqualPower(smoothedpan, panmat);
+            float envgain = 0.0;
+            if (envstate == EnvelopeState::Attack)
+            {
+                envgain = 1.0 / attlensamples * env_counter;
+                ++env_counter;
+                if (env_counter == attlensamples)
+                {
+                    envstate = EnvelopeState::Sustain;
+                    env_counter = 0;
+                }
+            }
+            if (envstate == EnvelopeState::Sustain)
+            {
+                envgain = 1.0f;
+            }
+            if (envstate == EnvelopeState::Release)
+            {
+                envgain = 1.0 - (1.0 / rellensamples * env_counter);
+                ++env_counter;
+                if (env_counter == rellensamples)
+                {
+                    env_counter = 0;
+                    envstate = EnvelopeState::Idle;
+                }
+            }
 
-            float out = plug->processGraph() * smoothedgain;
+            float out = plug->processGraph() * smoothedgain * envgain;
             float outL = panmat[0] * out;
             float outR = panmat[3] * out;
 
@@ -149,7 +201,7 @@ class NoisePlethoraSynth
             v->chan = i;
             m_voices.push_back(std::move(v));
         }
-        }
+    }
     void prepare(double sampleRate, int maxBlockSize)
     {
         m_sr = sampleRate;
@@ -191,6 +243,13 @@ class NoisePlethoraSynth
                             v->basevalues.filtcutoff = pev->value;
                         else if (pev->param_id == (uint32_t)ParamIDs::FiltResonance)
                             v->basevalues.filtreson = pev->value;
+                        else if (pev->param_id == (uint32_t)ParamIDs::Mute)
+                        {
+                            if (pev->value >= 0.5f)
+                                v->deactivate();
+                            else
+                                v->activate();
+                        }
                     }
                 }
             }
@@ -220,9 +279,12 @@ class NoisePlethoraSynth
             }
         }
 
-        for (int i = 0; i < 2; ++i)
+        for (int i = 0; i < m_voices.size(); ++i)
         {
-            m_voices[i]->process(m_mix_buf.getView());
+            if (m_voices[i]->envstate != NoisePlethoraVoice::EnvelopeState::Idle)
+            {
+                m_voices[i]->process(m_mix_buf.getView());
+            }
         }
         choc::buffer::applyGain(m_mix_buf, 0.5);
         choc::buffer::copy(destBuf, m_mix_buf);
@@ -237,7 +299,8 @@ class NoisePlethoraSynth
         FiltCutoff,
         FiltResonance,
         Algo,
-        Pan
+        Pan,
+        Mute
     };
 
   private:
