@@ -3,6 +3,7 @@
 #include "../Plugins/noise-plethora/plugins/NoisePlethoraPlugin.hpp"
 #include "../Plugins/noise-plethora/plugins/Banks.hpp"
 #include "audio/choc_AudioFileFormat_WAV.h"
+#include "sst/basic-blocks/dsp/PanLaws.h"
 
 class SignalSmoother
 {
@@ -39,6 +40,185 @@ inline void list_plugins()
         }
     }
 }
+
+class NoisePlethoraVoice
+{
+  public:
+    NoisePlethoraVoice()
+    {
+        for (int i = 0; i < numBanks; ++i)
+        {
+            auto &bank = getBankForIndex(i);
+            for (int j = 0; j < programsPerBank; ++j)
+            {
+                auto progname = bank.getProgramName(j);
+                auto p = MyFactory::Instance()->Create(progname);
+                m_plugs.push_back(std::move(p));
+            }
+        }
+    }
+    void prepare(double sampleRate)
+    {
+        m_sr = sampleRate;
+        dcblocker.setCoeff(hipasscutoff, 0.01, 1.0 / m_sr);
+        dcblocker.init();
+        m_gain_smoother.setSlope(0.999);
+        m_pan_smoother.setSlope(0.9999);
+        for (auto &p : m_plugs)
+        {
+            p->init();
+            p->m_sr = m_sr;
+        }
+    }
+    // must accumulate into the buffer, precleared by the synth before processing the first voice
+    void process(choc::buffer::ChannelArrayView<float> destBuf)
+    {
+        int safealgo = std::clamp(m_algo, 0, (int)m_plugs.size() - 1);
+        auto plug = m_plugs[safealgo].get();
+        // set params, doesn't actually process audio yet
+        plug->process(m_x, m_y);
+        double gain = xenakios::decibelsToGain(m_volume);
+        sst::basic_blocks::dsp::pan_laws::panmatrix_t panmat;
+        
+        for (size_t i = 0; i < destBuf.size.numFrames; ++i)
+        {
+            double smoothedgain = m_gain_smoother.process(gain);
+
+            double smoothedpan = m_pan_smoother.process(m_pan);
+            sst::basic_blocks::dsp::pan_laws::monoEqualPower(smoothedpan, panmat);
+
+            float out = plug->processGraph() * smoothedgain;
+            float outL = panmat[0] * out;
+            float outR = panmat[3] * out;
+
+            dcblocker.step<StereoSimperSVF::HP>(dcblocker, outL, outR);
+
+            destBuf.getSample(0, i) += outL;
+            destBuf.getSample(1, i) += outR;
+        }
+    }
+    int m_algo = 0;
+    double hipasscutoff = 12.0;
+    double m_volume = -6.0;
+    double m_x = 0.5;
+    double m_y = 0.5;
+    double m_pan = 0.5;
+
+  private:
+    std::vector<std::unique_ptr<NoisePlethoraPlugin>> m_plugs;
+    SignalSmoother m_gain_smoother;
+    SignalSmoother m_pan_smoother;
+    double m_sr = 0.0;
+    StereoSimperSVF dcblocker;
+};
+
+class NoisePlethoraSynth
+{
+  public:
+    NoisePlethoraSynth()
+    {
+        for (int i = 0; i < 8; ++i)
+        {
+            auto v = std::make_unique<NoisePlethoraVoice>();
+            m_voices.push_back(std::move(v));
+        }
+        idsToValuePtr[(uint32_t)ParamIDs::Volume] = &m_volume;
+        idsToValuePtr[(uint32_t)ParamIDs::X] = &m_x;
+        idsToValuePtr[(uint32_t)ParamIDs::Y] = &m_y;
+    }
+    void prepare(double sampleRate, int maxBlockSize)
+    {
+        m_sr = sampleRate;
+        m_mix_buf = choc::buffer::ChannelArrayBuffer<float>(2, (unsigned int)maxBlockSize);
+        for (auto &v : m_voices)
+        {
+            v->prepare(sampleRate);
+        }
+        m_voices[0]->m_algo = 0;
+        m_voices[1]->m_algo = 3;
+        m_seq.sortEvents();
+        m_seq_iter.setTime(0.0);
+    }
+    double m_volume = -6.0;
+    double m_x = 0.5;
+    double m_y = 0.5;
+
+    std::unordered_map<uint32_t, double *> idsToValuePtr;
+    void process(choc::buffer::ChannelArrayView<float> destBuf)
+    {
+        assert(m_sr > 0);
+        m_mix_buf.clear();
+        auto seqevents = m_seq_iter.readNextEvents(destBuf.getNumFrames() / m_sr);
+        bool paramsWereUpdated = false;
+        for (auto &ev : seqevents)
+        {
+            if (ev.event.header.type == CLAP_EVENT_PARAM_VALUE)
+            {
+                auto pev = (const clap_event_param_value *)&ev.event;
+                auto it = idsToValuePtr.find(pev->param_id);
+                if (it != idsToValuePtr.end())
+                {
+                    *(it->second) = pev->value;
+                    paramsWereUpdated = true;
+                }
+                if (pev->param_id == (uint32_t)ParamIDs::Algo)
+                {
+                    for (int i = 0; i < (int)m_voices.size(); ++i)
+                    {
+                        if (pev->channel == -1 || pev->channel == i)
+                        {
+                            m_voices[i]->m_algo = pev->value;
+                        }
+                    }
+                }
+                if (pev->param_id == (uint32_t)ParamIDs::Pan)
+                {
+                    for (int i = 0; i < (int)m_voices.size(); ++i)
+                    {
+                        if (pev->channel == -1 || pev->channel == i)
+                        {
+                            m_voices[i]->m_pan = pev->value;
+                        }
+                    }
+                }
+            }
+        }
+        if (paramsWereUpdated)
+        {
+            for (auto &v : m_voices)
+            {
+                v->m_volume = *idsToValuePtr[(uint32_t)ParamIDs::Volume];
+                v->m_x = *idsToValuePtr[(uint32_t)ParamIDs::X];
+                v->m_y = *idsToValuePtr[(uint32_t)ParamIDs::Y];
+            }
+        }
+        for (int i = 0; i < 2; ++i)
+        {
+            m_voices[i]->process(m_mix_buf.getView());
+        }
+        choc::buffer::applyGain(m_mix_buf, 0.5);
+        choc::buffer::copy(destBuf, m_mix_buf);
+    }
+    ClapEventSequence m_seq;
+    ClapEventSequence::Iterator m_seq_iter{m_seq};
+    enum class ParamIDs
+    {
+        Volume,
+        X,
+        Y,
+        FiltCutoff,
+        FiltResonance,
+        Algo,
+        Pan
+    };
+
+  private:
+    std::vector<std::unique_ptr<NoisePlethoraVoice>> m_voices;
+    choc::buffer::ChannelArrayBuffer<float> m_mix_buf;
+    double m_sr = 0;
+    int m_update_counter = 0;
+    int m_update_len = 32;
+};
 
 class NoisePlethoraEngine
 {

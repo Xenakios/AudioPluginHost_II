@@ -833,9 +833,64 @@ inline void test_mod_matrix_pyt()
     plet.processToFile(R"(C:\develop\AudioPluginHost_mk2\npclap02.wav)", 10.0);
 }
 
+inline void test_plethora_synth()
+{
+    double sr = 44100.0;
+    size_t bufSize = 64;
+    choc::buffer::ChannelArrayBuffer<float> procBuf{2, (unsigned int)bufSize};
+    choc::audio::AudioFileProperties outfileprops;
+    outfileprops.formatName = "WAV";
+    outfileprops.bitDepth = choc::audio::BitDepth::float32;
+    outfileprops.numChannels = 2;
+    outfileprops.sampleRate = sr;
+    choc::audio::WAVAudioFileFormat<true> wavformat;
+    auto writer = wavformat.createWriter(
+        R"(C:\MusicAudio\sourcesamples\test_signals\lanczos\npsynth1.wav)", outfileprops);
+    NoisePlethoraSynth synth;
+    // algo and panning take into account the channel number
+    synth.m_seq.addParameterEvent(false, 0.0, -1, -1, -1, -1,
+                                  (uint32_t)NoisePlethoraSynth::ParamIDs::Pan, 0.1);
+    synth.m_seq.addParameterEvent(false, 2.4, -1, -1, -1, -1,
+                                  (uint32_t)NoisePlethoraSynth::ParamIDs::Pan, 0.5);
+    synth.m_seq.addParameterEvent(false, 5.6, -1, 0, -1, -1,
+                                  (uint32_t)NoisePlethoraSynth::ParamIDs::Pan, 0.0);
+    synth.m_seq.addParameterEvent(false, 6.1, -1, 1, -1, -1,
+                                  (uint32_t)NoisePlethoraSynth::ParamIDs::Pan, 1.0);
+    synth.m_seq.addParameterEvent(false, 8.5, -1, -1, -1, -1,
+                                  (uint32_t)NoisePlethoraSynth::ParamIDs::Pan, 0.5);
+    synth.m_seq.addParameterEvent(false, 0.0, -1, -1, -1, -1,
+                                  (uint32_t)NoisePlethoraSynth::ParamIDs::Volume, -12.0);
+    synth.m_seq.addParameterEvent(false, 0.0, -1, -1, -1, -1,
+                                  (uint32_t)NoisePlethoraSynth::ParamIDs::X, 0.5);
+    synth.m_seq.addParameterEvent(false, 1.0, -1, -1, -1, -1,
+                                  (uint32_t)NoisePlethoraSynth::ParamIDs::X, 0.1);
+    synth.m_seq.addParameterEvent(false, 2.5, -1, -1, -1, -1,
+                                  (uint32_t)NoisePlethoraSynth::ParamIDs::Y, 0.77);
+    synth.m_seq.addParameterEvent(false, 3.25, -1, -1, -1, -1,
+                                  (uint32_t)NoisePlethoraSynth::ParamIDs::Y, 0.23);
+    synth.m_seq.addParameterEvent(false, 4.0, -1, -1, -1, -1,
+                                  (uint32_t)NoisePlethoraSynth::ParamIDs::Volume, -3);
+    synth.m_seq.addParameterEvent(false, 5.0, -1, -1, -1, -1,
+                                  (uint32_t)NoisePlethoraSynth::ParamIDs::Algo, 1);
+    synth.m_seq.addParameterEvent(false, 7.1, -1, 0, -1, -1,
+                                  (uint32_t)NoisePlethoraSynth::ParamIDs::Algo, 11);
+    synth.m_seq.addParameterEvent(false, 7.99, -1, 1, -1, -1,
+                                  (uint32_t)NoisePlethoraSynth::ParamIDs::Algo, 8);
+    synth.prepare(sr, bufSize);
+    size_t outLen = sr * 10.0;
+    size_t outCounter = 0;
+    while (outCounter < outLen)
+    {
+        synth.process(procBuf.getView());
+        writer->appendFrames(procBuf.getView());
+        outCounter += bufSize;
+    }
+}
+
 int main()
 {
-    test_mod_matrix_pyt();
+    test_plethora_synth();
+    // test_mod_matrix_pyt();
     // test_mod_matrix();
     // test_seq_event_chase();
     // test_clap_gui_choc();
