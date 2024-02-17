@@ -84,7 +84,7 @@ class NoisePlethoraVoice
         dcblocker.init();
         filter.init();
         m_gain_smoother.setSlope(0.999);
-        m_pan_smoother.setSlope(0.9999);
+        m_pan_smoother.setSlope(0.999);
         for (auto &p : m_plugs)
         {
             p->init();
@@ -104,11 +104,13 @@ class NoisePlethoraVoice
         double totalcutoff = std::clamp(basevalues.filtcutoff + modvalues.filtcutoff, 0.0f, 127.0f);
         double totalreson = std::clamp(basevalues.filtreson + modvalues.filtreson, 0.01f, 0.99f);
         filter.setCoeff(totalcutoff, totalreson, 1.0 / m_sr);
+        // might want to reflect instead so that voices don't get stuck at the stereo sides
+        double totalpan = std::clamp(basevalues.pan + modvalues.pan, 0.0f, 1.0f);
         for (size_t i = 0; i < destBuf.size.numFrames; ++i)
         {
             double smoothedgain = m_gain_smoother.process(gain);
-
-            double smoothedpan = m_pan_smoother.process(basevalues.pan);
+            double smoothedpan = m_pan_smoother.process(totalpan);
+            // does expensive calculation, so might want to use tables or something instead
             sst::basic_blocks::dsp::pan_laws::monoEqualPower(smoothedpan, panmat);
 
             float out = plug->processGraph() * smoothedgain;
