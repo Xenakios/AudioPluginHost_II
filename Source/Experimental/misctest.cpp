@@ -847,7 +847,9 @@ inline void test_plethora_synth()
     auto writer = wavformat.createWriter(
         R"(C:\MusicAudio\sourcesamples\test_signals\lanczos\npsynth1.wav)", outfileprops);
     NoisePlethoraSynth synth;
-    // algo and panning take into account the channel number
+    // if channel is -1, all voices affected, otherwise channel determines target voice
+    synth.m_seq.addParameterEvent(false, 0.0, -1, -1, -1, -1,
+                                  (uint32_t)NoisePlethoraSynth::ParamIDs::FiltResonance, 0.3);
     synth.m_seq.addParameterEvent(false, 0.0, -1, -1, -1, -1,
                                   (uint32_t)NoisePlethoraSynth::ParamIDs::Pan, 0.1);
     synth.m_seq.addParameterEvent(false, 2.4, -1, -1, -1, -1,
@@ -869,15 +871,50 @@ inline void test_plethora_synth()
     synth.m_seq.addParameterEvent(false, 3.25, -1, -1, -1, -1,
                                   (uint32_t)NoisePlethoraSynth::ParamIDs::Y, 0.23);
     synth.m_seq.addParameterEvent(false, 4.0, -1, -1, -1, -1,
-                                  (uint32_t)NoisePlethoraSynth::ParamIDs::Volume, -3);
+                                  (uint32_t)NoisePlethoraSynth::ParamIDs::Volume, -9);
+    double t = 5.0;
+    while (t < 20.0)
+    {
+        double mod = 6.0 * std::sin(2 * 3.1415926 * t * 2.0);
+        synth.m_seq.addParameterEvent(true, t, -1, 1, -1, -1,
+                                      (uint32_t)NoisePlethoraSynth::ParamIDs::Volume, mod);
+        t += 0.1;
+    }
+    t = 12.0;
+    while (t < 20.0)
+    {
+        double mod = -6.0 * std::sin(2 * 3.1415926 * t * 2.0);
+        synth.m_seq.addParameterEvent(true, t, -1, 0, -1, -1,
+                                      (uint32_t)NoisePlethoraSynth::ParamIDs::Volume, mod);
+        t += 0.1;
+    }
+    t = 0.0;
+    while (t < 20.0)
+    {
+        double mod = 96.0 + 18.0 * std::sin(2 * 3.1415926 * t * 0.4);
+        synth.m_seq.addParameterEvent(false, t, -1, 0, -1, -1,
+                                      (uint32_t)NoisePlethoraSynth::ParamIDs::FiltCutoff, mod);
+        mod = 96.0 - 18.0 * std::sin(2 * 3.1415926 * t * 0.4);
+        synth.m_seq.addParameterEvent(false, t, -1, 1, -1, -1,
+                                      (uint32_t)NoisePlethoraSynth::ParamIDs::FiltCutoff, mod);
+        t += 0.1;
+    }
     synth.m_seq.addParameterEvent(false, 5.0, -1, -1, -1, -1,
                                   (uint32_t)NoisePlethoraSynth::ParamIDs::Algo, 1);
     synth.m_seq.addParameterEvent(false, 7.1, -1, 0, -1, -1,
                                   (uint32_t)NoisePlethoraSynth::ParamIDs::Algo, 11);
     synth.m_seq.addParameterEvent(false, 7.99, -1, 1, -1, -1,
                                   (uint32_t)NoisePlethoraSynth::ParamIDs::Algo, 8);
+    synth.m_seq.addParameterEvent(false, 8.2, -1, 0, -1, -1,
+                                  (uint32_t)NoisePlethoraSynth::ParamIDs::Algo, 20);
+    synth.m_seq.addParameterEvent(false, 9.5, -1, 1, -1, -1,
+                                  (uint32_t)NoisePlethoraSynth::ParamIDs::Algo, 20);
+    synth.m_seq.addParameterEvent(false, 11.0, -1, 0, -1, -1,
+                                  (uint32_t)NoisePlethoraSynth::ParamIDs::Pan, 1.0);
+    synth.m_seq.addParameterEvent(false, 11.0, -1, 1, -1, -1,
+                                  (uint32_t)NoisePlethoraSynth::ParamIDs::Pan, 0.0);
     synth.prepare(sr, bufSize);
-    size_t outLen = sr * 10.0;
+    size_t outLen = sr * 20.0;
     size_t outCounter = 0;
     while (outCounter < outLen)
     {

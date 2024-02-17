@@ -44,8 +44,27 @@ inline void list_plugins()
 class NoisePlethoraVoice
 {
   public:
+    struct VoiceParams
+    {
+        float volume = -6.0f;
+        float x = 0.5f;
+        float y = 0.5f;
+        float filtcutoff = 120.0f;
+        float filtreson = 0.01;
+        float algo = 0.0f;
+        float pan = 0.5f;
+    };
+    VoiceParams basevalues;
+    VoiceParams modvalues;
     NoisePlethoraVoice()
     {
+        modvalues.algo = 0;
+        modvalues.filtcutoff = 0;
+        modvalues.filtreson = 0;
+        modvalues.pan = 0;
+        modvalues.volume = 0;
+        modvalues.x = 0;
+        modvalues.y = 0;
         for (int i = 0; i < numBanks; ++i)
         {
             auto &bank = getBankForIndex(i);
@@ -57,11 +76,13 @@ class NoisePlethoraVoice
             }
         }
     }
+    double hipasscutoff = 12.0;
     void prepare(double sampleRate)
     {
         m_sr = sampleRate;
         dcblocker.setCoeff(hipasscutoff, 0.01, 1.0 / m_sr);
         dcblocker.init();
+        filter.init();
         m_gain_smoother.setSlope(0.999);
         m_pan_smoother.setSlope(0.9999);
         for (auto &p : m_plugs)
@@ -73,18 +94,21 @@ class NoisePlethoraVoice
     // must accumulate into the buffer, precleared by the synth before processing the first voice
     void process(choc::buffer::ChannelArrayView<float> destBuf)
     {
-        int safealgo = std::clamp(m_algo, 0, (int)m_plugs.size() - 1);
+        int safealgo = std::clamp<float>(basevalues.algo, 0, (int)m_plugs.size() - 1);
         auto plug = m_plugs[safealgo].get();
-        // set params, doesn't actually process audio yet
-        plug->process(m_x, m_y);
-        double gain = xenakios::decibelsToGain(m_volume);
+        // set params, doesn't actually process audio
+        plug->process(basevalues.x, basevalues.y);
+        double totalvol = std::clamp(basevalues.volume + modvalues.volume, -96.0f, 0.0f);
+        double gain = xenakios::decibelsToGain(totalvol);
         sst::basic_blocks::dsp::pan_laws::panmatrix_t panmat;
-        
+        double totalcutoff = std::clamp(basevalues.filtcutoff + modvalues.filtcutoff, 0.0f, 127.0f);
+        double totalreson = std::clamp(basevalues.filtreson + modvalues.filtreson, 0.01f, 0.99f);
+        filter.setCoeff(totalcutoff, totalreson, 1.0 / m_sr);
         for (size_t i = 0; i < destBuf.size.numFrames; ++i)
         {
             double smoothedgain = m_gain_smoother.process(gain);
 
-            double smoothedpan = m_pan_smoother.process(m_pan);
+            double smoothedpan = m_pan_smoother.process(basevalues.pan);
             sst::basic_blocks::dsp::pan_laws::monoEqualPower(smoothedpan, panmat);
 
             float out = plug->processGraph() * smoothedgain;
@@ -92,17 +116,15 @@ class NoisePlethoraVoice
             float outR = panmat[3] * out;
 
             dcblocker.step<StereoSimperSVF::HP>(dcblocker, outL, outR);
-
+            filter.step<StereoSimperSVF::LP>(filter, outL, outR);
             destBuf.getSample(0, i) += outL;
             destBuf.getSample(1, i) += outR;
         }
     }
-    int m_algo = 0;
-    double hipasscutoff = 12.0;
-    double m_volume = -6.0;
-    double m_x = 0.5;
-    double m_y = 0.5;
-    double m_pan = 0.5;
+    int port_id = -1;
+    int chan = -1;
+    int key = -1;
+    int note_id = -1;
 
   private:
     std::vector<std::unique_ptr<NoisePlethoraPlugin>> m_plugs;
@@ -110,22 +132,22 @@ class NoisePlethoraVoice
     SignalSmoother m_pan_smoother;
     double m_sr = 0.0;
     StereoSimperSVF dcblocker;
+    StereoSimperSVF filter;
 };
 
 class NoisePlethoraSynth
 {
   public:
+    NoisePlethoraVoice::VoiceParams voiceparams;
     NoisePlethoraSynth()
     {
         for (int i = 0; i < 8; ++i)
         {
             auto v = std::make_unique<NoisePlethoraVoice>();
+            v->chan = i;
             m_voices.push_back(std::move(v));
         }
-        idsToValuePtr[(uint32_t)ParamIDs::Volume] = &m_volume;
-        idsToValuePtr[(uint32_t)ParamIDs::X] = &m_x;
-        idsToValuePtr[(uint32_t)ParamIDs::Y] = &m_y;
-    }
+        }
     void prepare(double sampleRate, int maxBlockSize)
     {
         m_sr = sampleRate;
@@ -134,16 +156,10 @@ class NoisePlethoraSynth
         {
             v->prepare(sampleRate);
         }
-        m_voices[0]->m_algo = 0;
-        m_voices[1]->m_algo = 3;
         m_seq.sortEvents();
         m_seq_iter.setTime(0.0);
     }
-    double m_volume = -6.0;
-    double m_x = 0.5;
-    double m_y = 0.5;
 
-    std::unordered_map<uint32_t, double *> idsToValuePtr;
     void process(choc::buffer::ChannelArrayView<float> destBuf)
     {
         assert(m_sr > 0);
@@ -155,43 +171,53 @@ class NoisePlethoraSynth
             if (ev.event.header.type == CLAP_EVENT_PARAM_VALUE)
             {
                 auto pev = (const clap_event_param_value *)&ev.event;
-                auto it = idsToValuePtr.find(pev->param_id);
-                if (it != idsToValuePtr.end())
+                for (auto &v : m_voices)
                 {
-                    *(it->second) = pev->value;
-                    paramsWereUpdated = true;
-                }
-                if (pev->param_id == (uint32_t)ParamIDs::Algo)
-                {
-                    for (int i = 0; i < (int)m_voices.size(); ++i)
+                    if (pev->channel == -1 || v->chan == pev->channel)
                     {
-                        if (pev->channel == -1 || pev->channel == i)
-                        {
-                            m_voices[i]->m_algo = pev->value;
-                        }
-                    }
-                }
-                if (pev->param_id == (uint32_t)ParamIDs::Pan)
-                {
-                    for (int i = 0; i < (int)m_voices.size(); ++i)
-                    {
-                        if (pev->channel == -1 || pev->channel == i)
-                        {
-                            m_voices[i]->m_pan = pev->value;
-                        }
+                        if (pev->param_id == (uint32_t)ParamIDs::Algo)
+                            v->basevalues.algo = pev->value;
+                        else if (pev->param_id == (uint32_t)ParamIDs::Volume)
+                            v->basevalues.volume = pev->value;
+                        else if (pev->param_id == (uint32_t)ParamIDs::Pan)
+                            v->basevalues.pan = pev->value;
+                        else if (pev->param_id == (uint32_t)ParamIDs::X)
+                            v->basevalues.x = pev->value;
+                        else if (pev->param_id == (uint32_t)ParamIDs::Y)
+                            v->basevalues.y = pev->value;
+                        else if (pev->param_id == (uint32_t)ParamIDs::FiltCutoff)
+                            v->basevalues.filtcutoff = pev->value;
+                        else if (pev->param_id == (uint32_t)ParamIDs::FiltResonance)
+                            v->basevalues.filtreson = pev->value;
                     }
                 }
             }
-        }
-        if (paramsWereUpdated)
-        {
-            for (auto &v : m_voices)
+            if (ev.event.header.type == CLAP_EVENT_PARAM_MOD)
             {
-                v->m_volume = *idsToValuePtr[(uint32_t)ParamIDs::Volume];
-                v->m_x = *idsToValuePtr[(uint32_t)ParamIDs::X];
-                v->m_y = *idsToValuePtr[(uint32_t)ParamIDs::Y];
+                auto pev = (const clap_event_param_mod *)&ev.event;
+                for (auto &v : m_voices)
+                {
+                    if (pev->channel == -1 || v->chan == pev->channel)
+                    {
+                        if (pev->param_id == (uint32_t)ParamIDs::Algo)
+                            v->modvalues.algo = pev->amount;
+                        else if (pev->param_id == (uint32_t)ParamIDs::Volume)
+                            v->modvalues.volume = pev->amount;
+                        else if (pev->param_id == (uint32_t)ParamIDs::X)
+                            v->modvalues.x = pev->amount;
+                        else if (pev->param_id == (uint32_t)ParamIDs::Y)
+                            v->modvalues.y = pev->amount;
+                        else if (pev->param_id == (uint32_t)ParamIDs::Pan)
+                            v->modvalues.pan = pev->amount;
+                        else if (pev->param_id == (uint32_t)ParamIDs::FiltCutoff)
+                            v->modvalues.filtcutoff = pev->amount;
+                        else if (pev->param_id == (uint32_t)ParamIDs::FiltResonance)
+                            v->modvalues.filtreson = pev->amount;
+                    }
+                }
             }
         }
+
         for (int i = 0; i < 2; ++i)
         {
             m_voices[i]->process(m_mix_buf.getView());
