@@ -132,6 +132,7 @@ ClapPluginFormatProcessor::ClapPluginFormatProcessor(std::string plugfilename, i
                 m_inited = true;
                 initParamsExtension();
                 initGUIExtension();
+                m_ext_state = (clap_plugin_state*)plug->get_extension(plug,CLAP_EXT_STATE);
                 if (!m_ext_gui && m_ext_params)
                 {
                     // create parameter infos for generic GUI

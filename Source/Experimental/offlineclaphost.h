@@ -551,6 +551,25 @@ class ClapProcessingEngine
         }
         return result;
     }
+    void saveStateToFile(std::string filename)
+    {
+        std::ofstream outstream(filename, std::ios::binary);
+        clap_ostream clapostream;
+        clapostream.ctx = &outstream;
+        // int64_t(CLAP_ABI *write)(const struct clap_ostream *stream, const void *buffer, uint64_t
+        // size);
+        clapostream.write = [](const clap_ostream *stream, const void *buffer, uint64_t size) {
+            auto os = (std::ofstream *)stream->ctx;
+            auto castbuf = (unsigned char*)buffer;
+            std::cout << "asked to write " << size << " bytes\n";
+            for (int i = 0; i < size; ++i)
+            {
+                (*os) << castbuf[i];
+            }
+            return (int64_t)size;
+        };
+        m_plug->stateSave(&clapostream);
+    }
     void processToFile(std::string filename, double duration, double samplerate)
     {
         using namespace std::chrono_literals;
