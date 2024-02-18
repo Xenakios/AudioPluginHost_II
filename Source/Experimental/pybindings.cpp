@@ -57,6 +57,7 @@ PYBIND11_MODULE(xenakios, m)
         .def("showGUIBlocking", &ClapProcessingEngine::openPluginGUIBlocking)
         .def("openWindow", &ClapProcessingEngine::openPersistentWindow)
         .def("saveStateToFile", &ClapProcessingEngine::saveStateToFile)
+        .def("loadStateFromFile", &ClapProcessingEngine::loadStateFromFile)
         .def("processToFile", &ClapProcessingEngine::processToFile);
 
     py::class_<NoisePlethoraEngine>(m, "NoisePlethoraEngine")
