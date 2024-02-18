@@ -57,13 +57,28 @@ def test_clap():
 def test_clap2():
     p = xenakios.ClapEngine(r'C:\Program Files\Common Files\CLAP\Surge Synth Team\Surge XT.clap',0)
     seq = xenakios.ClapSequence()
+    pulselen = 0.15
+    outdur = 20.0
     t = 0.0
-    while t<10.0:
-        key = random.randint(48,72)
-        seq.addNote(t,0.5,0,0,key,-1,0.9)
-        t = t + 0.25
+    while t<outdur:
+        key = random.randint(43,60)
+        velo = 0.5
+        if random.random()<0.5:
+            velo = 0.99
+        seq.addNote(t,0.5,0,0,key,-1,velo)
+        
+        t = t + pulselen * random.randint(1,5)
+    t = 0.0
+    while t<outdur:
+        key = random.randint(60,76)
+        velo = 0.5
+        if random.random()<0.5:
+            velo = 0.99
+        seq.addNote(t,0.5,0,0,key,-1,velo)
+        
+        t = t + pulselen * random.randint(1,2)
     p.setSequence(seq)
-    p.processToFile("clap_out03.wav",12.0,44100)
+    p.processToFile("clap_out03.wav",outdur+2.0,44100)
 
 test_clap2()
 
