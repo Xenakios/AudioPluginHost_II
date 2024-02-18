@@ -4,6 +4,9 @@
 #include "../Plugins/noise-plethora/plugins/Banks.hpp"
 #include "audio/choc_AudioFileFormat_WAV.h"
 #include "sst/basic-blocks/dsp/PanLaws.h"
+#include "gui/choc_DesktopWindow.h"
+#include "gui/choc_MessageLoop.h"
+#include "gui/choc_WebView.h"
 
 class SignalSmoother
 {
@@ -262,7 +265,7 @@ class NoisePlethoraSynth
                             v->basevalues.filtcutoff = pev->value;
                         else if (pev->param_id == (uint32_t)ParamIDs::FiltResonance)
                             v->basevalues.filtreson = pev->value;
-                                        }
+                    }
                 }
             }
 
@@ -314,6 +317,63 @@ class NoisePlethoraSynth
         Algo,
         Pan
     };
+    int m_polyphony = 1;
+    double m_pan_spread = 0.0;
+    double m_x_spread = 0.0;
+    double m_y_spread = 0.0;
+    NoisePlethoraVoice::VoiceParams renderparams;
+    void showGUIBlocking(std::function<void(void)> clickhandler)
+    {
+        choc::ui::setWindowsDPIAwareness();
+        choc::ui::DesktopWindow window({100, 100, (int)600, (int)300});
+        choc::ui::WebView webview;
+        window.setWindowTitle("Noise Plethora");
+        window.setResizable(true);
+        window.setMinimumSize(300, 300);
+        window.setMaximumSize(1500, 1200);
+        window.windowClosed = [this,clickhandler] { choc::messageloop::stop(); };
+        webview.bind("onRenderClicked", [clickhandler,this](const choc::value::ValueView &args) -> choc::value::Value {
+            clickhandler();
+            return choc::value::Value{};
+        });
+        webview.bind("onSliderMoved", [this](const choc::value::ValueView &args) -> choc::value::Value {
+            // note that things could get messed up here because the choc functions can throw
+            // exceptions, so we should maybe have a try catch block here...but we should
+            // just know this will work, really.
+            auto parid = args[0]["id"].get<int>();
+            auto value = args[0]["value"].get<double>();
+            // std::cout << "par " << parid << " changed to " << value << std::endl;
+            if (parid == 0)
+                renderparams.volume = value;
+            if (parid == 1)
+                renderparams.x = value;
+            if (parid == 2)
+                renderparams.y = value;
+            if (parid == 3)
+                renderparams.filtcutoff = value;
+            if (parid == 4)
+                renderparams.filtreson = value;
+            if (parid == 5)
+                renderparams.algo = value;
+            if (parid == 6)
+                renderparams.pan = value;
+            if (parid == 100)
+                m_polyphony = value;
+            if (parid == 101)
+                m_pan_spread = value;
+            if (parid == 200)
+                m_x_spread = value;
+            if (parid == 201)
+                m_y_spread = value;
+            return choc::value::Value{};
+        });
+        auto html = choc::file::loadFileAsString(R"(C:\develop\AudioPluginHost_mk2\htmltest.html)");
+        window.setContent(webview.getViewHandle());
+        webview.setHTML(html);
+
+        window.toFront();
+        choc::messageloop::run();
+    }
 
   private:
     std::vector<std::unique_ptr<NoisePlethoraVoice>> m_voices;

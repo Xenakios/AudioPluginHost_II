@@ -1,26 +1,47 @@
 <!DOCTYPE html>
 <html>
-    <body style="background-color:rgb(70, 66, 66);">
+    <body style="background-color:rgb(201, 191, 191);">
         <div id="slidersdiv"></div>
+        <button onclick="onRenderClicked()">Render</button>
     </body>
     <script>
-    var slid1 = document.createElement("input");
-    slid1.type = "range";
-    slid1.id = 0;
-    slid1.min = 10;
-    slid1.max = 480;
-    slid1.addEventListener("input", updateValue);
-    document.getElementById("slidersdiv").appendChild(slid1);
+    sliders = [];
+    function createSlider(slid_id,slid_label,minval,maxval,defaultval,step)
+    {
+        let lab = document.createTextNode(slid_label);
+        document.getElementById("slidersdiv").appendChild(lab);
+        let slid1 = document.createElement("input");
+        slid1.type = "range";
+        slid1.id = slid_id;
+        slid1.min = minval;
+        slid1.max = maxval;
+        if (step!=null)
+            slid1.step = step;
+        else
+            slid1.step = 0.01;
+        slid1.value = defaultval;
+        slid1.style = "width:400px";
+        slid1.clapchannel = 0;
+        slid1.addEventListener("input", updateValue);
+        document.getElementById("slidersdiv").appendChild(slid1);
+        let br = document.createElement("br");
+        document.getElementById("slidersdiv").appendChild(br);
+    }
     
-    var slid2 = document.createElement("input");
-    slid2.type = "range";
-    slid2.id = 1
-    slid2.addEventListener("input", updateValue);
-    document.getElementById("slidersdiv").appendChild(slid2);
-
+    createSlider(0,"Volume",-12.0,0.0,-6.0);
+    createSlider(1,"X",0.0,1.0,0.5);
+    createSlider(2,"Y",0.0,1.0,0.5);
+    createSlider(3,"Filter cutoff",0.0,127.0,120.0);
+    createSlider(4,"Filter resonance",0.01,0.99,0.01);
+    createSlider(5,"Algorithm",0.0,29.0,0.0,1);
+    createSlider(6,"Pan",0.0,1.0,0.5);
+    createSlider(100,"Polyphony",1.0,8.0,1.0,1);
+    createSlider(101,"Pan spread",0.0,1.0,0.0);
+    createSlider(200,"X Spread",0.0,1.0,0.0);
+    createSlider(201,"Y Spread",0.0,1.0,0.0);
     function updateValue(e) 
     {
-        onSliderMoved({id : e.target.id, value : e.target.value})
+        onSliderMoved({chan : e.target.clapchannel, id : e.target.id, value : e.target.value});
     }
 
     

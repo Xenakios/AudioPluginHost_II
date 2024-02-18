@@ -833,20 +833,8 @@ inline void test_mod_matrix_pyt()
     plet.processToFile(R"(C:\develop\AudioPluginHost_mk2\npclap02.wav)", 10.0);
 }
 
-inline void test_plethora_synth()
+inline void generate_test_sequence(NoisePlethoraSynth &synth)
 {
-    double sr = 44100.0;
-    size_t bufSize = 64;
-    choc::buffer::ChannelArrayBuffer<float> procBuf{2, (unsigned int)bufSize};
-    choc::audio::AudioFileProperties outfileprops;
-    outfileprops.formatName = "WAV";
-    outfileprops.bitDepth = choc::audio::BitDepth::float32;
-    outfileprops.numChannels = 2;
-    outfileprops.sampleRate = sr;
-    choc::audio::WAVAudioFileFormat<true> wavformat;
-    auto writer = wavformat.createWriter(
-        R"(C:\MusicAudio\sourcesamples\test_signals\lanczos\npsynth1.wav)", outfileprops);
-    NoisePlethoraSynth synth;
     // if channel is -1, all voices affected, otherwise channel determines target voice
     for (int i = 0; i < 2; ++i)
     {
@@ -899,7 +887,6 @@ inline void test_plethora_synth()
                                       30.0 * dist(rng));
         t += 0.125;
     }
-    
 
     synth.m_seq.addParameterEvent(false, 0.0, -1, -1, -1, -1,
                                   (uint32_t)NoisePlethoraSynth::ParamIDs::FiltResonance, 0.3);
@@ -982,15 +969,71 @@ inline void test_plethora_synth()
                                   (uint32_t)NoisePlethoraSynth::ParamIDs::Pan, 1.0);
     synth.m_seq.addParameterEvent(false, 11.0, -1, 1, -1, -1,
                                   (uint32_t)NoisePlethoraSynth::ParamIDs::Pan, 0.0);
-    synth.prepare(sr, bufSize);
-    size_t outLen = sr * 30.0;
-    size_t outCounter = 0;
-    while (outCounter < outLen)
-    {
-        synth.process(procBuf.getView());
-        writer->appendFrames(procBuf.getView());
-        outCounter += bufSize;
-    }
+}
+
+inline void test_plethora_synth()
+{
+    NoisePlethoraSynth synth;
+    synth.showGUIBlocking([&]() {
+        double sr = 44100.0;
+        size_t bufSize = 64;
+        choc::buffer::ChannelArrayBuffer<float> procBuf{2, (unsigned int)bufSize};
+        choc::audio::AudioFileProperties outfileprops;
+        outfileprops.formatName = "WAV";
+        outfileprops.bitDepth = choc::audio::BitDepth::float32;
+        outfileprops.numChannels = 2;
+        outfileprops.sampleRate = sr;
+        choc::audio::WAVAudioFileFormat<true> wavformat;
+        auto writer = wavformat.createWriter(
+            R"(C:\MusicAudio\sourcesamples\test_signals\lanczos\npsynth2.wav)", outfileprops);
+        synth.m_seq.m_evlist.clear();
+        for (int i = 0; i < synth.m_polyphony; ++i)
+        {
+            synth.m_seq.addNote(0.0, 9.0, -1, i, 0, -1, 1.0);
+            double volume = synth.renderparams.volume;
+            double x = synth.renderparams.x;
+            double y = synth.renderparams.y;
+            double cutoff = synth.renderparams.filtcutoff;
+            double reson = synth.renderparams.filtreson;
+            double algo = synth.renderparams.algo;
+            double pan = synth.renderparams.pan;
+            if (synth.m_polyphony > 1)
+            {
+                double panspread = synth.m_pan_spread * 0.5;
+                pan = xenakios::mapvalue<double>(i, 0, synth.m_polyphony - 1, 0.5 - panspread,
+                                                 0.5 + panspread);
+                double xspread = synth.m_x_spread * 0.5;
+                x = xenakios::mapvalue<double>(i, 0, synth.m_polyphony - 1,
+                                               synth.renderparams.x - xspread,
+                                               synth.renderparams.x + xspread);
+                double yspread = synth.m_y_spread * 0.5;
+                y = xenakios::mapvalue<double>(i, 0, synth.m_polyphony - 1,
+                                               synth.renderparams.y - yspread,
+                                               synth.renderparams.y + yspread);
+            }
+            synth.m_seq.addParameterEvent(false, 0.0, -1, i, -1, -1,
+                                          (uint32_t)NoisePlethoraSynth::ParamIDs::Volume, volume);
+            synth.m_seq.addParameterEvent(false, 0.0, -1, i, -1, -1,
+                                          (uint32_t)NoisePlethoraSynth::ParamIDs::Algo, algo);
+            synth.m_seq.addParameterEvent(false, 0.0, -1, i, -1, -1,
+                                          (uint32_t)NoisePlethoraSynth::ParamIDs::Pan, pan);
+            synth.m_seq.addParameterEvent(false, 0.0, -1, i, -1, -1,
+                                          (uint32_t)NoisePlethoraSynth::ParamIDs::X, x);
+            synth.m_seq.addParameterEvent(false, 0.0, -1, i, -1, -1,
+                                          (uint32_t)NoisePlethoraSynth::ParamIDs::Y, y);
+            
+        }
+
+        synth.prepare(sr, bufSize);
+        size_t outLen = sr * 10.0;
+        size_t outCounter = 0;
+        while (outCounter < outLen)
+        {
+            synth.process(procBuf.getView());
+            writer->appendFrames(procBuf.getView());
+            outCounter += bufSize;
+        }
+    });
 }
 
 int main()
