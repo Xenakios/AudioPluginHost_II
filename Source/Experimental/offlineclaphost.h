@@ -41,10 +41,7 @@ class ClapEventSequence
         bool operator<(const Event &other) { return timestamp < other.timestamp; }
     };
     std::vector<Event> m_evlist;
-    ClapEventSequence() 
-    {
-        m_evlist.reserve(4096);
-    }
+    ClapEventSequence() { m_evlist.reserve(4096); }
     void sortEvents() { choc::sorting::stable_sort(m_evlist.begin(), m_evlist.end()); }
     size_t getNumEvents() const { return m_evlist.size(); }
     // should be fairly accurate, despite the name of the method
@@ -60,6 +57,15 @@ class ClapEventSequence
         auto ev =
             xenakios::make_event_note(0, CLAP_EVENT_NOTE_OFF, port, channel, key, note_id, velo);
         m_evlist.push_back(Event(time, &ev));
+    }
+    void addNote(double time, double duration, int port, int channel, int key, int note_id,
+                 double velo)
+    {
+        auto ev =
+            xenakios::make_event_note(0, CLAP_EVENT_NOTE_ON, port, channel, key, note_id, velo);
+        m_evlist.push_back(Event(time, &ev));
+        ev = xenakios::make_event_note(0, CLAP_EVENT_NOTE_OFF, port, channel, key, note_id, velo);
+        m_evlist.push_back(Event(time + duration, &ev));
     }
     void addNoteExpression(double time, int port, int channel, int key, int note_id, int net,
                            double amt)

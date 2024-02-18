@@ -887,6 +887,19 @@ inline void test_plethora_synth()
     {
         synth.m_seq.addNoteOff(19.0, -1, i, -1, 1.0, -1);
     }
+    synth.m_seq.addNoteOn(20.0, -1, 3, -1, 1.0, -1);
+    synth.m_seq.addNote(20.0, 9.0, -1, 3, -1, -1, 1.0);
+    t = 20.0;
+    while (t < 30.0)
+    {
+        synth.m_seq.addParameterEvent(false, t, -1, 3, -1, -1,
+                                      (uint32_t)NoisePlethoraSynth::ParamIDs::Pan, dist(rng));
+        synth.m_seq.addParameterEvent(false, t, -1, 3, -1, -1,
+                                      (uint32_t)NoisePlethoraSynth::ParamIDs::Algo,
+                                      30.0 * dist(rng));
+        t += 0.125;
+    }
+    
 
     synth.m_seq.addParameterEvent(false, 0.0, -1, -1, -1, -1,
                                   (uint32_t)NoisePlethoraSynth::ParamIDs::FiltResonance, 0.3);
