@@ -572,34 +572,37 @@ class ClapProcessingEngine
     {
         std::ifstream infilestream(filename, std::ios::binary);
         if (!infilestream.is_open())
-            throw std::runtime_error("Could not open state file for reading");
+            return;
         clap_istream clapisteam;
         clapisteam.ctx = &infilestream;
         // int64_t(CLAP_ABI *read)(const struct clap_istream *stream, void *buffer, uint64_t size);
         clapisteam.read = [](const clap_istream *stream, void *buffer, uint64_t size) {
             auto is = (std::ifstream *)stream->ctx;
             auto castbuf = (unsigned char *)buffer;
-            std::cout << "asked to read " << size << " bytes\n";
+            std::cout << "\nasked to read " << size << " bytes\n";
             for (int i = 0; i < size; ++i)
             {
                 unsigned char c = 0;
                 (*is) >> c;
                 castbuf[i] = c;
+                // std::cout << (char)c;
                 if (is->eof())
                     return (int64_t)0;
             }
+            
             return (int64_t)size;
         };
+        // m_plug->activate(44100.0,512,512);
         if (m_plug->stateLoad(&clapisteam))
         {
             clap::helpers::EventList inlist;
             clap::helpers::EventList outlist;
-            m_plug->paramsFlush(inlist.clapInputEvents(), outlist.clapOutputEvents());
+            // m_plug->paramsFlush(inlist.clapInputEvents(), outlist.clapOutputEvents());
         } else
         {
             std::cout << "failed to set clap state\n";
         }
-        
+        // m_plug->deactivate();
     }
     void processToFile(std::string filename, double duration, double samplerate)
     {

@@ -83,7 +83,9 @@ def test_clap2():
 # test_clap2()
 
 def test_clap3():
+    # p = xenakios.ClapEngine(r'C:\Program Files\Common Files\CLAP\Conduit.clap',1)
     p = xenakios.ClapEngine(r'C:\Program Files\Common Files\CLAP\u-he\Zebralette3.clap',0)
+    # p = xenakios.ClapEngine(r'C:\Program Files\Common Files\CLAP\Surge Synth Team\Surge XT.clap',0)
     p.loadStateFromFile("zebrastate.bin")
     # return
     numpars = p.getNumParameters()
@@ -94,7 +96,7 @@ def test_clap3():
     seq = xenakios.ClapSequence()
     seq.addNote(0.0,5.0,0,0,60,-1,0.9)
     p.setSequence(seq)
-    # p.processToFile("clap_out04.wav",6.0,44100)
+    p.processToFile("clap_out04.wav",6.0,44100)
     p.saveStateToFile("zebrastate.bin")
 
 test_clap3()
