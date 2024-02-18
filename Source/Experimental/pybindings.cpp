@@ -25,6 +25,7 @@ PYBIND11_MODULE(xenakios, m)
         .def("getSizeInBytes", &ClapEventSequence::getApproxSizeInBytes)
         .def("addNoteOn", &ClapEventSequence::addNoteOn)
         .def("addNoteOff", &ClapEventSequence::addNoteOff)
+        .def("addNote", &ClapEventSequence::addNote)
         .def("addParameterEvent", &ClapEventSequence::addParameterEvent)
         .def("addProgramChange", &ClapEventSequence::addProgramChange)
         .def("addNoteExpression", &ClapEventSequence::addNoteExpression);

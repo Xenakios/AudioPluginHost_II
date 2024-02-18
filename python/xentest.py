@@ -54,7 +54,18 @@ def test_clap():
     print(f"sequence has {seq.getNumEvents()} events")
     p.processToFile("clap_out02.wav",61.0,44100)
 
-# test_clap()
+def test_clap2():
+    p = xenakios.ClapEngine(r'C:\Program Files\Common Files\CLAP\Surge Synth Team\Surge XT.clap',0)
+    seq = xenakios.ClapSequence()
+    t = 0.0
+    while t<10.0:
+        key = random.randint(48,72)
+        seq.addNote(t,0.5,0,0,key,-1,0.9)
+        t = t + 0.25
+    p.setSequence(seq)
+    p.processToFile("clap_out03.wav",12.0,44100)
+
+test_clap2()
 
 def test_dejavu():
     dejavu = xenakios.DejaVuRandom(1)
@@ -179,4 +190,4 @@ def test_plethora3():
     print(f'sequence has {seq.getNumEvents()} events')
     p.processToFile(f"npclap02.wav", outdur)
 
-test_plethora3()
+# test_plethora3()

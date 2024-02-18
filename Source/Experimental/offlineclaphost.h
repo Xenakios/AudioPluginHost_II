@@ -524,10 +524,12 @@ class ClapProcessingEngine
     }
     void processToFile(std::string filename, double duration, double samplerate)
     {
+        using namespace std::chrono_literals;
         m_seq.sortEvents();
         int procblocksize = 512;
         std::atomic<bool> renderloopfinished{false};
         m_plug->activate(samplerate, procblocksize, procblocksize);
+        // std::this_thread::sleep_for(1000ms);
         // even offline, do the processing in another another thread because things
         // can get complicated with plugins like Surge XT because of the thread checks
         std::thread th([&] {
@@ -597,7 +599,9 @@ class ClapProcessingEngine
                     //           << outcounter + ecopy.header.time << "\n";
                 }
 
-                m_plug->process(&cp);
+                auto status = m_plug->process(&cp);
+                if (status != CLAP_PROCESS_CONTINUE)
+                    std::cout << "clap processing failed " << status << "\n";
                 list_out.clear();
                 list_in.clear();
                 writer->appendFrames(buf.getView());

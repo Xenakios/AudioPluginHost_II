@@ -441,6 +441,7 @@ inline clap_event_note make_event_note(uint32_t time, uint16_t evtype, int16_t p
                                        int16_t channel, int16_t key, int32_t note_id,
                                        double velocity, uint32_t flags = 0)
 {
+    assert(channel>=-1 && channel<16);
     clap_event_note result;
     result.header.flags = flags;
     result.header.size = sizeof(clap_event_note);
