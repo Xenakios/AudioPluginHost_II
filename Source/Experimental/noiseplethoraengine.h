@@ -7,6 +7,7 @@
 #include "gui/choc_DesktopWindow.h"
 #include "gui/choc_MessageLoop.h"
 #include "gui/choc_WebView.h"
+#include "text/choc_Files.h"
 
 class SignalSmoother
 {

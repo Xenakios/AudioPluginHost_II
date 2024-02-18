@@ -52,6 +52,8 @@ PYBIND11_MODULE(xenakios, m)
         .def(py::init<const std::string &, int>())
         .def("setSequence", &ClapProcessingEngine::setSequencer)
         .def("getParameters", &ClapProcessingEngine::getParameters)
+        .def("getNumParameters",&ClapProcessingEngine::getNumParameters)
+        .def("getParameterInfoString",&ClapProcessingEngine::getParameterInfoString)
         .def("showGUIBlocking", &ClapProcessingEngine::openPluginGUIBlocking)
         .def("openWindow", &ClapProcessingEngine::openPersistentWindow)
         .def("processToFile", &ClapProcessingEngine::processToFile);

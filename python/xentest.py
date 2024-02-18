@@ -80,7 +80,16 @@ def test_clap2():
     p.setSequence(seq)
     p.processToFile("clap_out03.wav",outdur+2.0,44100)
 
-test_clap2()
+# test_clap2()
+
+def test_clap3():
+    p = xenakios.ClapEngine(r'C:\Program Files\Common Files\CLAP\Surge Synth Team\Surge XT.clap',0)
+    numpars = p.getNumParameters()
+    for i in range(numpars):
+        parinfo = p.getParameterInfoString(i)
+        print(parinfo)
+
+test_clap3()
 
 def test_dejavu():
     dejavu = xenakios.DejaVuRandom(1)

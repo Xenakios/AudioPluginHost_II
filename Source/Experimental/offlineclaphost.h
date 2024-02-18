@@ -522,6 +522,35 @@ class ClapProcessingEngine
         }
         return result;
     }
+    size_t getNumParameters() { return m_plug->paramsCount(); }
+    std::string getParameterInfoString(size_t index)
+    {
+        std::string result;
+        if (index >= 0 && m_plug->paramsCount())
+        {
+            clap_param_info pinfo;
+            if (m_plug->paramsInfo(index, &pinfo))
+            {
+                result += std::string(pinfo.module) + std::string(pinfo.name) + " (ID " +
+                          std::to_string(pinfo.id) + ") ";
+                result += "range [" + std::to_string(pinfo.min_value) + " - " +
+                          std::to_string(pinfo.max_value) + "] ";
+                if (pinfo.flags & CLAP_PARAM_IS_AUTOMATABLE)
+                {
+                    result += "Automatable";
+                }
+                if (pinfo.flags & CLAP_PARAM_IS_MODULATABLE)
+                {
+                    result += "/Modulatable";
+                }
+                if (pinfo.flags & CLAP_PARAM_IS_MODULATABLE_PER_NOTE_ID)
+                {
+                    result += "/PerNoteID";
+                }
+            }
+        }
+        return result;
+    }
     void processToFile(std::string filename, double duration, double samplerate)
     {
         using namespace std::chrono_literals;
