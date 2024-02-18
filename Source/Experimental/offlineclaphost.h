@@ -578,6 +578,8 @@ class ClapProcessingEngine
         // int64_t(CLAP_ABI *read)(const struct clap_istream *stream, void *buffer, uint64_t size);
         clapisteam.read = [](const clap_istream *stream, void *buffer, uint64_t size) {
             auto is = (std::ifstream *)stream->ctx;
+            if (is->eof())
+                return (int64_t)0;
             auto castbuf = (unsigned char *)buffer;
             std::cout << "\nasked to read " << size << " bytes\n";
             for (int i = 0; i < size; ++i)
@@ -587,7 +589,7 @@ class ClapProcessingEngine
                 castbuf[i] = c;
                 // std::cout << (char)c;
                 if (is->eof())
-                    return (int64_t)0;
+                    return (int64_t)(i-1);
             }
             
             return (int64_t)size;
