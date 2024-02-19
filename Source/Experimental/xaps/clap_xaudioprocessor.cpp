@@ -23,41 +23,8 @@ WebViewGenericEditor::WebViewGenericEditor(xenakios::XAudioProcessor *xap) : m_x
                         }
                         return result;
                     });
-    m_webview->setHTML(R"(
-        <body style="background-color:rgb(201, 191, 191);">
-        <div id="foodiv"></div>
-        </body>
-        <script>
-            function createSlider(slid_id,slid_label,minval,maxval,defaultval,step)
-            {
-                let lab = document.createTextNode(slid_label);
-                document.getElementById("foodiv").appendChild(lab);
-                let slid1 = document.createElement("input");
-                slid1.type = "range";
-                slid1.id = slid_id;
-                slid1.min = minval;
-                slid1.max = maxval;
-                if (step!=null)
-                    slid1.step = step;
-                else
-                    slid1.step = 0.01;
-                slid1.value = defaultval;
-                slid1.style = "width:400px";
-                // slid1.clapchannel = 0;
-                // slid1.addEventListener("input", updateValue);
-                document.getElementById("foodiv").appendChild(slid1);
-                let br = document.createElement("br");
-                document.getElementById("foodiv").appendChild(br);
-            }
-            getParameters([]).then ((result) => 
-            { 
-                for (var i=0;i<result.length;++i)
-                {
-                    createSlider(result[i].id,result[i].name,result[i].minval,result[i].maxval,result[i].defaultval);
-                }
-            });
-        </script>
-        )");
+    
+    m_webview->navigate(R"(C:\develop\AudioPluginHost_mk2\Source\Experimental\clapgenericgui.html)");
     // m_webview->evaluateJavascript("initPlugin();");
 }
 #endif
