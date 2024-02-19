@@ -5,7 +5,6 @@
 WebViewGenericEditor::WebViewGenericEditor(xenakios::XAudioProcessor *xap) : m_xap(xap)
 {
     m_webview = std::make_unique<choc::ui::WebView>();
-
     m_webview->bind("getParameters",
                     [this](const choc::value::ValueView &args) -> choc::value::Value {
                         auto result = choc::value::createEmptyArray();
@@ -25,7 +24,6 @@ WebViewGenericEditor::WebViewGenericEditor(xenakios::XAudioProcessor *xap) : m_x
                     });
     
     m_webview->navigate(R"(C:\develop\AudioPluginHost_mk2\Source\Experimental\clapgenericgui.html)");
-    // m_webview->evaluateJavascript("initPlugin();");
 }
 #endif
 

@@ -23,6 +23,7 @@
         let br = document.createElement("br");
         document.getElementById("foodiv").appendChild(br);
     }
+    // result from c++ is an async promise! so we need to deal with that like this...
     getParameters([]).then ((result) => 
     { 
         for (var i=0;i<result.length;++i)
