@@ -10,6 +10,19 @@
 #include "../xap_extensions.h"
 #include <thread>
 
+#ifndef JUCE_CORE_H_INCLUDED
+#include "gui/choc_WebView.h"
+#include "gui/choc_DesktopWindow.h"
+class WebViewGenericEditor
+{
+public:
+    WebViewGenericEditor(xenakios::XAudioProcessor* xap);
+    
+    xenakios::XAudioProcessor* m_xap = nullptr;
+    std::unique_ptr<choc::ui::WebView> m_webview;
+};
+#endif
+
 class ClapPluginFormatProcessor : public xenakios::XAudioProcessor
 {
     choc::file::DynamicLibrary m_plugdll;
@@ -323,6 +336,8 @@ class ClapPluginFormatProcessor : public xenakios::XAudioProcessor
         return false;
     }
 #else
+    
+    std::unique_ptr<WebViewGenericEditor> m_webview_ed;
     // if external plugin doesn't implement GUI, we'll use our generic editor,
     bool implementsGui() const noexcept override { return true; }
     bool guiCreate(const char *api, bool isFloating) noexcept override
@@ -331,7 +346,8 @@ class ClapPluginFormatProcessor : public xenakios::XAudioProcessor
         {
             return m_ext_gui->create(m_plug, "win32", false);
         }
-        return false;
+        m_webview_ed = std::make_unique<WebViewGenericEditor>(this);
+        return true;
     }
     void guiDestroy() noexcept override
     {
@@ -339,6 +355,7 @@ class ClapPluginFormatProcessor : public xenakios::XAudioProcessor
         {
             m_ext_gui->destroy(m_plug);
         }
+        m_webview_ed = nullptr;
     }
     
     bool guiShow() noexcept override
@@ -364,7 +381,9 @@ class ClapPluginFormatProcessor : public xenakios::XAudioProcessor
         {
             return m_ext_gui->get_size(m_plug, width, height);
         }
-        return false;
+        *width = 500;
+        *height = paramsCount() * 25;
+        return true;
     }
     bool guiCanResize() const noexcept override
     {
@@ -406,6 +425,8 @@ class ClapPluginFormatProcessor : public xenakios::XAudioProcessor
             win.win32 = window->win32;
             return m_ext_gui->set_parent(m_plug, &win);
         }
+        choc::ui::DesktopWindow* dwp = (choc::ui::DesktopWindow*)window->ptr;
+        dwp->setContent(m_webview_ed->m_webview->getViewHandle());
         return false;
     }
 #endif

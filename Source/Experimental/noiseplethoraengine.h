@@ -332,42 +332,51 @@ class NoisePlethoraSynth
         window.setResizable(true);
         window.setMinimumSize(300, 300);
         window.setMaximumSize(1500, 1200);
-        window.windowClosed = [this,clickhandler] { choc::messageloop::stop(); };
-        webview.bind("onRenderClicked", [clickhandler,this](const choc::value::ValueView &args) -> choc::value::Value {
-            clickhandler();
-            return choc::value::Value{};
-        });
-        webview.bind("onSliderMoved", [this](const choc::value::ValueView &args) -> choc::value::Value {
-            // note that things could get messed up here because the choc functions can throw
-            // exceptions, so we should maybe have a try catch block here...but we should
-            // just know this will work, really.
-            auto parid = args[0]["id"].get<int>();
-            auto value = args[0]["value"].get<double>();
-            // std::cout << "par " << parid << " changed to " << value << std::endl;
-            if (parid == 0)
-                renderparams.volume = value;
-            if (parid == 1)
-                renderparams.x = value;
-            if (parid == 2)
-                renderparams.y = value;
-            if (parid == 3)
-                renderparams.filtcutoff = value;
-            if (parid == 4)
-                renderparams.filtreson = value;
-            if (parid == 5)
-                renderparams.algo = value;
-            if (parid == 6)
-                renderparams.pan = value;
-            if (parid == 100)
-                m_polyphony = value;
-            if (parid == 101)
-                m_pan_spread = value;
-            if (parid == 200)
-                m_x_spread = value;
-            if (parid == 201)
-                m_y_spread = value;
-            return choc::value::Value{};
-        });
+        window.windowClosed = [this, clickhandler] { choc::messageloop::stop(); };
+        webview.bind("onRenderClicked",
+                     [clickhandler, this,
+                      &webview](const choc::value::ValueView &args) -> choc::value::Value {
+                         webview.evaluateJavascript(R"(
+                            updateUI("Rendering...");
+                            )");
+                         clickhandler();
+                         webview.evaluateJavascript(R"(
+                            updateUI("Finished!");
+                            )");
+                         return choc::value::Value{};
+                     });
+        webview.bind("onSliderMoved",
+                     [this](const choc::value::ValueView &args) -> choc::value::Value {
+                         // note that things could get messed up here because the choc functions can
+                         // throw exceptions, so we should maybe have a try catch block here...but
+                         // we should just know this will work, really.
+                         auto parid = args[0]["id"].get<int>();
+                         auto value = args[0]["value"].get<double>();
+                         // std::cout << "par " << parid << " changed to " << value << std::endl;
+                         if (parid == 0)
+                             renderparams.volume = value;
+                         if (parid == 1)
+                             renderparams.x = value;
+                         if (parid == 2)
+                             renderparams.y = value;
+                         if (parid == 3)
+                             renderparams.filtcutoff = value;
+                         if (parid == 4)
+                             renderparams.filtreson = value;
+                         if (parid == 5)
+                             renderparams.algo = value;
+                         if (parid == 6)
+                             renderparams.pan = value;
+                         if (parid == 100)
+                             m_polyphony = value;
+                         if (parid == 101)
+                             m_pan_spread = value;
+                         if (parid == 200)
+                             m_x_spread = value;
+                         if (parid == 201)
+                             m_y_spread = value;
+                         return choc::value::Value{};
+                     });
         auto html = choc::file::loadFileAsString(R"(C:\develop\AudioPluginHost_mk2\htmltest.html)");
         window.setContent(webview.getViewHandle());
         webview.setHTML(html);

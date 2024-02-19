@@ -1,13 +1,51 @@
 #include "clap_xaudioprocessor.h"
 #include <iostream>
 
+#ifndef JUCE_CORE_H_INCLUDED
+WebViewGenericEditor::WebViewGenericEditor(xenakios::XAudioProcessor *xap) : m_xap(xap)
+{
+    m_webview = std::make_unique<choc::ui::WebView>();
+    
+    m_webview->bind("getParameters",
+                    [this](const choc::value::ValueView &args) -> choc::value::Value {
+                        auto result = choc::value::createEmptyArray();
+                        for (int i = 0; i < m_xap->paramsCount(); ++i)
+                        {
+                            clap_param_info pinfo;
+                            m_xap->paramsInfo(i, &pinfo);
+                            result.addArrayElement(std::string(pinfo.name));
+                            // std::cout << pinfo.id << "\t" << pinfo.name << "\n";
+                        }
+                        return result;
+                    });
+    m_webview->setHTML(R"(
+        <body style="background-color:rgb(201, 191, 191);">
+        <div id="foodiv"></div>
+        </body>
+        <script>
+            
+            let lab = document.createTextNode("waiting for plugin info...");
+            document.getElementById("foodiv").appendChild(lab);
+            // getParameters();
+            function initPlugin()
+            {
+                getParameters([]).then ((result) => { lab.textContent = result; });
+            }
+            
+            
+        </script>
+        )");
+    m_webview->evaluateJavascript("initPlugin();");
+}
+#endif
+
 ClapPluginFormatProcessor::ClapPluginFormatProcessor(std::string plugfilename, int plugindex)
     : m_plugdll(plugfilename)
 {
     on_main_thread_fifo.reset(256);
     auto get_extension_lambda = [](const struct clap_host *host, const char *eid) -> const void * {
-        // DBG("plugin requested host extension " << eid);
-        // std::cout << "plugin requested host extension " << eid << "\n";
+    // DBG("plugin requested host extension " << eid);
+    // std::cout << "plugin requested host extension " << eid << "\n";
 #ifdef JUCE_CORE_H_INCLUDED
         if (!strcmp(eid, CLAP_EXT_THREAD_CHECK))
         {
@@ -132,7 +170,7 @@ ClapPluginFormatProcessor::ClapPluginFormatProcessor(std::string plugfilename, i
                 m_inited = true;
                 initParamsExtension();
                 initGUIExtension();
-                m_ext_state = (clap_plugin_state*)plug->get_extension(plug,CLAP_EXT_STATE);
+                m_ext_state = (clap_plugin_state *)plug->get_extension(plug, CLAP_EXT_STATE);
                 if (!m_ext_gui && m_ext_params)
                 {
                     // create parameter infos for generic GUI

@@ -3,9 +3,18 @@
     <body style="background-color:rgb(201, 191, 191);">
         <div id="slidersdiv"></div>
         <button onclick="onRenderClicked()">Render</button>
+        <br>
+        <canvas id="myCanvas" width="200" height="100" style="border:1px solid #d3d3d3;">
+            Your browser does not support the HTML canvas tag.</canvas>
     </body>
     <script>
-    sliders = [];
+    var c = document.getElementById("myCanvas");
+    var ctx = c.getContext("2d");
+    ctx.moveTo(0,0);
+    ctx.lineTo(200,100);
+    ctx.moveTo(0,100);
+    ctx.lineTo(200,0);
+    ctx.stroke();
     function createSlider(slid_id,slid_label,minval,maxval,defaultval,step)
     {
         let lab = document.createTextNode(slid_label);
@@ -43,7 +52,13 @@
     {
         onSliderMoved({chan : e.target.clapchannel, id : e.target.id, value : e.target.value});
     }
-
+    let infolab = document.createTextNode("Empty");
+    document.getElementById("slidersdiv").appendChild(infolab);    
+    
+    function updateUI(txt)
+    {
+        infolab.textContent = txt;
+    }
     
     </script>
 </html>

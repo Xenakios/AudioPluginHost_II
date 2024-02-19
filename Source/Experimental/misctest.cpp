@@ -599,8 +599,10 @@ inline void test_offline_clap()
 inline void test_clap_gui_choc()
 {
     ClapPluginFormatProcessor::mainthread_id() = std::this_thread::get_id();
+    // auto plug = std::make_unique<ClapPluginFormatProcessor>(
+    //     R"(C:\Program Files\Common Files\CLAP\Conduit.clap)", 0);
     auto plug = std::make_unique<ClapPluginFormatProcessor>(
-        R"(C:\Program Files\Common Files\CLAP\Conduit.clap)", 0);
+        R"(C:\Program Files\Common Files\CLAP\airwin-to-clap.clap)", 1);
     clap::helpers::EventList flushOutList;
     clap::helpers::EventList flushInList;
 
@@ -611,7 +613,9 @@ inline void test_clap_gui_choc()
     plug->guiGetSize(&pw, &ph);
     choc::ui::DesktopWindow window({100, 100, (int)pw, (int)ph + 80});
 
-    window.setWindowTitle("CHOC Window");
+    clap_plugin_descriptor desc;
+    plug->getDescriptor(&desc);
+    window.setWindowTitle(desc.name);
     window.setResizable(true);
     window.setMinimumSize(pw, ph + 80);
     window.setMaximumSize(1920, ph + 101);
@@ -619,6 +623,7 @@ inline void test_clap_gui_choc()
         plug->guiDestroy();
         choc::messageloop::stop();
     };
+#ifdef ENABLE_WEBVIEW_JUNK
     choc::ui::WebView webview;
     webview.navigate(R"(C:\develop\AudioPluginHost_mk2\htmltest.html)");
     window.setContent(webview.getViewHandle());
@@ -634,6 +639,7 @@ inline void test_clap_gui_choc()
         //    [bpm] { std::cout << bpm << std::endl; });
         return choc::value::Value{};
     });
+#endif
     choc::messageloop::Timer flushTimer{
         1000, [&plug, &flushOutList, &flushInList]() {
             plug->paramsFlush(flushInList.clapInputEvents(), flushOutList.clapOutputEvents());
@@ -650,9 +656,13 @@ inline void test_clap_gui_choc()
             flushOutList.clear();
             return true;
         }};
+
     clap_window clapwin;
     clapwin.api = "win32";
-    clapwin.win32 = window.getWindowHandle();
+    if (plug->m_webview_ed)
+        clapwin.ptr = &window;
+    else
+        clapwin.win32 = window.getWindowHandle();
     plug->guiSetParent(&clapwin);
     plug->guiShow();
     window.toFront();
@@ -1021,7 +1031,6 @@ inline void test_plethora_synth()
                                           (uint32_t)NoisePlethoraSynth::ParamIDs::X, x);
             synth.m_seq.addParameterEvent(false, 0.0, -1, i, -1, -1,
                                           (uint32_t)NoisePlethoraSynth::ParamIDs::Y, y);
-            
         }
 
         synth.prepare(sr, bufSize);
@@ -1038,11 +1047,11 @@ inline void test_plethora_synth()
 
 int main()
 {
-    test_plethora_synth();
+    // test_plethora_synth();
     // test_mod_matrix_pyt();
     // test_mod_matrix();
     // test_seq_event_chase();
-    // test_clap_gui_choc();
+    test_clap_gui_choc();
     // test_offline_clap();
     // test_fb_osc();
     // test_lanczos();
