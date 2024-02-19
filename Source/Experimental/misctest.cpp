@@ -602,7 +602,7 @@ inline void test_clap_gui_choc()
     // auto plug = std::make_unique<ClapPluginFormatProcessor>(
     //     R"(C:\Program Files\Common Files\CLAP\Conduit.clap)", 0);
     auto plug = std::make_unique<ClapPluginFormatProcessor>(
-        R"(C:\Program Files\Common Files\CLAP\airwin-to-clap.clap)", 80);
+        R"(C:\Program Files\Common Files\CLAP\airwin-to-clap.clap)", 1);
     clap::helpers::EventList flushOutList;
     clap::helpers::EventList flushInList;
 
