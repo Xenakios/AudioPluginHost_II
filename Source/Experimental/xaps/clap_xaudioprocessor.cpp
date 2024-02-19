@@ -5,7 +5,7 @@
 WebViewGenericEditor::WebViewGenericEditor(xenakios::XAudioProcessor *xap) : m_xap(xap)
 {
     m_webview = std::make_unique<choc::ui::WebView>();
-    
+
     m_webview->bind("getParameters",
                     [this](const choc::value::ValueView &args) -> choc::value::Value {
                         auto result = choc::value::createEmptyArray();
@@ -13,8 +13,13 @@ WebViewGenericEditor::WebViewGenericEditor(xenakios::XAudioProcessor *xap) : m_x
                         {
                             clap_param_info pinfo;
                             m_xap->paramsInfo(i, &pinfo);
-                            result.addArrayElement(std::string(pinfo.name));
-                            // std::cout << pinfo.id << "\t" << pinfo.name << "\n";
+                            auto info = choc::value::createObject("paraminfo");
+                            info.setMember("name", std::string(pinfo.name));
+                            info.setMember("id", (int64_t)pinfo.id);
+                            info.setMember("minval",pinfo.min_value);
+                            info.setMember("maxval",pinfo.max_value);
+                            info.setMember("defaultval",pinfo.default_value);
+                            result.addArrayElement(info);
                         }
                         return result;
                     });
@@ -23,19 +28,37 @@ WebViewGenericEditor::WebViewGenericEditor(xenakios::XAudioProcessor *xap) : m_x
         <div id="foodiv"></div>
         </body>
         <script>
-            
-            let lab = document.createTextNode("waiting for plugin info...");
-            document.getElementById("foodiv").appendChild(lab);
-            // getParameters();
-            function initPlugin()
+            function createSlider(slid_id,slid_label,minval,maxval,defaultval,step)
             {
-                getParameters([]).then ((result) => { lab.textContent = result; });
+                let lab = document.createTextNode(slid_label);
+                document.getElementById("foodiv").appendChild(lab);
+                let slid1 = document.createElement("input");
+                slid1.type = "range";
+                slid1.id = slid_id;
+                slid1.min = minval;
+                slid1.max = maxval;
+                if (step!=null)
+                    slid1.step = step;
+                else
+                    slid1.step = 0.01;
+                slid1.value = defaultval;
+                slid1.style = "width:400px";
+                // slid1.clapchannel = 0;
+                // slid1.addEventListener("input", updateValue);
+                document.getElementById("foodiv").appendChild(slid1);
+                let br = document.createElement("br");
+                document.getElementById("foodiv").appendChild(br);
             }
-            
-            
+            getParameters([]).then ((result) => 
+            { 
+                for (var i=0;i<result.length;++i)
+                {
+                    createSlider(result[i].id,result[i].name,result[i].minval,result[i].maxval,result[i].defaultval);
+                }
+            });
         </script>
         )");
-    m_webview->evaluateJavascript("initPlugin();");
+    // m_webview->evaluateJavascript("initPlugin();");
 }
 #endif
 

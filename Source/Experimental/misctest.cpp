@@ -602,7 +602,7 @@ inline void test_clap_gui_choc()
     // auto plug = std::make_unique<ClapPluginFormatProcessor>(
     //     R"(C:\Program Files\Common Files\CLAP\Conduit.clap)", 0);
     auto plug = std::make_unique<ClapPluginFormatProcessor>(
-        R"(C:\Program Files\Common Files\CLAP\airwin-to-clap.clap)", 1);
+        R"(C:\Program Files\Common Files\CLAP\airwin-to-clap.clap)", 80);
     clap::helpers::EventList flushOutList;
     clap::helpers::EventList flushInList;
 
@@ -611,14 +611,14 @@ inline void test_clap_gui_choc()
     uint32_t pw = 0;
     uint32_t ph = 0;
     plug->guiGetSize(&pw, &ph);
-    choc::ui::DesktopWindow window({100, 100, (int)pw, (int)ph + 80});
+    choc::ui::DesktopWindow window({100, 100, (int)pw, (int)ph});
 
     clap_plugin_descriptor desc;
     plug->getDescriptor(&desc);
     window.setWindowTitle(desc.name);
     window.setResizable(true);
-    window.setMinimumSize(pw, ph + 80);
-    window.setMaximumSize(1920, ph + 101);
+    window.setMinimumSize(200, 100);
+    window.setMaximumSize(1920, 1080);
     window.windowClosed = [&plug] {
         plug->guiDestroy();
         choc::messageloop::stop();
