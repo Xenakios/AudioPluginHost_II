@@ -181,6 +181,7 @@ struct xen_noise_plethora
                              nevt->velocity);
             break;
         }
+        
         case CLAP_EVENT_PARAM_VALUE:
         {
             auto pevt = reinterpret_cast<const clap_event_param_value *>(nextEvent);
