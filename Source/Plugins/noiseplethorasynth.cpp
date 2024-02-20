@@ -78,6 +78,24 @@ struct xen_noise_plethora
                            CLAP_PARAM_IS_MODULATABLE_PER_NOTE_ID | CLAP_PARAM_IS_STEPPED)
                 .withName("Algorithm")
                 .withID(PAR_Algo));
+        paramDescriptions.push_back(ParamDesc()
+                                        .withLinearScaleFormatting("")
+                                        .withRange(0.0, 127.0)
+                                        .withDefault(127)
+                                        .withFlags(CLAP_PARAM_IS_AUTOMATABLE |
+                                                   CLAP_PARAM_IS_MODULATABLE |
+                                                   CLAP_PARAM_IS_MODULATABLE_PER_NOTE_ID)
+                                        .withName("Filter cut off")
+                                        .withID(PAR_FilterCutoff));
+        paramDescriptions.push_back(ParamDesc()
+                                        .withLinearScaleFormatting("")
+                                        .withRange(0.01, 0.99)
+                                        .withDefault(0.01)
+                                        .withFlags(CLAP_PARAM_IS_AUTOMATABLE |
+                                                   CLAP_PARAM_IS_MODULATABLE |
+                                                   CLAP_PARAM_IS_MODULATABLE_PER_NOTE_ID)
+                                        .withName("Filter resonance")
+                                        .withID(PAR_FilterResonance));
     }
     clap_id timerId = 0;
 
@@ -105,7 +123,25 @@ struct xen_noise_plethora
     {
         return false;
     }
-
+    bool implementsNotePorts() const noexcept override { return true; }
+    uint32_t notePortsCount(bool isInput) const noexcept override
+    {
+        if (isInput)
+            return 1;
+        return 0;
+    }
+    bool notePortsInfo(uint32_t index, bool isInput,
+                       clap_note_port_info *info) const noexcept override
+    {
+        if (isInput)
+        {
+            info->id = 5012;
+            strcpy(info->name,"Note input");
+            info->preferred_dialect = CLAP_NOTE_DIALECT_CLAP;
+            info->supported_dialects = CLAP_NOTE_DIALECT_CLAP | CLAP_NOTE_DIALECT_MIDI;
+        }
+        return false;
+    }
     bool implementsAudioPorts() const noexcept override { return true; }
     uint32_t audioPortsCount(bool isInput) const noexcept override
     {
@@ -208,9 +244,9 @@ struct xen_noise_plethora
                     nextEvent = ev->get(ev, nextEventIndex);
             }
         }
-        
+
         choc::buffer::SeparateChannelLayout<float> layout(process->audio_outputs->data32);
-        choc::buffer::ChannelArrayView<float> bufview(layout,{2,process->frames_count});
+        choc::buffer::ChannelArrayView<float> bufview(layout, {2, process->frames_count});
         m_synth.processBlock(bufview);
         return CLAP_PROCESS_CONTINUE;
     }
