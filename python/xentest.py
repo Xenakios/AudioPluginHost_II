@@ -83,21 +83,31 @@ def test_clap2():
 # test_clap2()
 
 def test_clap3():
+    
+    p = xenakios.ClapEngine(r'C:\Program Files\Common Files\CLAP\NoisePlethoraSynth.clap',0)
     # p = xenakios.ClapEngine(r'C:\Program Files\Common Files\CLAP\Conduit.clap',1)
     # p = xenakios.ClapEngine(r'C:\Program Files\Common Files\CLAP\u-he\Zebralette3.clap',0)
-    p = xenakios.ClapEngine(r'C:\Program Files\Common Files\CLAP\Surge Synth Team\Surge XT.clap',0)
-    p.loadStateFromFile("surgestate.bin")
+    # p = xenakios.ClapEngine(r'C:\Program Files\Common Files\CLAP\Surge Synth Team\Surge XT.clap',0)
+    # p.loadStateFromFile("surgestate.bin")
     # return
     numpars = p.getNumParameters()
     for i in range(numpars):
         parinfo = p.getParameterInfoString(i)
-        # print(parinfo)
-    p.showGUIBlocking()
+        print(parinfo)
+    # p.showGUIBlocking()
     seq = xenakios.ClapSequence()
-    seq.addNote(0.0,5.0,0,0,60,-1,0.9)
+    seq.addNote(0.0,2.0,0,0,60,-1,0.9)
+    seq.addNote(3.0,2.0,0,0,60,0,0.9)
+    seq.addNote(5.0,4.0,0,0,60,1,0.9)
+    seq.addParameterEvent(False, 3.0, 0, 0, 60, 0, 0, -12.0)
+    seq.addParameterEvent(False, 4.0, 0, 0, 60, 0, 0, -3.0)
+    seq.addParameterEvent(False, 4.5, 0, 0, -1, 0, 1, 0.1)
+    seq.addParameterEvent(False, 5.0, 0, 0, -1, 1, 1, 0.2)
+    seq.addParameterEvent(False, 5.5, 0, 0, -1, 1, 1, 0.3)
+    seq.addParameterEvent(False, 6.0, 0, 0, -1, 1, 1, 0.6)
     p.setSequence(seq)
-    # p.processToFile("clap_out04.wav",6.0,44100)
-    p.saveStateToFile("surgestate.bin")
+    p.processToFile("clap_noiseplethora_out01.wav",10.0,44100)
+    # p.saveStateToFile("surgestate.bin")
 
 test_clap3()
 

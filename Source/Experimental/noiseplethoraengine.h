@@ -8,6 +8,9 @@
 #include "gui/choc_MessageLoop.h"
 #include "gui/choc_WebView.h"
 #include "text/choc_Files.h"
+#include "xap_utils.h"
+#include "xapdsp.h"
+#include "offlineclaphost.h"
 
 class SignalSmoother
 {
@@ -222,7 +225,64 @@ class NoisePlethoraSynth
         m_seq.sortEvents();
         m_seq_iter.setTime(0.0);
     }
-
+    void applyParameter(int port, int ch, int key, int note_id, clap_id parid, double value)
+    {
+        //std::cout << "par " << parid << " " << value << "\n";
+        for (auto &v : m_voices)
+        {
+            if ((key == -1 || v->key == key) && (note_id == -1 || v->note_id == note_id))
+            //if (v->port_id == port && v->chan == ch && v->key == key && v->note_id == note_id)
+            {
+                std::cout << "applying par " << parid << " to " << port << " " << ch << " " << key
+                          << " " << note_id << " " << value << "\n";
+                if (parid == (clap_id)ParamIDs::Volume)
+                    v->basevalues.volume = value;
+                if (parid == (clap_id)ParamIDs::X)
+                    v->basevalues.x = value;
+                if (parid == (clap_id)ParamIDs::Y)
+                    v->basevalues.y = value;
+            }
+        }
+    }
+    void startNote(int port, int ch, int key, int note_id, double velo)
+    {
+        for (auto &v : m_voices)
+        {
+            if (v->envstate == NoisePlethoraVoice::EnvelopeState::Idle)
+            {
+                std::cout << "activated " << ch << " " << key << " " << note_id << "\n";
+                v->activate(port, ch, key, note_id, velo);
+                return;
+            }
+        }
+        std::cout << "could not activate " << ch << " " << key << " " << note_id << "\n";
+    }
+    void stopNote(int port, int ch, int key, int note_id, double velo)
+    {
+        for (auto &v : m_voices)
+        {
+            if (v->envstate != NoisePlethoraVoice::EnvelopeState::Idle && v->port_id == port &&
+                v->chan == ch && v->key == key && v->note_id == note_id)
+            {
+                std::cout << "deactivated " << v->chan << " " << v->key << " " << v->note_id
+                          << "\n";
+                v->deactivate();
+            }
+        }
+    }
+    void processBlock(choc::buffer::ChannelArrayView<float> destBuf)
+    {
+        m_mix_buf.clear();
+        for (int i = 0; i < m_voices.size(); ++i)
+        {
+            if (m_voices[i]->envstate != NoisePlethoraVoice::EnvelopeState::Idle)
+            {
+                m_voices[i]->process(m_mix_buf.getView());
+            }
+        }
+        choc::buffer::applyGain(m_mix_buf, 0.5);
+        choc::buffer::copy(destBuf, m_mix_buf);
+    }
     void process(choc::buffer::ChannelArrayView<float> destBuf)
     {
         assert(m_sr > 0);

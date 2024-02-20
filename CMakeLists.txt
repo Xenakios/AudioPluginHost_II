@@ -88,6 +88,19 @@ add_custom_command(TARGET xenakios POST_BUILD
      "C:/Users/teemu/AppData/Local/Programs/Python/Python312/Lib/site-packages/$<TARGET_FILE_NAME:xenakios>" 
   COMMENT "Copying to output directory")
 
+add_library(NoisePlethoraSynth MODULE
+Source/Plugins/noiseplethorasynth.cpp
+)
+
+set_target_properties(NoisePlethoraSynth PROPERTIES SUFFIX ".clap" PREFIX "")
+target_compile_definitions(NoisePlethoraSynth PRIVATE _USE_MATH_DEFINES=1 IS_WIN=1)
+target_link_libraries(NoisePlethoraSynth PRIVATE noiseplethora)
+set(products_folder ${CMAKE_BINARY_DIR})
+    set(build_type ${CMAKE_BUILD_TYPE})
+    add_custom_command(
+        TARGET NoisePlethoraSynth POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy "${products_folder}/NoisePlethoraSynth.clap" "C:\\Program Files\\Common Files\\CLAP"
+    )
 
 add_library(noiseplethora
         Source/Plugins/noise-plethora/random.cpp
@@ -117,6 +130,8 @@ target_sources(TestingProgram
 )
 target_compile_definitions(TestingProgram PRIVATE _USE_MATH_DEFINES=1)
 target_link_libraries(TestingProgram PRIVATE noiseplethora)
+
+
 
 # juce::juce_recommended_lto_flags
 # juce_add_bundle_resources_directory(AudioPluginHost2 Assets)
