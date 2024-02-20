@@ -227,20 +227,29 @@ class NoisePlethoraSynth
     }
     void applyParameter(int port, int ch, int key, int note_id, clap_id parid, double value)
     {
-        //std::cout << "par " << parid << " " << value << "\n";
+        // std::cout << "par " << parid << " " << value << "\n";
         for (auto &v : m_voices)
         {
-            if ((key == -1 || v->key == key) && (note_id == -1 || v->note_id == note_id))
-            //if (v->port_id == port && v->chan == ch && v->key == key && v->note_id == note_id)
+            if ((key == -1 || v->key == key) && (note_id == -1 || v->note_id == note_id)
+                && (port != -1 || v->port_id == port) && (ch != -1 || v->chan == ch))
             {
-                std::cout << "applying par " << parid << " to " << port << " " << ch << " " << key
-                          << " " << note_id << " " << value << "\n";
+                // std::cout << "applying par " << parid << " to " << port << " " << ch << " " <<
+                // key
+                //           << " " << note_id << " " << value << "\n";
                 if (parid == (clap_id)ParamIDs::Volume)
                     v->basevalues.volume = value;
                 if (parid == (clap_id)ParamIDs::X)
                     v->basevalues.x = value;
                 if (parid == (clap_id)ParamIDs::Y)
                     v->basevalues.y = value;
+                if (parid == (clap_id)ParamIDs::Algo)
+                    v->basevalues.algo = value;
+                if (parid == (clap_id)ParamIDs::Pan)
+                    v->basevalues.pan = value;
+                if (parid == (clap_id)ParamIDs::FiltCutoff)
+                    v->basevalues.filtcutoff = value;
+                if (parid == (clap_id)ParamIDs::FiltResonance)
+                    v->basevalues.filtreson = value;
             }
         }
     }

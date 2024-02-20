@@ -96,15 +96,34 @@ def test_clap3():
         print(parinfo)
     # p.showGUIBlocking()
     seq = xenakios.ClapSequence()
+    seq.addParameterEvent(False, 0.0, 0, 0, -1, -1, 2, 0.2)
+    seq.addParameterEvent(False, 3.0, 0, 0, -1, -1, 2, 0.8)
+    seq.addParameterEvent(False, 6.2, 0, 0, -1, -1, 2, 0.4)
+    seq.addParameterEvent(False, 7.5, 0, 0, -1, -1, 2, 0.9)
     seq.addNote(0.0,2.0,0,0,60,-1,0.9)
     seq.addNote(3.0,2.0,0,0,60,0,0.9)
     seq.addNote(5.0,4.0,0,0,60,1,0.9)
+    seq.addNote(6.0,4.0,0,0,60,2,0.9)
     seq.addParameterEvent(False, 3.0, 0, 0, 60, 0, 0, -12.0)
     seq.addParameterEvent(False, 4.0, 0, 0, 60, 0, 0, -3.0)
     seq.addParameterEvent(False, 4.5, 0, 0, -1, 0, 1, 0.1)
     seq.addParameterEvent(False, 5.0, 0, 0, -1, 1, 1, 0.2)
     seq.addParameterEvent(False, 5.5, 0, 0, -1, 1, 1, 0.3)
     seq.addParameterEvent(False, 6.0, 0, 0, -1, 1, 1, 0.6)
+    t = 6.0
+    a = 0
+    while t<10.0:
+        seq.addParameterEvent(False, t, 0, 0, -1, 1, 5, a)
+        seq.addParameterEvent(False, t, 0, 0, -1, 1, 6, random.random())
+        seq.addParameterEvent(False, t, 0, 0, -1, 2, 6, random.random())
+        seq.addParameterEvent(False, t, 0, 0, -1, 2, 1, random.random())
+        t = t + 0.125
+        a = a + 1
+    seq.addParameterEvent(False, 0.0, 0, 0, -1, -1, 4, 0.3)
+    t = 0
+    while t<10.0:
+        seq.addParameterEvent(False, t, 0, 0, -1, -1, 3, 84+12.0* math.sin(2*3.141592*t*0.6))
+        t = t + 0.1
     p.setSequence(seq)
     p.processToFile("clap_noiseplethora_out01.wav",10.0,44100)
     # p.saveStateToFile("surgestate.bin")
