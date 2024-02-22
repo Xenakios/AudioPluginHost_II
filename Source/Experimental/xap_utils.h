@@ -611,6 +611,22 @@ template <typename T, size_t Size> class SimpleRingBuffer
     int m_available = 0;
 };
 
+// note that limits can't be the same and the loop may run for long!
+template<typename T>
+inline T wrap_value(const T& minval, const T& val, const T& maxval)
+{
+	T temp = val;
+	while (temp<minval || temp>maxval)
+	{
+		if (temp < minval)
+			temp = maxval - (minval - temp);
+		if (temp > maxval)
+			temp = minval - (maxval - temp);
+	}
+	return temp;
+}
+
+
 template <typename Key, typename Value> class KeyValueTable
 {
   public:

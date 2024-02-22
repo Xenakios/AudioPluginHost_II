@@ -60,6 +60,7 @@ class NoisePlethoraVoice
         float filtreson = 0.01;
         float algo = 0.0f;
         float pan = 0.5f;
+        float filttype = 0.0f;
     };
     VoiceParams basevalues;
     VoiceParams modvalues;
@@ -83,6 +84,7 @@ class NoisePlethoraVoice
         modvalues.volume = 0;
         modvalues.x = 0;
         modvalues.y = 0;
+        modvalues.filttype = 0.0f;
         for (int i = 0; i < numBanks; ++i)
         {
             auto &bank = getBankForIndex(i);
@@ -131,7 +133,9 @@ class NoisePlethoraVoice
     {
         if (envstate == EnvelopeState::Idle)
             return;
-        int safealgo = std::clamp<float>(basevalues.algo, 0, (int)m_plugs.size() - 1);
+        int safealgo =
+            wrap_value<float>(basevalues.algo + modvalues.algo, 0, (int)m_plugs.size() - 1);
+        assert(safealgo >= 0 && safealgo < m_plugs.size() - 1);
         auto plug = m_plugs[safealgo].get();
         // set params, doesn't actually process audio
         plug->process(basevalues.x, basevalues.y);
@@ -145,6 +149,7 @@ class NoisePlethoraVoice
         double totalpan = std::clamp(basevalues.pan + modvalues.pan, 0.0f, 1.0f);
         int attlensamples = env_attack * m_sr;
         int rellensamples = env_release * m_sr;
+        int ftype = basevalues.filttype;
         for (size_t i = 0; i < destBuf.size.numFrames; ++i)
         {
             double smoothedgain = m_gain_smoother.process(gain);
@@ -182,7 +187,12 @@ class NoisePlethoraVoice
             float outR = panmat[3] * out;
 
             dcblocker.step<StereoSimperSVF::HP>(dcblocker, outL, outR);
-            filter.step<StereoSimperSVF::LP>(filter, outL, outR);
+            if (ftype == 0)
+                filter.step<StereoSimperSVF::LP>(filter, outL, outR);
+            else if (ftype == 1)
+                filter.step<StereoSimperSVF::HP>(filter, outL, outR);
+            else
+                filter.step<StereoSimperSVF::BP>(filter, outL, outR);
             destBuf.getSample(0, i) += outL;
             destBuf.getSample(1, i) += outR;
         }
@@ -225,13 +235,37 @@ class NoisePlethoraSynth
         m_seq.sortEvents();
         m_seq_iter.setTime(0.0);
     }
+    void applyParameterModulation(int port, int ch, int key, int note_id, clap_id parid, double amt)
+    {
+        for (auto &v : m_voices)
+        {
+            if ((key == -1 || v->key == key) && (note_id == -1 || v->note_id == note_id) &&
+                (port != -1 || v->port_id == port) && (ch != -1 || v->chan == ch))
+            {
+                if (parid == (clap_id)ParamIDs::Volume)
+                    v->modvalues.volume = amt;
+                if (parid == (clap_id)ParamIDs::X)
+                    v->modvalues.x = amt;
+                if (parid == (clap_id)ParamIDs::Y)
+                    v->modvalues.y = amt;
+                if (parid == (clap_id)ParamIDs::Algo)
+                    v->modvalues.algo = amt;
+                if (parid == (clap_id)ParamIDs::Pan)
+                    v->modvalues.pan = amt;
+                if (parid == (clap_id)ParamIDs::FiltCutoff)
+                    v->modvalues.filtcutoff = amt;
+                if (parid == (clap_id)ParamIDs::FiltResonance)
+                    v->modvalues.filtreson = amt;
+            }
+        }
+    }
     void applyParameter(int port, int ch, int key, int note_id, clap_id parid, double value)
     {
         // std::cout << "par " << parid << " " << value << "\n";
         for (auto &v : m_voices)
         {
-            if ((key == -1 || v->key == key) && (note_id == -1 || v->note_id == note_id)
-                && (port != -1 || v->port_id == port) && (ch != -1 || v->chan == ch))
+            if ((key == -1 || v->key == key) && (note_id == -1 || v->note_id == note_id) &&
+                (port != -1 || v->port_id == port) && (ch != -1 || v->chan == ch))
             {
                 // std::cout << "applying par " << parid << " to " << port << " " << ch << " " <<
                 // key
@@ -250,6 +284,8 @@ class NoisePlethoraSynth
                     v->basevalues.filtcutoff = value;
                 if (parid == (clap_id)ParamIDs::FiltResonance)
                     v->basevalues.filtreson = value;
+                if (parid == (clap_id)ParamIDs::FiltType)
+                    v->basevalues.filttype = value;
             }
         }
     }
@@ -384,6 +420,7 @@ class NoisePlethoraSynth
         Y,
         FiltCutoff,
         FiltResonance,
+        FiltType,
         Algo,
         Pan
     };

@@ -610,7 +610,7 @@ class ClapProcessingEngine
     {
         using namespace std::chrono_literals;
         m_seq.sortEvents();
-        int procblocksize = 512;
+        int procblocksize = 64;
         std::atomic<bool> renderloopfinished{false};
         m_plug->activate(samplerate, procblocksize, procblocksize);
         // std::this_thread::sleep_for(1000ms);

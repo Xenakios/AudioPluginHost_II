@@ -22,7 +22,8 @@ struct xen_noise_plethora
         PAR_FilterResonance = 400,
         PAR_X = 500,
         PAR_Y = 600,
-        PAR_Algo = 700
+        PAR_Algo = 700,
+        PAR_FilterType = 800
     };
     float baseGain = 1.0f;
     float modulationGain = 1.0f;
@@ -96,6 +97,14 @@ struct xen_noise_plethora
                                                    CLAP_PARAM_IS_MODULATABLE_PER_NOTE_ID)
                                         .withName("Filter resonance")
                                         .withID(PAR_FilterResonance));
+        paramDescriptions.push_back(
+            ParamDesc()
+                .withUnorderedMapFormatting({{0, "Lowpass"}, {1, "Highpass"}, {2, "Bandpass"}})
+                .withDefault(0.0)
+                .withFlags(CLAP_PARAM_IS_AUTOMATABLE | CLAP_PARAM_IS_MODULATABLE |
+                           CLAP_PARAM_IS_MODULATABLE_PER_NOTE_ID | CLAP_PARAM_IS_STEPPED)
+                .withName("Filter type")
+                .withID(PAR_FilterType));
     }
     clap_id timerId = 0;
 
@@ -136,7 +145,7 @@ struct xen_noise_plethora
         if (isInput)
         {
             info->id = 5012;
-            strcpy(info->name,"Note input");
+            strcpy(info->name, "Note input");
             info->preferred_dialect = CLAP_NOTE_DIALECT_CLAP;
             info->supported_dialects = CLAP_NOTE_DIALECT_CLAP | CLAP_NOTE_DIALECT_MIDI;
         }
@@ -181,7 +190,7 @@ struct xen_noise_plethora
                              nevt->velocity);
             break;
         }
-        
+
         case CLAP_EVENT_PARAM_VALUE:
         {
             auto pevt = reinterpret_cast<const clap_event_param_value *>(nextEvent);
@@ -192,6 +201,9 @@ struct xen_noise_plethora
         case CLAP_EVENT_PARAM_MOD:
         {
             auto pevt = reinterpret_cast<const clap_event_param_mod *>(nextEvent);
+            m_synth.applyParameterModulation(pevt->port_index, pevt->channel, pevt->key,
+                                             pevt->note_id, pevt->param_id, pevt->amount);
+            break;
         }
         default:
             break;
@@ -248,6 +260,7 @@ struct xen_noise_plethora
 
         choc::buffer::SeparateChannelLayout<float> layout(process->audio_outputs->data32);
         choc::buffer::ChannelArrayView<float> bufview(layout, {2, process->frames_count});
+        bufview.clear();
         m_synth.processBlock(bufview);
         return CLAP_PROCESS_CONTINUE;
     }
