@@ -134,7 +134,7 @@ class NoisePlethoraVoice
         if (envstate == EnvelopeState::Idle)
             return;
         int safealgo =
-            wrap_value<float>(basevalues.algo + modvalues.algo, 0, (int)m_plugs.size() - 1);
+            wrap_value<float>(0, basevalues.algo + modvalues.algo, (int)m_plugs.size() - 1);
         assert(safealgo >= 0 && safealgo < m_plugs.size() - 1);
         auto plug = m_plugs[safealgo].get();
         // set params, doesn't actually process audio
@@ -145,8 +145,8 @@ class NoisePlethoraVoice
         double totalcutoff = std::clamp(basevalues.filtcutoff + modvalues.filtcutoff, 0.0f, 127.0f);
         double totalreson = std::clamp(basevalues.filtreson + modvalues.filtreson, 0.01f, 0.99f);
         filter.setCoeff(totalcutoff, totalreson, 1.0 / m_sr);
-        // might want to reflect instead so that voices don't get stuck at the stereo sides
-        double totalpan = std::clamp(basevalues.pan + modvalues.pan, 0.0f, 1.0f);
+
+        double totalpan = reflect_value(0.0f, basevalues.pan + modvalues.pan, 1.0f);
         int attlensamples = env_attack * m_sr;
         int rellensamples = env_release * m_sr;
         int ftype = basevalues.filttype;
