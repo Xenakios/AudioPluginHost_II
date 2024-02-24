@@ -94,12 +94,11 @@ class NoisePlethoraVoice
     };
     VoiceParams basevalues;
     VoiceParams modvalues;
-    
+
     using EnvType = sst::basic_blocks::modulators::ADSREnvelope<SRProviderB, ENVBLOCKSIZE>;
     SRProviderB m_sr_provider;
     EnvType m_vol_env{&m_sr_provider};
-    
-    
+
     NoisePlethoraVoice()
     {
         modvalues.algo = 0;
@@ -148,16 +147,17 @@ class NoisePlethoraVoice
         chan = chan_;
         key = key_;
         note_id = id_;
-        
+
         m_voice_active = true;
         m_eg_gate = true;
         m_vol_env.attackFrom(0.0f, 0.0f, 0, true);
     }
-    void deactivate()
-    {
-        m_eg_gate = false;
-    }
+    void deactivate() { m_eg_gate = false; }
     int m_update_counter = 0;
+    float eg_attack = 0.4f;
+    float eg_decay = 0.4f;
+    float eg_sustain = 1.0f;
+    float eg_release = 0.6f;
     // must accumulate into the buffer, precleared by the synth before processing the first voice
     void process(choc::buffer::ChannelArrayView<float> destBuf)
     {
@@ -177,14 +177,15 @@ class NoisePlethoraVoice
         filter.setCoeff(totalcutoff, totalreson, 1.0 / m_sr);
 
         double totalpan = reflect_value(0.0f, basevalues.pan + modvalues.pan, 1.0f);
-        
+
         int ftype = basevalues.filttype;
 
         for (size_t i = 0; i < destBuf.size.numFrames; ++i)
         {
             if (m_update_counter == 0)
             {
-                m_vol_env.processBlock(0.4f, 0.5f, 0.5f, 0.7f, 1, 1, 1, m_eg_gate);
+                m_vol_env.processBlock(eg_attack, eg_decay, eg_sustain, eg_release, 1, 1, 1,
+                                       m_eg_gate);
             }
             float envgain = m_vol_env.outputCache[m_update_counter];
             ++m_update_counter;
@@ -194,7 +195,7 @@ class NoisePlethoraVoice
             double smoothedpan = m_pan_smoother.process(totalpan);
             // does expensive calculation, so might want to use tables or something instead
             sst::basic_blocks::dsp::pan_laws::monoEqualPower(smoothedpan, panmat);
-            
+
             float out = plug->processGraph() * smoothedgain * envgain;
             float outL = panmat[0] * out;
             float outR = panmat[3] * out;
@@ -307,6 +308,14 @@ class NoisePlethoraSynth
                     v->basevalues.filtreson = value;
                 if (parid == (clap_id)ParamIDs::FiltType)
                     v->basevalues.filttype = value;
+                if (parid == (clap_id)ParamIDs::EGAttack)
+                    v->eg_attack = value;
+                if (parid == (clap_id)ParamIDs::EGDecay)
+                    v->eg_decay = value;
+                if (parid == (clap_id)ParamIDs::EGSustain)
+                    v->eg_sustain = value;
+                if (parid == (clap_id)ParamIDs::EGRelease)
+                    v->eg_release = value;
             }
         }
     }
@@ -327,8 +336,8 @@ class NoisePlethoraSynth
     {
         for (auto &v : m_voices)
         {
-            if (v->m_voice_active && v->port_id == port &&
-                v->chan == ch && v->key == key && v->note_id == note_id)
+            if (v->m_voice_active && v->port_id == port && v->chan == ch && v->key == key &&
+                v->note_id == note_id)
             {
                 std::cout << "deactivated " << v->chan << " " << v->key << " " << v->note_id
                           << "\n";
@@ -359,7 +368,11 @@ class NoisePlethoraSynth
         FiltResonance,
         FiltType,
         Algo,
-        Pan
+        Pan,
+        EGAttack,
+        EGDecay,
+        EGSustain,
+        EGRelease
     };
     int m_polyphony = 1;
     double m_pan_spread = 0.0;

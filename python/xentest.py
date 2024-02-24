@@ -98,6 +98,20 @@ def test_clap3():
     seq = xenakios.ClapSequence()
     seq.addNote(0.0,8.0,0,0,60,-1,0.9)
     seq.addNote(5.0,3.0,0,0,61,-1,0.9)
+    
+    seq.addParameterEvent(False, 0.0, -1, -1, -1, -1, 4, 0.01)
+    seq.addParameterEvent(False, 5.0, -1, -1, 61, -1, 1, 0.9)
+    seq.addParameterEvent(False, 0.0, -1, -1, -1, -1, 8, 0.6)
+    t = 0.0
+    cutoffs = [84.0,72.0,90.0,78.0,61.0,93.0,52.0]
+    i = 0
+    while t<10.0:
+        # seq.addParameterEvent(False, t, -1, -1, -1, -1, 3, cutoffs[i % 7])
+        # seq.addParameterEvent(False,t,-1,-1,-1,-1,5,i % 6)
+        # seq.addParameterEvent(False,t, -1, -1, -1, -1, 4, 0.98)
+        # seq.addParameterEvent(False,t+0.1, -1, -1, -1, -1, 4, 0.01)
+        t = t + 0.2
+        i = i + 1
     p.setSequence(seq)
     p.processToFile("clap_noiseplethora_out02.wav",12.0,44100)
     return
