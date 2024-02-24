@@ -25,12 +25,7 @@ struct xen_noise_plethora
         PAR_Algo = 700,
         PAR_FilterType = 800
     };
-    float baseGain = 1.0f;
-    float modulationGain = 1.0f;
-    float mutingGain = 1.0f;
-
     float sampleRate = 44100.0f;
-    float plugparams[10];
     NoisePlethoraSynth m_synth;
     xen_noise_plethora(const clap_host *host, const clap_plugin_descriptor *desc)
         : clap::helpers::Plugin<clap::helpers::MisbehaviourHandler::Terminate,
@@ -99,7 +94,12 @@ struct xen_noise_plethora
                                         .withID(PAR_FilterResonance));
         paramDescriptions.push_back(
             ParamDesc()
-                .withUnorderedMapFormatting({{0, "Lowpass"}, {1, "Highpass"}, {2, "Bandpass"}})
+                .withUnorderedMapFormatting({{0, "Lowpass"},
+                                             {1, "Highpass"},
+                                             {2, "Bandpass"},
+                                             {3, "Peak"},
+                                             {4, "Notch"},
+                                             {5, "Allpass"}})
                 .withDefault(0.0)
                 .withFlags(CLAP_PARAM_IS_AUTOMATABLE | CLAP_PARAM_IS_MODULATABLE |
                            CLAP_PARAM_IS_MODULATABLE_PER_NOTE_ID | CLAP_PARAM_IS_STEPPED)

@@ -17,7 +17,7 @@ PYBIND11_MODULE(xenakios, m)
 {
     m.doc() = "pybind11 xenakios plugin"; // optional module docstring
 
-    m.def("list_plugins", &list_plugins, "print noise plethora plugins");
+    // m.def("list_plugins", &list_plugins, "print noise plethora plugins");
 
     py::class_<ClapEventSequence>(m, "ClapSequence")
         .def(py::init<>())
@@ -52,20 +52,13 @@ PYBIND11_MODULE(xenakios, m)
         .def(py::init<const std::string &, int>())
         .def("setSequence", &ClapProcessingEngine::setSequencer)
         .def("getParameters", &ClapProcessingEngine::getParameters)
-        .def("getNumParameters",&ClapProcessingEngine::getNumParameters)
-        .def("getParameterInfoString",&ClapProcessingEngine::getParameterInfoString)
+        .def("getNumParameters", &ClapProcessingEngine::getNumParameters)
+        .def("getParameterInfoString", &ClapProcessingEngine::getParameterInfoString)
         .def("showGUIBlocking", &ClapProcessingEngine::openPluginGUIBlocking)
         .def("openWindow", &ClapProcessingEngine::openPersistentWindow)
         .def("saveStateToFile", &ClapProcessingEngine::saveStateToFile)
         .def("loadStateFromFile", &ClapProcessingEngine::loadStateFromFile)
         .def("processToFile", &ClapProcessingEngine::processToFile);
-
-    py::class_<NoisePlethoraEngine>(m, "NoisePlethoraEngine")
-        .def(py::init<>())
-        .def("processToFile", &NoisePlethoraEngine::processToFile)
-        .def_readwrite("highpass", &NoisePlethoraEngine::hipasscutoff,
-                       "high pass filter cutoff, in semitones")
-        .def("setSequence", &NoisePlethoraEngine::setSequence);
 
     py::class_<xenakios::EnvelopePoint>(m, "EnvelopePoint")
         .def(py::init<double, double>())
