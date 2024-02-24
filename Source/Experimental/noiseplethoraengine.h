@@ -168,7 +168,9 @@ class NoisePlethoraVoice
         assert(safealgo >= 0 && safealgo < m_plugs.size() - 1);
         auto plug = m_plugs[safealgo].get();
         // set params, doesn't actually process audio
-        plug->process(basevalues.x, basevalues.y);
+        float totalx = std::clamp(basevalues.x + modvalues.x, 0.0f, 1.0f);
+        float totaly = std::clamp(basevalues.y + modvalues.y, 0.0f, 1.0f);
+        plug->process(totalx, totaly);
         double totalvol = std::clamp(basevalues.volume + modvalues.volume, -96.0f, 0.0f);
         double gain = xenakios::decibelsToGain(totalvol);
         sst::basic_blocks::dsp::pan_laws::panmatrix_t panmat;
