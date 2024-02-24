@@ -96,7 +96,11 @@ def test_clap3():
         print(parinfo)
     # p.showGUIBlocking()
     seq = xenakios.ClapSequence()
-    seq.addNote(0.0,9.0,0,0,60,-1,0.9)
+    seq.addNote(0.0,8.0,0,0,60,-1,0.9)
+    seq.addNote(5.0,3.0,0,0,61,-1,0.9)
+    p.setSequence(seq)
+    p.processToFile("clap_noiseplethora_out02.wav",12.0,44100)
+    return
     seq.addParameterEvent(False, 0.0, 0, 0, -1, -1, 3, 84.0)
     seq.addParameterEvent(False, 0.0, 0, 0, -1, -1, 4, 0.4)
     seq.addParameterEvent(False, 7.5, 0, 0, -1, -1, 4, 0.9)
@@ -138,7 +142,7 @@ def test_clap3():
             seq.addParameterEvent(False, t, 0, 0, -1, -1, 3, 84+12.0* math.sin(2*3.141592*t*0.6))
             t = t + 0.1
     p.setSequence(seq)
-    p.processToFile("clap_noiseplethora_out01.wav",10.0,44100)
+    p.processToFile("clap_noiseplethora_out02.wav",10.0,44100)
     # p.saveStateToFile("surgestate.bin")
 
 test_clap3()

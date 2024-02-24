@@ -4,6 +4,7 @@
 #include "../Plugins/noise-plethora/plugins/Banks.hpp"
 #include "audio/choc_AudioFileFormat_WAV.h"
 #include "sst/basic-blocks/dsp/PanLaws.h"
+#include "sst/basic-blocks/modulators/ADSREnvelope.h"
 #include "gui/choc_DesktopWindow.h"
 #include "gui/choc_MessageLoop.h"
 #include "gui/choc_WebView.h"
@@ -47,6 +48,36 @@ inline void list_plugins()
     }
 }
 
+struct SRProviderB
+{
+    static constexpr int BLOCK_SIZE = 32;
+    static constexpr int BLOCK_SIZE_OS = BLOCK_SIZE * 2;
+    SRProviderB() { initTables(); }
+    alignas(32) float table_envrate_linear[512];
+    double samplerate = 44100.0;
+    void initTables()
+    {
+        double dsamplerate_os = samplerate * 2;
+        for (int i = 0; i < 512; ++i)
+        {
+            double k =
+                dsamplerate_os * pow(2.0, (((double)i - 256.0) / 16.0)) / (double)BLOCK_SIZE_OS;
+            table_envrate_linear[i] = (float)(1.f / k);
+        }
+    }
+    float envelope_rate_linear_nowrap(float x)
+    {
+        x *= 16.f;
+        x += 256.f;
+        int e = std::clamp<int>((int)x, 0, 0x1ff - 1);
+
+        float a = x - (float)e;
+
+        return (1 - a) * table_envrate_linear[e & 0x1ff] +
+               a * table_envrate_linear[(e + 1) & 0x1ff];
+    }
+};
+
 class NoisePlethoraVoice
 {
   public:
@@ -63,17 +94,12 @@ class NoisePlethoraVoice
     };
     VoiceParams basevalues;
     VoiceParams modvalues;
-    enum class EnvelopeState
-    {
-        Idle,
-        Attack,
-        Sustain,
-        Release
-    };
-    EnvelopeState envstate = EnvelopeState::Idle;
-    double env_attack = 0.01;
-    double env_release = 1.0;
-    int env_counter = 0;
+    
+    using EnvType = sst::basic_blocks::modulators::ADSREnvelope<SRProviderB, ENVBLOCKSIZE>;
+    SRProviderB m_sr_provider;
+    EnvType m_vol_env{&m_sr_provider};
+    
+    
     NoisePlethoraVoice()
     {
         modvalues.algo = 0;
@@ -98,6 +124,8 @@ class NoisePlethoraVoice
     double hipasscutoff = 12.0;
     void prepare(double sampleRate)
     {
+        m_sr_provider.samplerate = sampleRate;
+        m_sr_provider.initTables();
         m_sr = sampleRate;
         dcblocker.setCoeff(hipasscutoff, 0.01, 1.0 / m_sr);
         dcblocker.init();
@@ -111,6 +139,8 @@ class NoisePlethoraVoice
         }
     }
     double velocity = 1.0;
+    bool m_eg_gate = false;
+    bool m_voice_active = false;
     void activate(int port_, int chan_, int key_, int id_, double velo)
     {
         velocity = velo;
@@ -118,20 +148,21 @@ class NoisePlethoraVoice
         chan = chan_;
         key = key_;
         note_id = id_;
-        envstate = EnvelopeState::Attack;
-        env_counter = 0;
+        
+        m_voice_active = true;
+        m_eg_gate = true;
+        m_vol_env.attackFrom(0.0f, 0.0f, 0, true);
     }
     void deactivate()
     {
-        envstate = EnvelopeState::Release;
-        env_counter = 0;
+        m_eg_gate = false;
     }
-
+    int m_update_counter = 0;
     // must accumulate into the buffer, precleared by the synth before processing the first voice
     void process(choc::buffer::ChannelArrayView<float> destBuf)
     {
-        if (envstate == EnvelopeState::Idle)
-            return;
+        // if (envstate == EnvelopeState::Idle)
+        //     return;
         int safealgo =
             wrap_value<float>(0, basevalues.algo + modvalues.algo, (int)m_plugs.size() - 1);
         assert(safealgo >= 0 && safealgo < m_plugs.size() - 1);
@@ -146,41 +177,24 @@ class NoisePlethoraVoice
         filter.setCoeff(totalcutoff, totalreson, 1.0 / m_sr);
 
         double totalpan = reflect_value(0.0f, basevalues.pan + modvalues.pan, 1.0f);
-        int attlensamples = env_attack * m_sr;
-        int rellensamples = env_release * m_sr;
+        
         int ftype = basevalues.filttype;
+
         for (size_t i = 0; i < destBuf.size.numFrames; ++i)
         {
+            if (m_update_counter == 0)
+            {
+                m_vol_env.processBlock(0.4f, 0.5f, 0.5f, 0.7f, 1, 1, 1, m_eg_gate);
+            }
+            float envgain = m_vol_env.outputCache[m_update_counter];
+            ++m_update_counter;
+            if (m_update_counter == ENVBLOCKSIZE)
+                m_update_counter = 0;
             double smoothedgain = m_gain_smoother.process(gain);
             double smoothedpan = m_pan_smoother.process(totalpan);
             // does expensive calculation, so might want to use tables or something instead
             sst::basic_blocks::dsp::pan_laws::monoEqualPower(smoothedpan, panmat);
-            float envgain = 0.0;
-            if (envstate == EnvelopeState::Attack)
-            {
-                envgain = 1.0 / attlensamples * env_counter;
-                ++env_counter;
-                if (env_counter == attlensamples)
-                {
-                    envstate = EnvelopeState::Sustain;
-                    env_counter = 0;
-                }
-            }
-            if (envstate == EnvelopeState::Sustain)
-            {
-                envgain = 1.0f;
-            }
-            if (envstate == EnvelopeState::Release)
-            {
-                envgain = 1.0 - (1.0 / rellensamples * env_counter);
-                ++env_counter;
-                if (env_counter == rellensamples)
-                {
-                    env_counter = 0;
-                    envstate = EnvelopeState::Idle;
-                }
-            }
-
+            
             float out = plug->processGraph() * smoothedgain * envgain;
             float outL = panmat[0] * out;
             float outR = panmat[3] * out;
@@ -201,6 +215,10 @@ class NoisePlethoraVoice
                 filter.step<StereoSimperSVF::ALL>(filter, outL, outR);
             destBuf.getSample(0, i) += outL;
             destBuf.getSample(1, i) += outR;
+        }
+        if (m_vol_env.stage == EnvType::s_eoc)
+        {
+            m_voice_active = false;
         }
     }
     int port_id = -1;
@@ -296,7 +314,7 @@ class NoisePlethoraSynth
     {
         for (auto &v : m_voices)
         {
-            if (v->envstate == NoisePlethoraVoice::EnvelopeState::Idle)
+            if (!v->m_voice_active)
             {
                 std::cout << "activated " << ch << " " << key << " " << note_id << "\n";
                 v->activate(port, ch, key, note_id, velo);
@@ -309,7 +327,7 @@ class NoisePlethoraSynth
     {
         for (auto &v : m_voices)
         {
-            if (v->envstate != NoisePlethoraVoice::EnvelopeState::Idle && v->port_id == port &&
+            if (v->m_voice_active && v->port_id == port &&
                 v->chan == ch && v->key == key && v->note_id == note_id)
             {
                 std::cout << "deactivated " << v->chan << " " << v->key << " " << v->note_id
@@ -323,7 +341,7 @@ class NoisePlethoraSynth
         m_mix_buf.clear();
         for (int i = 0; i < m_voices.size(); ++i)
         {
-            if (m_voices[i]->envstate != NoisePlethoraVoice::EnvelopeState::Idle)
+            if (m_voices[i]->m_voice_active)
             {
                 m_voices[i]->process(m_mix_buf.getView());
             }
