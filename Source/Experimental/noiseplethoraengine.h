@@ -161,8 +161,6 @@ class NoisePlethoraVoice
     // must accumulate into the buffer, precleared by the synth before processing the first voice
     void process(choc::buffer::ChannelArrayView<float> destBuf)
     {
-        // if (envstate == EnvelopeState::Idle)
-        //     return;
         int safealgo =
             wrap_value<float>(0, basevalues.algo + modvalues.algo, (int)m_plugs.size() - 1);
         assert(safealgo >= 0 && safealgo < m_plugs.size() - 1);
@@ -241,10 +239,10 @@ class NoisePlethoraVoice
 class NoisePlethoraSynth
 {
   public:
-    NoisePlethoraVoice::VoiceParams voiceparams;
+    static constexpr size_t maxNumVoices = 16;
     NoisePlethoraSynth()
     {
-        for (int i = 0; i < 8; ++i)
+        for (size_t i = 0; i < maxNumVoices; ++i)
         {
             auto v = std::make_unique<NoisePlethoraVoice>();
             m_voices.push_back(std::move(v));
