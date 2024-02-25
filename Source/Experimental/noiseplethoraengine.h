@@ -230,9 +230,9 @@ class NoisePlethoraVoice
             destBuf.getSample(1, i) += outR;
         }
     }
-    int port_id = -1;
-    int chan = -1;
-    int key = -1;
+    int port_id = 0;
+    int chan = 0;
+    int key = 0;
     int note_id = -1;
 
   private:
@@ -348,8 +348,7 @@ class NoisePlethoraSynth
     {
         for (auto &v : m_voices)
         {
-            if (v->port_id == port && v->chan == ch && v->key == key &&
-                v->note_id == note_id)
+            if (v->port_id == port && v->chan == ch && v->key == key && v->note_id == note_id)
             {
                 // std::cout << "deactivated " << v->chan << " " << v->key << " " << v->note_id
                 //          << "\n";

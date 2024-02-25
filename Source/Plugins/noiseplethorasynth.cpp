@@ -227,13 +227,14 @@ struct xen_noise_plethora
         // This pointer is the sentinel to our next event which we advance once an event is
         // processed
 
+        /*
         const clap_event_header_t *nextEvent{nullptr};
         uint32_t nextEventIndex{0};
         if (sz != 0)
         {
             nextEvent = ev->get(ev, nextEventIndex);
         }
-        
+
         for (uint32_t i = 0; i < fc; ++i)
         {
             // while, because we need to scan for events that could be at the same buffer position
@@ -247,7 +248,12 @@ struct xen_noise_plethora
                     nextEvent = ev->get(ev, nextEventIndex);
             }
         }
-
+        */
+        for (int i = 0; i < sz; ++i)
+        {
+            auto evt = ev->get(ev, i);
+            handleNextEvent(evt);
+        }
         choc::buffer::SeparateChannelLayout<float> layout(process->audio_outputs->data32);
         choc::buffer::ChannelArrayView<float> bufview(layout, {2, process->frames_count});
         bufview.clear();

@@ -119,19 +119,25 @@ def test_clap3():
     # decay
     seq.addParameterEvent(False, 0.0, -1, -1, -1, -1, 9, 0.1 )
     # sustain
-    seq.addParameterEvent(False, 0.0, -1, -1, -1, -1, 10, 0.5 )
+    seq.addParameterEvent(False, 0.0, -1, -1, -1, -1, 10, 0.25 )
     # release
-    seq.addParameterEvent(False, 0.0, -1, -1, -1, -1, 11, 0.4 )
+    seq.addParameterEvent(False, 0.0, -1, -1, -1, -1, 11, 0.6 )
     
     t = 0.0
     i = 0
-    while t<10.0:
+    while t<14.0:
         # if random.random()<0.5:
         seq.addNote(t,0.1,0,0,60,i,0.9)
+        pan = 0.5
+        if i % 2 == 0:
+            pan = 0.1
+        else:
+            pan = 0.9
+        seq.addParameterEvent(False,t, 0, -1, -1, i, 7, pan)
         # seq.addParameterEvent(False,t, -1, -1, -1, -1, 3, 84.0+36.5*math.sin(2*3.141592653*t*0.25))
         # seq.addParameterEvent(False,t, -1, -1, -1, -1, 4, 0.5+0.5*math.sin(2*3.141592653*t*0.5))
-        t = t + 0.05001
-        i = i + 2
+        t = t + 0.2
+        i = i + 1
     p.setSequence(seq)
     p.processToFile("clap_noiseplethora_out02.wav",15.0,44100)
     return
