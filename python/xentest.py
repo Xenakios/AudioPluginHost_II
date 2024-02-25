@@ -93,6 +93,8 @@ Filter resonance (ID 4) range [0.010000 - 0.990000] Automatable/Modulatable/PerN
 Filter type (ID 5) range [0.000000 - 1.000000] Automatable/Modulatable/PerNoteID
 """
 
+npids={"Volume":0,"Pan":7,"X":1,"Y":2,"Cutoff":3}
+
 def test_clap3():
     
     p = xenakios.ClapEngine(r'C:\Program Files\Common Files\CLAP\NoisePlethoraSynth.clap',0)
@@ -121,22 +123,25 @@ def test_clap3():
     # sustain
     seq.addParameterEvent(False, 0.0, -1, -1, -1, -1, 10, 0.25 )
     # release
-    seq.addParameterEvent(False, 0.0, -1, -1, -1, -1, 11, 0.6 )
+    seq.addParameterEvent(False, 0.0, -1, -1, -1, -1, 11, 0.25 )
     
     t = 0.0
     i = 0
     while t<14.0:
         # if random.random()<0.5:
-        seq.addNote(t,0.1,0,0,60,i,0.9)
+        seq.addNote(t,0.5,0,0,60,i,0.9)
         pan = 0.5
         if i % 2 == 0:
             pan = 0.1
         else:
             pan = 0.9
-        seq.addParameterEvent(False,t, 0, -1, -1, i, 7, pan)
+        seq.addParameterEvent(False,t, 0, -1, -1, i, npids["Pan"], pan)
+        if i % 7 == 0:
+            seq.addParameterEvent(False,t, 0, -1, -1, i, 1, 0.0+1.0*random.random())
+            seq.addParameterEvent(False,t, 0, -1, -1, i, 2, 0.0+1.0*random.random())
         # seq.addParameterEvent(False,t, -1, -1, -1, -1, 3, 84.0+36.5*math.sin(2*3.141592653*t*0.25))
         # seq.addParameterEvent(False,t, -1, -1, -1, -1, 4, 0.5+0.5*math.sin(2*3.141592653*t*0.5))
-        t = t + 0.2
+        t = t + 0.1
         i = i + 1
     p.setSequence(seq)
     p.processToFile("clap_noiseplethora_out02.wav",15.0,44100)
