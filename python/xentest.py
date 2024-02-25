@@ -125,13 +125,13 @@ def test_clap3():
     
     t = 0.0
     i = 0
-    while t<10.5:
+    while t<10.0:
         # if random.random()<0.5:
         seq.addNote(t,0.1,0,0,60,i,0.9)
         # seq.addParameterEvent(False,t, -1, -1, -1, -1, 3, 84.0+36.5*math.sin(2*3.141592653*t*0.25))
         # seq.addParameterEvent(False,t, -1, -1, -1, -1, 4, 0.5+0.5*math.sin(2*3.141592653*t*0.5))
-        t = t + 0.05
-        i = i + 1
+        t = t + 0.05001
+        i = i + 2
     p.setSequence(seq)
     p.processToFile("clap_noiseplethora_out02.wav",15.0,44100)
     return

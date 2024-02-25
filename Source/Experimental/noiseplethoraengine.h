@@ -167,6 +167,8 @@ class NoisePlethoraVoice
     // must accumulate into the buffer, precleared by the synth before processing the first voice
     void process(choc::buffer::ChannelArrayView<float> destBuf)
     {
+        if (!m_voice_active)
+            return;
         int safealgo =
             wrap_value<float>(0, basevalues.algo + modvalues.algo, (int)m_plugs.size() - 1);
         assert(safealgo >= 0 && safealgo < m_plugs.size() - 1);
@@ -346,7 +348,7 @@ class NoisePlethoraSynth
     {
         for (auto &v : m_voices)
         {
-            if (v->m_voice_active && v->port_id == port && v->chan == ch && v->key == key &&
+            if (v->port_id == port && v->chan == ch && v->key == key &&
                 v->note_id == note_id)
             {
                 // std::cout << "deactivated " << v->chan << " " << v->key << " " << v->note_id

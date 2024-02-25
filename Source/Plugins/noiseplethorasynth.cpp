@@ -233,7 +233,7 @@ struct xen_noise_plethora
         {
             nextEvent = ev->get(ev, nextEventIndex);
         }
-        uint32_t overscount = 0;
+        
         for (uint32_t i = 0; i < fc; ++i)
         {
             // while, because we need to scan for events that could be at the same buffer position
