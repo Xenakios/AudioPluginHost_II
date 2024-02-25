@@ -589,9 +589,9 @@ class ClapProcessingEngine
                 castbuf[i] = c;
                 // std::cout << (char)c;
                 if (is->eof())
-                    return (int64_t)(i-1);
+                    return (int64_t)(i - 1);
             }
-            
+
             return (int64_t)size;
         };
         // m_plug->activate(44100.0,512,512);
@@ -600,7 +600,8 @@ class ClapProcessingEngine
             clap::helpers::EventList inlist;
             clap::helpers::EventList outlist;
             // m_plug->paramsFlush(inlist.clapInputEvents(), outlist.clapOutputEvents());
-        } else
+        }
+        else
         {
             std::cout << "failed to set clap state\n";
         }
@@ -671,8 +672,16 @@ class ClapProcessingEngine
             choc::audio::WAVAudioFileFormat<true> wavformat;
             auto writer = wavformat.createWriter(filename, outfileprops);
             eviter.setTime(0.0);
+            int blockcount = 0;
             while (outcounter < outlensamples)
             {
+                if (blockcount == 0)
+                {
+                    // eviter.setTime(outcounter / samplerate);
+                }
+                ++blockcount;
+                if (blockcount == 128)
+                    blockcount = 0;
                 auto blockevts = eviter.readNextEvents(procblocksize / samplerate);
                 for (auto &e : blockevts)
                 {

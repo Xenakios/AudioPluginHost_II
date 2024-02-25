@@ -131,6 +131,12 @@ class NoisePlethoraVoice
         filter.init();
         m_gain_smoother.setSlope(0.999);
         m_pan_smoother.setSlope(0.999);
+        float g = xenakios::decibelsToGain(basevalues.volume);
+        for (int i = 0; i < 2048; ++i)
+        {
+            m_pan_smoother.process(basevalues.pan);
+            m_gain_smoother.process(g);
+        }
         for (auto &p : m_plugs)
         {
             p->init();
@@ -186,6 +192,10 @@ class NoisePlethoraVoice
             {
                 m_vol_env.processBlock(eg_attack, eg_decay, eg_sustain, eg_release, 1, 1, 1,
                                        m_eg_gate);
+                if (m_vol_env.stage == EnvType::s_eoc)
+                {
+                    m_voice_active = false;
+                }
             }
             float envgain = m_vol_env.outputCache[m_update_counter];
             ++m_update_counter;
@@ -217,10 +227,6 @@ class NoisePlethoraVoice
             destBuf.getSample(0, i) += outL;
             destBuf.getSample(1, i) += outR;
         }
-        if (m_vol_env.stage == EnvType::s_eoc)
-        {
-            m_voice_active = false;
-        }
     }
     int port_id = -1;
     int chan = -1;
@@ -248,6 +254,8 @@ class NoisePlethoraSynth
             m_voices.push_back(std::move(v));
         }
     }
+    ~NoisePlethoraSynth() { std::cout << "voices left at synth dtor " << voicecount << "\n"; }
+
     void prepare(double sampleRate, int maxBlockSize)
     {
         m_sr = sampleRate;
@@ -319,13 +327,15 @@ class NoisePlethoraSynth
             }
         }
     }
+    int voicecount = 0;
     void startNote(int port, int ch, int key, int note_id, double velo)
     {
         for (auto &v : m_voices)
         {
             if (!v->m_voice_active)
             {
-                std::cout << "activated " << ch << " " << key << " " << note_id << "\n";
+                ++voicecount;
+                // std::cout << "activated " << ch << " " << key << " " << note_id << "\n";
                 v->activate(port, ch, key, note_id, velo);
                 return;
             }
@@ -339,8 +349,9 @@ class NoisePlethoraSynth
             if (v->m_voice_active && v->port_id == port && v->chan == ch && v->key == key &&
                 v->note_id == note_id)
             {
-                std::cout << "deactivated " << v->chan << " " << v->key << " " << v->note_id
-                          << "\n";
+                // std::cout << "deactivated " << v->chan << " " << v->key << " " << v->note_id
+                //          << "\n";
+                --voicecount;
                 v->deactivate();
             }
         }
@@ -348,7 +359,7 @@ class NoisePlethoraSynth
     void processBlock(choc::buffer::ChannelArrayView<float> destBuf)
     {
         m_mix_buf.clear();
-        for (int i = 0; i < m_voices.size(); ++i)
+        for (size_t i = 0; i < m_voices.size(); ++i)
         {
             if (m_voices[i]->m_voice_active)
             {

@@ -14,17 +14,7 @@ struct xen_noise_plethora
                                    clap::helpers::CheckingLevel::Maximal>
 {
     std::vector<ParamDesc> paramDescriptions;
-    enum PARAMS
-    {
-        PAR_Volume = 100,
-        PAR_Pan = 200,
-        PAR_FilterCutoff = 300,
-        PAR_FilterResonance = 400,
-        PAR_X = 500,
-        PAR_Y = 600,
-        PAR_Algo = 700,
-        PAR_FilterType = 800
-    };
+
     float sampleRate = 44100.0f;
     NoisePlethoraSynth m_synth;
     xen_noise_plethora(const clap_host *host, const clap_plugin_descriptor *desc)
@@ -40,14 +30,14 @@ struct xen_noise_plethora
                                                    CLAP_PARAM_IS_MODULATABLE |
                                                    CLAP_PARAM_IS_MODULATABLE_PER_NOTE_ID)
                                         .withName("Volume")
-                                        .withID(PAR_Volume));
+                                        .withID((clap_id)NoisePlethoraSynth::ParamIDs::Volume));
         paramDescriptions.push_back(ParamDesc()
                                         .asPercentBipolar()
                                         .withFlags(CLAP_PARAM_IS_AUTOMATABLE |
                                                    CLAP_PARAM_IS_MODULATABLE |
                                                    CLAP_PARAM_IS_MODULATABLE_PER_NOTE_ID)
                                         .withName("Pan")
-                                        .withID(PAR_Pan));
+                                        .withID((clap_id)NoisePlethoraSynth::ParamIDs::Pan));
         paramDescriptions.push_back(ParamDesc()
                                         .withLinearScaleFormatting("")
                                         .withRange(0.0, 1.0)
@@ -56,7 +46,7 @@ struct xen_noise_plethora
                                                    CLAP_PARAM_IS_MODULATABLE |
                                                    CLAP_PARAM_IS_MODULATABLE_PER_NOTE_ID)
                                         .withName("X")
-                                        .withID(PAR_X));
+                                        .withID((clap_id)NoisePlethoraSynth::ParamIDs::X));
         paramDescriptions.push_back(ParamDesc()
                                         .withLinearScaleFormatting("")
                                         .withRange(0.0, 1.0)
@@ -65,7 +55,7 @@ struct xen_noise_plethora
                                                    CLAP_PARAM_IS_MODULATABLE |
                                                    CLAP_PARAM_IS_MODULATABLE_PER_NOTE_ID)
                                         .withName("Y")
-                                        .withID(PAR_Y));
+                                        .withID((clap_id)NoisePlethoraSynth::ParamIDs::Y));
         paramDescriptions.push_back(
             ParamDesc()
                 .withRange(0.0, 29.0)
@@ -73,7 +63,7 @@ struct xen_noise_plethora
                 .withFlags(CLAP_PARAM_IS_AUTOMATABLE | CLAP_PARAM_IS_MODULATABLE |
                            CLAP_PARAM_IS_MODULATABLE_PER_NOTE_ID | CLAP_PARAM_IS_STEPPED)
                 .withName("Algorithm")
-                .withID(PAR_Algo));
+                .withID((clap_id)NoisePlethoraSynth::ParamIDs::Algo));
         paramDescriptions.push_back(ParamDesc()
                                         .withLinearScaleFormatting("")
                                         .withRange(0.0, 127.0)
@@ -82,16 +72,16 @@ struct xen_noise_plethora
                                                    CLAP_PARAM_IS_MODULATABLE |
                                                    CLAP_PARAM_IS_MODULATABLE_PER_NOTE_ID)
                                         .withName("Filter cut off")
-                                        .withID(PAR_FilterCutoff));
-        paramDescriptions.push_back(ParamDesc()
-                                        .withLinearScaleFormatting("")
-                                        .withRange(0.01, 0.99)
-                                        .withDefault(0.01)
-                                        .withFlags(CLAP_PARAM_IS_AUTOMATABLE |
-                                                   CLAP_PARAM_IS_MODULATABLE |
-                                                   CLAP_PARAM_IS_MODULATABLE_PER_NOTE_ID)
-                                        .withName("Filter resonance")
-                                        .withID(PAR_FilterResonance));
+                                        .withID((clap_id)NoisePlethoraSynth::ParamIDs::FiltCutoff));
+        paramDescriptions.push_back(
+            ParamDesc()
+                .withLinearScaleFormatting("")
+                .withRange(0.01, 0.99)
+                .withDefault(0.01)
+                .withFlags(CLAP_PARAM_IS_AUTOMATABLE | CLAP_PARAM_IS_MODULATABLE |
+                           CLAP_PARAM_IS_MODULATABLE_PER_NOTE_ID)
+                .withName("Filter resonance")
+                .withID((clap_id)NoisePlethoraSynth::ParamIDs::FiltResonance));
         paramDescriptions.push_back(
             ParamDesc()
                 .withUnorderedMapFormatting({{0, "Lowpass"},
@@ -104,7 +94,7 @@ struct xen_noise_plethora
                 .withFlags(CLAP_PARAM_IS_AUTOMATABLE | CLAP_PARAM_IS_MODULATABLE |
                            CLAP_PARAM_IS_MODULATABLE_PER_NOTE_ID | CLAP_PARAM_IS_STEPPED)
                 .withName("Filter type")
-                .withID(PAR_FilterType));
+                .withID((clap_id)NoisePlethoraSynth::ParamIDs::FiltType));
     }
     clap_id timerId = 0;
 
@@ -176,18 +166,18 @@ struct xen_noise_plethora
 
         switch (nextEvent->type)
         {
-        case CLAP_EVENT_NOTE_ON:
-        {
-            auto nevt = reinterpret_cast<const clap_event_note *>(nextEvent);
-            m_synth.startNote(nevt->port_index, nevt->channel, nevt->key, nevt->note_id,
-                              nevt->velocity);
-            break;
-        }
         case CLAP_EVENT_NOTE_OFF:
         {
             auto nevt = reinterpret_cast<const clap_event_note *>(nextEvent);
             m_synth.stopNote(nevt->port_index, nevt->channel, nevt->key, nevt->note_id,
                              nevt->velocity);
+            break;
+        }
+        case CLAP_EVENT_NOTE_ON:
+        {
+            auto nevt = reinterpret_cast<const clap_event_note *>(nextEvent);
+            m_synth.startNote(nevt->port_index, nevt->channel, nevt->key, nevt->note_id,
+                              nevt->velocity);
             break;
         }
 

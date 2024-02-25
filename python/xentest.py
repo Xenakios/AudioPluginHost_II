@@ -82,6 +82,17 @@ def test_clap2():
 
 # test_clap2()
 
+"""
+Volume (ID 0) range [-24.000000 - 0.000000] Automatable/Modulatable/PerNoteID
+Pan (ID 7) range [-1.000000 - 1.000000] Automatable/Modulatable/PerNoteID
+X (ID 1) range [0.000000 - 1.000000] Automatable/Modulatable/PerNoteID
+Y (ID 2) range [0.000000 - 1.000000] Automatable/Modulatable/PerNoteID
+Algorithm (ID 6) range [0.000000 - 29.000000] Automatable/Modulatable/PerNoteID
+Filter cut off (ID 3) range [0.000000 - 127.000000] Automatable/Modulatable/PerNoteID
+Filter resonance (ID 4) range [0.010000 - 0.990000] Automatable/Modulatable/PerNoteID
+Filter type (ID 5) range [0.000000 - 1.000000] Automatable/Modulatable/PerNoteID
+"""
+
 def test_clap3():
     
     p = xenakios.ClapEngine(r'C:\Program Files\Common Files\CLAP\NoisePlethoraSynth.clap',0)
@@ -93,27 +104,36 @@ def test_clap3():
     numpars = p.getNumParameters()
     for i in range(numpars):
         parinfo = p.getParameterInfoString(i)
-        print(parinfo)
+        # print(parinfo)
     # p.showGUIBlocking()
     seq = xenakios.ClapSequence()
-    seq.addNote(0.0,8.0,0,0,60,-1,0.9)
-    seq.addNote(5.0,3.0,0,0,61,-1,0.9)
     
-    seq.addParameterEvent(False, 0.0, -1, -1, -1, -1, 4, 0.01)
-    seq.addParameterEvent(False, 5.0, -1, -1, 61, -1, 1, 0.9)
-    seq.addParameterEvent(False, 0.0, -1, -1, -1, -1, 8, 0.6)
+    # seq.addNote(5.0,5.0,0,0,61,-1,0.9)
+    
+    # seq.addParameterEvent(False, 0.0, -1, -1, -1, -1, 3, 84.0)
+    # seq.addParameterEvent(False, 0.0, -1,-1,-1,-1,5,3)
+    # seq.addParameterEvent(False, 0.0, -1, -1, -1, -1, 4, 0.90 )
+    
+    # attack
+    seq.addParameterEvent(False, 0.0, -1, -1, -1, -1, 8, 0.01 )
+    # decay
+    seq.addParameterEvent(False, 0.0, -1, -1, -1, -1, 9, 0.1 )
+    # sustain
+    seq.addParameterEvent(False, 0.0, -1, -1, -1, -1, 10, 0.5 )
+    # release
+    seq.addParameterEvent(False, 0.0, -1, -1, -1, -1, 11, 0.4 )
+    
     t = 0.0
-    cutoffs = [84.0,72.0,90.0,78.0,61.0,93.0,52.0]
     i = 0
-    while t<10.0:
-        # seq.addParameterEvent(False, t, -1, -1, -1, -1, 3, cutoffs[i % 7])
-        # seq.addParameterEvent(False,t,-1,-1,-1,-1,5,i % 6)
-        # seq.addParameterEvent(False,t, -1, -1, -1, -1, 4, 0.98)
-        # seq.addParameterEvent(False,t+0.1, -1, -1, -1, -1, 4, 0.01)
-        t = t + 0.2
+    while t<10.5:
+        # if random.random()<0.5:
+        seq.addNote(t,0.1,0,0,60,i,0.9)
+        # seq.addParameterEvent(False,t, -1, -1, -1, -1, 3, 84.0+36.5*math.sin(2*3.141592653*t*0.25))
+        # seq.addParameterEvent(False,t, -1, -1, -1, -1, 4, 0.5+0.5*math.sin(2*3.141592653*t*0.5))
+        t = t + 0.05
         i = i + 1
     p.setSequence(seq)
-    p.processToFile("clap_noiseplethora_out02.wav",12.0,44100)
+    p.processToFile("clap_noiseplethora_out02.wav",15.0,44100)
     return
     seq.addParameterEvent(False, 0.0, 0, 0, -1, -1, 3, 84.0)
     seq.addParameterEvent(False, 0.0, 0, 0, -1, -1, 4, 0.4)
