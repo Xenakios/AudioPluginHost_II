@@ -125,9 +125,11 @@ def test_clap3():
     # release
     seq.addParameterEvent(False, 0.0, -1, -1, -1, -1, 11, 0.25 )
     
+
+
     t = 0.0
     i = 0
-    while t<14.0:
+    while t<43.0:
         # if random.random()<0.5:
         seq.addNote(t,0.5,0,0,60,i,0.9)
         pan = 0.5
@@ -137,14 +139,15 @@ def test_clap3():
             pan = 0.9
         seq.addParameterEvent(False,t, 0, -1, -1, i, npids["Pan"], pan)
         if i % 7 == 0:
-            seq.addParameterEvent(False,t, 0, -1, -1, i, 1, 0.0+1.0*random.random())
-            seq.addParameterEvent(False,t, 0, -1, -1, i, 2, 0.0+1.0*random.random())
+            seq.addParameterEvent(False,t , -1, -1, -1, -1, 6, random.random()*12)
+        seq.addParameterEvent(False,t, 0, -1, -1, i, 1, 0.0+1.0*random.random())
+        seq.addParameterEvent(False,t, 0, -1, -1, i, 2, 0.0+1.0*random.random())
         # seq.addParameterEvent(False,t, -1, -1, -1, -1, 3, 84.0+36.5*math.sin(2*3.141592653*t*0.25))
         # seq.addParameterEvent(False,t, -1, -1, -1, -1, 4, 0.5+0.5*math.sin(2*3.141592653*t*0.5))
         t = t + 0.1
         i = i + 1
     p.setSequence(seq)
-    p.processToFile("clap_noiseplethora_out02.wav",15.0,44100)
+    p.processToFile("clap_noiseplethora_out02.wav",45.0,44100)
     return
     seq.addParameterEvent(False, 0.0, 0, 0, -1, -1, 3, 84.0)
     seq.addParameterEvent(False, 0.0, 0, 0, -1, -1, 4, 0.4)
