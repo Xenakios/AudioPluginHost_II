@@ -147,7 +147,7 @@ def test_clap3():
         t = t + 0.1
         i = i + 1
     p.setSequence(seq)
-    p.processToFile("clap_noiseplethora_out02.wav",45.0,44100)
+    p.processToFile("clap_noiseplethora_out02.wav",15.0,44100)
     return
     seq.addParameterEvent(False, 0.0, 0, 0, -1, -1, 3, 84.0)
     seq.addParameterEvent(False, 0.0, 0, 0, -1, -1, 4, 0.4)

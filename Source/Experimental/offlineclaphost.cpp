@@ -23,7 +23,7 @@ void ClapProcessingEngine::processToFile(std::string filename, double duration, 
     int procblocksize = 64;
     std::atomic<bool> renderloopfinished{false};
     m_plug->activate(samplerate, procblocksize, procblocksize);
-    // std::this_thread::sleep_for(1000ms);
+
     // even offline, do the processing in another another thread because things
     // can get complicated with plugins like Surge XT because of the thread checks
     std::thread th([&] {
@@ -32,24 +32,24 @@ void ClapProcessingEngine::processToFile(std::string filename, double duration, 
         memset(&cp, 0, sizeof(clap_process));
         cp.frames_count = procblocksize;
         cp.audio_inputs_count = 1;
-        choc::buffer::ChannelArrayBuffer<float> ibuf{2, (unsigned int)procblocksize};
-        ibuf.clear();
+        choc::buffer::ChannelArrayBuffer<float> inputbuffer{2, (unsigned int)procblocksize};
+        inputbuffer.clear();
         clap_audio_buffer inbufs[1];
         inbufs[0].channel_count = 2;
         inbufs[0].constant_mask = 0;
         inbufs[0].latency = 0;
-        auto ichansdata = ibuf.getView().data.channels;
+        auto ichansdata = inputbuffer.getView().data.channels;
         inbufs[0].data32 = (float **)ichansdata;
         cp.audio_inputs = inbufs;
 
         cp.audio_outputs_count = 1;
-        choc::buffer::ChannelArrayBuffer<float> buf{2, (unsigned int)procblocksize};
-        buf.clear();
+        choc::buffer::ChannelArrayBuffer<float> outputbuffer{2, (unsigned int)procblocksize};
+        outputbuffer.clear();
         clap_audio_buffer outbufs[1];
         outbufs[0].channel_count = 2;
         outbufs[0].constant_mask = 0;
         outbufs[0].latency = 0;
-        auto chansdata = buf.getView().data.channels;
+        auto chansdata = outputbuffer.getView().data.channels;
         outbufs[0].data32 = (float **)chansdata;
         cp.audio_outputs = outbufs;
 
@@ -106,7 +106,10 @@ void ClapProcessingEngine::processToFile(std::string filename, double duration, 
                 std::cout << "clap processing failed " << status << "\n";
             list_out.clear();
             list_in.clear();
-            writer->appendFrames(buf.getView());
+            uint32_t framesToWrite = std::min(outlensamples - outcounter, procblocksize);
+            auto writeSectionView =
+                outputbuffer.getSection(choc::buffer::ChannelRange{0, 2}, {0, framesToWrite});
+            writer->appendFrames(writeSectionView);
             // std::cout << outcounter << " ";
             cp.steady_time = outcounter;
 
