@@ -79,6 +79,7 @@ add_subdirectory(libs/pybind11)
 pybind11_add_module(xenakios 
     Source/Experimental/pybindings.cpp
     Source/Experimental/xaps/clap_xaudioprocessor.cpp
+    Source/Experimental/offlineclaphost.cpp
 )
 target_link_libraries(xenakios PRIVATE noiseplethora)
 target_compile_definitions(xenakios PRIVATE _USE_MATH_DEFINES=1)

@@ -50,7 +50,7 @@ PYBIND11_MODULE(xenakios, m)
 
     py::class_<ClapProcessingEngine>(m, "ClapEngine")
         .def(py::init<const std::string &, int>())
-        .def("setSequence", &ClapProcessingEngine::setSequencer)
+        .def("setSequence", &ClapProcessingEngine::setSequence)
         .def("getParameters", &ClapProcessingEngine::getParameters)
         .def("getNumParameters", &ClapProcessingEngine::getNumParameters)
         .def("getParameterInfoString", &ClapProcessingEngine::getParameterInfoString)
