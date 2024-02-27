@@ -84,13 +84,6 @@ void ClapProcessingEngine::processToFile(std::string filename, double duration, 
         int blockcount = 0;
         while (outcounter < outlensamples)
         {
-            if (blockcount == 0)
-            {
-                // eviter.setTime(outcounter / samplerate);
-            }
-            ++blockcount;
-            if (blockcount == 128)
-                blockcount = 0;
             auto blockevts = eviter.readNextEvents(procblocksize / samplerate);
             for (auto &e : blockevts)
             {
@@ -102,8 +95,8 @@ void ClapProcessingEngine::processToFile(std::string filename, double duration, 
             }
 
             auto status = m_plug->process(&cp);
-            if (status != CLAP_PROCESS_CONTINUE)
-                std::cout << "clap processing failed " << status << "\n";
+            if (status == CLAP_PROCESS_ERROR)
+                throw std::runtime_error("Clap processing failed");
             list_out.clear();
             list_in.clear();
             uint32_t framesToWrite = std::min(outlensamples - outcounter, procblocksize);
@@ -211,6 +204,25 @@ std::string ClapProcessingEngine::getParameterInfoString(size_t index)
             if (pinfo.flags & CLAP_PARAM_IS_MODULATABLE_PER_NOTE_ID)
             {
                 result += "/PerNoteID";
+            }
+            if (pinfo.flags & CLAP_PARAM_IS_STEPPED)
+            {
+                result += "/Stepped";
+                int numsteps = pinfo.max_value - pinfo.min_value;
+                if (numsteps >= 0 && numsteps < 64)
+                {
+                    result += "/[";
+                    char tbuf[256];
+                    for (int i = 0; i < numsteps; ++i)
+                    {
+                        double v = pinfo.min_value + i;
+                        if (m_plug->paramsValueToText(pinfo.id, v, tbuf, 256))
+                        {
+                            result += std::string(tbuf);
+                            result += " , ";
+                        }
+                    }
+                }
             }
         }
     }

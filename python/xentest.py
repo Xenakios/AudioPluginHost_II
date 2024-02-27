@@ -106,8 +106,9 @@ def test_clap3():
     numpars = p.getNumParameters()
     for i in range(numpars):
         parinfo = p.getParameterInfoString(i)
-        # print(parinfo)
+        print(parinfo)
     # p.showGUIBlocking()
+    return
     seq = xenakios.ClapSequence()
     
     # seq.addNote(5.0,5.0,0,0,61,-1,0.9)

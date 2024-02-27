@@ -120,6 +120,18 @@ struct xen_noise_plethora
     bool paramsValueToText(clap_id paramId, double value, char *display,
                            uint32_t size) noexcept override
     {
+        for (auto &e : paramDescriptions)
+        {
+            if (e.id == paramId)
+            {
+                auto s = e.valueToString(value);
+                if (s)
+                {
+                    strcpy(display, s->c_str());
+                    return true;
+                }
+            }
+        }
         return false;
     }
     bool implementsNotePorts() const noexcept override { return true; }

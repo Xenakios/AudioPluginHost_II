@@ -95,7 +95,7 @@ Source/Plugins/noiseplethorasynth.cpp
 
 set_target_properties(NoisePlethoraSynth PROPERTIES SUFFIX ".clap" PREFIX "")
 target_compile_definitions(NoisePlethoraSynth PRIVATE _USE_MATH_DEFINES=1 IS_WIN=1)
-target_link_libraries(NoisePlethoraSynth PRIVATE noiseplethora)
+target_link_libraries(NoisePlethoraSynth PRIVATE noiseplethora fmt)
 set(products_folder ${CMAKE_BINARY_DIR})
     set(build_type ${CMAKE_BUILD_TYPE})
     add_custom_command(
