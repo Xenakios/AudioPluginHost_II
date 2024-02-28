@@ -106,9 +106,9 @@ def test_clap3():
     numpars = p.getNumParameters()
     for i in range(numpars):
         parinfo = p.getParameterInfoString(i)
-        print(parinfo)
+        # print(parinfo)
     # p.showGUIBlocking()
-    return
+    # return
     seq = xenakios.ClapSequence()
     
     # seq.addNote(5.0,5.0,0,0,61,-1,0.9)
@@ -126,29 +126,44 @@ def test_clap3():
     # release
     seq.addParameterEvent(False, 0.0, -1, -1, -1, -1, 11, 0.25 )
     
+    dvrands = [xenakios.DejaVuRandom(9008),xenakios.DejaVuRandom(64)]
+    
+    dvrands[0].setDejaVu(0.45)
+    dvrands[0].setLoopLength(7)
 
+    dvrands[1].setDejaVu(0.45)
+    dvrands[1].setLoopLength(8)
 
     t = 0.0
-    i = 0
-    while t<43.0:
-        # if random.random()<0.5:
-        seq.addNote(t,0.5,0,0,60,i,0.9)
-        pan = 0.5
-        if i % 2 == 0:
-            pan = 0.1
-        else:
-            pan = 0.9
-        seq.addParameterEvent(False,t, 0, -1, -1, i, npids["Pan"], pan)
-        if i % 7 == 0:
-            seq.addParameterEvent(False,t , -1, -1, -1, -1, 6, random.random()*12)
-        seq.addParameterEvent(False,t, 0, -1, -1, i, 1, 0.0+1.0*random.random())
-        seq.addParameterEvent(False,t, 0, -1, -1, i, 2, 0.0+1.0*random.random())
+    id = 0
+    pans = [0.05,0.3,0.7,0.95]
+    pulselen = 0.75
+    k = 0
+    while t<60.0:
+        xp = dvrands[0].nextFloat(0.0,1.0)
+        pan = pans[k % 4]
+        numnotes = 1
+        if random.random()<0.2:
+            numnotes = random.randint(2,16)
+        sublen = pulselen / numnotes
+        for j in range(0,numnotes):
+            subt = t+sublen*j
+            seq.addNote(subt,sublen,0,0,60,id,0.9)
+            seq.addParameterEvent(False,subt, 0, -1, -1, id, npids["Pan"], pan)
+            seq.addParameterEvent(False,subt, 0, -1, -1, id, 1, xp)
+            id = id + 1
+            
+        # if i % 7 == 0:
+        #     seq.addParameterEvent(False,t , -1, -1, -1, -1, 6, random.random()*12)
+        # seq.addParameterEvent(False,t, 0, -1, -1, i, 1, dvrands[0].nextFloat(0.0,1.0))
+        # seq.addParameterEvent(False,t, 0, -1, -1, i, 2, dvrands[2].nextFloat(0.0,1.0))
         # seq.addParameterEvent(False,t, -1, -1, -1, -1, 3, 84.0+36.5*math.sin(2*3.141592653*t*0.25))
         # seq.addParameterEvent(False,t, -1, -1, -1, -1, 4, 0.5+0.5*math.sin(2*3.141592653*t*0.5))
-        t = t + 0.1
-        i = i + 1
+        t = t + pulselen
+        k = k + 1
+
     p.setSequence(seq)
-    p.processToFile("clap_noiseplethora_out02.wav",15.0,44100)
+    p.processToFile("clap_noiseplethora_out02.wav",61.0,44100)
     return
     seq.addParameterEvent(False, 0.0, 0, 0, -1, -1, 3, 84.0)
     seq.addParameterEvent(False, 0.0, 0, 0, -1, -1, 4, 0.4)
@@ -194,10 +209,56 @@ def test_clap3():
     p.processToFile("clap_noiseplethora_out02.wav",10.0,44100)
     # p.saveStateToFile("surgestate.bin")
 
-test_clap3()
+# test_clap3()
+
+def row_transpose(row, amount):
+    cp = row
+    for i in range(len(cp)):
+        cp[i] = (cp[i] + amount) % 6
+    return cp 
+
+def converge1(seq,seqtpos,seqdur,noteid,numvoices,xp):
+    gran = 0.05
+    for i in range(numvoices):
+        t = seqdur/numvoices * i
+        
+        dur = seqdur-t
+        t = t + seqtpos
+        partpos = t
+        # print(f"{t} {dur}")
+        seq.addNote(t,dur,0,0,60,noteid+i,0.2)
+        while partpos<t+dur+gran:
+            pval = 0.90/dur*(partpos-t)
+            # print(f"  {partpos} {pval}")
+            seq.addParameterEvent(False, partpos, -1, -1, -1, noteid+i, 1, pval)
+            partpos = partpos + gran
+    return noteid + numvoices
+
+def foo():
+    seq = xenakios.ClapSequence()
+    
+    seq.addParameterEvent(False, 0.0, -1, -1, -1, -1, 2, 0.8)
+    noteid = converge1(seq,0.0,4.0,0,4,0.0)    
+    seq.addParameterEvent(False, 5.0, -1, -1, -1, -1, 2, 0.2)
+    noteid = converge1(seq,5.0,2.0,noteid,6,0.0)    
+    seq.addParameterEvent(False, 7.0, -1, -1, -1, -1, 2, 0.4)
+    noteid = converge1(seq,7.0,5.0,noteid,3,0.0)    
+    seq.addParameterEvent(False, 12.5, -1, -1, -1, -1, 2, 0.98)
+    noteid = converge1(seq,12.5,1.0,noteid,9,0.0)    
+    seq.addParameterEvent(False, 13.5, -1, -1, -1, -1, 2, 0.86)
+    noteid = converge1(seq,13.5,3.0,noteid,9,0.0)    
+    seq.addParameterEvent(False, 17.0, -1, -1, -1, -1, 2, 0.05)
+    noteid = converge1(seq,17.0,12.0,noteid,5,0.0)    
+    seq.addParameterEvent(False, 29.0, -1, -1, -1, -1, 2, 0.45)
+
+    p = xenakios.ClapEngine(r'C:\Program Files\Common Files\CLAP\NoisePlethoraSynth.clap',0)
+    p.setSequence(seq)
+    p.processToFile("clap_noiseplethora_out04.wav",30.0,44100)
+
+foo()
 
 def test_dejavu():
-    dejavu = xenakios.DejaVuRandom(1)
+    dejavu = xenakios.DejaVuRandom(9)
     dejavu.setDejaVu(0.45)
     for i in range(10):
         print(dejavu.nextInt(0,3),end =" ")
