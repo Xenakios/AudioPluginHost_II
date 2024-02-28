@@ -211,6 +211,27 @@ def test_clap3():
 
 # test_clap3()
 
+def test_clap4():
+    p = xenakios.ClapEngine(r'C:\Program Files\Common Files\CLAP\NoisePlethoraSynth.clap',0)
+    seq = xenakios.ClapSequence()
+    seq.addNote(time=0.0,dur=1.0,key=60)
+    seq.addNote(time=2.0,dur=0.1,key=60)
+    seq.addNote(time=3.0,dur=2.0,key=60)
+    seq.addNote(time=5.0,dur=4.0,key=60)
+    
+    seq.addParameterEvent(False,0.0,-1,-1,-1,-1,1,0.9)
+    seq.addParameterEvent(time=5.0,parid=1,val=0.1)
+    seq.addParameterEvent(time=7.0,parid=1,val=0.8)
+    t = 6.0
+    while t<10.0:
+        seq.addParameterEvent(time=t,parid=2,val=random.random())    
+        t = t + 0.025
+    
+    p.setSequence(seq)
+    p.processToFile("clap_noiseplethora_out05.wav",10.0,44100)
+    
+test_clap4()
+
 def row_transpose(row, amount):
     cp = row
     for i in range(len(cp)):
@@ -256,7 +277,7 @@ def foo():
     p.setSequence(seq)
     p.processToFile("clap_noiseplethora_out04.wav",30.0,44100)
 
-foo()
+# foo()
 
 def test_dejavu():
     dejavu = xenakios.DejaVuRandom(9)

@@ -15,9 +15,8 @@ namespace py = pybind11;
 
 PYBIND11_MODULE(xenakios, m)
 {
+    using namespace pybind11::literals;
     m.doc() = "pybind11 xenakios plugin"; // optional module docstring
-
-    // m.def("list_plugins", &list_plugins, "print noise plethora plugins");
 
     py::class_<ClapEventSequence>(m, "ClapSequence")
         .def(py::init<>())
@@ -25,8 +24,11 @@ PYBIND11_MODULE(xenakios, m)
         .def("getSizeInBytes", &ClapEventSequence::getApproxSizeInBytes)
         .def("addNoteOn", &ClapEventSequence::addNoteOn)
         .def("addNoteOff", &ClapEventSequence::addNoteOff)
-        .def("addNote", &ClapEventSequence::addNote)
-        .def("addParameterEvent", &ClapEventSequence::addParameterEvent)
+        .def("addNote", &ClapEventSequence::addNote, "time"_a = 0.0, "dur"_a = 0.0, "port"_a = 0,
+             "ch"_a = 0, "key"_a, "nid"_a = -1, "velo"_a = 1.0)
+        .def("addParameterEvent", &ClapEventSequence::addParameterEvent, "ismod"_a = false,
+             "time"_a = 0.0, "port"_a = -1, "ch"_a = -1, "key"_a = -1, "nid"_a = -1, "parid"_a,
+             "val"_a)
         .def("addProgramChange", &ClapEventSequence::addProgramChange)
         .def("addNoteExpression", &ClapEventSequence::addNoteExpression);
 
