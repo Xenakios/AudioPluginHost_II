@@ -177,7 +177,8 @@ class NoisePlethoraVoice
         float totalx = std::clamp(basevalues.x + modvalues.x, 0.0f, 1.0f);
         float totaly = std::clamp(basevalues.y + modvalues.y, 0.0f, 1.0f);
         plug->process(totalx, totaly);
-        double totalvol = std::clamp(basevalues.volume + modvalues.volume, -96.0f, 0.0f);
+        float velodb = -18.0 + 18.0 * velocity;
+        double totalvol = std::clamp(basevalues.volume + modvalues.volume + velodb, -96.0f, 0.0f);
         double gain = xenakios::decibelsToGain(totalvol);
         sst::basic_blocks::dsp::pan_laws::panmatrix_t panmat;
         double totalcutoff = std::clamp(basevalues.filtcutoff + modvalues.filtcutoff, 0.0f, 127.0f);

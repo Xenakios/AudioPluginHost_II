@@ -87,6 +87,11 @@ PYBIND11_MODULE(xenakios, m)
           py::arg("targetSequence"), py::arg("sourceEnvelope"), py::arg("eventsStartTime"),
           py::arg("duration"), py::arg("granularity"), py::arg("noteExpressionType"),
           py::arg("port"), py::arg("channel"), py::arg("key"), py::arg("note_id"));
-    m.def("generateParameterEventsFromEnvelope", &generateParameterEventsFromEnvelope);
+
+    m.def("generateParameterEventsFromEnvelope", &generateParameterEventsFromEnvelope,
+          "ismod"_a = false, "targetseq"_a, "env"_a, "start_time"_a = 0.0, "duration"_a,
+          "granularity"_a = 0.05, "parid"_a, "port"_a = -1, "chan"_a = -1, "key"_a = -1,
+          "nid"_a = -1);
+
     m.def("generateEnvelopeFromLFO", &generateEnvelopeFromLFO);
 }

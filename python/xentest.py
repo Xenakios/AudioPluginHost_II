@@ -2,6 +2,8 @@ import xenakios
 import random
 import math
 
+ept = xenakios.EnvelopePoint
+
 def generate_expression_curve(dur, granularity, seq, net, port, chan, key, noteid, func):
     numevents = dur / granularity
     for i in range(0,int(numevents)):
@@ -212,13 +214,21 @@ def test_clap3():
 # test_clap3()
 
 def test_clap4():
+    env = xenakios.Envelope()
+    env.addPoint(ept(0.0,127.0))
+    env.addPoint(ept(1.0,48.0))
+    env.addPoint(ept(5.0,127.0))
+    env.addPoint(ept(7.0,48.0))
+    env.addPoint(ept(7.5,127.0))
+    env.addPoint(ept(8.5,49.0))
     p = xenakios.ClapEngine(r'C:\Program Files\Common Files\CLAP\NoisePlethoraSynth.clap',0)
     seq = xenakios.ClapSequence()
-    seq.addNote(time=0.0,dur=1.0,key=60)
+    seq.addNote(time=0.0,dur=1.0,key=60,velo=0.9)
     seq.addNote(time=2.0,dur=0.1,key=60)
-    seq.addNote(time=3.0,dur=2.0,key=60)
-    seq.addNote(time=5.0,dur=4.0,key=60)
     
+    seq.addNote(time=5.0,dur=4.0,key=60)
+    seq.addNote(time=3.0,dur=2.0,key=61)
+
     seq.addParameterEvent(False,0.0,-1,-1,-1,-1,1,0.9)
     seq.addParameterEvent(time=5.0,parid=1,val=0.1)
     seq.addParameterEvent(time=7.0,parid=1,val=0.8)
@@ -226,7 +236,11 @@ def test_clap4():
     while t<10.0:
         seq.addParameterEvent(time=t,parid=2,val=random.random())    
         t = t + 0.025
-    
+    t = 6.0
+    while t<10.0:
+        seq.addParameterEvent(time=t,parid=1,val=random.random())    
+        t = t + 0.333
+    xenakios.generateParameterEventsFromEnvelope(targetseq=seq,env=env,duration=10.0,parid=3)
     p.setSequence(seq)
     p.processToFile("clap_noiseplethora_out05.wav",10.0,44100)
     
