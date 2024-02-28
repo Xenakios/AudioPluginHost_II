@@ -217,7 +217,7 @@ def row_transpose(row, amount):
         cp[i] = (cp[i] + amount) % 6
     return cp 
 
-def converge1(seq,seqtpos,seqdur,noteid,numvoices,xp):
+def converge1(seq,seqtpos,seqdur,noteid,numvoices,parid,parmin,parmax):
     gran = 0.05
     for i in range(numvoices):
         t = seqdur/numvoices * i
@@ -228,9 +228,10 @@ def converge1(seq,seqtpos,seqdur,noteid,numvoices,xp):
         # print(f"{t} {dur}")
         seq.addNote(t,dur,0,0,60,noteid+i,0.2)
         while partpos<t+dur+gran:
-            pval = 0.90/dur*(partpos-t)
+            pval = 1.00/dur*(partpos-t)
+            pval = parmin + (parmax-parmin) * pval
             # print(f"  {partpos} {pval}")
-            seq.addParameterEvent(False, partpos, -1, -1, -1, noteid+i, 1, pval)
+            seq.addParameterEvent(False, partpos, -1, -1, -1, noteid+i, parid, pval)
             partpos = partpos + gran
     return noteid + numvoices
 
@@ -238,18 +239,18 @@ def foo():
     seq = xenakios.ClapSequence()
     
     seq.addParameterEvent(False, 0.0, -1, -1, -1, -1, 2, 0.8)
-    noteid = converge1(seq,0.0,4.0,0,4,0.0)    
+    noteid = converge1(seq,0.0,4.0,0,4,1,0.0,0.95)    
     seq.addParameterEvent(False, 5.0, -1, -1, -1, -1, 2, 0.2)
-    noteid = converge1(seq,5.0,2.0,noteid,6,0.0)    
+    noteid = converge1(seq,5.0,2.0,noteid,6,1,0.0,0.95)    
     seq.addParameterEvent(False, 7.0, -1, -1, -1, -1, 2, 0.4)
-    noteid = converge1(seq,7.0,5.0,noteid,3,0.0)    
+    noteid = converge1(seq,7.0,5.0,noteid,3,1,0.0,0.95)    
     seq.addParameterEvent(False, 12.5, -1, -1, -1, -1, 2, 0.98)
-    noteid = converge1(seq,12.5,1.0,noteid,9,0.0)    
+    noteid = converge1(seq,12.5,1.0,noteid,9,1,0.0,0.95)    
     seq.addParameterEvent(False, 13.5, -1, -1, -1, -1, 2, 0.86)
-    noteid = converge1(seq,13.5,3.0,noteid,9,0.0)    
-    seq.addParameterEvent(False, 17.0, -1, -1, -1, -1, 2, 0.05)
-    noteid = converge1(seq,17.0,12.0,noteid,5,0.0)    
-    seq.addParameterEvent(False, 29.0, -1, -1, -1, -1, 2, 0.45)
+    noteid = converge1(seq,13.5,3.0,noteid,9,1,0.0,0.95)    
+    seq.addParameterEvent(False, 17.0, -1, -1, -1, -1, 2, 0.45)
+    noteid = converge1(seq,17.0,12.0,noteid,5,1,0.99,0.0)    
+    seq.addParameterEvent(False, 29.0, -1, -1, -1, -1, 2, 0.95)
 
     p = xenakios.ClapEngine(r'C:\Program Files\Common Files\CLAP\NoisePlethoraSynth.clap',0)
     p.setSequence(seq)
