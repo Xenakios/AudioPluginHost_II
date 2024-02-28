@@ -323,7 +323,6 @@ void clap_deinit() {}
 extern "C"
 {
 
-
     // clang-format off
 const CLAP_EXPORT struct clap_plugin_entry clap_entry = {
         CLAP_VERSION,
