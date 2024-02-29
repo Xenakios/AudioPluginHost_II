@@ -161,10 +161,10 @@ class NoisePlethoraVoice
     }
     void deactivate() { m_eg_gate = false; }
     int m_update_counter = 0;
-    float eg_attack = 0.4f;
-    float eg_decay = 0.4f;
-    float eg_sustain = 1.0f;
-    float eg_release = 0.6f;
+    float eg_attack = 0.1f;
+    float eg_decay = 0.1f;
+    float eg_sustain = 0.75f;
+    float eg_release = 0.1f;
     std::function<void(int, int, int, int)> DeativatedVoiceCallback;
     // must accumulate into the buffer, precleared by the synth before processing the first voice
     void process(choc::buffer::ChannelArrayView<float> destBuf)
@@ -190,7 +190,7 @@ class NoisePlethoraVoice
         filter.setCoeff(totalcutoff, totalreson, 1.0 / m_sr);
         float basepan = xenakios::mapvalue(basevalues.pan, -1.0f, 1.0f, 0.0f, 1.0f);
         float expr_pan = xenakios::mapvalue(note_expr_pan, 0.0f, 1.0f, -0.5f, 0.5f);
-        double totalpan = reflect_value(0.0f, basepan + modvalues.pan + expr_pan, 1.0f);
+        double totalpan = reflect_value(0.0f, basepan + modvalues.pan, 1.0f);
 
         int ftype = basevalues.filttype;
 

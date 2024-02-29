@@ -99,6 +99,34 @@ struct xen_noise_plethora
                            CLAP_PARAM_IS_MODULATABLE_PER_NOTE_ID | CLAP_PARAM_IS_STEPPED)
                 .withName("Filter type")
                 .withID((clap_id)NoisePlethoraSynth::ParamIDs::FiltType));
+        paramDescriptions.push_back(ParamDesc()
+                                        .withLinearScaleFormatting("%", 100.0)
+                                        .withRange(0.0, 1.0)
+                                        .withDefault(0.1f)
+                                        .withFlags(CLAP_PARAM_IS_AUTOMATABLE)
+                                        .withName("EG Attack")
+                                        .withID((clap_id)NoisePlethoraSynth::ParamIDs::EGAttack));
+        paramDescriptions.push_back(ParamDesc()
+                                        .withLinearScaleFormatting("%", 100.0)
+                                        .withRange(0.0, 1.0)
+                                        .withDefault(0.1f)
+                                        .withFlags(CLAP_PARAM_IS_AUTOMATABLE)
+                                        .withName("EG Decay")
+                                        .withID((clap_id)NoisePlethoraSynth::ParamIDs::EGDecay));
+        paramDescriptions.push_back(ParamDesc()
+                                        .withLinearScaleFormatting("%", 100.0)
+                                        .withRange(0.0, 1.0)
+                                        .withDefault(0.75f)
+                                        .withFlags(CLAP_PARAM_IS_AUTOMATABLE)
+                                        .withName("EG Sustain")
+                                        .withID((clap_id)NoisePlethoraSynth::ParamIDs::EGSustain));
+        paramDescriptions.push_back(ParamDesc()
+                                        .withLinearScaleFormatting("%", 100.0)
+                                        .withRange(0.0, 1.0)
+                                        .withDefault(0.1f)
+                                        .withFlags(CLAP_PARAM_IS_AUTOMATABLE)
+                                        .withName("EG Release")
+                                        .withID((clap_id)NoisePlethoraSynth::ParamIDs::EGRelease));
         paramValues[0] = m_synth.m_voices[0]->basevalues.volume;
         paramValues[1] = m_synth.m_voices[0]->basevalues.x;
         paramValues[2] = m_synth.m_voices[0]->basevalues.y;
@@ -107,6 +135,10 @@ struct xen_noise_plethora
         paramValues[5] = m_synth.m_voices[0]->basevalues.filttype;
         paramValues[6] = m_synth.m_voices[0]->basevalues.algo;
         paramValues[7] = m_synth.m_voices[0]->basevalues.pan;
+        paramValues[8] = m_synth.m_voices[0]->eg_attack;
+        paramValues[9] = m_synth.m_voices[0]->eg_decay;
+        paramValues[10] = m_synth.m_voices[0]->eg_sustain;
+        paramValues[11] = m_synth.m_voices[0]->eg_release;
     }
     clap_id timerId = 0;
 
@@ -134,11 +166,11 @@ struct xen_noise_plethora
         paramDescriptions[paramIndex].toClapParamInfo<CLAP_NAME_SIZE>(info);
         return true;
     }
-    static constexpr size_t numParams = 8;
+    static constexpr size_t numParams = 12;
     float paramValues[numParams];
     bool paramsValue(clap_id paramId, double *value) noexcept override
     {
-        if (value && paramId >= 0 && paramId < 8)
+        if (value && paramId >= 0 && paramId < numParams)
         {
             *value = paramValues[paramId];
             return true;
@@ -231,7 +263,7 @@ struct xen_noise_plethora
         case CLAP_EVENT_PARAM_VALUE:
         {
             auto pevt = reinterpret_cast<const clap_event_param_value *>(nextEvent);
-            if (pevt->param_id >= 0 && pevt->param_id < 8)
+            if (pevt->param_id >= 0 && pevt->param_id < numParams)
             {
                 paramValues[pevt->param_id] = pevt->value;
                 m_synth.applyParameter(pevt->port_index, pevt->channel, pevt->key, pevt->note_id,
