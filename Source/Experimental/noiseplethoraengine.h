@@ -89,7 +89,7 @@ class NoisePlethoraVoice
         float filtcutoff = 120.0f;
         float filtreson = 0.01;
         float algo = 0.0f;
-        float pan = 0.5f;
+        float pan = 0.0f;
         float filttype = 0.0f;
     };
     VoiceParams basevalues;
@@ -184,8 +184,8 @@ class NoisePlethoraVoice
         double totalcutoff = std::clamp(basevalues.filtcutoff + modvalues.filtcutoff, 0.0f, 127.0f);
         double totalreson = std::clamp(basevalues.filtreson + modvalues.filtreson, 0.01f, 0.99f);
         filter.setCoeff(totalcutoff, totalreson, 1.0 / m_sr);
-
-        double totalpan = reflect_value(0.0f, basevalues.pan + modvalues.pan, 1.0f);
+        float basepan = xenakios::mapvalue(basevalues.pan, -1.0f, 1.0f, 0.0f, 1.0f);
+        double totalpan = reflect_value(0.0f, basepan + modvalues.pan, 1.0f);
 
         int ftype = basevalues.filttype;
 
@@ -349,7 +349,8 @@ class NoisePlethoraSynth
     {
         for (auto &v : m_voices)
         {
-            if (v->port_id == port && v->chan == ch && v->key == key && v->note_id == note_id)
+            if (v->port_id == port && v->chan == ch && v->key == key &&
+                (note_id == -1 || v->note_id == note_id))
             {
                 // std::cout << "deactivated " << v->chan << " " << v->key << " " << v->note_id
                 //          << "\n";
@@ -454,8 +455,8 @@ class NoisePlethoraSynth
         choc::messageloop::run();
     }
     std::vector<std::unique_ptr<NoisePlethoraVoice>> m_voices;
+
   private:
-    
     choc::buffer::ChannelArrayBuffer<float> m_mix_buf;
     double m_sr = 0;
     int m_update_counter = 0;

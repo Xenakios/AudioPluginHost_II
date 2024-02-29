@@ -108,9 +108,9 @@ def test_clap3():
     numpars = p.getNumParameters()
     for i in range(numpars):
         parinfo = p.getParameterInfoString(i)
-        # print(parinfo)
+        print(parinfo)
     # p.showGUIBlocking()
-    # return
+    return
     seq = xenakios.ClapSequence()
     
     # seq.addNote(5.0,5.0,0,0,61,-1,0.9)
@@ -211,7 +211,7 @@ def test_clap3():
     p.processToFile("clap_noiseplethora_out02.wav",10.0,44100)
     # p.saveStateToFile("surgestate.bin")
 
-# test_clap3()
+test_clap3()
 
 def test_clap4():
     env = xenakios.Envelope()
@@ -244,7 +244,7 @@ def test_clap4():
     p.setSequence(seq)
     p.processToFile("clap_noiseplethora_out05.wav",10.0,44100)
     
-test_clap4()
+# test_clap4()
 
 def row_transpose(row, amount):
     cp = row

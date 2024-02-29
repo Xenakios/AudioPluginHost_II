@@ -58,6 +58,7 @@ struct xen_noise_plethora
                                         .withID((clap_id)NoisePlethoraSynth::ParamIDs::Y));
         paramDescriptions.push_back(
             ParamDesc()
+                .withType(ParamDesc::INT)
                 .withRange(0.0, 29.0)
                 .withDefault(0.5)
                 .withFlags(CLAP_PARAM_IS_AUTOMATABLE | CLAP_PARAM_IS_MODULATABLE |
@@ -84,14 +85,15 @@ struct xen_noise_plethora
                 .withID((clap_id)NoisePlethoraSynth::ParamIDs::FiltResonance));
         paramDescriptions.push_back(
             ParamDesc()
+                
                 .withUnorderedMapFormatting({{0, "Lowpass"},
                                              {1, "Highpass"},
                                              {2, "Bandpass"},
                                              {3, "Peak"},
                                              {4, "Notch"},
-                                             {5, "Allpass"}})
+                                             {5, "Allpass"}}, true)
                 .withDefault(0.0)
-                .withRange(0.0f,5.0f)
+                
                 .withFlags(CLAP_PARAM_IS_AUTOMATABLE | CLAP_PARAM_IS_MODULATABLE |
                            CLAP_PARAM_IS_MODULATABLE_PER_NOTE_ID | CLAP_PARAM_IS_STEPPED)
                 .withName("Filter type")
@@ -204,6 +206,7 @@ struct xen_noise_plethora
         switch (nextEvent->type)
         {
         case CLAP_EVENT_NOTE_OFF:
+        case CLAP_EVENT_NOTE_CHOKE:
         {
             auto nevt = reinterpret_cast<const clap_event_note *>(nextEvent);
             m_synth.stopNote(nevt->port_index, nevt->channel, nevt->key, nevt->note_id,
