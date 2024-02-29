@@ -178,7 +178,7 @@ class NoisePlethoraVoice
         auto plug = m_plugs[safealgo].get();
 
         float expr_x = xenakios::mapvalue(note_expr_pressure, 0.0f, 1.0f, -0.5f, 0.5f);
-        float totalx = std::clamp(basevalues.x + modvalues.x + expr_x, 0.0f, 1.0f);
+        float totalx = std::clamp(basevalues.x + modvalues.x, 0.0f, 1.0f);
         float totaly = std::clamp(basevalues.y + modvalues.y, 0.0f, 1.0f);
         plug->process(totalx, totaly);
         float velodb = -18.0 + 18.0 * velocity;
