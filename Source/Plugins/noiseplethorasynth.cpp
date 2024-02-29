@@ -56,11 +56,21 @@ struct xen_noise_plethora
                                                    CLAP_PARAM_IS_MODULATABLE_PER_NOTE_ID)
                                         .withName("Y")
                                         .withID((clap_id)NoisePlethoraSynth::ParamIDs::Y));
+        std::unordered_map<int, std::string> algonamemap;
+        int k = 0;
+        for (int i = 0; i < numBanks; ++i)
+        {
+            auto &bank = getBankForIndex(i);
+            for (int j = 0; j < programsPerBank; ++j)
+            {
+                algonamemap[k] = bank.getProgramName(j);
+                ++k;
+            }
+        }
         paramDescriptions.push_back(
             ParamDesc()
-                .withType(ParamDesc::INT)
-                .withRange(0.0, 29.0)
-                .withDefault(0.5)
+                .withUnorderedMapFormatting(algonamemap, true)
+                .withDefault(0.0)
                 .withFlags(CLAP_PARAM_IS_AUTOMATABLE | CLAP_PARAM_IS_MODULATABLE |
                            CLAP_PARAM_IS_MODULATABLE_PER_NOTE_ID | CLAP_PARAM_IS_STEPPED)
                 .withName("Algorithm")
