@@ -91,10 +91,19 @@ struct xen_noise_plethora
                                              {4, "Notch"},
                                              {5, "Allpass"}})
                 .withDefault(0.0)
+                .withRange(0.0f,5.0f)
                 .withFlags(CLAP_PARAM_IS_AUTOMATABLE | CLAP_PARAM_IS_MODULATABLE |
                            CLAP_PARAM_IS_MODULATABLE_PER_NOTE_ID | CLAP_PARAM_IS_STEPPED)
                 .withName("Filter type")
                 .withID((clap_id)NoisePlethoraSynth::ParamIDs::FiltType));
+        paramValues[0] = m_synth.m_voices[0]->basevalues.volume;
+        paramValues[1] = m_synth.m_voices[0]->basevalues.x;
+        paramValues[2] = m_synth.m_voices[0]->basevalues.y;
+        paramValues[3] = m_synth.m_voices[0]->basevalues.filtcutoff;
+        paramValues[4] = m_synth.m_voices[0]->basevalues.filtreson;
+        paramValues[5] = m_synth.m_voices[0]->basevalues.filttype;
+        paramValues[6] = m_synth.m_voices[0]->basevalues.algo;
+        paramValues[7] = m_synth.m_voices[0]->basevalues.pan;
     }
     clap_id timerId = 0;
 
@@ -107,16 +116,32 @@ struct xen_noise_plethora
 
   protected:
     bool implementsParams() const noexcept override { return true; }
-    bool isValidParamId(clap_id paramId) const noexcept override { return false; }
+    bool isValidParamId(clap_id paramId) const noexcept override
+    {
+        for (auto &e : paramDescriptions)
+            if (e.id == paramId)
+                return true;
+        return false;
+    }
     uint32_t paramsCount() const noexcept override { return paramDescriptions.size(); }
     bool paramsInfo(uint32_t paramIndex, clap_param_info *info) const noexcept override
     {
-        if (paramIndex > paramDescriptions.size())
+        if (paramIndex >= paramDescriptions.size())
             return false;
         paramDescriptions[paramIndex].toClapParamInfo<CLAP_NAME_SIZE>(info);
         return true;
     }
-    bool paramsValue(clap_id paramId, double *value) noexcept override { return false; }
+    static constexpr size_t numParams = 8;
+    float paramValues[numParams];
+    bool paramsValue(clap_id paramId, double *value) noexcept override
+    {
+        if (value && paramId >= 0 && paramId < 8)
+        {
+            *value = paramValues[paramId];
+            return true;
+        }
+        return false;
+    }
     bool paramsValueToText(clap_id paramId, double value, char *display,
                            uint32_t size) noexcept override
     {
@@ -196,8 +221,13 @@ struct xen_noise_plethora
         case CLAP_EVENT_PARAM_VALUE:
         {
             auto pevt = reinterpret_cast<const clap_event_param_value *>(nextEvent);
-            m_synth.applyParameter(pevt->port_index, pevt->channel, pevt->key, pevt->note_id,
-                                   pevt->param_id, pevt->value);
+            if (pevt->param_id >= 0 && pevt->param_id < 8)
+            {
+                paramValues[pevt->param_id] = pevt->value;
+                m_synth.applyParameter(pevt->port_index, pevt->channel, pevt->key, pevt->note_id,
+                                       pevt->param_id, pevt->value);
+            }
+
             break;
         }
         case CLAP_EVENT_PARAM_MOD:
@@ -226,9 +256,7 @@ struct xen_noise_plethora
     clap_process_status process(const clap_process *process) noexcept override
     {
         auto fc = process->frames_count;
-        float *ip[2], *op[2];
-        ip[0] = &process->audio_inputs->data32[0][0];
-        ip[1] = &process->audio_inputs->data32[1][0];
+        float *op[2];
         op[0] = &process->audio_outputs->data32[0][0];
         op[1] = &process->audio_outputs->data32[1][0];
         auto smp = 0U;

@@ -453,9 +453,9 @@ class NoisePlethoraSynth
         window.toFront();
         choc::messageloop::run();
     }
-
-  private:
     std::vector<std::unique_ptr<NoisePlethoraVoice>> m_voices;
+  private:
+    
     choc::buffer::ChannelArrayBuffer<float> m_mix_buf;
     double m_sr = 0;
     int m_update_counter = 0;
