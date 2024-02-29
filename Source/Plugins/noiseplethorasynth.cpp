@@ -85,15 +85,16 @@ struct xen_noise_plethora
                 .withID((clap_id)NoisePlethoraSynth::ParamIDs::FiltResonance));
         paramDescriptions.push_back(
             ParamDesc()
-                
+
                 .withUnorderedMapFormatting({{0, "Lowpass"},
                                              {1, "Highpass"},
                                              {2, "Bandpass"},
                                              {3, "Peak"},
                                              {4, "Notch"},
-                                             {5, "Allpass"}}, true)
+                                             {5, "Allpass"}},
+                                            true)
                 .withDefault(0.0)
-                
+
                 .withFlags(CLAP_PARAM_IS_AUTOMATABLE | CLAP_PARAM_IS_MODULATABLE |
                            CLAP_PARAM_IS_MODULATABLE_PER_NOTE_ID | CLAP_PARAM_IS_STEPPED)
                 .withName("Filter type")
@@ -220,7 +221,13 @@ struct xen_noise_plethora
                               nevt->velocity);
             break;
         }
-
+        case CLAP_EVENT_NOTE_EXPRESSION:
+        {
+            auto nexp = reinterpret_cast<const clap_event_note_expression *>(nextEvent);
+            m_synth.applyNoteExpression(nexp->port_index, nexp->channel, nexp->key, nexp->note_id,
+                                        nexp->expression_id, nexp->value);
+            break;
+        }
         case CLAP_EVENT_PARAM_VALUE:
         {
             auto pevt = reinterpret_cast<const clap_event_param_value *>(nextEvent);
@@ -296,6 +303,21 @@ struct xen_noise_plethora
         {
             auto evt = ev->get(ev, i);
             handleNextEvent(evt);
+        }
+        for (const auto &denote : m_synth.deactivatedNotes)
+        {
+            clap_event_note nevt;
+            nevt.header.flags = 0;
+            nevt.header.size = sizeof(clap_event_note);
+            nevt.header.space_id = CLAP_CORE_EVENT_SPACE_ID;
+            nevt.header.time = 0;
+            nevt.header.type = CLAP_EVENT_NOTE_END;
+            nevt.port_index = std::get<0>(denote);
+            nevt.channel = std::get<1>(denote);
+            nevt.key = std::get<2>(denote);
+            nevt.note_id = std::get<3>(denote);
+            nevt.velocity = 0.0;
+            process->out_events->try_push(process->out_events, (const clap_event_header *)&nevt);
         }
         choc::buffer::SeparateChannelLayout<float> layout(process->audio_outputs->data32);
         choc::buffer::ChannelArrayView<float> bufview(layout, {2, process->frames_count});

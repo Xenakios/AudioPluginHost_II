@@ -94,7 +94,8 @@ class NoisePlethoraVoice
     };
     VoiceParams basevalues;
     VoiceParams modvalues;
-
+    float note_expr_pressure = 0.0f;
+    float note_expr_pan = 0.0f;
     using EnvType = sst::basic_blocks::modulators::ADSREnvelope<SRProviderB, ENVBLOCKSIZE>;
     SRProviderB m_sr_provider;
     EnvType m_vol_env{&m_sr_provider};
@@ -164,17 +165,20 @@ class NoisePlethoraVoice
     float eg_decay = 0.4f;
     float eg_sustain = 1.0f;
     float eg_release = 0.6f;
+    std::function<void(int, int, int, int)> DeativatedVoiceCallback;
     // must accumulate into the buffer, precleared by the synth before processing the first voice
     void process(choc::buffer::ChannelArrayView<float> destBuf)
     {
         if (!m_voice_active)
             return;
+        // when algo is modulated, we don't want to get stuck at the first or last algo
         int safealgo =
             wrap_value<float>(0, basevalues.algo + modvalues.algo, (int)m_plugs.size() - 1);
         assert(safealgo >= 0 && safealgo < m_plugs.size() - 1);
         auto plug = m_plugs[safealgo].get();
-        // set params, doesn't actually process audio
-        float totalx = std::clamp(basevalues.x + modvalues.x, 0.0f, 1.0f);
+
+        float expr_x = xenakios::mapvalue(note_expr_pressure, 0.0f, 1.0f, -0.5f, 0.5f);
+        float totalx = std::clamp(basevalues.x + modvalues.x + expr_x, 0.0f, 1.0f);
         float totaly = std::clamp(basevalues.y + modvalues.y, 0.0f, 1.0f);
         plug->process(totalx, totaly);
         float velodb = -18.0 + 18.0 * velocity;
@@ -185,7 +189,8 @@ class NoisePlethoraVoice
         double totalreson = std::clamp(basevalues.filtreson + modvalues.filtreson, 0.01f, 0.99f);
         filter.setCoeff(totalcutoff, totalreson, 1.0 / m_sr);
         float basepan = xenakios::mapvalue(basevalues.pan, -1.0f, 1.0f, 0.0f, 1.0f);
-        double totalpan = reflect_value(0.0f, basepan + modvalues.pan, 1.0f);
+        float expr_pan = xenakios::mapvalue(note_expr_pan, 0.0f, 1.0f, -0.5f, 0.5f);
+        double totalpan = reflect_value(0.0f, basepan + modvalues.pan + expr_pan, 1.0f);
 
         int ftype = basevalues.filttype;
 
@@ -198,6 +203,8 @@ class NoisePlethoraVoice
                 if (m_vol_env.stage == EnvType::s_eoc)
                 {
                     m_voice_active = false;
+                    if (DeativatedVoiceCallback)
+                        DeativatedVoiceCallback(port_id, chan, key, note_id);
                 }
             }
             float envgain = m_vol_env.outputCache[m_update_counter];
@@ -251,9 +258,13 @@ class NoisePlethoraSynth
     static constexpr size_t maxNumVoices = 16;
     NoisePlethoraSynth()
     {
+        deactivatedNotes.reserve(1024);
         for (size_t i = 0; i < maxNumVoices; ++i)
         {
             auto v = std::make_unique<NoisePlethoraVoice>();
+            v->DeativatedVoiceCallback = [this](int port, int chan, int key, int noteid) {
+                deactivatedNotes.emplace_back(port, chan, key, noteid);
+            };
             m_voices.push_back(std::move(v));
         }
     }
@@ -266,6 +277,20 @@ class NoisePlethoraSynth
         for (auto &v : m_voices)
         {
             v->prepare(sampleRate);
+        }
+    }
+    void applyNoteExpression(int port, int ch, int key, int note_id, int net, double amt)
+    {
+        for (auto &v : m_voices)
+        {
+            if ((key == -1 || v->key == key) && (note_id == -1 || v->note_id == note_id) &&
+                (port == -1 || v->port_id == port) && (ch == -1 || v->chan == ch))
+            {
+                if (net == 6)
+                    v->note_expr_pressure = amt;
+                if (net == 1)
+                    v->note_expr_pan = amt;
+            }
         }
     }
     void applyParameterModulation(int port, int ch, int key, int note_id, clap_id parid, double amt)
@@ -330,6 +355,7 @@ class NoisePlethoraSynth
             }
         }
     }
+    std::vector<std::tuple<int, int, int, int>> deactivatedNotes;
     int voicecount = 0;
     void startNote(int port, int ch, int key, int note_id, double velo)
     {
@@ -361,6 +387,7 @@ class NoisePlethoraSynth
     }
     void processBlock(choc::buffer::ChannelArrayView<float> destBuf)
     {
+        deactivatedNotes.clear();
         m_mix_buf.clear();
         for (size_t i = 0; i < m_voices.size(); ++i)
         {
