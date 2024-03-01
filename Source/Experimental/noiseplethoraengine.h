@@ -78,6 +78,19 @@ struct SRProviderB
     }
 };
 
+template <typename T> inline T wrap_algo(const T minval, const T val, const T maxval)
+{
+    T temp = val;
+    while (temp < minval || temp > maxval)
+    {
+        if (temp < minval)
+            temp = maxval - (minval - temp) + 1;
+        if (temp > maxval)
+            temp = minval + (temp - maxval) - 1;
+    }
+    return temp;
+}
+
 class NoisePlethoraVoice
 {
   public:
@@ -173,8 +186,8 @@ class NoisePlethoraVoice
             return;
         // when algo is modulated, we don't want to get stuck at the first or last algo
         int safealgo =
-            wrap_value<float>(0, basevalues.algo + modvalues.algo, (int)m_plugs.size() - 1);
-        assert(safealgo >= 0 && safealgo < m_plugs.size() - 1);
+            wrap_algo<float>(0, basevalues.algo + modvalues.algo, (int)m_plugs.size() - 1);
+        assert(safealgo >= 0 && safealgo < m_plugs.size());
         auto plug = m_plugs[safealgo].get();
 
         float expr_x = xenakios::mapvalue(note_expr_pressure, 0.0f, 1.0f, -0.5f, 0.5f);

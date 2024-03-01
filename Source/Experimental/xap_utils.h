@@ -612,6 +612,7 @@ template <typename T, size_t Size> class SimpleRingBuffer
 };
 
 // note that limits can't be the same and the loop may run for long!
+// looks like this is broken...need to explore further
 template <typename T> inline T wrap_value(const T minval, const T val, const T maxval)
 {
     T temp = val;
