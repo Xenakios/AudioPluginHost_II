@@ -78,6 +78,8 @@ struct SRProviderB
     }
 };
 
+// this was tested to work for this particular use case, but the more generic function
+// in utils should be checked/fixed too
 template <typename T> inline T wrap_algo(const T minval, const T val, const T maxval)
 {
     T temp = val;
@@ -109,6 +111,8 @@ class NoisePlethoraVoice
     VoiceParams modvalues;
     float note_expr_pressure = 0.0f;
     float note_expr_pan = 0.0f;
+    float keytrack_x_mod = 0.0f;
+    float keytrack_y_mod = 0.0f;
     using EnvType = sst::basic_blocks::modulators::ADSREnvelope<SRProviderB, ENVBLOCKSIZE>;
     SRProviderB m_sr_provider;
     EnvType m_vol_env{&m_sr_provider};
@@ -171,6 +175,30 @@ class NoisePlethoraVoice
         m_voice_active = true;
         m_eg_gate = true;
         m_vol_env.attackFrom(0.0f, 0.0f, 0, true);
+        keytrack_x_mod = 0.0f;
+        keytrack_y_mod = 0.0f;
+        if (key == -1)
+            return;
+
+        int keytrack_mode = 1;
+        if (keytrack_mode == 0)
+        {
+            // calculate x and y mods from key, using a Lissajous style mapping
+            float t = xenakios::mapvalue<float>(key, 0, 127, -M_PI, M_PI);
+            keytrack_x_mod = 0.5 * std::sin(t * 10.0);
+            keytrack_y_mod = 0.5 * std::cos(t * 11.0);
+        }
+        else if (keytrack_mode == 1)
+        {
+            // 7x7 mapping, for 49 XY states
+            int gsize = 7;
+            int numcells = gsize * gsize;
+            int modkey = key % numcells;
+            int ix = modkey % gsize;
+            int iy = modkey / gsize;
+            keytrack_x_mod = xenakios::mapvalue<float>(ix, 0, gsize - 1, -0.5f, 0.5f);
+            keytrack_y_mod = xenakios::mapvalue<float>(iy, 0, gsize - 1, -0.5f, 0.5f);
+        }
     }
     void deactivate() { m_eg_gate = false; }
     int m_update_counter = 0;
@@ -191,8 +219,8 @@ class NoisePlethoraVoice
         auto plug = m_plugs[safealgo].get();
 
         float expr_x = xenakios::mapvalue(note_expr_pressure, 0.0f, 1.0f, -0.5f, 0.5f);
-        float totalx = std::clamp(basevalues.x + modvalues.x, 0.0f, 1.0f);
-        float totaly = std::clamp(basevalues.y + modvalues.y, 0.0f, 1.0f);
+        float totalx = std::clamp(basevalues.x + modvalues.x + keytrack_x_mod, 0.0f, 1.0f);
+        float totaly = std::clamp(basevalues.y + modvalues.y + keytrack_y_mod, 0.0f, 1.0f);
         plug->process(totalx, totaly);
         float velodb = -18.0 + 18.0 * velocity;
         double totalvol = std::clamp(basevalues.volume + modvalues.volume + velodb, -96.0f, 0.0f);

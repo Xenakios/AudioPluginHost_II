@@ -419,8 +419,10 @@ struct xen_noise_plethora
                     if (i < numParams)
                     {
                         paramValues[i] = fvalues[i].get<float>();
+                        m_synth.applyParameter(-1, -1, -1, -1, i, paramValues[i]);
                     }
                 }
+                
             }
             return true;
         }
