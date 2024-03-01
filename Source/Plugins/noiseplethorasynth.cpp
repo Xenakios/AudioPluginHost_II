@@ -368,9 +368,64 @@ struct xen_noise_plethora
         return CLAP_PROCESS_CONTINUE;
     }
 
-    bool implementsState() const noexcept override { return false; }
-    bool stateSave(const clap_ostream *stream) noexcept override { return false; }
-    bool stateLoad(const clap_istream *stream) noexcept override { return false; }
+    bool implementsState() const noexcept override { return true; }
+    bool stateSave(const clap_ostream *stream) noexcept override
+    {
+        choc::value::Value v = choc::value::createObject("");
+        v.addMember("version", 0);
+        auto fvalues = choc::value::createEmptyArray();
+        for (int i = 0; i < numParams; ++i)
+        {
+            fvalues.addArrayElement(paramValues[i]);
+        }
+        v.addMember("floatvalues", fvalues);
+        auto json = choc::json::toString(v, true);
+
+        if (json.size() > 0)
+        {
+            // DBG("volume serialized json is\n" << json);
+            if (stream->write(stream, json.data(), json.size()) != -1)
+                return true;
+        }
+        return false;
+    }
+    bool stateLoad(const clap_istream *stream) noexcept override
+    {
+        std::string json;
+        constexpr size_t bufsize = 4096;
+        json.reserve(bufsize);
+        unsigned char buf[bufsize];
+        memset(buf, 0, bufsize);
+        while (true)
+        {
+            int read = stream->read(stream, buf, bufsize);
+            if (read == 0)
+                break;
+            for (size_t i = 0; i < read; ++i)
+                json.push_back(buf[i]);
+        }
+        // DBG("volume deserialized json is\n" << json);
+        if (json.size() > 0)
+        {
+            auto val = choc::json::parseValue(json);
+            if (val.isObject() && val.hasObjectMember("version") && val["version"].get<int>() >= 0)
+            {
+                // these are not thread safe!
+                // but interestingly, the SST Conduit plugin seems to be doing things
+                // similarly, where they just update the plugin parameter states directly
+                auto fvalues = val["floatvalues"];
+                for (int i = 0; i < fvalues.size(); ++i)
+                {
+                    if (i < numParams)
+                    {
+                        paramValues[i] = fvalues[i].get<float>();
+                    }
+                }
+            }
+            return true;
+        }
+        return false;
+    }
 };
 
 const char *features[] = {CLAP_PLUGIN_FEATURE_INSTRUMENT, nullptr};
