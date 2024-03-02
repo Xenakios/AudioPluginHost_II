@@ -28,7 +28,8 @@ class NoisePlethoraGUI
     std::vector<ParamDesc> m_paramDescs;
     CommFIFO &m_to_proc_fifo;
     CommFIFO &m_from_proc_fifo;
-    NoisePlethoraGUI(std::vector<ParamDesc> paramDescs, CommFIFO &outfifo, CommFIFO &infifo)
+    NoisePlethoraGUI(std::vector<ParamDesc> paramDescs, CommFIFO &outfifo, CommFIFO &infifo,
+                     std::function<float(int)> pargetfunc)
         : m_paramDescs(paramDescs), m_to_proc_fifo(outfifo), m_from_proc_fifo(infifo)
     {
         m_webview = std::make_unique<choc::ui::WebView>();
@@ -70,26 +71,27 @@ class NoisePlethoraGUI
                             m_to_proc_fifo.push(msg);
                             return choc::value::Value{};
                         });
-        m_webview->bind("getParameters",
-                        [this](const choc::value::ValueView &args) -> choc::value::Value {
-                            auto result = choc::value::createEmptyArray();
-                            for (int i = 0; i < m_paramDescs.size(); ++i)
-                            {
-                                auto info = choc::value::createObject("paraminfo");
-                                info.setMember("name", m_paramDescs[i].name);
-                                info.setMember("id", (int64_t)m_paramDescs[i].id);
-                                info.setMember("minval", m_paramDescs[i].minVal);
-                                info.setMember("maxval", m_paramDescs[i].maxVal);
-                                info.setMember("defaultval", m_paramDescs[i].defaultVal);
-                                // info.setMember("val", m_paramDescs[i].defaultVal);
-                                if (m_paramDescs[i].type == ParamDesc::INT)
-                                    info.setMember("step", 1.0);
-                                else
-                                    info.setMember("step", 0.01);
-                                result.addArrayElement(info);
-                            }
-                            return result;
-                        });
+        m_webview->bind(
+            "getParameters",
+            [this, pargetfunc](const choc::value::ValueView &args) -> choc::value::Value {
+                auto result = choc::value::createEmptyArray();
+                for (int i = 0; i < m_paramDescs.size(); ++i)
+                {
+                    auto info = choc::value::createObject("paraminfo");
+                    info.setMember("name", m_paramDescs[i].name);
+                    info.setMember("id", (int64_t)m_paramDescs[i].id);
+                    info.setMember("minval", m_paramDescs[i].minVal);
+                    info.setMember("maxval", m_paramDescs[i].maxVal);
+                    info.setMember("defaultval", m_paramDescs[i].defaultVal);
+                    info.setMember("val", pargetfunc(m_paramDescs[i].id));
+                    if (m_paramDescs[i].type == ParamDesc::INT)
+                        info.setMember("step", 1.0);
+                    else
+                        info.setMember("step", 0.01);
+                    result.addArrayElement(info);
+                }
+                return result;
+            });
 
         m_webview->navigate(R"(C:\develop\AudioPluginHost_mk2\Source\Plugins\noiseplethora.html)");
     }
@@ -243,8 +245,6 @@ struct xen_noise_plethora
         paramValues[10] = m_synth.m_voices[0]->eg_sustain;
         paramValues[11] = m_synth.m_voices[0]->eg_release;
     }
-    clap_id timerId = 0;
-
     bool activate(double sampleRate_, uint32_t minFrameCount,
                   uint32_t maxFrameCount) noexcept override
     {
@@ -396,7 +396,7 @@ struct xen_noise_plethora
     }
     void paramsFlush(const clap_input_events *in, const clap_output_events *out) noexcept override
     {
-        handleUIMessages();
+        handleUIMessages(out);
         auto sz = in->size(in);
 
         // This pointer is the sentinel to our next event which we advance once an event is
@@ -404,10 +404,10 @@ struct xen_noise_plethora
         for (auto e = 0U; e < sz; ++e)
         {
             auto nextEvent = in->get(in, e);
-            handleNextEvent(nextEvent, true);
+            handleNextEvent(nextEvent, false);
         }
     }
-    void handleUIMessages()
+    void handleUIMessages(const clap_output_events* oevts)
     {
         UiMessage msg;
         while (m_from_ui_fifo.pop(msg))
@@ -427,6 +427,7 @@ struct xen_noise_plethora
                 evt.param_id = msg.parid;
                 evt.value = msg.value;
                 handleNextEvent((const clap_event_header *)&evt, true);
+                // oevts->try_push(oevts, (const clap_event_header *)&evt);
             }
         }
     }
@@ -466,7 +467,7 @@ struct xen_noise_plethora
             }
         }
         */
-        handleUIMessages();
+        handleUIMessages(process->out_events);
         for (int i = 0; i < sz; ++i)
         {
             auto evt = ev->get(ev, i);
@@ -580,13 +581,25 @@ struct xen_noise_plethora
     // }
     bool guiCreate(const char *api, bool isFloating) noexcept override
     {
-        m_gui = std::make_unique<NoisePlethoraGUI>(paramDescriptions, m_from_ui_fifo, m_to_ui_fifo);
+        m_gui =
+            std::make_unique<NoisePlethoraGUI>(paramDescriptions, m_from_ui_fifo, m_to_ui_fifo,
+                                               [this](int parid) { return paramValues[parid]; });
         return true;
     }
     void guiDestroy() noexcept override { m_gui = nullptr; }
     // virtual bool guiSetScale(double scale) noexcept { return false; }
-    bool guiShow() noexcept override { return true; }
-    bool guiHide() noexcept override { return true; }
+    bool guiShow() noexcept override 
+    { 
+        if (!m_gui)
+            return false;
+        return true; 
+    }
+    bool guiHide() noexcept override 
+    { 
+        if (!m_gui)
+            return false;
+        return true; 
+    }
     int guiw = 700;
     int guih = 800;
     bool guiGetSize(uint32_t *width, uint32_t *height) noexcept override
@@ -611,7 +624,8 @@ struct xen_noise_plethora
             return false;
         SetParent((HWND)m_gui->m_webview->getViewHandle(), (HWND)window->win32);
         ShowWindow((HWND)m_gui->m_webview->getViewHandle(), SW_SHOWNA);
-        SetWindowPos((HWND)m_gui->m_webview->getViewHandle(), NULL, 0, 0, guiw, guih, SWP_SHOWWINDOW);
+        SetWindowPos((HWND)m_gui->m_webview->getViewHandle(), NULL, 0, 0, guiw, guih,
+                     SWP_SHOWWINDOW);
 
         return true;
     }
