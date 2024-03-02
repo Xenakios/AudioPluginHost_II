@@ -81,6 +81,7 @@ class NoisePlethoraGUI
                                 info.setMember("minval", m_paramDescs[i].minVal);
                                 info.setMember("maxval", m_paramDescs[i].maxVal);
                                 info.setMember("defaultval", m_paramDescs[i].defaultVal);
+                                // info.setMember("val", m_paramDescs[i].defaultVal);
                                 if (m_paramDescs[i].type == ParamDesc::INT)
                                     info.setMember("step", 1.0);
                                 else
@@ -587,7 +588,7 @@ struct xen_noise_plethora
     bool guiShow() noexcept override { return true; }
     bool guiHide() noexcept override { return true; }
     int guiw = 700;
-    int guih = 700;
+    int guih = 800;
     bool guiGetSize(uint32_t *width, uint32_t *height) noexcept override
     {
         if (!m_gui)

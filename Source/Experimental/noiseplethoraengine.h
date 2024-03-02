@@ -180,7 +180,7 @@ class NoisePlethoraVoice
         if (key == -1)
             return;
 
-        int keytrack_mode = 1;
+        int keytrack_mode = 0;
         if (keytrack_mode == 0)
         {
             // calculate x and y mods from key, using a Lissajous style mapping
