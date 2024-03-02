@@ -95,15 +95,8 @@
 
     function updateValue(e) 
     {
-      if (e.target!=null)
-      {
-        onSliderMoved({id : e.target.id, value : e.target.value});
-      }  else
-      {
-        console.log("event was triggered by code");
-      }
-      
-      
+      // console.log("slider moved " + e.target.value);  
+      onSliderMoved({id : e.target.id, value : e.target.value});
     }
 </script>
 </html>

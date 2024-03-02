@@ -101,6 +101,7 @@ struct xen_noise_plethora
 
     {
         m_from_ui_fifo.reset(1024);
+        m_to_ui_fifo.reset(1024);
         paramDescriptions.push_back(ParamDesc()
                                         .withLinearScaleFormatting("dB")
                                         .withRange(-24.0, 0.0)
@@ -320,7 +321,7 @@ struct xen_noise_plethora
         info->port_type = CLAP_PORT_STEREO;
         return true;
     }
-    void handleNextEvent(const clap_event_header_t *nextEvent)
+    void handleNextEvent(const clap_event_header_t *nextEvent, bool is_from_ui)
     {
         if (nextEvent->space_id != CLAP_CORE_EVENT_SPACE_ID)
             return;
@@ -357,7 +358,7 @@ struct xen_noise_plethora
                 paramValues[pevt->param_id] = pevt->value;
                 m_synth.applyParameter(pevt->port_index, pevt->channel, pevt->key, pevt->note_id,
                                        pevt->param_id, pevt->value);
-                if (m_gui)
+                if (m_gui && !is_from_ui)
                 {
                     UiMessage msg;
                     msg.type = CLAP_EVENT_PARAM_VALUE;
@@ -365,8 +366,7 @@ struct xen_noise_plethora
                     msg.value = pevt->value;
                     m_to_ui_fifo.push(msg);
                 }
-                
-            }
+                        }
 
             break;
         }
@@ -391,7 +391,7 @@ struct xen_noise_plethora
         for (auto e = 0U; e < sz; ++e)
         {
             auto nextEvent = in->get(in, e);
-            handleNextEvent(nextEvent);
+            handleNextEvent(nextEvent, true);
         }
     }
     void handleUIMessages()
@@ -413,7 +413,7 @@ struct xen_noise_plethora
                 evt.note_id = -1;
                 evt.param_id = msg.parid;
                 evt.value = msg.value;
-                handleNextEvent((const clap_event_header *)&evt);
+                handleNextEvent((const clap_event_header *)&evt, true);
             }
         }
     }
@@ -457,7 +457,7 @@ struct xen_noise_plethora
         for (int i = 0; i < sz; ++i)
         {
             auto evt = ev->get(ev, i);
-            handleNextEvent(evt);
+            handleNextEvent(evt, false);
         }
 
         choc::buffer::SeparateChannelLayout<float> layout(process->audio_outputs->data32);
