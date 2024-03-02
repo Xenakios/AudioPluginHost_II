@@ -42,6 +42,7 @@
 </body>
 
 <script>
+    var sliders = {};
     function createSlider(slid_id,slid_label,minval,maxval,defaultval,step)
     {
         let lab = document.createTextNode(slid_label);
@@ -63,19 +64,46 @@
         document.getElementById("foodiv").appendChild(slid1);
         let br = document.createElement("br");
         document.getElementById("foodiv").appendChild(br);
+        sliders[slid_id] = slid1;
     }
+    
     // result from c++ is an async promise! so we need to deal with that like this...
     getParameters([]).then ((result) => 
     { 
         for (var i=0;i<result.length;++i)
         {
-            createSlider(result[i].id,result[i].name,result[i].
+            let id = result[i].id;
+            createSlider(id,result[i].name,result[i].
               minval,result[i].maxval,result[i].defaultval,result[i].step);
         }
     });
+
+    setInterval(onMyTimer,100);
+
+    function onMyTimer()
+    {
+      getParameterUpdates([]).then((result) =>
+      {
+        for (var i=0;i<result.length;++i)
+        {
+          // console.log(result[i]);
+          var id = result[i].id;
+          sliders[id].value = result[i].val;
+        }
+      });     
+    }
+
     function updateValue(e) 
     {
+      if (e.target!=null)
+      {
         onSliderMoved({id : e.target.id, value : e.target.value});
+      }  else
+      {
+        console.log("event was triggered by code");
+      }
+      
+      
     }
 </script>
 </html>

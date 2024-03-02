@@ -26,10 +26,24 @@ class NoisePlethoraGUI
   public:
     std::vector<ParamDesc> m_paramDescs;
     CommFIFO &m_to_proc_fifo;
-    NoisePlethoraGUI(std::vector<ParamDesc> paramDescs, CommFIFO &fifo)
-        : m_paramDescs(paramDescs), m_to_proc_fifo(fifo)
+    CommFIFO &m_from_proc_fifo;
+    NoisePlethoraGUI(std::vector<ParamDesc> paramDescs, CommFIFO &outfifo, CommFIFO &infifo)
+        : m_paramDescs(paramDescs), m_to_proc_fifo(outfifo), m_from_proc_fifo(infifo)
     {
         m_webview = std::make_unique<choc::ui::WebView>();
+        m_webview->bind("getParameterUpdates",
+                        [this](const choc::value::ValueView &args) -> choc::value::Value {
+                            auto result = choc::value::createEmptyArray();
+                            UiMessage msg;
+                            while (m_from_proc_fifo.pop(msg))
+                            {
+                                auto info = choc::value::createObject("parupdate");
+                                info.setMember("id", (int64_t)msg.parid);
+                                info.setMember("val", msg.value);
+                                result.addArrayElement(info);
+                            }
+                            return result;
+                        });
         m_webview->bind("onSliderMoved",
                         [this](const choc::value::ValueView &args) -> choc::value::Value {
                             // note that things could get messed up here because the choc functions
@@ -78,6 +92,7 @@ struct xen_noise_plethora
     std::vector<ParamDesc> paramDescriptions;
     std::unique_ptr<NoisePlethoraGUI> m_gui;
     CommFIFO m_from_ui_fifo;
+    CommFIFO m_to_ui_fifo;
     float sampleRate = 44100.0f;
     NoisePlethoraSynth m_synth;
     xen_noise_plethora(const clap_host *host, const clap_plugin_descriptor *desc)
@@ -342,6 +357,15 @@ struct xen_noise_plethora
                 paramValues[pevt->param_id] = pevt->value;
                 m_synth.applyParameter(pevt->port_index, pevt->channel, pevt->key, pevt->note_id,
                                        pevt->param_id, pevt->value);
+                if (m_gui)
+                {
+                    UiMessage msg;
+                    msg.type = CLAP_EVENT_PARAM_VALUE;
+                    msg.parid = pevt->param_id;
+                    msg.value = pevt->value;
+                    m_to_ui_fifo.push(msg);
+                }
+                
             }
 
             break;
@@ -528,7 +552,7 @@ struct xen_noise_plethora
     // }
     bool guiCreate(const char *api, bool isFloating) noexcept override
     {
-        m_gui = std::make_unique<NoisePlethoraGUI>(paramDescriptions, m_from_ui_fifo);
+        m_gui = std::make_unique<NoisePlethoraGUI>(paramDescriptions, m_from_ui_fifo, m_to_ui_fifo);
         return true;
     }
     void guiDestroy() noexcept override { m_gui = nullptr; }
