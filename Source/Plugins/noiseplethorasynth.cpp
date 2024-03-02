@@ -16,7 +16,8 @@ struct UiMessage
     UiMessage() {}
     int type = 0;
     clap_id parid = CLAP_INVALID_ID;
-    double value = 0.0;
+    float value = 0.0;
+    float auxvalue = 0.0f;
 };
 
 using CommFIFO = choc::fifo::SingleReaderSingleWriterFIFO<UiMessage>;
@@ -37,10 +38,21 @@ class NoisePlethoraGUI
                             UiMessage msg;
                             while (m_from_proc_fifo.pop(msg))
                             {
-                                auto info = choc::value::createObject("parupdate");
-                                info.setMember("id", (int64_t)msg.parid);
-                                info.setMember("val", msg.value);
-                                result.addArrayElement(info);
+                                if (msg.type == CLAP_EVENT_PARAM_VALUE)
+                                {
+                                    auto info = choc::value::createObject("parupdate");
+                                    info.setMember("id", (int64_t)msg.parid);
+                                    info.setMember("val", msg.value);
+                                    result.addArrayElement(info);
+                                }
+                                if (msg.type == 10000)
+                                {
+                                    auto info = choc::value::createObject("xy");
+                                    info.setMember("id", 10000);
+                                    info.setMember("x", msg.value);
+                                    info.setMember("y", msg.auxvalue);
+                                    result.addArrayElement(info);
+                                }
                             }
                             return result;
                         });
@@ -366,7 +378,7 @@ struct xen_noise_plethora
                     msg.value = pevt->value;
                     m_to_ui_fifo.push(msg);
                 }
-                        }
+            }
 
             break;
         }
@@ -464,6 +476,21 @@ struct xen_noise_plethora
         choc::buffer::ChannelArrayView<float> bufview(layout, {2, process->frames_count});
         bufview.clear();
         m_synth.processBlock(bufview);
+        if (m_gui)
+        {
+            for (auto &v : m_synth.m_voices)
+            {
+                if (v->m_voice_active)
+                {
+                    UiMessage msg;
+                    msg.type = 10000;
+                    msg.value = v->totalx;
+                    msg.auxvalue = v->totaly;
+                    m_to_ui_fifo.push(msg);
+                }
+            }
+        }
+
         for (const auto &denote : m_synth.deactivatedNotes)
         {
             clap_event_note nevt;
@@ -559,12 +586,14 @@ struct xen_noise_plethora
     // virtual bool guiSetScale(double scale) noexcept { return false; }
     bool guiShow() noexcept override { return true; }
     bool guiHide() noexcept override { return true; }
+    int guiw = 700;
+    int guih = 700;
     bool guiGetSize(uint32_t *width, uint32_t *height) noexcept override
     {
         if (!m_gui)
             return false;
-        *width = 700;
-        *height = 600;
+        *width = guiw;
+        *height = guih;
         return true;
     }
     // virtual bool guiCanResize() const noexcept { return false; }
@@ -581,7 +610,7 @@ struct xen_noise_plethora
             return false;
         SetParent((HWND)m_gui->m_webview->getViewHandle(), (HWND)window->win32);
         ShowWindow((HWND)m_gui->m_webview->getViewHandle(), SW_SHOWNA);
-        SetWindowPos((HWND)m_gui->m_webview->getViewHandle(), NULL, 0, 0, 700, 600, SWP_SHOWWINDOW);
+        SetWindowPos((HWND)m_gui->m_webview->getViewHandle(), NULL, 0, 0, guiw, guih, SWP_SHOWWINDOW);
 
         return true;
     }

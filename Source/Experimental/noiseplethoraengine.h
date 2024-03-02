@@ -208,6 +208,8 @@ class NoisePlethoraVoice
     float eg_release = 0.1f;
     std::function<void(int, int, int, int)> DeativatedVoiceCallback;
     // must accumulate into the buffer, precleared by the synth before processing the first voice
+    float totalx = 0.0f;
+    float totaly = 0.0f;
     void process(choc::buffer::ChannelArrayView<float> destBuf)
     {
         if (!m_voice_active)
@@ -219,8 +221,8 @@ class NoisePlethoraVoice
         auto plug = m_plugs[safealgo].get();
 
         float expr_x = xenakios::mapvalue(note_expr_pressure, 0.0f, 1.0f, -0.5f, 0.5f);
-        float totalx = std::clamp(basevalues.x + modvalues.x + keytrack_x_mod, 0.0f, 1.0f);
-        float totaly = std::clamp(basevalues.y + modvalues.y + keytrack_y_mod, 0.0f, 1.0f);
+        totalx = std::clamp(basevalues.x + modvalues.x + keytrack_x_mod, 0.0f, 1.0f);
+        totaly = std::clamp(basevalues.y + modvalues.y + keytrack_y_mod, 0.0f, 1.0f);
         plug->process(totalx, totaly);
         float velodb = -18.0 + 18.0 * velocity;
         double totalvol = std::clamp(basevalues.volume + modvalues.volume + velodb, -96.0f, 0.0f);
