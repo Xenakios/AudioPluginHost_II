@@ -6,15 +6,78 @@
 #include "clap/helpers/host-proxy.hxx"
 #include "../Experimental/noiseplethoraengine.h"
 #include "sst/basic-blocks/params/ParamMetadata.h"
+#include "gui/choc_WebView.h"
+#include "containers/choc_SingleReaderSingleWriterFIFO.h"
 
 using ParamDesc = sst::basic_blocks::params::ParamMetaData;
+
+struct UiMessage
+{
+    UiMessage() {}
+    int type = 0;
+    clap_id parid = CLAP_INVALID_ID;
+    double value = 0.0;
+};
+
+using CommFIFO = choc::fifo::SingleReaderSingleWriterFIFO<UiMessage>;
+
+class NoisePlethoraGUI
+{
+  public:
+    std::vector<ParamDesc> m_paramDescs;
+    CommFIFO &m_to_proc_fifo;
+    NoisePlethoraGUI(std::vector<ParamDesc> paramDescs, CommFIFO &fifo)
+        : m_paramDescs(paramDescs), m_to_proc_fifo(fifo)
+    {
+        m_webview = std::make_unique<choc::ui::WebView>();
+        m_webview->bind("onSliderMoved",
+                        [this](const choc::value::ValueView &args) -> choc::value::Value {
+                            // note that things could get messed up here because the choc functions
+                            // can throw exceptions, so we should maybe have a try catch block
+                            // here...but we should just know this will work, really.
+                            auto parid = args[0]["id"].get<int>();
+                            auto value = args[0]["value"].get<double>();
+                            UiMessage msg;
+                            msg.type = CLAP_EVENT_PARAM_VALUE;
+                            msg.value = value;
+                            msg.parid = parid;
+                            m_to_proc_fifo.push(msg);
+                            return choc::value::Value{};
+                        });
+        m_webview->bind("getParameters",
+                        [this](const choc::value::ValueView &args) -> choc::value::Value {
+                            auto result = choc::value::createEmptyArray();
+                            for (int i = 0; i < m_paramDescs.size(); ++i)
+                            {
+                                auto info = choc::value::createObject("paraminfo");
+                                info.setMember("name", m_paramDescs[i].name);
+                                info.setMember("id", (int64_t)m_paramDescs[i].id);
+                                info.setMember("minval", m_paramDescs[i].minVal);
+                                info.setMember("maxval", m_paramDescs[i].maxVal);
+                                info.setMember("defaultval", m_paramDescs[i].defaultVal);
+                                if (m_paramDescs[i].type == ParamDesc::INT)
+                                    info.setMember("step", 1.0);
+                                else
+                                    info.setMember("step", 0.01);
+                                result.addArrayElement(info);
+                            }
+                            return result;
+                        });
+
+        m_webview->navigate(R"(C:\develop\AudioPluginHost_mk2\Source\Plugins\noiseplethora.html)");
+    }
+    std::unique_ptr<choc::ui::WebView> m_webview;
+
+  private:
+};
 
 struct xen_noise_plethora
     : public clap::helpers::Plugin<clap::helpers::MisbehaviourHandler::Terminate,
                                    clap::helpers::CheckingLevel::Maximal>
 {
     std::vector<ParamDesc> paramDescriptions;
-
+    std::unique_ptr<NoisePlethoraGUI> m_gui;
+    CommFIFO m_from_ui_fifo;
     float sampleRate = 44100.0f;
     NoisePlethoraSynth m_synth;
     xen_noise_plethora(const clap_host *host, const clap_plugin_descriptor *desc)
@@ -22,6 +85,7 @@ struct xen_noise_plethora
                                 clap::helpers::CheckingLevel::Maximal>(desc, host)
 
     {
+        m_from_ui_fifo.reset(1024);
         paramDescriptions.push_back(ParamDesc()
                                         .withLinearScaleFormatting("dB")
                                         .withRange(-24.0, 0.0)
@@ -295,6 +359,7 @@ struct xen_noise_plethora
     }
     void paramsFlush(const clap_input_events *in, const clap_output_events *out) noexcept override
     {
+        handleUIMessages();
         auto sz = in->size(in);
 
         // This pointer is the sentinel to our next event which we advance once an event is
@@ -303,6 +368,29 @@ struct xen_noise_plethora
         {
             auto nextEvent = in->get(in, e);
             handleNextEvent(nextEvent);
+        }
+    }
+    void handleUIMessages()
+    {
+        UiMessage msg;
+        while (m_from_ui_fifo.pop(msg))
+        {
+            if (msg.type == CLAP_EVENT_PARAM_VALUE)
+            {
+                clap_event_param_value evt;
+                evt.header.space_id = CLAP_CORE_EVENT_SPACE_ID;
+                evt.header.flags = 0;
+                evt.header.size = sizeof(clap_event_param_value);
+                evt.header.type = CLAP_EVENT_PARAM_VALUE;
+                evt.header.time = 0;
+                evt.channel = -1;
+                evt.port_index = -1;
+                evt.key = -1;
+                evt.note_id = -1;
+                evt.param_id = msg.parid;
+                evt.value = msg.value;
+                handleNextEvent((const clap_event_header *)&evt);
+            }
         }
     }
     clap_process_status process(const clap_process *process) noexcept override
@@ -341,11 +429,17 @@ struct xen_noise_plethora
             }
         }
         */
+        handleUIMessages();
         for (int i = 0; i < sz; ++i)
         {
             auto evt = ev->get(ev, i);
             handleNextEvent(evt);
         }
+
+        choc::buffer::SeparateChannelLayout<float> layout(process->audio_outputs->data32);
+        choc::buffer::ChannelArrayView<float> bufview(layout, {2, process->frames_count});
+        bufview.clear();
+        m_synth.processBlock(bufview);
         for (const auto &denote : m_synth.deactivatedNotes)
         {
             clap_event_note nevt;
@@ -361,10 +455,6 @@ struct xen_noise_plethora
             nevt.velocity = 0.0;
             process->out_events->try_push(process->out_events, (const clap_event_header *)&nevt);
         }
-        choc::buffer::SeparateChannelLayout<float> layout(process->audio_outputs->data32);
-        choc::buffer::ChannelArrayView<float> bufview(layout, {2, process->frames_count});
-        bufview.clear();
-        m_synth.processBlock(bufview);
         return CLAP_PROCESS_CONTINUE;
     }
 
@@ -422,12 +512,56 @@ struct xen_noise_plethora
                         m_synth.applyParameter(-1, -1, -1, -1, i, paramValues[i]);
                     }
                 }
-                
             }
             return true;
         }
         return false;
     }
+    bool implementsGui() const noexcept override { return true; }
+    bool guiIsApiSupported(const char *api, bool isFloating) noexcept override
+    {
+        if (strcmp(api, "win32") == 0)
+            return true;
+        return false;
+    }
+    // virtual bool guiGetPreferredApi(const char **api, bool *is_floating) noexcept { return false;
+    // }
+    bool guiCreate(const char *api, bool isFloating) noexcept override
+    {
+        m_gui = std::make_unique<NoisePlethoraGUI>(paramDescriptions, m_from_ui_fifo);
+        return true;
+    }
+    void guiDestroy() noexcept override { m_gui = nullptr; }
+    // virtual bool guiSetScale(double scale) noexcept { return false; }
+    bool guiShow() noexcept override { return true; }
+    bool guiHide() noexcept override { return true; }
+    bool guiGetSize(uint32_t *width, uint32_t *height) noexcept override
+    {
+        if (!m_gui)
+            return false;
+        *width = 700;
+        *height = 600;
+        return true;
+    }
+    // virtual bool guiCanResize() const noexcept { return false; }
+    // virtual bool guiGetResizeHints(clap_gui_resize_hints_t *hints) noexcept { return false; }
+    bool guiAdjustSize(uint32_t *width, uint32_t *height) noexcept override
+    {
+        return guiGetSize(width, height);
+    }
+    // virtual bool guiSetSize(uint32_t width, uint32_t height) noexcept { return false; }
+    // virtual void guiSuggestTitle(const char *title) noexcept {}
+    bool guiSetParent(const clap_window *window) noexcept override
+    {
+        if (!m_gui)
+            return false;
+        SetParent((HWND)m_gui->m_webview->getViewHandle(), (HWND)window->win32);
+        ShowWindow((HWND)m_gui->m_webview->getViewHandle(), SW_SHOWNA);
+        SetWindowPos((HWND)m_gui->m_webview->getViewHandle(), NULL, 0, 0, 700, 600, SWP_SHOWWINDOW);
+
+        return true;
+    }
+    // virtual bool guiSetTransient(const clap_window *window) noexcept { return false; }
 };
 
 const char *features[] = {CLAP_PLUGIN_FEATURE_INSTRUMENT, nullptr};

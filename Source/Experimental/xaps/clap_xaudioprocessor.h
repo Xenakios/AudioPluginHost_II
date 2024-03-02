@@ -427,7 +427,7 @@ class ClapPluginFormatProcessor : public xenakios::XAudioProcessor
         }
         choc::ui::DesktopWindow* dwp = (choc::ui::DesktopWindow*)window->ptr;
         dwp->setContent(m_webview_ed->m_webview->getViewHandle());
-        return false;
+        return true;
     }
 #endif
 };

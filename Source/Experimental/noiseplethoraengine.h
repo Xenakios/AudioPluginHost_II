@@ -429,16 +429,18 @@ class NoisePlethoraSynth
     void processBlock(choc::buffer::ChannelArrayView<float> destBuf)
     {
         deactivatedNotes.clear();
-        m_mix_buf.clear();
+        auto mixbufView =
+            m_mix_buf.getSection(choc::buffer::ChannelRange{0, 2}, {0, destBuf.getNumFrames()});
+        mixbufView.clear();
         for (size_t i = 0; i < m_voices.size(); ++i)
         {
             if (m_voices[i]->m_voice_active)
             {
-                m_voices[i]->process(m_mix_buf.getView());
+                m_voices[i]->process(mixbufView);
             }
         }
-        choc::buffer::applyGain(m_mix_buf, 0.5);
-        choc::buffer::copy(destBuf, m_mix_buf);
+        choc::buffer::applyGain(mixbufView, 0.5);
+        choc::buffer::copy(destBuf, mixbufView);
     }
 
     enum class ParamIDs
