@@ -16,8 +16,7 @@ struct UiMessage
     UiMessage() {}
     int type = 0;
     clap_id parid = CLAP_INVALID_ID;
-    float value = 0.0;
-    float auxvalue = 0.0f;
+    float values[4] = {0.0f, 0.0f, 0.0f, 0.0f};
 };
 
 using CommFIFO = choc::fifo::SingleReaderSingleWriterFIFO<UiMessage>;
@@ -43,15 +42,16 @@ class NoisePlethoraGUI
                                 {
                                     auto info = choc::value::createObject("parupdate");
                                     info.setMember("id", (int64_t)msg.parid);
-                                    info.setMember("val", msg.value);
+                                    info.setMember("val", msg.values[0]);
                                     result.addArrayElement(info);
                                 }
                                 if (msg.type == 10000)
                                 {
                                     auto info = choc::value::createObject("xy");
                                     info.setMember("id", 10000);
-                                    info.setMember("x", msg.value);
-                                    info.setMember("y", msg.auxvalue);
+                                    info.setMember("x", msg.values[0]);
+                                    info.setMember("y", msg.values[1]);
+                                    info.setMember("gain", msg.values[2]);
                                     result.addArrayElement(info);
                                 }
                             }
@@ -66,7 +66,7 @@ class NoisePlethoraGUI
                             auto value = args[0]["value"].get<double>();
                             UiMessage msg;
                             msg.type = CLAP_EVENT_PARAM_VALUE;
-                            msg.value = value;
+                            msg.values[0] = value;
                             msg.parid = parid;
                             m_to_proc_fifo.push(msg);
                             return choc::value::Value{};
@@ -110,7 +110,7 @@ struct xen_noise_plethora
     CommFIFO m_to_ui_fifo;
     float sampleRate = 44100.0f;
     NoisePlethoraSynth m_synth;
-    
+
     xen_noise_plethora(const clap_host *host, const clap_plugin_descriptor *desc)
         : clap::helpers::Plugin<clap::helpers::MisbehaviourHandler::Terminate,
                                 clap::helpers::CheckingLevel::Maximal>(desc, host)
@@ -392,7 +392,7 @@ struct xen_noise_plethora
                     UiMessage msg;
                     msg.type = CLAP_EVENT_PARAM_VALUE;
                     msg.parid = pevt->param_id;
-                    msg.value = pevt->value;
+                    msg.values[0] = pevt->value;
                     m_to_ui_fifo.push(msg);
                 }
             }
@@ -441,7 +441,7 @@ struct xen_noise_plethora
                 evt.key = -1;
                 evt.note_id = -1;
                 evt.param_id = msg.parid;
-                evt.value = msg.value;
+                evt.value = msg.values[0];
                 handleNextEvent((const clap_event_header *)&evt, true);
                 // oevts->try_push(oevts, (const clap_event_header *)&evt);
             }
@@ -502,8 +502,9 @@ struct xen_noise_plethora
                 {
                     UiMessage msg;
                     msg.type = 10000;
-                    msg.value = v->totalx;
-                    msg.auxvalue = v->totaly;
+                    msg.values[0] = v->totalx;
+                    msg.values[1] = v->totaly;
+                    msg.values[2] = v->total_gain;
                     m_to_ui_fifo.push(msg);
                     v->visualizationDirty = false;
                 }

@@ -211,6 +211,7 @@ class NoisePlethoraVoice
     std::function<void(int, int, int, int)> DeativatedVoiceCallback;
     float totalx = 0.0f;
     float totaly = 0.0f;
+    float total_gain = 0.0f;
     bool visualizationDirty = false;
     // must accumulate into the buffer, precleared by the synth before processing the first voice
 
@@ -268,8 +269,9 @@ class NoisePlethoraVoice
             double smoothedpan = m_pan_smoother.process(totalpan);
             // does expensive calculation, so might want to use tables or something instead
             sst::basic_blocks::dsp::pan_laws::monoEqualPower(smoothedpan, panmat);
-
-            float out = plug->processGraph() * smoothedgain * envgain;
+            float finalgain = smoothedgain * envgain;
+            total_gain = finalgain;
+            float out = plug->processGraph() * finalgain;
             float outL = panmat[0] * out;
             float outR = panmat[3] * out;
 
