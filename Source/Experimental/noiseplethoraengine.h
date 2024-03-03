@@ -559,28 +559,3 @@ class NoisePlethoraSynth
     int m_update_len = 32;
 };
 
-class NoisePlethoraEngine
-{
-  public:
-    NoisePlethoraEngine()
-    {
-        int k = 0;
-        for (int i = 0; i < numBanks; ++i)
-        {
-            auto &bank = getBankForIndex(i);
-            std::cout << "bank " << i << "\n";
-            for (int j = 0; j < programsPerBank; ++j)
-            {
-                auto progname = bank.getProgramName(j);
-                std::cout << "\t" << progname << "\t\t" << k << "\n";
-                // availablePlugins[k] = bank.getProgramName(j);
-                ++k;
-                auto p = MyFactory::Instance()->Create(progname);
-                m_plugs.push_back(std::move(p));
-            }
-        }
-    }
-
-  private:
-    std::vector<std::unique_ptr<NoisePlethoraPlugin>> m_plugs;
-};
