@@ -110,6 +110,7 @@ struct xen_noise_plethora
     CommFIFO m_to_ui_fifo;
     float sampleRate = 44100.0f;
     NoisePlethoraSynth m_synth;
+    
     xen_noise_plethora(const clap_host *host, const clap_plugin_descriptor *desc)
         : clap::helpers::Plugin<clap::helpers::MisbehaviourHandler::Terminate,
                                 clap::helpers::CheckingLevel::Maximal>(desc, host)
@@ -233,9 +234,13 @@ struct xen_noise_plethora
                                         .withID((clap_id)NoisePlethoraSynth::ParamIDs::EGRelease));
         paramDescriptions.push_back(
             ParamDesc()
-                .withUnorderedMapFormatting({
-                    {0, "No tracking"}, {1, "Lissajous"}, {2, "Grid"},
-                }, true)
+                .withUnorderedMapFormatting(
+                    {
+                        {0, "No tracking"},
+                        {1, "Lissajous"},
+                        {2, "Grid"},
+                    },
+                    true)
                 .withDefault(0.0)
 
                 .withFlags(CLAP_PARAM_IS_AUTOMATABLE | CLAP_PARAM_IS_MODULATABLE |
