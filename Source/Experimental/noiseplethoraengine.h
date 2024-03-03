@@ -177,18 +177,19 @@ class NoisePlethoraVoice
         m_vol_env.attackFrom(0.0f, 0.0f, 0, true);
         keytrack_x_mod = 0.0f;
         keytrack_y_mod = 0.0f;
-        if (key == -1)
+        visualizationDirty = true;
+        // theoretically possible was started with key -1, although no longer endorsed by Clap
+        if (key == -1) 
             return;
 
-        int keytrack_mode = 0;
-        if (keytrack_mode == 0)
+        if (keytrackMode == 1)
         {
             // calculate x and y mods from key, using a Lissajous style mapping
             float t = xenakios::mapvalue<float>(key, 0, 127, -M_PI, M_PI);
             keytrack_x_mod = 0.5 * std::sin(t * 10.0);
             keytrack_y_mod = 0.5 * std::cos(t * 11.0);
         }
-        else if (keytrack_mode == 1)
+        else if (keytrackMode == 2)
         {
             // 7x7 mapping, for 49 XY states
             int gsize = 7;
@@ -206,10 +207,13 @@ class NoisePlethoraVoice
     float eg_decay = 0.1f;
     float eg_sustain = 0.75f;
     float eg_release = 0.1f;
+    int keytrackMode = 1;
     std::function<void(int, int, int, int)> DeativatedVoiceCallback;
-    // must accumulate into the buffer, precleared by the synth before processing the first voice
     float totalx = 0.0f;
     float totaly = 0.0f;
+    bool visualizationDirty = false;
+    // must accumulate into the buffer, precleared by the synth before processing the first voice
+
     void process(choc::buffer::ChannelArrayView<float> destBuf)
     {
         if (!m_voice_active)
@@ -221,8 +225,14 @@ class NoisePlethoraVoice
         auto plug = m_plugs[safealgo].get();
 
         float expr_x = xenakios::mapvalue(note_expr_pressure, 0.0f, 1.0f, -0.5f, 0.5f);
-        totalx = std::clamp(basevalues.x + modvalues.x + keytrack_x_mod, 0.0f, 1.0f);
-        totaly = std::clamp(basevalues.y + modvalues.y + keytrack_y_mod, 0.0f, 1.0f);
+        float tempx = std::clamp(basevalues.x + modvalues.x + keytrack_x_mod, 0.0f, 1.0f);
+        float tempy = std::clamp(basevalues.y + modvalues.y + keytrack_y_mod, 0.0f, 1.0f);
+        if (tempx != totalx || tempy != totaly)
+        {
+            visualizationDirty = true;
+            totalx = tempx;
+            totaly = tempy;
+        }
         plug->process(totalx, totaly);
         float velodb = -18.0 + 18.0 * velocity;
         double totalvol = std::clamp(basevalues.volume + modvalues.volume + velodb, -96.0f, 0.0f);
@@ -395,6 +405,8 @@ class NoisePlethoraSynth
                     v->eg_sustain = value;
                 if (parid == (clap_id)ParamIDs::EGRelease)
                     v->eg_release = value;
+                if (parid == (clap_id)ParamIDs::KeyTrackMode)
+                    v->keytrackMode = value;
             }
         }
     }
@@ -458,7 +470,8 @@ class NoisePlethoraSynth
         EGAttack,
         EGDecay,
         EGSustain,
-        EGRelease
+        EGRelease,
+        KeyTrackMode
     };
     int m_polyphony = 1;
     double m_pan_spread = 0.0;

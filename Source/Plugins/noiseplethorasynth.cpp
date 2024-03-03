@@ -190,7 +190,6 @@ struct xen_noise_plethora
                 .withID((clap_id)NoisePlethoraSynth::ParamIDs::FiltResonance));
         paramDescriptions.push_back(
             ParamDesc()
-
                 .withUnorderedMapFormatting({{0, "Lowpass"},
                                              {1, "Highpass"},
                                              {2, "Bandpass"},
@@ -232,6 +231,17 @@ struct xen_noise_plethora
                                         .withFlags(CLAP_PARAM_IS_AUTOMATABLE)
                                         .withName("EG Release")
                                         .withID((clap_id)NoisePlethoraSynth::ParamIDs::EGRelease));
+        paramDescriptions.push_back(
+            ParamDesc()
+                .withUnorderedMapFormatting({
+                    {0, "No tracking"}, {1, "Lissajous"}, {2, "Grid"},
+                }, true)
+                .withDefault(0.0)
+
+                .withFlags(CLAP_PARAM_IS_AUTOMATABLE | CLAP_PARAM_IS_MODULATABLE |
+                           CLAP_PARAM_IS_MODULATABLE_PER_NOTE_ID | CLAP_PARAM_IS_STEPPED)
+                .withName("Key tracking mode")
+                .withID((clap_id)NoisePlethoraSynth::ParamIDs::KeyTrackMode));
         paramValues[0] = m_synth.m_voices[0]->basevalues.volume;
         paramValues[1] = m_synth.m_voices[0]->basevalues.x;
         paramValues[2] = m_synth.m_voices[0]->basevalues.y;
@@ -244,6 +254,7 @@ struct xen_noise_plethora
         paramValues[9] = m_synth.m_voices[0]->eg_decay;
         paramValues[10] = m_synth.m_voices[0]->eg_sustain;
         paramValues[11] = m_synth.m_voices[0]->eg_release;
+        paramValues[12] = m_synth.m_voices[0]->keytrackMode;
     }
     bool activate(double sampleRate_, uint32_t minFrameCount,
                   uint32_t maxFrameCount) noexcept override
@@ -269,7 +280,7 @@ struct xen_noise_plethora
         paramDescriptions[paramIndex].toClapParamInfo<CLAP_NAME_SIZE>(info);
         return true;
     }
-    static constexpr size_t numParams = 12;
+    static constexpr size_t numParams = 13;
     float paramValues[numParams];
     bool paramsValue(clap_id paramId, double *value) noexcept override
     {
@@ -407,7 +418,7 @@ struct xen_noise_plethora
             handleNextEvent(nextEvent, false);
         }
     }
-    void handleUIMessages(const clap_output_events* oevts)
+    void handleUIMessages(const clap_output_events *oevts)
     {
         UiMessage msg;
         while (m_from_ui_fifo.pop(msg))
@@ -455,8 +466,8 @@ struct xen_noise_plethora
 
         for (uint32_t i = 0; i < fc; ++i)
         {
-            // while, because we need to scan for events that could be at the same buffer position
-            while (nextEvent && nextEvent->time == i)
+            // while, because we need to scan for events that could be at the same buffer
+        position while (nextEvent && nextEvent->time == i)
             {
                 handleNextEvent(nextEvent);
                 nextEventIndex++;
@@ -489,10 +500,13 @@ struct xen_noise_plethora
                     msg.value = v->totalx;
                     msg.auxvalue = v->totaly;
                     m_to_ui_fifo.push(msg);
+                    v->visualizationDirty = false;
                 }
             }
         }
-
+        visThrottleCounter += process->frames_count;
+        if (visThrottleCounter >= 44100)
+            visThrottleCounter = 0;
         for (const auto &denote : m_synth.deactivatedNotes)
         {
             clap_event_note nevt;
@@ -510,7 +524,7 @@ struct xen_noise_plethora
         }
         return CLAP_PROCESS_CONTINUE;
     }
-
+    int visThrottleCounter = 0;
     bool implementsState() const noexcept override { return true; }
     bool stateSave(const clap_ostream *stream) noexcept override
     {
@@ -588,20 +602,20 @@ struct xen_noise_plethora
     }
     void guiDestroy() noexcept override { m_gui = nullptr; }
     // virtual bool guiSetScale(double scale) noexcept { return false; }
-    bool guiShow() noexcept override 
-    { 
+    bool guiShow() noexcept override
+    {
         if (!m_gui)
             return false;
-        return true; 
+        return true;
     }
-    bool guiHide() noexcept override 
-    { 
+    bool guiHide() noexcept override
+    {
         if (!m_gui)
             return false;
-        return true; 
+        return true;
     }
     int guiw = 700;
-    int guih = 800;
+    int guih = 830;
     bool guiGetSize(uint32_t *width, uint32_t *height) noexcept override
     {
         if (!m_gui)
