@@ -47,6 +47,7 @@
     function createSlider(slid_id,slid_label,minval,maxval,defaultval,step)
     {
         let lab = document.createTextNode(slid_label);
+        document.getElementById("foodiv").style.fontSize=12;
         document.getElementById("foodiv").appendChild(lab);
         let slid1 = document.createElement("input");
         slid1.type = "range";

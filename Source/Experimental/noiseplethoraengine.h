@@ -160,7 +160,9 @@ class NoisePlethoraVoice
             p->init();
             p->m_sr = m_sr;
         }
+        m_cur_plugin = m_plugs[0].get();
     }
+    NoisePlethoraPlugin *m_cur_plugin = nullptr;
     double velocity = 1.0;
     bool m_eg_gate = false;
     bool m_voice_active = false;
@@ -171,7 +173,10 @@ class NoisePlethoraVoice
         chan = chan_;
         key = key_;
         note_id = id_;
-
+        int curplug = basevalues.algo;
+        curplug = std::clamp(curplug, 0, (int)m_plugs.size() - 1);
+        m_cur_plugin = m_plugs[curplug].get();
+        m_cur_plugin->init();
         m_voice_active = true;
         m_eg_gate = true;
         m_vol_env.attackFrom(0.0f, 0.0f, 0, true);
@@ -179,7 +184,7 @@ class NoisePlethoraVoice
         keytrack_y_mod = 0.0f;
         visualizationDirty = true;
         // theoretically possible was started with key -1, although no longer endorsed by Clap
-        if (key == -1) 
+        if (key == -1)
             return;
 
         if (keytrackMode == 1)
@@ -189,10 +194,13 @@ class NoisePlethoraVoice
             keytrack_x_mod = 0.5 * std::sin(t * 10.0);
             keytrack_y_mod = 0.5 * std::cos(t * 11.0);
         }
-        else if (keytrackMode == 2)
+        else if (keytrackMode >= 2 && keytrackMode <= 4)
         {
-            // 7x7 mapping, for 49 XY states
-            int gsize = 7;
+            int gsize = 3;
+            if (keytrackMode == 3)
+                gsize = 5;
+            if (keytrackMode == 4)
+                gsize = 7;
             int numcells = gsize * gsize;
             int modkey = key % numcells;
             int ix = modkey % gsize;
@@ -224,7 +232,7 @@ class NoisePlethoraVoice
             wrap_algo<float>(0, basevalues.algo + modvalues.algo, (int)m_plugs.size() - 1);
         assert(safealgo >= 0 && safealgo < m_plugs.size());
         auto plug = m_plugs[safealgo].get();
-
+        m_cur_plugin = plug;
         float expr_x = xenakios::mapvalue(note_expr_pressure, 0.0f, 1.0f, -0.5f, 0.5f);
         float tempx = std::clamp(basevalues.x + modvalues.x + keytrack_x_mod, 0.0f, 1.0f);
         float tempy = std::clamp(basevalues.y + modvalues.y + keytrack_y_mod, 0.0f, 1.0f);
@@ -299,6 +307,7 @@ class NoisePlethoraVoice
     int note_id = -1;
 
   private:
+    // the noise plethora code calls the algos "plugins", which is a bit confusing
     std::vector<std::unique_ptr<NoisePlethoraPlugin>> m_plugs;
     SignalSmoother m_gain_smoother;
     SignalSmoother m_pan_smoother;

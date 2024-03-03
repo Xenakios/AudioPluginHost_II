@@ -31,7 +31,9 @@ class NoisePlethoraGUI
                      std::function<float(int)> pargetfunc)
         : m_paramDescs(paramDescs), m_to_proc_fifo(outfifo), m_from_proc_fifo(infifo)
     {
-        m_webview = std::make_unique<choc::ui::WebView>();
+        choc::ui::WebView::Options opts;
+        opts.enableDebugMode = true;
+        m_webview = std::make_unique<choc::ui::WebView>(opts);
         m_webview->bind("getParameterUpdates",
                         [this](const choc::value::ValueView &args) -> choc::value::Value {
                             auto result = choc::value::createEmptyArray();
@@ -238,7 +240,9 @@ struct xen_noise_plethora
                     {
                         {0, "No tracking"},
                         {1, "Lissajous"},
-                        {2, "Grid"},
+                        {2, "Grid 3x3"},
+                        {3, "Grid 5x5"},
+                        {4, "Grid 7x7"}
                     },
                     true)
                 .withDefault(0.0)
@@ -443,7 +447,7 @@ struct xen_noise_plethora
                 evt.param_id = msg.parid;
                 evt.value = msg.values[0];
                 handleNextEvent((const clap_event_header *)&evt, true);
-                // oevts->try_push(oevts, (const clap_event_header *)&evt);
+                oevts->try_push(oevts, (const clap_event_header *)&evt);
             }
         }
     }
