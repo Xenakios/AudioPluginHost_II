@@ -11,6 +11,7 @@
 #include "text/choc_Files.h"
 #include "xap_utils.h"
 #include "xapdsp.h"
+#include "sst/voicemanager/voicemanager.h"
 
 class SignalSmoother
 {
@@ -319,11 +320,14 @@ class NoisePlethoraVoice
 class NoisePlethoraSynth
 {
   public:
-    static constexpr size_t maxNumVoices = 16;
-    NoisePlethoraSynth()
+    using voice_t = NoisePlethoraVoice;
+    static constexpr size_t maxVoiceCount = 16;
+    sst::voicemanager::VoiceManager<NoisePlethoraSynth, NoisePlethoraSynth> m_voice_manager;
+    
+    NoisePlethoraSynth() : m_voice_manager(*this)
     {
         deactivatedNotes.reserve(1024);
-        for (size_t i = 0; i < maxNumVoices; ++i)
+        for (size_t i = 0; i < maxVoiceCount; ++i)
         {
             auto v = std::make_unique<NoisePlethoraVoice>();
             v->DeativatedVoiceCallback = [this](int port, int chan, int key, int noteid) {
@@ -333,7 +337,7 @@ class NoisePlethoraSynth
         }
     }
     ~NoisePlethoraSynth() { std::cout << "voices left at synth dtor " << voicecount << "\n"; }
-
+    void setVoiceEndCallback(std::function<void(voice_t*)>) {}
     void prepare(double sampleRate, int maxBlockSize)
     {
         m_sr = sampleRate;
@@ -558,4 +562,3 @@ class NoisePlethoraSynth
     int m_update_counter = 0;
     int m_update_len = 32;
 };
-

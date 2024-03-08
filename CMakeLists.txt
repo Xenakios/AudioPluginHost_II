@@ -21,6 +21,7 @@ include_directories(
     libs/concurrentqueue
     libs/WDL
     libs/pybind11/include
+    libs/sst-voicemanager/include
     C:/Users/teemu/AppData/Local/Programs/Python/Python312/include
 )
 
