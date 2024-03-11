@@ -831,11 +831,12 @@ inline void test_mod_matrix()
 
 int main()
 {
+    
     // test_plethora_synth();
     // test_mod_matrix_pyt();
     // test_mod_matrix();
     // test_seq_event_chase();
-    test_clap_gui_choc();
+    // test_clap_gui_choc();
     // test_offline_clap();
     // test_fb_osc();
     // test_lanczos();

@@ -236,15 +236,12 @@ struct xen_noise_plethora
                                         .withID((clap_id)NoisePlethoraSynth::ParamIDs::EGRelease));
         paramDescriptions.push_back(
             ParamDesc()
-                .withUnorderedMapFormatting(
-                    {
-                        {0, "No tracking"},
-                        {1, "Lissajous"},
-                        {2, "Grid 3x3"},
-                        {3, "Grid 5x5"},
-                        {4, "Grid 7x7"}
-                    },
-                    true)
+                .withUnorderedMapFormatting({{0, "No tracking"},
+                                             {1, "Lissajous"},
+                                             {2, "Grid 3x3"},
+                                             {3, "Grid 5x5"},
+                                             {4, "Grid 7x7"}},
+                                            true)
                 .withDefault(0.0)
 
                 .withFlags(CLAP_PARAM_IS_AUTOMATABLE | CLAP_PARAM_IS_MODULATABLE |
@@ -462,42 +459,38 @@ struct xen_noise_plethora
         auto ev = process->in_events;
         auto sz = ev->size(ev);
 
-        // This pointer is the sentinel to our next event which we advance once an event is
-        // processed
+        handleUIMessages(process->out_events);
 
-        /*
+        // just do a simple subchunking here without a ringbuffer etc
         const clap_event_header_t *nextEvent{nullptr};
         uint32_t nextEventIndex{0};
         if (sz != 0)
         {
             nextEvent = ev->get(ev, nextEventIndex);
         }
-
-        for (uint32_t i = 0; i < fc; ++i)
+        uint32_t chunkSize = ENVBLOCKSIZE;
+        uint32_t pos = 0;
+        m_synth.deactivatedNotes.clear();
+        while (pos < fc)
         {
-            // while, because we need to scan for events that could be at the same buffer
-        position while (nextEvent && nextEvent->time == i)
+            uint32_t adjChunkSize = std::min(chunkSize, fc - pos);
+            while (nextEvent && nextEvent->time < pos + adjChunkSize)
             {
-                handleNextEvent(nextEvent);
+                auto iev = ev->get(ev, nextEventIndex);
+                handleNextEvent(iev, false);
                 nextEventIndex++;
                 if (nextEventIndex >= sz)
                     nextEvent = nullptr;
                 else
                     nextEvent = ev->get(ev, nextEventIndex);
             }
-        }
-        */
-        handleUIMessages(process->out_events);
-        for (int i = 0; i < sz; ++i)
-        {
-            auto evt = ev->get(ev, i);
-            handleNextEvent(evt, false);
+            choc::buffer::SeparateChannelLayout<float> layout(process->audio_outputs->data32, pos);
+            choc::buffer::ChannelArrayView<float> bufview(layout, {2, adjChunkSize});
+            bufview.clear();
+            m_synth.processBlock(bufview);
+            pos += adjChunkSize;
         }
 
-        choc::buffer::SeparateChannelLayout<float> layout(process->audio_outputs->data32);
-        choc::buffer::ChannelArrayView<float> bufview(layout, {2, process->frames_count});
-        bufview.clear();
-        m_synth.processBlock(bufview);
         if (m_gui)
         {
             for (auto &v : m_synth.m_voices)

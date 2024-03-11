@@ -457,7 +457,7 @@ class NoisePlethoraSynth
     }
     void processBlock(choc::buffer::ChannelArrayView<float> destBuf)
     {
-        deactivatedNotes.clear();
+        
         auto mixbufView =
             m_mix_buf.getSection(choc::buffer::ChannelRange{0, 2}, {0, destBuf.getNumFrames()});
         mixbufView.clear();
