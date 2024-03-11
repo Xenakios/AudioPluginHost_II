@@ -450,39 +450,38 @@ struct xen_noise_plethora
     }
     clap_process_status process(const clap_process *process) noexcept override
     {
-        auto fc = process->frames_count;
+        auto frameCount = process->frames_count;
         float *op[2];
         op[0] = &process->audio_outputs->data32[0][0];
         op[1] = &process->audio_outputs->data32[1][0];
-        auto smp = 0U;
 
-        auto ev = process->in_events;
-        auto sz = ev->size(ev);
+        auto inEvents = process->in_events;
+        auto inEventsSize = inEvents->size(inEvents);
 
         handleUIMessages(process->out_events);
 
         // just do a simple subchunking here without a ringbuffer etc
         const clap_event_header_t *nextEvent{nullptr};
         uint32_t nextEventIndex{0};
-        if (sz != 0)
+        if (inEventsSize != 0)
         {
-            nextEvent = ev->get(ev, nextEventIndex);
+            nextEvent = inEvents->get(inEvents, nextEventIndex);
         }
         uint32_t chunkSize = ENVBLOCKSIZE;
         uint32_t pos = 0;
         m_synth.deactivatedNotes.clear();
-        while (pos < fc)
+        while (pos < frameCount)
         {
-            uint32_t adjChunkSize = std::min(chunkSize, fc - pos);
+            uint32_t adjChunkSize = std::min(chunkSize, frameCount - pos);
             while (nextEvent && nextEvent->time < pos + adjChunkSize)
             {
-                auto iev = ev->get(ev, nextEventIndex);
+                auto iev = inEvents->get(inEvents, nextEventIndex);
                 handleNextEvent(iev, false);
                 nextEventIndex++;
-                if (nextEventIndex >= sz)
+                if (nextEventIndex >= inEventsSize)
                     nextEvent = nullptr;
                 else
-                    nextEvent = ev->get(ev, nextEventIndex);
+                    nextEvent = inEvents->get(inEvents, nextEventIndex);
             }
             choc::buffer::SeparateChannelLayout<float> layout(process->audio_outputs->data32, pos);
             choc::buffer::ChannelArrayView<float> bufview(layout, {2, adjChunkSize});
