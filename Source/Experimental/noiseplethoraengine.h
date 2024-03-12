@@ -167,6 +167,7 @@ class NoisePlethoraVoice
     double velocity = 1.0;
     bool m_eg_gate = false;
     bool m_voice_active = false;
+
     void activate(int port_, int chan_, int key_, int id_, double velo)
     {
         velocity = velo;
@@ -188,19 +189,26 @@ class NoisePlethoraVoice
         if (key == -1)
             return;
 
-        if (keytrackMode == 1)
+        if (keytrackMode == 1 || keytrackMode == 2)
         {
             // calculate x and y mods from key, using a Lissajous style mapping
             float t = xenakios::mapvalue<float>(key, 0, 127, -M_PI, M_PI);
-            keytrack_x_mod = 0.5 * std::sin(t * 10.0);
-            keytrack_y_mod = 0.5 * std::cos(t * 11.0);
+            float hz0 = 10.0;
+            float hz1 = 11.0;
+            if (keytrackMode == 2)
+            {
+                hz0 = 4.0;
+                hz1 = 7.13;
+            }
+            keytrack_x_mod = 0.5 * std::sin(t * hz0);
+            keytrack_y_mod = 0.5 * std::cos(t * hz1);
         }
-        else if (keytrackMode >= 2 && keytrackMode <= 4)
+        else if (keytrackMode >= 3 && keytrackMode <= 5)
         {
             int gsize = 3;
-            if (keytrackMode == 3)
-                gsize = 5;
             if (keytrackMode == 4)
+                gsize = 5;
+            if (keytrackMode == 5)
                 gsize = 7;
             int numcells = gsize * gsize;
             int modkey = key % numcells;
@@ -213,9 +221,9 @@ class NoisePlethoraVoice
     void deactivate() { m_eg_gate = false; }
     int m_update_counter = 0;
     float eg_attack = 0.1f;
-    float eg_decay = 0.1f;
+    float eg_decay = 0.5f;
     float eg_sustain = 0.75f;
-    float eg_release = 0.1f;
+    float eg_release = 0.5f;
     int keytrackMode = 1;
     std::function<void(int, int, int, int)> DeativatedVoiceCallback;
     float totalx = 0.0f;

@@ -237,10 +237,11 @@ struct xen_noise_plethora
         paramDescriptions.push_back(
             ParamDesc()
                 .withUnorderedMapFormatting({{0, "No tracking"},
-                                             {1, "Lissajous"},
-                                             {2, "Grid 3x3"},
-                                             {3, "Grid 5x5"},
-                                             {4, "Grid 7x7"}},
+                                             {1, "Lissajous 1"},
+                                             {2, "Lissajous 2"},
+                                             {3, "Grid 3x3"},
+                                             {4, "Grid 5x5"},
+                                             {5, "Grid 7x7"}},
                                             true)
                 .withDefault(0.0)
 
