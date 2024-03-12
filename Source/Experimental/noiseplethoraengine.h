@@ -255,7 +255,7 @@ class NoisePlethoraVoice
         float expr_pan = xenakios::mapvalue(note_expr_pan, 0.0f, 1.0f, -0.5f, 0.5f);
         double totalpan = reflect_value(0.0f, basepan + modvalues.pan, 1.0f);
 
-        int ftype = basevalues.filttype;
+        StereoSimperSVF::Mode ftype = (StereoSimperSVF::Mode)(int)basevalues.filttype;
 
         for (size_t i = 0; i < destBuf.size.numFrames; ++i)
         {
@@ -285,19 +285,42 @@ class NoisePlethoraVoice
             float outR = panmat[3] * out;
 
             dcblocker.step<StereoSimperSVF::HP>(dcblocker, outL, outR);
-
-            if (ftype == 0)
+            switch (ftype)
+            {
+            case StereoSimperSVF::LP:
+            {
                 filter.step<StereoSimperSVF::LP>(filter, outL, outR);
-            else if (ftype == 1)
+                break;
+            }
+            case StereoSimperSVF::HP:
+            {
                 filter.step<StereoSimperSVF::HP>(filter, outL, outR);
-            else if (ftype == 2)
+                break;
+            }
+            case StereoSimperSVF::BP:
+            {
                 filter.step<StereoSimperSVF::BP>(filter, outL, outR);
-            else if (ftype == 3)
+                break;
+            }
+            case StereoSimperSVF::PEAK:
+            {
                 filter.step<StereoSimperSVF::PEAK>(filter, outL, outR);
-            else if (ftype == 4)
+                break;
+            }
+            case StereoSimperSVF::NOTCH:
+            {
                 filter.step<StereoSimperSVF::NOTCH>(filter, outL, outR);
-            else
+                break;
+            }
+            case StereoSimperSVF::ALL:
+            {
                 filter.step<StereoSimperSVF::ALL>(filter, outL, outR);
+                break;
+            }
+            default:
+                break;
+            };
+
             destBuf.getSample(0, i) += outL;
             destBuf.getSample(1, i) += outR;
         }
@@ -323,7 +346,7 @@ class NoisePlethoraSynth
     using voice_t = NoisePlethoraVoice;
     static constexpr size_t maxVoiceCount = 16;
     sst::voicemanager::VoiceManager<NoisePlethoraSynth, NoisePlethoraSynth> m_voice_manager;
-    
+
     NoisePlethoraSynth() : m_voice_manager(*this)
     {
         deactivatedNotes.reserve(1024);
@@ -337,7 +360,7 @@ class NoisePlethoraSynth
         }
     }
     ~NoisePlethoraSynth() { std::cout << "voices left at synth dtor " << voicecount << "\n"; }
-    void setVoiceEndCallback(std::function<void(voice_t*)>) {}
+    void setVoiceEndCallback(std::function<void(voice_t *)>) {}
     void prepare(double sampleRate, int maxBlockSize)
     {
         m_sr = sampleRate;
@@ -457,7 +480,7 @@ class NoisePlethoraSynth
     }
     void processBlock(choc::buffer::ChannelArrayView<float> destBuf)
     {
-        
+
         auto mixbufView =
             m_mix_buf.getSection(choc::buffer::ChannelRange{0, 2}, {0, destBuf.getNumFrames()});
         mixbufView.clear();
