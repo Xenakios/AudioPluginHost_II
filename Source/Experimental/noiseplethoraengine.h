@@ -51,7 +51,7 @@ inline void list_plugins()
 
 struct SRProviderB
 {
-    static constexpr int BLOCK_SIZE = 32;
+    static constexpr int BLOCK_SIZE = ENVBLOCKSIZE;
     static constexpr int BLOCK_SIZE_OS = BLOCK_SIZE * 2;
     SRProviderB() { initTables(); }
     alignas(32) float table_envrate_linear[512];
