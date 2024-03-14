@@ -1,0 +1,91 @@
+<html>
+    <style>
+        
+        .xycontrols {
+        display: flex;
+        padding: 10px;
+        justify-content: space-between;
+        background-color: DodgerBlue;
+        }
+    </style>    
+    <body style="background-color:rgb(201, 191, 191);">
+        
+        <div class="xycontrols" id="foodiv"></div>
+    </body>
+    
+    <script>
+        function mapvalue(in_val, in_min, in_max, out_min, out_max) {
+            return (in_val - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
+        }
+        class XYControl {
+            constructor(cid,xparid, xparname, xminval, xmaxval, yparid, yparname, yminval, ymaxval, defx, defy) 
+            {
+                var canvas = document.createElement('canvas');
+                canvas.id = cid;
+                canvas.width = 150;
+                canvas.height = 150;
+                // canvas.style.zIndex = 8;
+                // canvas.style.position = "absolute";
+                canvas.style.border = "1px solid";
+                this.canvas = canvas;
+                this.ctx = canvas.getContext("2d");
+                canvas.addEventListener('mousedown', (event) => {
+                    this.isdragging = true;
+                    this.updateValuesFromCoords(event.clientX,event.clientY);
+                    this.draw();
+                });
+                canvas.addEventListener('mousemove', (event) => { 
+                    if (this.isdragging)
+                    {
+                        this.updateValuesFromCoords(event.clientX,event.clientY);
+                        this.draw();
+                    }
+                });
+                canvas.addEventListener('mouseup', (event) => { 
+                    this.isdragging = false; 
+                    this.draw();
+                });
+                document.getElementById("foodiv").appendChild(canvas);
+                this.xparid = xparid;
+                this.xparname = xparname;
+                this.xminval = xminval;
+                this.xmaxval = xmaxval;
+                this.xdefault = defx;
+                this.xval = defx;
+                this.yparid = yparid;
+                this.yparname = yparname;
+                this.yminval = yminval;
+                this.ymaxval = ymaxval;
+                this.ydefault = defy;
+                this.yval = defy;
+                this.isdragging = false;
+            }
+            updateValuesFromCoords(xc,yc)
+            {
+                var rect = this.canvas.getBoundingClientRect();
+                this.xval = mapvalue(xc-rect.left,0.0,150.0,this.xminval,this.xmaxval);
+                this.yval = mapvalue(yc-rect.top,0.0,150.0,this.ymaxval,this.yminval);
+            }
+            draw()
+            {
+                this.ctx.clearRect(0,0,150,150);
+                this.ctx.beginPath();
+                let xcor = mapvalue(this.xval,this.xminval,this.xmaxval,0.0,150.0);
+                let ycor = mapvalue(this.yval,this.yminval,this.ymaxval,150.0,0.0);
+                this.ctx.arc(xcor, ycor, 10.0, 0, 2 * Math.PI);
+                this.ctx.fill();
+            }
+          }
+          xy0 = new XYControl("A",5,"X",0.0,1.0,6,"Y",0.0,1.0,0.5,0.5);
+          xy1 = new XYControl("B",10,"Cutoff",0.0,127.0,11,"Resonance",0.01,0.99,120.0,0.01);
+          xy2 = new XYControl("C",0,"Pan",-1.0,1.0,1,"Volume",-48.0,0.0,0.0,-6.0);
+        
+        setInterval(onTimer,1000);
+        function onTimer()
+        {
+            xy0.draw();
+            xy1.draw();
+            xy2.draw();
+        }
+        </script>
+</html>
