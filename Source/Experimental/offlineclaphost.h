@@ -74,6 +74,23 @@ class ClapEventSequence
         ev = xenakios::make_event_note(0, CLAP_EVENT_NOTE_OFF, port, channel, key, note_id, velo);
         m_evlist.push_back(Event(time + duration, &ev));
     }
+    void addNoteF(double time, double duration, int port, int channel, double pitch, int note_id,
+                  double velo)
+    {
+        int key = (int)pitch;
+        double frac = pitch - key;
+        auto ev =
+            xenakios::make_event_note(0, CLAP_EVENT_NOTE_ON, port, channel, key, note_id, velo);
+        m_evlist.push_back(Event(time, &ev));
+        if (frac > 0.0)
+        {
+            auto exprev = xenakios::make_event_note_expression(0, CLAP_NOTE_EXPRESSION_TUNING, port,
+                                                               channel, key, note_id, frac);
+            m_evlist.push_back(Event(time, &exprev));
+        }
+        ev = xenakios::make_event_note(0, CLAP_EVENT_NOTE_OFF, port, channel, key, note_id, velo);
+        m_evlist.push_back(Event(time + duration, &ev));
+    }
     void addNoteExpression(double time, int port, int channel, int key, int note_id, int net,
                            double amt)
     {
