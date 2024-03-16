@@ -113,6 +113,15 @@ class ClapEventSequence
             m_evlist.push_back(Event(time, &ev));
         }
     }
+    std::unordered_map<int, std::string> sequenceStrings;
+    void addString(int id, std::string str)
+    {
+        sequenceStrings[id] = str;
+    }
+    void removeString(int id)
+    {
+        sequenceStrings.erase(id);
+    }
     void addProgramChange(double time, int port, int channel, int program)
     {
         clap_event_midi ev;
