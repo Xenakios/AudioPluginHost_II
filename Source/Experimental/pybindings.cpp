@@ -25,7 +25,7 @@ PYBIND11_MODULE(xenakios, m)
         .def("addNoteOn", &ClapEventSequence::addNoteOn)
         .def("addNoteOff", &ClapEventSequence::addNoteOff)
         .def("addNote", &ClapEventSequence::addNote, "time"_a = 0.0, "dur"_a = 0.0, "port"_a = 0,
-             "ch"_a = 0, "key"_a, "nid"_a = -1, "velo"_a = 1.0)
+             "ch"_a = 0, "key"_a, "nid"_a = -1, "velo"_a = 1.0, "retune"_a = 0.0)
         .def("addParameterEvent", &ClapEventSequence::addParameterEvent, "ismod"_a = false,
              "time"_a = 0.0, "port"_a = -1, "ch"_a = -1, "key"_a = -1, "nid"_a = -1, "parid"_a,
              "val"_a)
