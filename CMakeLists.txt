@@ -90,19 +90,34 @@ add_custom_command(TARGET xenakios POST_BUILD
      "C:/Users/teemu/AppData/Local/Programs/Python/Python312/Lib/site-packages/$<TARGET_FILE_NAME:xenakios>" 
   COMMENT "Copying to output directory")
 
-add_library(NoisePlethoraSynth MODULE
-Source/Plugins/noiseplethorasynth.cpp
+add_library(FilePlayerPlugin MODULE
+Source/Plugins/fileplayer.cpp
 )
 
-set_target_properties(NoisePlethoraSynth PROPERTIES SUFFIX ".clap" PREFIX "")
-target_compile_definitions(NoisePlethoraSynth PRIVATE _USE_MATH_DEFINES=1 IS_WIN=1)
-target_link_libraries(NoisePlethoraSynth PRIVATE noiseplethora fmt)
+set_target_properties(FilePlayerPlugin PROPERTIES SUFFIX ".clap" PREFIX "")
+target_compile_definitions(FilePlayerPlugin PRIVATE _USE_MATH_DEFINES=1 IS_WIN=1)
+target_link_libraries(FilePlayerPlugin PRIVATE fmt)
 set(products_folder ${CMAKE_BINARY_DIR})
     set(build_type ${CMAKE_BUILD_TYPE})
     add_custom_command(
-        TARGET NoisePlethoraSynth POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy "${products_folder}/NoisePlethoraSynth.clap" "C:\\Program Files\\Common Files\\CLAP"
+        TARGET FilePlayerPlugin POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy "${products_folder}/FilePlayerPlugin.clap" "C:\\Program Files\\Common Files\\CLAP"
     )
+
+    add_library(NoisePlethoraSynth MODULE
+    Source/Plugins/noiseplethorasynth.cpp
+    )
+    
+    set_target_properties(NoisePlethoraSynth PROPERTIES SUFFIX ".clap" PREFIX "")
+    target_compile_definitions(NoisePlethoraSynth PRIVATE _USE_MATH_DEFINES=1 IS_WIN=1)
+    target_link_libraries(NoisePlethoraSynth PRIVATE noiseplethora fmt)
+    set(products_folder ${CMAKE_BINARY_DIR})
+        set(build_type ${CMAKE_BUILD_TYPE})
+        add_custom_command(
+            TARGET NoisePlethoraSynth POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy "${products_folder}/NoisePlethoraSynth.clap" "C:\\Program Files\\Common Files\\CLAP"
+        )
+    
 
 add_library(noiseplethora
         Source/Plugins/noise-plethora/random.cpp
