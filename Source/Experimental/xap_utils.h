@@ -716,6 +716,7 @@ struct clap_event_xen_string
     clap_event_header header;
     // which string property to change
     int32_t target;
-    // owned by host, do not free
+    // owned by host, do not free, do not cache, do not mutate
+    // only immediately use or copy the contents
     char* str;
 };

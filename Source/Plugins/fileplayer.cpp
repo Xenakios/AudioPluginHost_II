@@ -35,7 +35,9 @@ struct xen_fileplayer : public clap::helpers::Plugin<clap::helpers::Misbehaviour
     choc::audio::AudioFileFormatList fmtList;
     choc::audio::AudioFileProperties fileProps;
     choc::buffer::ChannelArrayBuffer<float> fileBuffer;
+    choc::buffer::ChannelArrayBuffer<float> workBuffer;
     sst::basic_blocks::dsp::LanczosResampler<128> m_lanczos{44100.0f, 44100.0f};
+    signalsmith::stretch::SignalsmithStretch<float> m_stretch;
     void loadAudioFile(std::string path)
     {
         auto reader = fmtList.createReader(path);
@@ -87,6 +89,14 @@ struct xen_fileplayer : public clap::helpers::Plugin<clap::helpers::Misbehaviour
                                  .withID((clap_id)ParamIDs::Playrate));
         paramDescs.push_back(ParamDesc()
                                  .asFloat()
+                                 .withRange(-24.0f, 24.0f)
+                                 .withDefault(0.0)
+                                 .withDecimalPlaces(3)
+                                 .withFlags(CLAP_PARAM_IS_AUTOMATABLE | CLAP_PARAM_IS_MODULATABLE)
+                                 .withName("Pitch")
+                                 .withID((clap_id)ParamIDs::Pitch));
+        paramDescs.push_back(ParamDesc()
+                                 .asFloat()
                                  .withRange(0.0f, 1.0f)
                                  .withDefault(0.0)
                                  .withDecimalPlaces(3)
@@ -115,6 +125,10 @@ struct xen_fileplayer : public clap::helpers::Plugin<clap::helpers::Misbehaviour
     {
         outSr = sampleRate_;
         m_rs_out_buf.resize(maxFrameCount * 2);
+        workBuffer =
+            choc::buffer::ChannelArrayBuffer<float>(choc::buffer::Size(2, maxFrameCount * 16));
+        workBuffer.clear();
+        m_stretch.presetDefault(2, sampleRate_);
         return true;
     }
     bool implementsParams() const noexcept override { return true; }
@@ -211,7 +225,7 @@ struct xen_fileplayer : public clap::helpers::Plugin<clap::helpers::Misbehaviour
             }
             if (ev->type == XENAKIOS_STRING_MSG)
             {
-                auto strev = (clap_event_xen_string*)ev;
+                auto strev = (clap_event_xen_string *)ev;
                 if (strev->target == 0 && strev->str != nullptr)
                 {
                     // obviously, can't do this really, but for testing now...
@@ -268,6 +282,7 @@ struct xen_fileplayer : public clap::helpers::Plugin<clap::helpers::Misbehaviour
             float s1 = srcbuf[temp];
             return s0 * xfadegain + s1 * (1.0f - xfadegain);
         };
+        int numinchans = fileProps.numChannels;
         int playmode = *idToParPtrMap[(clap_id)ParamIDs::StretchMode];
         if (playmode == 0)
         {
@@ -275,7 +290,7 @@ struct xen_fileplayer : public clap::helpers::Plugin<clap::helpers::Misbehaviour
             m_lanczos.sro = outSr / rate;
             m_lanczos.dPhaseO = m_lanczos.sri / m_lanczos.sro;
             auto samplestopush = m_lanczos.inputsRequiredToGenerateOutputs(process->frames_count);
-            int numinchans = fileProps.numChannels;
+            
             for (size_t i = 0; i < samplestopush; ++i)
             {
                 float in0 = getxfadedsample(fileBuffer.getChannel(0).data.data, m_buf_playpos,
@@ -300,6 +315,41 @@ struct xen_fileplayer : public clap::helpers::Plugin<clap::helpers::Misbehaviour
                 process->audio_outputs[0].data32[0][j] = outl;
                 process->audio_outputs[0].data32[1][j] = outr;
             }
+        }
+        if (playmode == 1)
+        {
+            double pshift = *idToParPtrMap[(clap_id)ParamIDs::Pitch];
+            // if (m_fs_pitch.isExtended)
+            //     pshift *= pitchExtendFactor;
+            // pshift += m_pitch_mod;
+            pshift = std::clamp(pshift, -48.0, 48.0);
+            double pitchratio = std::pow(2.0, pshift / 12.0);
+            /*
+            double tonlimit = m_tonality_limit;
+            if (tonlimit >= 0.0 && tonlimit < 0.9)
+                tonlimit = jmap<double>(tonlimit, 0.0, 0.9, 0.01, 0.1);
+            else
+                tonlimit = jmap<double>(tonlimit, 0.9, 1.0, 0.1, 1.0);
+            */
+            m_stretch.setTransposeFactor(pitchratio * compensrate);
+            rate *= compensrate;
+            int samplestopush = process->frames_count * rate;
+            for (int i = 0; i < samplestopush; ++i)
+            {
+                float inleft = getxfadedsample(fileBuffer.getChannel(0).data.data , m_buf_playpos, loop_start_samples,
+                                             loop_end_samples, xfadelensamples);
+                workBuffer.getSample(0,i) = inleft;
+                float inright = inleft;
+                if (numinchans == 2)
+                    inright = getxfadedsample(fileBuffer.getChannel(1).data.data , m_buf_playpos, loop_start_samples,
+                                             loop_end_samples, xfadelensamples);
+                workBuffer.getSample(1,i) = inright;
+                ++m_buf_playpos;
+                if (m_buf_playpos >= loop_end_samples)
+                    m_buf_playpos = loop_start_samples;
+            }
+            m_stretch.process(workBuffer.getView().data.channels, samplestopush,
+                              process->audio_outputs[0].data32, process->frames_count);
         }
         return CLAP_PROCESS_CONTINUE;
     }

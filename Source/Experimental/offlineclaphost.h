@@ -29,7 +29,7 @@ class ClapEventSequence
         clap_event_param_gesture_t paramgest;
         clap_event_note_expression_t noteexpression;
         clap_event_transport_t transport;
-        clap_event_xen_string;
+        clap_event_xen_string xstr;
     };
     struct Event
     {
