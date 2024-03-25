@@ -140,6 +140,7 @@ target_compile_definitions(noiseplethora PRIVATE _USE_MATH_DEFINES=1)
 add_executable(TestingProgram 
     Source/Experimental/misctest.cpp 
     Source/Experimental/xaps/clap_xaudioprocessor.cpp
+    Source/Experimental/offlineclaphost.cpp
     )
 target_sources(TestingProgram
     PRIVATE

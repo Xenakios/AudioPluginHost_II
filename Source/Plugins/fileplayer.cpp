@@ -84,6 +84,22 @@ struct xen_fileplayer : public clap::helpers::Plugin<clap::helpers::Misbehaviour
                                  .withFlags(CLAP_PARAM_IS_AUTOMATABLE | CLAP_PARAM_IS_MODULATABLE)
                                  .withName("Playrate")
                                  .withID((clap_id)ParamIDs::Playrate));
+        paramDescs.push_back(ParamDesc()
+                                 .asFloat()
+                                 .withRange(0.0f, 1.0f)
+                                 .withDefault(0.0)
+                                 .withDecimalPlaces(3)
+                                 .withFlags(CLAP_PARAM_IS_AUTOMATABLE | CLAP_PARAM_IS_MODULATABLE)
+                                 .withName("Loop start")
+                                 .withID((clap_id)ParamIDs::LoopStart));
+        paramDescs.push_back(ParamDesc()
+                                 .asFloat()
+                                 .withRange(0.0f, 1.0f)
+                                 .withDefault(1.0)
+                                 .withDecimalPlaces(3)
+                                 .withFlags(CLAP_PARAM_IS_AUTOMATABLE | CLAP_PARAM_IS_MODULATABLE)
+                                 .withName("Loop end")
+                                 .withID((clap_id)ParamIDs::LoopEnd));
         for (size_t i = 0; i < numParams; ++i)
             paramValues[i] = 0.0f;
         for (size_t i = 0; i < paramDescs.size(); ++i)
@@ -97,6 +113,7 @@ struct xen_fileplayer : public clap::helpers::Plugin<clap::helpers::Misbehaviour
                   uint32_t maxFrameCount) noexcept override
     {
         outSr = sampleRate_;
+        m_rs_out_buf.resize(maxFrameCount * 2);
         return true;
     }
     bool implementsParams() const noexcept override { return true; }
@@ -179,8 +196,21 @@ struct xen_fileplayer : public clap::helpers::Plugin<clap::helpers::Misbehaviour
         }
         auto inEvents = process->in_events;
         auto inEventsSize = inEvents->size(inEvents);
-        double m_loop_start = 0.0;
-        double m_loop_end = 1.0;
+        for (int i = 0; i < inEventsSize; ++i)
+        {
+            auto ev = inEvents->get(inEvents, i);
+            if (ev->type == CLAP_EVENT_PARAM_VALUE)
+            {
+                auto pev = (clap_event_param_value *)ev;
+                auto it = idToParPtrMap.find(pev->param_id);
+                if (it != idToParPtrMap.end())
+                {
+                    *it->second = pev->value;
+                }
+            }
+        }
+        double m_loop_start = *idToParPtrMap[(clap_id)ParamIDs::LoopStart];
+        double m_loop_end = *idToParPtrMap[(clap_id)ParamIDs::LoopEnd];
         int loop_start_samples = m_loop_start * fileProps.numFrames;
         int loop_end_samples = m_loop_end * fileProps.numFrames;
         if (loop_start_samples > loop_end_samples)
@@ -202,6 +232,7 @@ struct xen_fileplayer : public clap::helpers::Plugin<clap::helpers::Misbehaviour
 
         // time octaves
         double rate = *idToParPtrMap[(clap_id)ParamIDs::Playrate];
+
         double m_rate_mod = 0.0;
         rate += m_rate_mod;
         // we could allow modulation to make it go a bit over these limits...
@@ -229,11 +260,40 @@ struct xen_fileplayer : public clap::helpers::Plugin<clap::helpers::Misbehaviour
         int playmode = *idToParPtrMap[(clap_id)ParamIDs::StretchMode];
         if (playmode == 0)
         {
-            
+            m_lanczos.sri = fileProps.sampleRate;
+            m_lanczos.sro = outSr / rate;
+            m_lanczos.dPhaseO = m_lanczos.sri / m_lanczos.sro;
+            auto samplestopush = m_lanczos.inputsRequiredToGenerateOutputs(process->frames_count);
+            int numinchans = fileProps.numChannels;
+            for (size_t i = 0; i < samplestopush; ++i)
+            {
+                float in0 = getxfadedsample(fileBuffer.getChannel(0).data.data, m_buf_playpos,
+                                            loop_start_samples, loop_end_samples, xfadelensamples);
+                float in1 = in0;
+                if (numinchans == 2)
+                    in1 = getxfadedsample(fileBuffer.getChannel(1).data.data, m_buf_playpos,
+                                          loop_start_samples, loop_end_samples, xfadelensamples);
+                m_lanczos.push(in0, in1);
+                ++m_buf_playpos;
+                if (m_buf_playpos >= loop_end_samples)
+                    m_buf_playpos = loop_start_samples;
+            }
+            float *rsoutleft = &m_rs_out_buf[0];
+            float *rsoutright = &m_rs_out_buf[m_rs_out_buf.size() / 2];
+            auto produced = m_lanczos.populateNext(rsoutleft, rsoutright, process->frames_count);
+            assert(produced == process->frames_count);
+            for (int j = 0; j < process->frames_count; ++j)
+            {
+                float outl = rsoutleft[j];
+                float outr = rsoutright[j];
+                process->audio_outputs[0].data32[0][j] = outl;
+                process->audio_outputs[0].data32[1][j] = outr;
+            }
         }
         return CLAP_PROCESS_CONTINUE;
     }
     int64_t m_buf_playpos = 0;
+    std::vector<float> m_rs_out_buf;
 };
 
 const char *features[] = {CLAP_PLUGIN_FEATURE_INSTRUMENT, nullptr};

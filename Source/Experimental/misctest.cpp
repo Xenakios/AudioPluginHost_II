@@ -829,9 +829,21 @@ inline void test_mod_matrix()
     writer->appendFrames(outputbuf.getView());
 }
 
+inline void test_file_player_clap()
+{
+    ClapProcessingEngine engine{R"(C:\Program Files\Common Files\CLAP\FilePlayerPlugin.clap)", 0};
+    ClapEventSequence seq;
+    seq.addParameterEvent(false,0.0,-1,-1,-1,-1,9999,0.0);
+    seq.addParameterEvent(false,0.0,-1,-1,-1,-1,8888,0.1);
+    seq.addParameterEvent(false,0.0,-1,-1,-1,-1,1001,1.0);
+    engine.setSequence(seq);
+    engine.processToFile(R"(C:\develop\AudioPluginHost_mk2\audio\noise_plethora_out_03.wav)", 10.0,
+                         44100.0);
+}
+
 int main()
 {
-    
+    test_file_player_clap();
     // test_plethora_synth();
     // test_mod_matrix_pyt();
     // test_mod_matrix();
