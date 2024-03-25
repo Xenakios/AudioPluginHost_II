@@ -29,6 +29,7 @@ class ClapEventSequence
         clap_event_param_gesture_t paramgest;
         clap_event_note_expression_t noteexpression;
         clap_event_transport_t transport;
+        clap_event_xen_string;
     };
     struct Event
     {
@@ -114,13 +115,24 @@ class ClapEventSequence
         }
     }
     std::unordered_map<int, std::string> sequenceStrings;
-    void addString(int id, std::string str)
+    void addString(int id, std::string str) { sequenceStrings[id] = str; }
+    void removeString(int id) { sequenceStrings.erase(id); }
+    void addStringEvent(double time, int port, int channel, int key, int note_id, int str_id,
+                          int32_t target)
     {
-        sequenceStrings[id] = str;
-    }
-    void removeString(int id)
-    {
-        sequenceStrings.erase(id);
+        auto it = sequenceStrings.find(str_id);
+        if (it != sequenceStrings.end())
+        {
+            clap_event_xen_string ev;
+            ev.header.flags = 0;
+            ev.header.size = sizeof(clap_event_xen_string);
+            ev.header.space_id = 666;
+            ev.header.time = 0;
+            ev.header.type = XENAKIOS_STRING_MSG;
+            ev.target = target;
+            ev.str = (char *)it->second.c_str();
+            m_evlist.push_back(Event(time, &ev));
+        }
     }
     void addProgramChange(double time, int port, int channel, int program)
     {

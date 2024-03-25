@@ -22,6 +22,8 @@ PYBIND11_MODULE(xenakios, m)
         .def(py::init<>())
         .def("getNumEvents", &ClapEventSequence::getNumEvents)
         .def("getSizeInBytes", &ClapEventSequence::getApproxSizeInBytes)
+        .def("addString", &ClapEventSequence::addString)
+        .def("addStringEvent", &ClapEventSequence::addStringEvent)
         .def("addNoteOn", &ClapEventSequence::addNoteOn)
         .def("addNoteOff", &ClapEventSequence::addNoteOff)
         .def("addNote", &ClapEventSequence::addNote, "time"_a = 0.0, "dur"_a = 0.05, "port"_a = 0,

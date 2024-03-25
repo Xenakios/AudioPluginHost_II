@@ -708,3 +708,14 @@ class VecToStreamAdapter
         return sz;
     }
 };
+
+#define XENAKIOS_STRING_MSG 60000
+
+struct clap_event_xen_string
+{
+    clap_event_header header;
+    // which string property to change
+    int32_t target;
+    // owned by host, do not free
+    char* str;
+};

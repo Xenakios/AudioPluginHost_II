@@ -49,6 +49,7 @@ struct xen_fileplayer : public clap::helpers::Plugin<clap::helpers::Misbehaviour
                 // only for initial testing, this is not thread safe etc
                 fileProps = props;
                 fileBuffer = readbuf;
+                m_buf_playpos = 0;
             }
         }
     }
@@ -206,6 +207,16 @@ struct xen_fileplayer : public clap::helpers::Plugin<clap::helpers::Misbehaviour
                 if (it != idToParPtrMap.end())
                 {
                     *it->second = pev->value;
+                }
+            }
+            if (ev->type == XENAKIOS_STRING_MSG)
+            {
+                auto strev = (clap_event_xen_string*)ev;
+                if (strev->target == 0 && strev->str != nullptr)
+                {
+                    // obviously, can't do this really, but for testing now...
+                    std::string filename(strev->str);
+                    loadAudioFile(filename);
                 }
             }
         }
