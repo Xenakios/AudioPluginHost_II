@@ -40,7 +40,7 @@ def test_fileplayer_clap2():
     seq = xenakios.ClapSequence()
     
     # play mode
-    seq.addParameterEvent(False, 0.0, -1, -1, -1, -1, 2022, 0.0)
+    seq.addParameterEvent(False, 0.0, -1, -1, -1, -1, 2022, 1.0)
     
     seq.addParameterEvent(False, 0.0, -1, -1, -1, -1, 1001, -1.0)
     seq.addParameterEvent(False, 5.0, -1, -1, -1, -1, 1001, 0.0)
@@ -50,13 +50,14 @@ def test_fileplayer_clap2():
     seq.addParameterEvent(False, 4.0, -1, -1, -1, -1, 12001, 0.0)
     seq.addParameterEvent(False, 5.0, -1, -1, -1, -1, 12001, 1.0)
     seq.addParameterEvent(False, 6.0, -1, -1, -1, -1, 12001, 0.0)
+    seq.addParameterEvent(False, 9.0, -1, -1, -1, -1, 12001, 1.0)
+    seq.addParameterEvent(False, 13.0, -1, -1, -1, -1, 12001, 0.0)
+    seq.addParameterEvent(False, 15.5, -1, -1, -1, -1, 12001, 1.0)
     t = 0.0
     while t<20.0:
         seq.addParameterEvent(False, t, -1, -1, -1, -1, 44, -3.0+6.0*random.random())
         t = t + 0.1
     
-    
-
     p.setSequence(seq)
     p.processToFile("file_player_out_01.wav",20.0,44100)
 

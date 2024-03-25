@@ -69,7 +69,6 @@ void ClapProcessingEngine::processToFile(std::string filename, double duration, 
         cp.in_events = list_in.clapInputEvents();
         cp.out_events = list_out.clapOutputEvents();
 
-        std::cout << "plug activated\n";
         m_plug->startProcessing();
         int outcounter = 0;
         int outlensamples = duration * samplerate;
@@ -82,6 +81,9 @@ void ClapProcessingEngine::processToFile(std::string filename, double duration, 
         auto writer = wavformat.createWriter(filename, outfileprops);
         eviter.setTime(0.0);
         int blockcount = 0;
+        using clock = std::chrono::system_clock;
+        using ms = std::chrono::duration<double, std::milli>;
+        const auto start_time = clock::now();
         while (outcounter < outlensamples)
         {
             auto blockevts = eviter.readNextEvents(procblocksize / samplerate);
@@ -108,9 +110,10 @@ void ClapProcessingEngine::processToFile(std::string filename, double duration, 
 
             outcounter += procblocksize;
         }
+        const ms duration = clock::now() - start_time;
         m_plug->stopProcessing();
         writer->flush();
-        std::cout << "finished\n";
+        std::cout << "finished in " << duration.count()/1000.0 << " seconds\n";
         renderloopfinished = true;
     });
     using namespace std::chrono_literals;
