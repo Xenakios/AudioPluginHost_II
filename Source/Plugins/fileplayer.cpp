@@ -26,9 +26,10 @@ struct xen_fileplayer : public clap::helpers::Plugin<clap::helpers::Misbehaviour
         Pitch = 44,
         StretchMode = 2022,
         LoopStart = 9999,
-        LoopEnd = 8888
+        LoopEnd = 8888,
+        Reverse = 12001
     };
-    static constexpr size_t numParams = 6;
+    static constexpr size_t numParams = 7;
     float paramValues[numParams];
     std::unordered_map<clap_id, float *> idToParPtrMap;
     std::vector<ParamDesc> paramDescs;
@@ -111,6 +112,13 @@ struct xen_fileplayer : public clap::helpers::Plugin<clap::helpers::Misbehaviour
                                  .withFlags(CLAP_PARAM_IS_AUTOMATABLE | CLAP_PARAM_IS_MODULATABLE)
                                  .withName("Loop end")
                                  .withID((clap_id)ParamIDs::LoopEnd));
+        paramDescs.push_back(ParamDesc()
+                                 .asBool()
+                                 .withDefault(0.0)
+                                 .withFlags(CLAP_PARAM_IS_AUTOMATABLE | CLAP_PARAM_IS_MODULATABLE |
+                                            CLAP_PARAM_IS_STEPPED)
+                                 .withName("Reverse")
+                                 .withID((clap_id)ParamIDs::Reverse));
         for (size_t i = 0; i < numParams; ++i)
             paramValues[i] = 0.0f;
         for (size_t i = 0; i < paramDescs.size(); ++i)
@@ -284,13 +292,16 @@ struct xen_fileplayer : public clap::helpers::Plugin<clap::helpers::Misbehaviour
         };
         int numinchans = fileProps.numChannels;
         int playmode = *idToParPtrMap[(clap_id)ParamIDs::StretchMode];
+        int sampleAdvance = 1;
+        if (*idToParPtrMap[(clap_id)ParamIDs::Reverse] >= 0.5)
+            sampleAdvance = -1;
         if (playmode == 0)
         {
             m_lanczos.sri = fileProps.sampleRate;
             m_lanczos.sro = outSr / rate;
             m_lanczos.dPhaseO = m_lanczos.sri / m_lanczos.sro;
             auto samplestopush = m_lanczos.inputsRequiredToGenerateOutputs(process->frames_count);
-            
+
             for (size_t i = 0; i < samplestopush; ++i)
             {
                 float in0 = getxfadedsample(fileBuffer.getChannel(0).data.data, m_buf_playpos,
@@ -300,9 +311,11 @@ struct xen_fileplayer : public clap::helpers::Plugin<clap::helpers::Misbehaviour
                     in1 = getxfadedsample(fileBuffer.getChannel(1).data.data, m_buf_playpos,
                                           loop_start_samples, loop_end_samples, xfadelensamples);
                 m_lanczos.push(in0, in1);
-                ++m_buf_playpos;
+                m_buf_playpos += sampleAdvance;
                 if (m_buf_playpos >= loop_end_samples)
                     m_buf_playpos = loop_start_samples;
+                if (m_buf_playpos < loop_start_samples)
+                    m_buf_playpos = loop_end_samples - 1;
             }
             float *rsoutleft = &m_rs_out_buf[0];
             float *rsoutright = &m_rs_out_buf[m_rs_out_buf.size() / 2];
@@ -336,17 +349,21 @@ struct xen_fileplayer : public clap::helpers::Plugin<clap::helpers::Misbehaviour
             int samplestopush = process->frames_count * rate;
             for (int i = 0; i < samplestopush; ++i)
             {
-                float inleft = getxfadedsample(fileBuffer.getChannel(0).data.data , m_buf_playpos, loop_start_samples,
-                                             loop_end_samples, xfadelensamples);
-                workBuffer.getSample(0,i) = inleft;
+                float inleft =
+                    getxfadedsample(fileBuffer.getChannel(0).data.data, m_buf_playpos,
+                                    loop_start_samples, loop_end_samples, xfadelensamples);
+                workBuffer.getSample(0, i) = inleft;
                 float inright = inleft;
                 if (numinchans == 2)
-                    inright = getxfadedsample(fileBuffer.getChannel(1).data.data , m_buf_playpos, loop_start_samples,
-                                             loop_end_samples, xfadelensamples);
-                workBuffer.getSample(1,i) = inright;
-                ++m_buf_playpos;
+                    inright =
+                        getxfadedsample(fileBuffer.getChannel(1).data.data, m_buf_playpos,
+                                        loop_start_samples, loop_end_samples, xfadelensamples);
+                workBuffer.getSample(1, i) = inright;
+                m_buf_playpos += sampleAdvance;
                 if (m_buf_playpos >= loop_end_samples)
                     m_buf_playpos = loop_start_samples;
+                if (m_buf_playpos < loop_start_samples)
+                    m_buf_playpos = loop_end_samples - 1;
             }
             m_stretch.process(workBuffer.getView().data.channels, samplestopush,
                               process->audio_outputs[0].data32, process->frames_count);
