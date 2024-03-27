@@ -298,9 +298,16 @@ struct xen_fileplayer : public clap::helpers::Plugin<clap::helpers::Misbehaviour
         auto advanceSampleFunc = [this, sampleAdvance, loop_start_samples, loop_end_samples]() {
             m_buf_playpos += sampleAdvance;
             if (m_buf_playpos >= loop_end_samples)
+            {
                 m_buf_playpos = loop_start_samples;
+                m_buf_playpos_float = loop_start_samples;
+            }
             if (m_buf_playpos < loop_start_samples)
+            {
                 m_buf_playpos = loop_end_samples - 1;
+                m_buf_playpos_float = loop_end_samples - 1;
+            }
+                
         };
         if (playmode == 0)
         {
@@ -349,7 +356,9 @@ struct xen_fileplayer : public clap::helpers::Plugin<clap::helpers::Misbehaviour
             */
             m_stretch.setTransposeFactor(pitchratio * compensrate);
             rate *= compensrate;
-            int samplestopush = process->frames_count * rate;
+            int adjust = m_buf_playpos_float - m_buf_playpos;
+            int samplestopush = rate * (process->frames_count + adjust);
+            // int samplestopush = process->frames_count * rate;
             for (int i = 0; i < samplestopush; ++i)
             {
                 float inleft =
@@ -364,12 +373,14 @@ struct xen_fileplayer : public clap::helpers::Plugin<clap::helpers::Misbehaviour
                 workBuffer.getSample(1, i) = inright;
                 advanceSampleFunc();
             }
+            m_buf_playpos_float += (rate * process->frames_count) * sampleAdvance;
             m_stretch.process(workBuffer.getView().data.channels, samplestopush,
                               process->audio_outputs[0].data32, process->frames_count);
         }
         return CLAP_PROCESS_CONTINUE;
     }
     int64_t m_buf_playpos = 0;
+    double m_buf_playpos_float = 0.0;
     std::vector<float> m_rs_out_buf;
 };
 

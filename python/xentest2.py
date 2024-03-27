@@ -41,25 +41,30 @@ def test_fileplayer_clap2():
     
     # play mode
     seq.addParameterEvent(False, 0.0, -1, -1, -1, -1, 2022, 1.0)
-    
-    seq.addParameterEvent(False, 0.0, -1, -1, -1, -1, 1001, -1.0)
-    seq.addParameterEvent(False, 5.0, -1, -1, -1, -1, 1001, 0.0)
-    seq.addParameterEvent(False, 10.0, -1, -1, -1, -1, 1001, 1.0)
-    seq.addParameterEvent(False, 13.0, -1, -1, -1, -1, 1001, -2.0)
-    seq.addParameterEvent(False, 3.0, -1, -1, -1, -1, 12001, 1.0)
-    seq.addParameterEvent(False, 4.0, -1, -1, -1, -1, 12001, 0.0)
-    seq.addParameterEvent(False, 5.0, -1, -1, -1, -1, 12001, 1.0)
-    seq.addParameterEvent(False, 6.0, -1, -1, -1, -1, 12001, 0.0)
-    seq.addParameterEvent(False, 9.0, -1, -1, -1, -1, 12001, 1.0)
-    seq.addParameterEvent(False, 13.0, -1, -1, -1, -1, 12001, 0.0)
-    seq.addParameterEvent(False, 15.5, -1, -1, -1, -1, 12001, 1.0)
+    seq.addParameterEvent(False, 0.0, -1, -1, -1, -1, 1001, 0.5)
+    seq.addParameterEvent(False, 5.0, -1, -1, -1, -1, 1001, -0.5)
+    seq.addParameterEvent(False, 6.5, -1, -1, -1, -1, 1001, 0.0)
+    seq.addParameterEvent(False, 7.0, -1, -1, -1, -1, 1001, 0.2)
+    seq.addParameterEvent(False, 7.5, -1, -1, -1, -1, 1001, -3.0)
+    seq.addParameterEvent(False, 9.5, -1, -1, -1, -1, 1001, 0.0)
+    # seq.addParameterEvent(False, 0.0, -1, -1, -1, -1, 1001, -1.0)
+    # seq.addParameterEvent(False, 5.0, -1, -1, -1, -1, 1001, 0.0)
+    # seq.addParameterEvent(False, 10.0, -1, -1, -1, -1, 1001, 1.0)
+    # seq.addParameterEvent(False, 13.0, -1, -1, -1, -1, 1001, -2.0)
+    # seq.addParameterEvent(False, 3.0, -1, -1, -1, -1, 12001, 1.0)
+    # seq.addParameterEvent(False, 4.0, -1, -1, -1, -1, 12001, 0.0)
+    # seq.addParameterEvent(False, 5.0, -1, -1, -1, -1, 12001, 1.0)
+    # seq.addParameterEvent(False, 6.0, -1, -1, -1, -1, 12001, 0.0)
+    # seq.addParameterEvent(False, 9.0, -1, -1, -1, -1, 12001, 1.0)
+    # seq.addParameterEvent(False, 13.0, -1, -1, -1, -1, 12001, 0.0)
+    # seq.addParameterEvent(False, 15.5, -1, -1, -1, -1, 12001, 1.0)
     t = 0.0
     while t<20.0:
-        seq.addParameterEvent(False, t, -1, -1, -1, -1, 44, -3.0+6.0*random.random())
+        # seq.addParameterEvent(False, t, -1, -1, -1, -1, 44, -3.0+6.0*random.random())
         t = t + 0.1
     
     p.setSequence(seq)
-    p.processToFile("file_player_out_01.wav",20.0,44100)
+    p.processToFile("file_player_out_01.wav",10.0,44100)
 
 
 test_fileplayer_clap2()
@@ -81,3 +86,21 @@ def test_clap():
     p.processToFile("clap_out_b01.wav",10.0,44100)
 
 # test_clap()
+
+def ssscompens():
+    sr = 44100.0
+    playrate = 0.9
+    playpos = 0.0
+    outdur = 10.0
+    outdursamples = outdur*sr
+    blocksize = 512
+    while playpos<outdursamples:
+        t0 = round(playpos)
+        t1 = round(playpos+playrate*blocksize)
+        adjustedblocksize = (t1-t0)*playrate
+        if playpos<sr:
+            print(math.floor(adjustedblocksize))
+        playpos = playpos + adjustedblocksize
+    print(playpos/sr)
+
+# ssscompens()
