@@ -10,8 +10,8 @@
 #include "xap_utils.h"
 #include "concurrentqueue.h"
 #include <chrono>
-#include "../Plugins/noise-plethora/plugins/NoisePlethoraPlugin.hpp"
-#include "../Plugins/noise-plethora/plugins/Banks.hpp"
+// #include "../Plugins/noise-plethora/plugins/NoisePlethoraPlugin.hpp"
+// #include "../Plugins/noise-plethora/plugins/Banks.hpp"
 #include "xapdsp.h"
 #include "audio/choc_AudioFileFormat_WAV.h"
 #include "containers/choc_NonAllocatingStableSort.h"
@@ -23,7 +23,6 @@
 #include "gui/choc_MessageLoop.h"
 #include "gui/choc_WebView.h"
 #include "text/choc_Files.h"
-#include "noiseplethoraengine.h"
 
 class object_t
 {
@@ -281,7 +280,7 @@ template <size_t BLOCK_SIZE> struct SRProvider
                a * table_envrate_linear[(e + 1) & 0x1ff];
     }
 };
-
+#ifdef NPLETHORABUILT
 void test_np_code()
 {
     std::unique_ptr<NoisePlethoraPlugin> plug;
@@ -399,6 +398,7 @@ void test_np_code()
     }
     writer->appendFrames(buf.getView());
 }
+#endif
 
 inline void test_lanczos()
 {

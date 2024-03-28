@@ -9,9 +9,10 @@
 #include "xap_utils.h"
 #include "offlineclaphost.h"
 #include "dejavurandom.h"
-#include "noiseplethoraengine.h"
 
 namespace py = pybind11;
+
+constexpr size_t ENVBLOCKSIZE = 64;
 
 PYBIND11_MODULE(xenakios, m)
 {

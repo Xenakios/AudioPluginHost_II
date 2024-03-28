@@ -12,7 +12,7 @@ include_directories(
     libs/clap/include
     libs/clap-helpers/include
     Source/AudioGraph
-    Source/Plugins/noise-plethora/rack/include
+    
     libs/signalsmith-stretch
     libs/choc
     libs/sst-basic-blocks/include
@@ -77,64 +77,18 @@ add_subdirectory(libs/fmt)
 
 project(cmaketest)
 add_subdirectory(libs/pybind11)
-pybind11_add_module(xenakios 
+pybind11_add_module(xenakiospymodule 
     Source/Experimental/pybindings.cpp
     Source/Experimental/xaps/clap_xaudioprocessor.cpp
     Source/Experimental/offlineclaphost.cpp
 )
-target_link_libraries(xenakios PRIVATE noiseplethora)
-target_compile_definitions(xenakios PRIVATE _USE_MATH_DEFINES=1)
-add_custom_command(TARGET xenakios POST_BUILD 
+
+target_compile_definitions(xenakiospymodule PRIVATE _USE_MATH_DEFINES=1)
+add_custom_command(TARGET xenakiospymodule POST_BUILD 
   COMMAND "${CMAKE_COMMAND}" -E copy 
-     "$<TARGET_FILE:xenakios>"
-     "C:/Users/teemu/AppData/Local/Programs/Python/Python312/Lib/site-packages/$<TARGET_FILE_NAME:xenakios>" 
+     "$<TARGET_FILE:xenakiospymodule>"
+     "C:/Users/teemu/AppData/Local/Programs/Python/Python312/Lib/site-packages/$<TARGET_FILE_NAME:xenakiospymodule>" 
   COMMENT "Copying to output directory")
-
-add_library(FilePlayerPlugin MODULE
-Source/Plugins/fileplayer.cpp
-)
-
-set_target_properties(FilePlayerPlugin PROPERTIES SUFFIX ".clap" PREFIX "")
-target_compile_definitions(FilePlayerPlugin PRIVATE _USE_MATH_DEFINES=1 IS_WIN=1)
-target_link_libraries(FilePlayerPlugin PRIVATE fmt)
-set(products_folder ${CMAKE_BINARY_DIR})
-    set(build_type ${CMAKE_BUILD_TYPE})
-    add_custom_command(
-        TARGET FilePlayerPlugin POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy "${products_folder}/FilePlayerPlugin.clap" "C:\\Program Files\\Common Files\\CLAP"
-    )
-
-    add_library(NoisePlethoraSynth MODULE
-    Source/Plugins/noiseplethorasynth.cpp
-    )
-    
-    set_target_properties(NoisePlethoraSynth PROPERTIES SUFFIX ".clap" PREFIX "")
-    target_compile_definitions(NoisePlethoraSynth PRIVATE _USE_MATH_DEFINES=1 IS_WIN=1)
-    target_link_libraries(NoisePlethoraSynth PRIVATE noiseplethora fmt)
-    set(products_folder ${CMAKE_BINARY_DIR})
-        set(build_type ${CMAKE_BUILD_TYPE})
-        add_custom_command(
-            TARGET NoisePlethoraSynth POST_BUILD
-            COMMAND ${CMAKE_COMMAND} -E copy "${products_folder}/NoisePlethoraSynth.clap" "C:\\Program Files\\Common Files\\CLAP"
-        )
-    
-
-add_library(noiseplethora
-        Source/Plugins/noise-plethora/random.cpp
-        Source/Plugins/noise-plethora/teensy/effect_freeverb.cpp
-        Source/Plugins/noise-plethora/teensy/effect_bitcrusher.cpp
-        Source/Plugins/noise-plethora/teensy/effect_granular.cpp
-        Source/Plugins/noise-plethora/teensy/effect_combine.cpp
-        Source/Plugins/noise-plethora/teensy/effect_multiply.cpp
-        Source/Plugins/noise-plethora/teensy/effect_flange.cpp
-        Source/Plugins/noise-plethora/teensy/effect_wavefolder.cpp
-        Source/Plugins/noise-plethora/teensy/filter_variable.cpp
-        Source/Plugins/noise-plethora/teensy/synth_pwm.cpp
-        Source/Plugins/noise-plethora/teensy/synth_pinknoise.cpp
-        Source/Plugins/noise-plethora/teensy/synth_whitenoise.cpp
-        Source/Plugins/noise-plethora/plugins/Banks.cpp
-)
-target_compile_definitions(noiseplethora PRIVATE _USE_MATH_DEFINES=1)
 
 # this is used for simple C++ testing/experimenting stuff without Juce
 add_executable(TestingProgram 
@@ -147,9 +101,6 @@ target_sources(TestingProgram
     
 )
 target_compile_definitions(TestingProgram PRIVATE _USE_MATH_DEFINES=1)
-target_link_libraries(TestingProgram PRIVATE noiseplethora)
-
-
 
 # juce::juce_recommended_lto_flags
 # juce_add_bundle_resources_directory(AudioPluginHost2 Assets)
