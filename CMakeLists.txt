@@ -77,17 +77,17 @@ add_subdirectory(libs/fmt)
 
 project(cmaketest)
 add_subdirectory(libs/pybind11)
-pybind11_add_module(xenakiospymodule 
+pybind11_add_module(xenakios 
     Source/Experimental/pybindings.cpp
     Source/Experimental/xaps/clap_xaudioprocessor.cpp
     Source/Experimental/offlineclaphost.cpp
 )
 
-target_compile_definitions(xenakiospymodule PRIVATE _USE_MATH_DEFINES=1)
-add_custom_command(TARGET xenakiospymodule POST_BUILD 
+target_compile_definitions(xenakios PRIVATE _USE_MATH_DEFINES=1)
+add_custom_command(TARGET xenakios POST_BUILD 
   COMMAND "${CMAKE_COMMAND}" -E copy 
-     "$<TARGET_FILE:xenakiospymodule>"
-     "C:/Users/teemu/AppData/Local/Programs/Python/Python312/Lib/site-packages/$<TARGET_FILE_NAME:xenakiospymodule>" 
+     "$<TARGET_FILE:xenakios>"
+     "C:/Users/teemu/AppData/Local/Programs/Python/Python312/Lib/site-packages/$<TARGET_FILE_NAME:xenakios>" 
   COMMENT "Copying to output directory")
 
 # this is used for simple C++ testing/experimenting stuff without Juce
