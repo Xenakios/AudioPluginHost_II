@@ -603,11 +603,15 @@ class ClapProcessingEngine
             m_desktopwindow->toFront();
             m_desktopwindow->windowClosed = [this] {
                 // std::cout << "window closed\n";
+                //using namespace std::chrono_literals;
+                //std::this_thread::sleep_for(1000ms);
+                
                 choc::messageloop::stop();
             };
             choc::messageloop::run();
             // std::cout << "finished message loop\n";
             m_desktopwindow = nullptr;
+            
             OleUninitialize();
         });
         th.detach();

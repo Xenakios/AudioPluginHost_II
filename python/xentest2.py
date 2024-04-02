@@ -1,6 +1,7 @@
 import xenakios
 import random
 import math
+import time
 
 def test_fileplayer_clap():
     p = xenakios.ClapEngine(r'C:\Program Files\Common Files\CLAP\FilePlayerPlugin.clap',0)
@@ -104,3 +105,10 @@ def ssscompens():
     print(playpos/sr)
 
 # ssscompens()
+
+def test_choc_window():
+    p = xenakios.ClapEngine(r'C:\Program Files\Common Files\CLAP\Surge Synth Team\Surge XT.clap',0)
+    for i in range(0,100):
+        name = "window " + i
+        p.showWindow(name)
+        time.sleep(1)

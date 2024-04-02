@@ -833,7 +833,7 @@ inline void test_file_player_clap()
 {
     ClapProcessingEngine engine{R"(C:\Program Files\Common Files\CLAP\FilePlayerPlugin.clap)", 0};
     ClapEventSequence seq;
-    seq.addParameterEvent(false,0.0,-1,-1,-1,-1,2022,1.0);
+    seq.addParameterEvent(false, 0.0, -1, -1, -1, -1, 2022, 1.0);
     // seq.addParameterEvent(false,0.0,-1,-1,-1,-1,8888,0.1);
     // seq.addParameterEvent(false,0.0,-1,-1,-1,-1,1001,1.0);
     engine.setSequence(seq);
@@ -841,9 +841,29 @@ inline void test_file_player_clap()
                          44100.0);
 }
 
+inline void test_thread_rand()
+{
+    auto f = []() { std::cout << rand() << " \n"; };
+    using namespace std::chrono_literals;
+    
+    std::thread th0(f);
+    std::this_thread::sleep_for(1000ms);
+    std::thread th1(f);
+    std::this_thread::sleep_for(1000ms);
+    std::thread th2(f);
+    std::this_thread::sleep_for(1000ms);
+    std::thread th3(f);
+    std::this_thread::sleep_for(1000ms);
+    th0.join();
+    th1.join();
+    th2.join();
+    th3.join();
+}
+
 int main()
 {
-    test_file_player_clap();
+    test_thread_rand();
+    // test_file_player_clap();
     // test_plethora_synth();
     // test_mod_matrix_pyt();
     // test_mod_matrix();
