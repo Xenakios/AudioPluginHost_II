@@ -67,7 +67,7 @@ def test_fileplayer_clap2():
     p.processToFile("file_player_out_01.wav",10.0,44100)
 
 
-test_fileplayer_clap2()
+# test_fileplayer_clap2()
 
 def test_clap():
     p = xenakios.ClapEngine(r'C:\Program Files\Common Files\CLAP\Surge Synth Team\Surge XT.clap',0)

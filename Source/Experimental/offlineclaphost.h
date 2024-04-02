@@ -118,7 +118,7 @@ class ClapEventSequence
     void addString(int id, std::string str) { sequenceStrings[id] = str; }
     void removeString(int id) { sequenceStrings.erase(id); }
     void addStringEvent(double time, int port, int channel, int key, int note_id, int str_id,
-                          int32_t target)
+                        int32_t target)
     {
         auto it = sequenceStrings.find(str_id);
         if (it != sequenceStrings.end())
@@ -595,17 +595,20 @@ class ClapProcessingEngine
     {
         std::thread th([this, title]() {
             // choc::messageloop::initialise();
+            OleInitialize(nullptr);
             choc::ui::setWindowsDPIAwareness();
             m_desktopwindow =
                 std::make_unique<choc::ui::DesktopWindow>(choc::ui::Bounds{100, 100, 300, 200});
             m_desktopwindow->setWindowTitle(title);
             m_desktopwindow->toFront();
             m_desktopwindow->windowClosed = [this] {
-                std::cout << "window closed\n";
+                // std::cout << "window closed\n";
                 choc::messageloop::stop();
             };
             choc::messageloop::run();
-            std::cout << "finished message loop\n", m_desktopwindow = nullptr;
+            // std::cout << "finished message loop\n";
+            m_desktopwindow = nullptr;
+            OleUninitialize();
         });
         th.detach();
     }
