@@ -108,6 +108,8 @@ def ssscompens():
 
 def test_choc_window():
     p = xenakios.ClapEngine(r'C:\Program Files\Common Files\CLAP\Surge Synth Team\Surge XT.clap',0)
+    p = xenakios.ClapEngine(r'C:\Program Files\Common Files\CLAP\u-he\Zebralette3.clap',0)
+    # 
     for i in range(0,100):
         name = "window " + i
         p.showWindow(name)

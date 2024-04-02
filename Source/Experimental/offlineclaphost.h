@@ -594,6 +594,36 @@ class ClapProcessingEngine
     void openPersistentWindow(std::string title)
     {
         std::thread th([this, title]() {
+            OleInitialize(nullptr);
+            m_plug->mainthread_id() = std::this_thread::get_id();
+            choc::ui::setWindowsDPIAwareness(); // For Windows, we need to tell the OS we're
+                                                // high-DPI-aware
+            m_plug->guiCreate("win32", false);
+            uint32_t pw = 0;
+            uint32_t ph = 0;
+            m_plug->guiGetSize(&pw, &ph);
+            m_desktopwindow = std::make_unique<choc::ui::DesktopWindow>(
+                choc::ui::Bounds{100, 100, (int)pw, (int)ph});
+
+            m_desktopwindow->setWindowTitle("CHOC Window");
+            m_desktopwindow->setResizable(true);
+            m_desktopwindow->setMinimumSize(300, 300);
+            m_desktopwindow->setMaximumSize(1500, 1200);
+            m_desktopwindow->windowClosed = [this] {
+                m_plug->guiDestroy();
+                choc::messageloop::stop();
+            };
+
+            clap_window clapwin;
+            clapwin.api = "win32";
+            clapwin.win32 = m_desktopwindow->getWindowHandle();
+            m_plug->guiSetParent(&clapwin);
+            m_plug->guiShow();
+            m_desktopwindow->toFront();
+            choc::messageloop::run();
+            m_desktopwindow = nullptr;
+            OleUninitialize();
+            return;
             // choc::messageloop::initialise();
             OleInitialize(nullptr);
             choc::ui::setWindowsDPIAwareness();
@@ -603,15 +633,15 @@ class ClapProcessingEngine
             m_desktopwindow->toFront();
             m_desktopwindow->windowClosed = [this] {
                 // std::cout << "window closed\n";
-                //using namespace std::chrono_literals;
-                //std::this_thread::sleep_for(1000ms);
-                
+                // using namespace std::chrono_literals;
+                // std::this_thread::sleep_for(1000ms);
+
                 choc::messageloop::stop();
             };
             choc::messageloop::run();
             // std::cout << "finished message loop\n";
             m_desktopwindow = nullptr;
-            
+
             OleUninitialize();
         });
         th.detach();
