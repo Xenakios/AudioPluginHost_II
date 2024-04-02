@@ -2,6 +2,54 @@
 
 ClapProcessingEngine::ClapProcessingEngine(std::string plugfilename, int plugindex)
 {
+    m_to_plugin_thread_fifo.reset(64);
+    m_from_plugin_thread_fifo.reset(64);
+    Message msg;
+    msg.op = Message::Op::CreatePlugin;
+    msg.action = plugfilename;
+    msg.idata = plugindex;
+    m_to_plugin_thread_fifo.push(msg);
+    m_plugin_thread = std::make_unique<std::thread>([this]() {
+        ClapPluginFormatProcessor::mainthread_id() = std::this_thread::get_id();
+        while (true)
+        {
+            Message msg;
+            while (m_to_plugin_thread_fifo.pop(msg))
+            {
+                if (msg.op == Message::Op::DestroyPlugin)
+                {
+                    m_plug = nullptr;
+                    return;
+                }
+                if (msg.op == Message::Op::CreatePlugin)
+                {
+                    m_plug = std::make_unique<ClapPluginFormatProcessor>(msg.action, msg.idata);
+                    if (m_plug)
+                    {
+                        clap_plugin_descriptor desc;
+                        if (m_plug->getDescriptor(&desc))
+                        {
+                            std::cout << "created : " << desc.name << "\n";
+                        }
+                    }
+                    else
+                    {
+                        Message omsg;
+                        omsg.op = Message::Op::CreationFailed;
+                        m_from_plugin_thread_fifo.push(omsg);
+                    }
+                        
+                }
+            }
+        }
+    });
+    {
+        Message imsg;
+        while (m_from_plugin_thread_fifo.pop(imsg))
+        {
+            
+        }
+    }
     ClapPluginFormatProcessor::mainthread_id() = std::this_thread::get_id();
     m_plug = std::make_unique<ClapPluginFormatProcessor>(plugfilename, plugindex);
     if (m_plug)
@@ -113,7 +161,7 @@ void ClapProcessingEngine::processToFile(std::string filename, double duration, 
         const ms duration = clock::now() - start_time;
         m_plug->stopProcessing();
         writer->flush();
-        std::cout << "finished in " << duration.count()/1000.0 << " seconds\n";
+        std::cout << "finished in " << duration.count() / 1000.0 << " seconds\n";
         renderloopfinished = true;
     });
     using namespace std::chrono_literals;

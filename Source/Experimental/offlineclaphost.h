@@ -533,14 +533,42 @@ class ClapProcessingEngine
     std::unique_ptr<ClapPluginFormatProcessor> m_plug;
 
   public:
+    struct Message
+    {
+        enum class Op
+        {
+            CreatePlugin,
+            CreationFailed,
+            DestroyPlugin,
+            ShowGUI
+        };  
+        Op op;
+        std::string action;
+        int idata = 0;
+        Message() {}
+        Message(std::string act) : action(act) {}
+    };
+    choc::fifo::SingleReaderSingleWriterFIFO<Message> m_to_plugin_thread_fifo;
+    choc::fifo::SingleReaderSingleWriterFIFO<Message> m_from_plugin_thread_fifo;
     ClapEventSequence m_seq;
+    std::unique_ptr<std::thread> m_plugin_thread;
     void setSequence(ClapEventSequence seq)
     {
         m_seq = seq;
         // m_seq.m_evlist.sortEvents();
     }
     ClapProcessingEngine(std::string plugfilename, int plugindex);
-
+    ~ClapProcessingEngine() 
+    {
+        Message msg;
+        msg.op = Message::Op::DestroyPlugin;
+        m_to_plugin_thread_fifo.push(msg);
+        if (m_plugin_thread)
+        {
+            m_plugin_thread->join();
+        }
+            
+    }
     std::map<std::string, clap_id> getParameters()
     {
         std::map<std::string, clap_id> result;
