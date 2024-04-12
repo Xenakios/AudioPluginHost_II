@@ -598,7 +598,7 @@ inline void test_offline_clap()
 
 inline void test_clap_gui_choc()
 {
-    ClapPluginFormatProcessor::mainthread_id() = std::this_thread::get_id();
+    // ClapPluginFormatProcessor::mainthread_id() = std::this_thread::get_id();
     // auto plug = std::make_unique<ClapPluginFormatProcessor>(
     //     R"(C:\Program Files\Common Files\CLAP\Conduit.clap)", 0);
     auto plug = std::make_unique<ClapPluginFormatProcessor>(
@@ -845,7 +845,7 @@ inline void test_thread_rand()
 {
     auto f = []() { std::cout << rand() << " \n"; };
     using namespace std::chrono_literals;
-    
+
     std::thread th0(f);
     std::this_thread::sleep_for(1000ms);
     std::thread th1(f);
@@ -862,7 +862,7 @@ inline void test_thread_rand()
 
 int main()
 {
-    test_thread_rand();
+    // test_thread_rand();
     // test_file_player_clap();
     // test_plethora_synth();
     // test_mod_matrix_pyt();

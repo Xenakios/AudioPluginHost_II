@@ -539,8 +539,10 @@ class ClapProcessingEngine
         {
             CreatePlugin,
             CreationFailed,
+            CreationSucceeded,
             DestroyPlugin,
-            ShowGUI
+            ShowGUI,
+            EndThread
         };  
         Op op;
         std::string action;
@@ -552,6 +554,7 @@ class ClapProcessingEngine
     choc::fifo::SingleReaderSingleWriterFIFO<Message> m_from_plugin_thread_fifo;
     ClapEventSequence m_seq;
     std::unique_ptr<std::thread> m_plugin_thread;
+    void processMessagesFromPluginBlocking();
     void setSequence(ClapEventSequence seq)
     {
         m_seq = seq;
@@ -592,7 +595,7 @@ class ClapProcessingEngine
 
     void openPluginGUIBlocking()
     {
-        m_plug->mainthread_id() = std::this_thread::get_id();
+        // m_plug->mainthread_id() = std::this_thread::get_id();
         choc::ui::setWindowsDPIAwareness(); // For Windows, we need to tell the OS we're
                                             // high-DPI-aware
         m_plug->guiCreate("win32", false);
@@ -623,7 +626,7 @@ class ClapProcessingEngine
     {
         std::thread th([this, title]() {
             OleInitialize(nullptr);
-            m_plug->mainthread_id() = std::this_thread::get_id();
+            // m_plug->mainthread_id() = std::this_thread::get_id();
             choc::ui::setWindowsDPIAwareness(); // For Windows, we need to tell the OS we're
                                                 // high-DPI-aware
             m_plug->guiCreate("win32", false);

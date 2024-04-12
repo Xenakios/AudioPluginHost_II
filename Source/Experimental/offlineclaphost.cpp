@@ -1,67 +1,110 @@
 #include "offlineclaphost.h"
 
+using namespace std::chrono_literals;
+
 ClapProcessingEngine::ClapProcessingEngine(std::string plugfilename, int plugindex)
 {
+
     m_to_plugin_thread_fifo.reset(64);
     m_from_plugin_thread_fifo.reset(64);
-    Message msg;
-    msg.op = Message::Op::CreatePlugin;
-    msg.action = plugfilename;
-    msg.idata = plugindex;
-    m_to_plugin_thread_fifo.push(msg);
-    m_plugin_thread = std::make_unique<std::thread>([this]() {
-        ClapPluginFormatProcessor::mainthread_id() = std::this_thread::get_id();
-        while (true)
-        {
-            Message msg;
-            while (m_to_plugin_thread_fifo.pop(msg))
+    bool plugin_in_another_thread = false;
+    if (plugin_in_another_thread)
+    {
+
+        Message msg;
+        msg.op = Message::Op::CreatePlugin;
+        msg.action = plugfilename;
+        msg.idata = plugindex;
+        m_to_plugin_thread_fifo.push(msg);
+        m_plugin_thread = std::make_unique<std::thread>([this]() {
+            std::cout << "start plugin thread\n";
+            // ClapPluginFormatProcessor::mainthread_id() = std::this_thread::get_id();
+            while (true)
             {
-                if (msg.op == Message::Op::DestroyPlugin)
+                Message msg;
+                while (m_to_plugin_thread_fifo.pop(msg))
                 {
-                    m_plug = nullptr;
-                    return;
-                }
-                if (msg.op == Message::Op::CreatePlugin)
-                {
-                    m_plug = std::make_unique<ClapPluginFormatProcessor>(msg.action, msg.idata);
-                    if (m_plug)
+                    if (msg.op == Message::Op::EndThread)
                     {
-                        clap_plugin_descriptor desc;
-                        if (m_plug->getDescriptor(&desc))
+                        return;
+                    }
+                    if (msg.op == Message::Op::DestroyPlugin)
+                    {
+                        std::cout << "Message::Op::DestroyPlugin\n";
+                        m_plug = nullptr;
+                        return;
+                    }
+                    if (msg.op == Message::Op::CreatePlugin)
+                    {
+                        std::cout << "Message::Op::CreatePlugin\n";
+                        m_plug = std::make_unique<ClapPluginFormatProcessor>(msg.action, msg.idata);
+                        if (m_plug)
                         {
-                            std::cout << "created : " << desc.name << "\n";
+                            Message omsg;
+                            omsg.op = Message::Op::CreationSucceeded;
+                            m_from_plugin_thread_fifo.push(omsg);
+                        }
+                        else
+                        {
+                            Message omsg;
+                            omsg.op = Message::Op::CreationFailed;
+                            m_from_plugin_thread_fifo.push(omsg);
+                            return;
                         }
                     }
-                    else
-                    {
-                        Message omsg;
-                        omsg.op = Message::Op::CreationFailed;
-                        m_from_plugin_thread_fifo.push(omsg);
-                    }
-                        
                 }
+                std::this_thread::sleep_for(10ms);
+            }
+            std::cout << "end plugin thread\n";
+        });
+        processMessagesFromPluginBlocking();
+        return;
+    }
+    else
+    {
+        // ClapPluginFormatProcessor::mainthread_id() = std::this_thread::get_id();
+        m_plug = std::make_unique<ClapPluginFormatProcessor>(plugfilename, plugindex);
+        if (m_plug)
+        {
+            clap_plugin_descriptor desc;
+            if (m_plug->getDescriptor(&desc))
+            {
+                std::cout << "created : " << desc.name << "\n";
             }
         }
-    });
+        else
+            throw std::runtime_error("Could not create CLAP plugin");
+    }
+}
+
+void ClapProcessingEngine::processMessagesFromPluginBlocking()
+{
+    bool hadMessages = false;
+    while (!hadMessages)
     {
         Message imsg;
         while (m_from_plugin_thread_fifo.pop(imsg))
         {
-            
+            hadMessages = true;
+            if (imsg.op == Message::Op::CreationFailed)
+            {
+                m_plugin_thread->join();
+                m_plugin_thread = nullptr;
+                throw std::runtime_error("Could not create CLAP plugin");
+                return;
+            }
+            if (imsg.op == Message::Op::CreationSucceeded)
+            {
+                clap_plugin_descriptor desc;
+                if (m_plug->getDescriptor(&desc))
+                {
+                    std::cout << "created : " << desc.name << "\n";
+                }
+                return;
+            }
         }
+        std::this_thread::sleep_for(10ms);
     }
-    ClapPluginFormatProcessor::mainthread_id() = std::this_thread::get_id();
-    m_plug = std::make_unique<ClapPluginFormatProcessor>(plugfilename, plugindex);
-    if (m_plug)
-    {
-        clap_plugin_descriptor desc;
-        if (m_plug->getDescriptor(&desc))
-        {
-            std::cout << "created : " << desc.name << "\n";
-        }
-    }
-    else
-        throw std::runtime_error("Could not create CLAP plugin");
 }
 
 void ClapProcessingEngine::processToFile(std::string filename, double duration, double samplerate)
@@ -235,15 +278,16 @@ void ClapProcessingEngine::loadStateFromFile(std::string filename)
 std::string ClapProcessingEngine::getParameterInfoString(size_t index)
 {
     std::string result;
+    result.reserve(128);
     if (index >= 0 && m_plug->paramsCount())
     {
         clap_param_info pinfo;
         if (m_plug->paramsInfo(index, &pinfo))
         {
             result += std::string(pinfo.module) + std::string(pinfo.name) + " (ID " +
-                      std::to_string(pinfo.id) + ") ";
-            result += "range [" + std::to_string(pinfo.min_value) + " - " +
-                      std::to_string(pinfo.max_value) + "] ";
+                      std::to_string(pinfo.id) + ")\n";
+            result += "\trange [" + std::to_string(pinfo.min_value) + " - " +
+                      std::to_string(pinfo.max_value) + "]\n\t";
             if (pinfo.flags & CLAP_PARAM_IS_AUTOMATABLE)
             {
                 result += "Automatable";
@@ -258,19 +302,19 @@ std::string ClapProcessingEngine::getParameterInfoString(size_t index)
             }
             if (pinfo.flags & CLAP_PARAM_IS_STEPPED)
             {
-                result += "/Stepped";
+                result += "/Stepped\n";
                 int numsteps = pinfo.max_value - pinfo.min_value;
-                if (numsteps >= 0 && numsteps < 64)
+                if (numsteps >= 2 && numsteps < 64)
                 {
-                    result += "/[";
+                    // result += "/[";
                     char tbuf[256];
                     for (int i = 0; i < numsteps; ++i)
                     {
                         double v = pinfo.min_value + i;
                         if (m_plug->paramsValueToText(pinfo.id, v, tbuf, 256))
                         {
-                            result += std::string(tbuf);
-                            result += " , ";
+                            result += "\t\t" + std::string(tbuf);
+                            result += "\n";
                         }
                     }
                 }

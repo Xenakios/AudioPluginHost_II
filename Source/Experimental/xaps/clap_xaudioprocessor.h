@@ -15,10 +15,10 @@
 #include "gui/choc_DesktopWindow.h"
 class WebViewGenericEditor
 {
-public:
-    WebViewGenericEditor(xenakios::XAudioProcessor* xap);
-    
-    xenakios::XAudioProcessor* m_xap = nullptr;
+  public:
+    WebViewGenericEditor(xenakios::XAudioProcessor *xap);
+
+    xenakios::XAudioProcessor *m_xap = nullptr;
     std::unique_ptr<choc::ui::WebView> m_webview;
 };
 #endif
@@ -82,11 +82,14 @@ class ClapPluginFormatProcessor : public xenakios::XAudioProcessor
             m_processingStarted = false;
         }
     }
+    /*
     static std::thread::id& mainthread_id()
     {
         static std::thread::id id;
         return id;
     }
+    */
+    std::thread::id mainThreadId;
     choc::fifo::SingleReaderSingleWriterFIFO<std::function<void()>> on_main_thread_fifo;
     void runMainThreadTasks()
     {
@@ -150,6 +153,13 @@ class ClapPluginFormatProcessor : public xenakios::XAudioProcessor
     {
         if (m_ext_params)
             return m_ext_params->get_value(m_plug, paramId, value);
+        return false;
+    }
+    bool paramsValueToText(clap_id paramId, double value, char *display,
+                           uint32_t size) noexcept override
+    {
+        if (m_ext_params)
+            return m_ext_params->value_to_text(m_plug, paramId, value, display, size);
         return false;
     }
     clap_plugin_tail *m_ext_plugin_tail = nullptr;
@@ -336,7 +346,7 @@ class ClapPluginFormatProcessor : public xenakios::XAudioProcessor
         return false;
     }
 #else
-    
+
     std::unique_ptr<WebViewGenericEditor> m_webview_ed;
     // if external plugin doesn't implement GUI, we'll use our generic editor,
     bool implementsGui() const noexcept override { return true; }
@@ -357,7 +367,7 @@ class ClapPluginFormatProcessor : public xenakios::XAudioProcessor
         }
         m_webview_ed = nullptr;
     }
-    
+
     bool guiShow() noexcept override
     {
         if (m_ext_gui)
@@ -376,7 +386,7 @@ class ClapPluginFormatProcessor : public xenakios::XAudioProcessor
     }
     bool guiGetSize(uint32_t *width, uint32_t *height) noexcept override
     {
-        
+
         if (m_ext_gui)
         {
             return m_ext_gui->get_size(m_plug, width, height);
@@ -415,7 +425,7 @@ class ClapPluginFormatProcessor : public xenakios::XAudioProcessor
         }
         return false;
     }
-    
+
     bool guiSetParent(const clap_window *window) noexcept override
     {
         if (m_ext_gui)
@@ -425,7 +435,7 @@ class ClapPluginFormatProcessor : public xenakios::XAudioProcessor
             win.win32 = window->win32;
             return m_ext_gui->set_parent(m_plug, &win);
         }
-        choc::ui::DesktopWindow* dwp = (choc::ui::DesktopWindow*)window->ptr;
+        choc::ui::DesktopWindow *dwp = (choc::ui::DesktopWindow *)window->ptr;
         dwp->setContent(m_webview_ed->m_webview->getViewHandle());
         return true;
     }

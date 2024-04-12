@@ -30,6 +30,7 @@ WebViewGenericEditor::WebViewGenericEditor(xenakios::XAudioProcessor *xap) : m_x
 ClapPluginFormatProcessor::ClapPluginFormatProcessor(std::string plugfilename, int plugindex)
     : m_plugdll(plugfilename)
 {
+    mainThreadId = std::this_thread::get_id();
     on_main_thread_fifo.reset(256);
     auto get_extension_lambda = [](const struct clap_host *host, const char *eid) -> const void * {
     // DBG("plugin requested host extension " << eid);
@@ -52,11 +53,11 @@ ClapPluginFormatProcessor::ClapPluginFormatProcessor(std::string plugfilename, i
             static clap_host_thread_check ext_thcheck;
             ext_thcheck.is_audio_thread = [](const clap_host *host_) {
                 auto claphost = (ClapPluginFormatProcessor *)host_->host_data;
-                return std::this_thread::get_id() != claphost->mainthread_id();
+                return std::this_thread::get_id() != claphost->mainThreadId;
             };
             ext_thcheck.is_main_thread = [](const clap_host *host_) {
                 auto claphost = (ClapPluginFormatProcessor *)host_->host_data;
-                return std::this_thread::get_id() == claphost->mainthread_id();
+                return std::this_thread::get_id() == claphost->mainThreadId;
             };
             return &ext_thcheck;
         }
