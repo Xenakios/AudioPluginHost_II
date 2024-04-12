@@ -126,7 +126,14 @@ class ClapPluginFormatProcessor : public xenakios::XAudioProcessor
 
     bool activate(double sampleRate, uint32_t minFrameCount,
                   uint32_t maxFrameCount) noexcept override;
-
+    void deactivate() noexcept override
+    {
+        if (m_plug)
+        {
+            m_plug->deactivate(m_plug);
+            m_activated = false;
+        }
+    }
     uint32_t tailGet() const noexcept override
     {
         if (!m_plug)

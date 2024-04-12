@@ -543,7 +543,7 @@ class ClapProcessingEngine
             DestroyPlugin,
             ShowGUI,
             EndThread
-        };  
+        };
         Op op;
         std::string action;
         int idata = 0;
@@ -561,7 +561,7 @@ class ClapProcessingEngine
         // m_seq.m_evlist.sortEvents();
     }
     ClapProcessingEngine(std::string plugfilename, int plugindex);
-    ~ClapProcessingEngine() 
+    ~ClapProcessingEngine()
     {
         Message msg;
         msg.op = Message::Op::DestroyPlugin;
@@ -570,7 +570,6 @@ class ClapProcessingEngine
         {
             m_plugin_thread->join();
         }
-            
     }
     std::map<std::string, clap_id> getParameters()
     {
@@ -590,37 +589,13 @@ class ClapProcessingEngine
 
     void saveStateToFile(std::string filename);
     void loadStateFromFile(std::string filename);
+    std::string m_stateFileToLoad;
+    void enqueueStateFile(std::string filename) { m_stateFileToLoad = filename; }
 
     void processToFile(std::string filename, double duration, double samplerate);
 
-    void openPluginGUIBlocking()
-    {
-        // m_plug->mainthread_id() = std::this_thread::get_id();
-        choc::ui::setWindowsDPIAwareness(); // For Windows, we need to tell the OS we're
-                                            // high-DPI-aware
-        m_plug->guiCreate("win32", false);
-        uint32_t pw = 0;
-        uint32_t ph = 0;
-        m_plug->guiGetSize(&pw, &ph);
-        choc::ui::DesktopWindow window({100, 100, (int)pw, (int)ph});
-
-        window.setWindowTitle("CHOC Window");
-        window.setResizable(true);
-        window.setMinimumSize(300, 300);
-        window.setMaximumSize(1500, 1200);
-        window.windowClosed = [this] {
-            m_plug->guiDestroy();
-            choc::messageloop::stop();
-        };
-
-        clap_window clapwin;
-        clapwin.api = "win32";
-        clapwin.win32 = window.getWindowHandle();
-        m_plug->guiSetParent(&clapwin);
-        m_plug->guiShow();
-        window.toFront();
-        choc::messageloop::run();
-    }
+    void openPluginGUIBlocking();
+    
     std::unique_ptr<choc::ui::DesktopWindow> m_desktopwindow;
     void openPersistentWindow(std::string title)
     {

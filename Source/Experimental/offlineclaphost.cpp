@@ -114,9 +114,10 @@ void ClapProcessingEngine::processToFile(std::string filename, double duration, 
     int procblocksize = 64;
     std::atomic<bool> renderloopfinished{false};
     m_plug->activate(samplerate, procblocksize, procblocksize);
-
-    // even offline, do the processing in another another thread because things
-    // can get complicated with plugins like Surge XT because of the thread checks
+    // if (!m_stateFileToLoad.empty())
+    //     loadStateFromFile(m_stateFileToLoad);
+    //  even offline, do the processing in another another thread because things
+    //  can get complicated with plugins like Surge XT because of the thread checks
     std::thread th([&] {
         ClapEventSequence::Iterator eviter(m_seq);
         clap_process cp;
@@ -215,6 +216,7 @@ void ClapProcessingEngine::processToFile(std::string filename, double duration, 
         std::this_thread::sleep_for(5ms);
     }
     th.join();
+    m_plug->deactivate();
 }
 
 void ClapProcessingEngine::saveStateToFile(std::string filename)
@@ -223,16 +225,54 @@ void ClapProcessingEngine::saveStateToFile(std::string filename)
     clap_ostream clapostream;
     clapostream.ctx = &outstream;
     clapostream.write = [](const clap_ostream *stream, const void *buffer, uint64_t size) {
-        auto os = (std::ofstream *)stream->ctx;
-        auto castbuf = (unsigned char *)buffer;
-        std::cout << "asked to write " << size << " bytes\n";
-        for (int i = 0; i < size; ++i)
-        {
-            (*os) << castbuf[i];
-        }
+        auto ofs = static_cast<std::ofstream *>(stream->ctx);
+        ofs->write((const char *)buffer, size);
         return (int64_t)size;
     };
-    m_plug->stateSave(&clapostream);
+    m_plug->activate(44100.0, 512, 512);
+    if (!m_plug->stateSave(&clapostream))
+    {
+        std::cout << "state save failed\n";
+    }
+    m_plug->deactivate();
+}
+
+void ClapProcessingEngine::openPluginGUIBlocking()
+{
+    // m_plug->mainthread_id() = std::this_thread::get_id();
+    choc::ui::setWindowsDPIAwareness(); // For Windows, we need to tell the OS we're
+                                        // high-DPI-aware
+    m_plug->activate(44100.0, 512, 512);
+    m_plug->guiCreate("win32", false);
+    uint32_t pw = 0;
+    uint32_t ph = 0;
+    m_plug->guiGetSize(&pw, &ph);
+    choc::ui::DesktopWindow window({100, 100, (int)pw, (int)ph});
+
+    window.setWindowTitle("CHOC Window");
+    window.setResizable(true);
+    window.setMinimumSize(300, 300);
+    window.setMaximumSize(1500, 1200);
+    window.windowClosed = [this] {
+        m_plug->guiDestroy();
+        choc::messageloop::stop();
+    };
+
+    clap_window clapwin;
+    clapwin.api = "win32";
+    clapwin.win32 = window.getWindowHandle();
+    m_plug->guiSetParent(&clapwin);
+    m_plug->guiShow();
+    window.toFront();
+    clap::helpers::EventList inlist;
+    clap::helpers::EventList outlist;
+    choc::messageloop::Timer timer(1000, [&inlist, &outlist, this]() {
+        // m_plug->paramsFlush(inlist.clapInputEvents(), outlist.clapOutputEvents());
+        // std::cout << "plugin outputted " << outlist.size() << " output events\n";
+        return true;
+    });
+    choc::messageloop::run();
+    m_plug->deactivate();
 }
 
 void ClapProcessingEngine::loadStateFromFile(std::string filename)
@@ -242,37 +282,25 @@ void ClapProcessingEngine::loadStateFromFile(std::string filename)
         return;
     clap_istream clapisteam;
     clapisteam.ctx = &infilestream;
-    // int64_t(CLAP_ABI *read)(const struct clap_istream *stream, void *buffer, uint64_t size);
     clapisteam.read = [](const clap_istream *stream, void *buffer, uint64_t size) {
-        auto is = (std::ifstream *)stream->ctx;
-        if (is->eof())
-            return (int64_t)0;
-        auto castbuf = (unsigned char *)buffer;
-        std::cout << "\nasked to read " << size << " bytes\n";
-        for (int i = 0; i < size; ++i)
-        {
-            unsigned char c = 0;
-            (*is) >> c;
-            castbuf[i] = c;
-            // std::cout << (char)c;
-            if (is->eof())
-                return (int64_t)(i - 1);
-        }
+        // thanks to baconpaul for this improved code
+        auto ifs = static_cast<std::ifstream *>(stream->ctx);
+        // Oh this API is so terrible. I think this is right?
+        ifs->read(static_cast<char *>(buffer), size);
+        if (ifs->rdstate() == std::ios::goodbit || ifs->rdstate() == std::ios::eofbit)
+            return (int64_t)ifs->gcount();
 
-        return (int64_t)size;
+        if (ifs->rdstate() & std::ios::eofbit)
+            return (int64_t)ifs->gcount();
+
+        return (int64_t)-1;
     };
-    // m_plug->activate(44100.0,512,512);
-    if (m_plug->stateLoad(&clapisteam))
-    {
-        clap::helpers::EventList inlist;
-        clap::helpers::EventList outlist;
-        // m_plug->paramsFlush(inlist.clapInputEvents(), outlist.clapOutputEvents());
-    }
-    else
+    m_plug->activate(44100.0, 512, 512);
+    if (!m_plug->stateLoad(&clapisteam))
     {
         std::cout << "failed to set clap state\n";
     }
-    // m_plug->deactivate();
+    m_plug->deactivate();
 }
 
 std::string ClapProcessingEngine::getParameterInfoString(size_t index)
@@ -304,17 +332,18 @@ std::string ClapProcessingEngine::getParameterInfoString(size_t index)
             {
                 result += "/Stepped\n";
                 int numsteps = pinfo.max_value - pinfo.min_value;
-                if (numsteps >= 2 && numsteps < 64)
+                if (numsteps >= 1 && numsteps < 64)
                 {
                     // result += "/[";
                     char tbuf[256];
-                    for (int i = 0; i < numsteps; ++i)
+                    for (int i = 0; i <= numsteps; ++i)
                     {
                         double v = pinfo.min_value + i;
                         if (m_plug->paramsValueToText(pinfo.id, v, tbuf, 256))
                         {
                             result += "\t\t" + std::string(tbuf);
-                            result += "\n";
+                            if (i < numsteps)
+                                result += "\n";
                         }
                     }
                 }
