@@ -860,8 +860,30 @@ inline void test_thread_rand()
     th3.join();
 }
 
+inline void test_vector_of_atomics()
+{
+    std::unordered_map<int, std::atomic<float>> afmap;
+    afmap[0] = 0.5f;
+    afmap[100] = 0.1f;
+    for (auto& e : afmap)
+    {
+        std::cout << e.first << " : " << e.second << "\n";
+    }
+    std::cout << afmap[66] << "\n";
+    return;
+    std::array<std::atomic<float>, 128> afarr;
+    std::fill(afarr.begin(), afarr.end(), 0.0f);
+    afarr[0] = 0.5f;
+    afarr[64] = 0.1f;
+    afarr[127] = -0.2f;
+    for (auto& e : afarr)
+        std::cout << e << " ";
+    std::cout << "\n";
+}
+
 int main()
 {
+    test_vector_of_atomics();
     // test_thread_rand();
     // test_file_player_clap();
     // test_plethora_synth();
