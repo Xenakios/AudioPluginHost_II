@@ -588,14 +588,14 @@ class ClapProcessingEngine
     std::string getParameterInfoString(size_t index);
 
     void saveStateToFile(std::string filename);
-    void loadStateFromFile(std::string filename);
+    void loadStateFromFile(const std::filesystem::path &filepath);
     std::string m_stateFileToLoad;
     void enqueueStateFile(std::string filename) { m_stateFileToLoad = filename; }
 
     void processToFile(std::string filename, double duration, double samplerate);
 
     void openPluginGUIBlocking();
-    
+
     std::unique_ptr<choc::ui::DesktopWindow> m_desktopwindow;
     void openPersistentWindow(std::string title)
     {

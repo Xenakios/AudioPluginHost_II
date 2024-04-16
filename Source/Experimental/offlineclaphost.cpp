@@ -310,12 +310,11 @@ void ClapProcessingEngine::openPluginGUIBlocking()
     m_plug->deactivate();
 }
 
-void ClapProcessingEngine::loadStateFromFile(std::string filename)
+void ClapProcessingEngine::loadStateFromFile(const std::filesystem::path &filepath)
 {
     if (!m_plug)
         throw std::runtime_error("No plugin instance");
-    std::u8string_view u8view{reinterpret_cast<char8_t *>(filename.data()), filename.size()};
-    auto str = choc::file::loadFileAsString(u8view);
+    auto str = choc::file::loadFileAsString(filepath);
     auto json = choc::json::parse(str);
     if (json.hasObjectMember("plugin_id"))
     {
@@ -358,7 +357,7 @@ void ClapProcessingEngine::loadStateFromFile(std::string filename)
     else
         throw std::runtime_error("File is not json with a plugin_id");
     return;
-    std::ifstream infilestream(filename, std::ios::binary);
+    std::ifstream infilestream(filepath, std::ios::binary);
     if (!infilestream.is_open())
         return;
     clap_istream clapisteam;
