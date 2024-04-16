@@ -220,7 +220,7 @@ void ClapProcessingEngine::processToFile(std::string filename, double duration, 
     m_plug->deactivate();
 }
 
-void ClapProcessingEngine::saveStateToFile(std::string filename)
+void ClapProcessingEngine::saveStateToFile(const std::filesystem::path &filepath)
 {
     if (!m_plug)
         throw std::runtime_error("No plugin instance");
@@ -246,7 +246,7 @@ void ClapProcessingEngine::saveStateToFile(std::string filename)
         {
             auto str = choc::base64::encodeToString(ovec.data(), ovec.size());
             ob.setMember("plugin_data", str);
-            std::ofstream ofs(filename);
+            std::ofstream ofs(filepath);
             choc::json::writeAsJSON(ofs, ob, true);
         }
         else
@@ -255,21 +255,6 @@ void ClapProcessingEngine::saveStateToFile(std::string filename)
     else
         throw std::runtime_error(
             "Can not store state of plugin that doesn't implement plugin descriptor");
-    return;
-    std::ofstream outstream(filename, std::ios::binary);
-    clap_ostream clapostream;
-    clapostream.ctx = &outstream;
-    clapostream.write = [](const clap_ostream *stream, const void *buffer, uint64_t size) {
-        auto ofs = static_cast<std::ofstream *>(stream->ctx);
-        ofs->write((const char *)buffer, size);
-        return (int64_t)size;
-    };
-    m_plug->activate(44100.0, 512, 512);
-    if (!m_plug->stateSave(&clapostream))
-    {
-        std::cout << "state save failed\n";
-    }
-    m_plug->deactivate();
 }
 
 void ClapProcessingEngine::openPluginGUIBlocking()
@@ -356,31 +341,6 @@ void ClapProcessingEngine::loadStateFromFile(const std::filesystem::path &filepa
     }
     else
         throw std::runtime_error("File is not json with a plugin_id");
-    return;
-    std::ifstream infilestream(filepath, std::ios::binary);
-    if (!infilestream.is_open())
-        return;
-    clap_istream clapisteam;
-    clapisteam.ctx = &infilestream;
-    clapisteam.read = [](const clap_istream *stream, void *buffer, uint64_t size) {
-        // thanks to baconpaul for this improved code
-        auto ifs = static_cast<std::ifstream *>(stream->ctx);
-        // Oh this API is so terrible. I think this is right?
-        ifs->read(static_cast<char *>(buffer), size);
-        if (ifs->rdstate() == std::ios::goodbit || ifs->rdstate() == std::ios::eofbit)
-            return (int64_t)ifs->gcount();
-
-        if (ifs->rdstate() & std::ios::eofbit)
-            return (int64_t)ifs->gcount();
-
-        return (int64_t)-1;
-    };
-    m_plug->activate(44100.0, 512, 512);
-    if (!m_plug->stateLoad(&clapisteam))
-    {
-        std::cout << "failed to set clap state\n";
-    }
-    m_plug->deactivate();
 }
 
 std::string ClapProcessingEngine::getParameterInfoString(size_t index)

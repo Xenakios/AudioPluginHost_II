@@ -587,7 +587,7 @@ class ClapProcessingEngine
     size_t getNumParameters() { return m_plug->paramsCount(); }
     std::string getParameterInfoString(size_t index);
 
-    void saveStateToFile(std::string filename);
+    void saveStateToFile(const std::filesystem::path &filepath);
     void loadStateFromFile(const std::filesystem::path &filepath);
     std::string m_stateFileToLoad;
     void enqueueStateFile(std::string filename) { m_stateFileToLoad = filename; }

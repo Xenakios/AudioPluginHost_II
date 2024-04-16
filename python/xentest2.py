@@ -106,14 +106,16 @@ def ssscompens():
 
 # ssscompens()
 
+# 😊
+
 def test_choc_window():
     # p = xenakios.ClapEngine(r'C:\Program Files\Common Files\CLAP\Surge Synth Team\Surge XT.clap',0)
     # p = xenakios.ClapEngine(r'C:\Program Files\Common Files\CLAP\Surge Synth Team\Surge XT.clappo',0)
     p = xenakios.ClapEngine(r'C:\Program Files\Common Files\CLAP\u-he\Zebralette3.clap',0)
     p.loadStateFromFile("💩 zebralettestate 💩.json")
-    # p.showGUIBlocking()
-    # p.processToFile("zebrarender.wav",1.0,44100.0)
-    # p.saveStateToFile("zebralettestate.json")
+    p.showGUIBlocking()
+    p.processToFile("zebrarender.wav",1.0,44100.0)
+    p.saveStateToFile("💩 zebralettestate 💩.json")
     # numpars = p.getNumParameters()
     # for i in range(numpars):
     #    print(p.getParameterInfoString(i))
