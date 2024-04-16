@@ -314,9 +314,8 @@ void ClapProcessingEngine::loadStateFromFile(std::string filename)
 {
     if (!m_plug)
         throw std::runtime_error("No plugin instance");
-    //if (!std::filesystem::exists(filename))
-    //    throw std::runtime_error("File does not exist");
-    auto str = choc::file::loadFileAsString(filename);
+    std::u8string_view u8view{reinterpret_cast<char8_t *>(filename.data()), filename.size()};
+    auto str = choc::file::loadFileAsString(u8view);
     auto json = choc::json::parse(str);
     if (json.hasObjectMember("plugin_id"))
     {
