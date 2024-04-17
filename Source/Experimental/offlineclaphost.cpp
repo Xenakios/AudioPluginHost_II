@@ -316,7 +316,7 @@ void ClapProcessingEngine::loadStateFromFile(const std::filesystem::path &filepa
         VecWithPos datavec;
         datavec.second = 0;
         datavec.first.reserve(65536);
-
+        
         choc::base64::decode(datastr, [&datavec](uint8_t byte) { datavec.first.push_back(byte); });
         std::cout << "decoded datavec has " << datavec.first.size() << " bytes\n";
 

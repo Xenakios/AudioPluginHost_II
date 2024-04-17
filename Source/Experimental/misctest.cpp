@@ -23,6 +23,7 @@
 #include "gui/choc_MessageLoop.h"
 #include "gui/choc_WebView.h"
 #include "text/choc_Files.h"
+#include "RtAudio.h"
 
 class object_t
 {
@@ -860,30 +861,56 @@ inline void test_thread_rand()
     th3.join();
 }
 
-inline void test_vector_of_atomics()
+std::mt19937 rng;
+
+int MyRtAudioCallback(void *outputBuffer, void *inputBuffer, unsigned int nFrames,
+                      double streamTime, RtAudioStreamStatus status, void *userData)
 {
-    std::unordered_map<int, std::atomic<float>> afmap;
-    afmap[0] = 0.5f;
-    afmap[100] = 0.1f;
-    for (auto& e : afmap)
+    float *fbuf = (float *)outputBuffer;
+    std::uniform_real_distribution<float> dist(-0.05f, 0.05f);
+    for (int i = 0; i < nFrames; ++i)
     {
-        std::cout << e.first << " : " << e.second << "\n";
+        float osample = dist(rng);
+        for (int j = 0; j < 2; ++j)
+        {
+            fbuf[i * 2 + j] = osample;
+        }
     }
-    std::cout << afmap[66] << "\n";
+    return 0;
+}
+
+inline void test_rtaudio()
+{
+    RtAudio ra;
+    auto defdev = ra.getDefaultOutputDevice();
+    std::cout << ra.getDeviceInfo(defdev).name << "\n";
+    RtAudio::StreamParameters outpars;
+    outpars.deviceId = defdev;
+    outpars.firstChannel = 0;
+    outpars.nChannels = 2;
+    unsigned int bframes = 512;
+    auto err = ra.openStream(&outpars, nullptr, RTAUDIO_FLOAT32, 44100, &bframes, MyRtAudioCallback,
+                             nullptr, nullptr);
+    if (err != RTAUDIO_NO_ERROR)
+    {
+        std::cout << "error opening stream\n";
+        return;
+    }
+    std::cout << "stream opened with size " << bframes << "\n";
+    ra.startStream();
+    using namespace std::chrono_literals;
+    std::this_thread::sleep_for(1000ms);
     return;
-    std::array<std::atomic<float>, 128> afarr;
-    std::fill(afarr.begin(), afarr.end(), 0.0f);
-    afarr[0] = 0.5f;
-    afarr[64] = 0.1f;
-    afarr[127] = -0.2f;
-    for (auto& e : afarr)
-        std::cout << e << " ";
-    std::cout << "\n";
+    auto devices = ra.getDeviceIds();
+    for (auto &d : devices)
+    {
+        std::cout << ra.getDeviceInfo(d).name << "\n";
+    }
 }
 
 int main()
 {
-    test_vector_of_atomics();
+    test_rtaudio();
     // test_thread_rand();
     // test_file_player_clap();
     // test_plethora_synth();

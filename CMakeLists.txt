@@ -22,6 +22,7 @@ include_directories(
     libs/WDL
     libs/pybind11/include
     libs/sst-voicemanager/include
+    libs/rtaudio
     C:/Users/teemu/AppData/Local/Programs/Python/Python312/include
 )
 
@@ -74,7 +75,7 @@ target_link_libraries(MainHostApp
 
 # add_subdirectory(libs/fmt EXCLUDE_FROM_ALL)
 add_subdirectory(libs/fmt)
-
+# add_subdirectory(libs/rtaudio)
 project(cmaketest)
 add_subdirectory(libs/pybind11)
 pybind11_add_module(xenakios 
@@ -95,12 +96,16 @@ add_executable(TestingProgram
     Source/Experimental/misctest.cpp 
     Source/Experimental/xaps/clap_xaudioprocessor.cpp
     Source/Experimental/offlineclaphost.cpp
+    libs/rtaudio/RtAudio.cpp  
     )
+# target_link_libraries(TestingProgram PRIVATE rtaudio)
+
+
 target_sources(TestingProgram
     PRIVATE
     
 )
-target_compile_definitions(TestingProgram PRIVATE _USE_MATH_DEFINES=1)
+target_compile_definitions(TestingProgram PRIVATE _USE_MATH_DEFINES=1 __WINDOWS_WASAPI__)
 
 # juce::juce_recommended_lto_flags
 # juce_add_bundle_resources_directory(AudioPluginHost2 Assets)
