@@ -908,9 +908,38 @@ inline void test_rtaudio()
     }
 }
 
+template<typename T>
+inline void writeBinaryToStream(std::ostream& os, T v)
+{
+    os.write((const char*)&v, sizeof(T));
+}
+
+inline void test_clap_riff()
+{
+    std::ofstream os("koe.clappreset", std::ios::binary);
+    os << "RIFF";
+    uint32_t sz = 1000;
+    writeBinaryToStream(os, sz);
+    os << "CLAP";
+    os << "hder";
+    auto proc = std::make_unique<ClapPluginFormatProcessor>(
+        R"(C:\Program Files\Common Files\CLAP\Conduit.clap)", 0);
+    clap_plugin_descriptor desc;
+    if (proc->getDescriptor(&desc))
+    {
+        sz = 4 + strlen(desc.id) + 1;
+        writeBinaryToStream(os, sz);
+        os << desc.id;
+        writeBinaryToStream(os, (unsigned char)0);
+        writeBinaryToStream(os, (unsigned char)255);
+    }
+
+}
+
 int main()
 {
-    test_rtaudio();
+    test_clap_riff();
+    // test_rtaudio();
     // test_thread_rand();
     // test_file_player_clap();
     // test_plethora_synth();

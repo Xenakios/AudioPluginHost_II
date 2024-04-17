@@ -15,15 +15,16 @@ WebViewGenericEditor::WebViewGenericEditor(xenakios::XAudioProcessor *xap) : m_x
                             auto info = choc::value::createObject("paraminfo");
                             info.setMember("name", std::string(pinfo.name));
                             info.setMember("id", (int64_t)pinfo.id);
-                            info.setMember("minval",pinfo.min_value);
-                            info.setMember("maxval",pinfo.max_value);
-                            info.setMember("defaultval",pinfo.default_value);
+                            info.setMember("minval", pinfo.min_value);
+                            info.setMember("maxval", pinfo.max_value);
+                            info.setMember("defaultval", pinfo.default_value);
                             result.addArrayElement(info);
                         }
                         return result;
                     });
-    
-    m_webview->navigate(R"(C:\develop\AudioPluginHost_mk2\Source\Experimental\clapgenericgui.html)");
+
+    m_webview->navigate(
+        R"(C:\develop\AudioPluginHost_mk2\Source\Experimental\clapgenericgui.html)");
 }
 #endif
 
@@ -234,7 +235,8 @@ bool ClapPluginFormatProcessor::activate(double sampleRate, uint32_t minFrameCou
             m_ext_plugin_tail = (clap_plugin_tail *)m_plug->get_extension(m_plug, CLAP_EXT_TAIL);
             m_ext_remote_controls = (clap_plugin_remote_controls *)m_plug->get_extension(
                 m_plug, CLAP_EXT_REMOTE_CONTROLS);
-
+            m_ext_render_mode =
+                (clap_plugin_render *)m_plug->get_extension(m_plug, CLAP_EXT_RENDER);
             return true;
         }
     }

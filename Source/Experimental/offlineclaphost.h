@@ -142,7 +142,7 @@ class ClapEventSequence
         ev.header.space_id = CLAP_CORE_EVENT_SPACE_ID;
         ev.header.time = 0;
         ev.header.type = CLAP_EVENT_MIDI;
-        ev.port_index = port;
+        ev.port_index = std::clamp<int>(port, 0, 65536);
         ev.data[0] = 0xc0 + (channel % 16);
         ev.data[1] = program & 0x7f;
         ev.data[2] = 0;

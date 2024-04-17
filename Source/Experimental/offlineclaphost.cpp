@@ -115,11 +115,15 @@ void ClapProcessingEngine::processToFile(std::string filename, double duration, 
     int procblocksize = 64;
     std::atomic<bool> renderloopfinished{false};
     m_plug->activate(samplerate, procblocksize, procblocksize);
+    std::this_thread::sleep_for(1000ms); 
+    if (m_plug->renderSetMode(CLAP_RENDER_OFFLINE))
+        std::cout << "was able to set offline render mode\n";
     // if (!m_stateFileToLoad.empty())
     //     loadStateFromFile(m_stateFileToLoad);
     //  even offline, do the processing in another another thread because things
     //  can get complicated with plugins like Surge XT because of the thread checks
     std::thread th([&] {
+        
         ClapEventSequence::Iterator eviter(m_seq);
         clap_process cp;
         memset(&cp, 0, sizeof(clap_process));
@@ -177,6 +181,7 @@ void ClapProcessingEngine::processToFile(std::string filename, double duration, 
         using clock = std::chrono::system_clock;
         using ms = std::chrono::duration<double, std::milli>;
         const auto start_time = clock::now();
+        using namespace std::chrono_literals;
         while (outcounter < outlensamples)
         {
             auto blockevts = eviter.readNextEvents(procblocksize / samplerate);
@@ -185,6 +190,8 @@ void ClapProcessingEngine::processToFile(std::string filename, double duration, 
                 auto ecopy = e.event;
                 ecopy.header.time = (e.timestamp * samplerate) - outcounter;
                 list_in.push((const clap_event_header *)&ecopy);
+                //if (ecopy.header.type == CLAP_EVENT_MIDI)
+                //    std::this_thread::sleep_for(500ms); 
                 // std::cout << "sent event type " << e.event.header.type << " at samplepos "
                 //           << outcounter + ecopy.header.time << "\n";
             }
@@ -316,7 +323,7 @@ void ClapProcessingEngine::loadStateFromFile(const std::filesystem::path &filepa
         VecWithPos datavec;
         datavec.second = 0;
         datavec.first.reserve(65536);
-        
+
         choc::base64::decode(datastr, [&datavec](uint8_t byte) { datavec.first.push_back(byte); });
         std::cout << "decoded datavec has " << datavec.first.size() << " bytes\n";
 

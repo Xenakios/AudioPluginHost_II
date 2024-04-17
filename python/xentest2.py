@@ -109,16 +109,24 @@ def ssscompens():
 # 😊
 
 def test_choc_window():
-    # p = xenakios.ClapEngine(r'C:\Program Files\Common Files\CLAP\Surge Synth Team\Surge XT.clap',0)
+    p = xenakios.ClapEngine(r'C:\Program Files\Common Files\CLAP\Surge Synth Team\Surge XT.clap',0)
+    # time.sleep(1)
     # p = xenakios.ClapEngine(r'C:\Program Files\Common Files\CLAP\Surge Synth Team\Surge XT.clappo',0)
-    p = xenakios.ClapEngine(r'C:\Program Files\Common Files\CLAP\u-he\Zebralette3.clap',0)
-    try:
-        p.loadStateFromFile("😊 zebralettestate 🦓.json")
-    except:
-        pass
-    p.showGUIBlocking()
-    p.processToFile("zebrarender.wav",1.0,44100.0)
-    p.saveStateToFile("😊 zebralettestate 🦓.json")
+    # p = xenakios.ClapEngine(r'C:\Program Files\Common Files\CLAP\u-he\Zebralette3.clap',0)
+    # try:
+    #     p.loadStateFromFile("😊 zebralettestate 🦓.json")
+    # except:
+    #     pass
+    # p.showGUIBlocking()
+    seq = xenakios.ClapSequence()
+    seq.addProgramChange(0.0,0,1,2)
+    seq.addNote(time=2.0,dur=3.0,key=60)
+    seq.addProgramChange(6.0,0,1,3)
+    
+    seq.addNote(time=8.0,dur=3.0,key=67)
+    p.setSequence(seq)
+    p.processToFile("surgerender.wav",15.0,44100.0)
+    # p.saveStateToFile("😊 zebralettestate 🦓.json")
     # numpars = p.getNumParameters()
     # for i in range(numpars):
     #    print(p.getParameterInfoString(i))

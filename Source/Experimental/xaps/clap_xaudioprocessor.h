@@ -33,6 +33,7 @@ class ClapPluginFormatProcessor : public xenakios::XAudioProcessor
     std::atomic<bool> m_inited{false};
     clap_plugin_params_t *m_ext_params = nullptr;
     clap_plugin_remote_controls *m_ext_remote_controls = nullptr;
+    clap_plugin_render *m_ext_render_mode = nullptr;
     std::atomic<bool> m_processingStarted{false};
     std::atomic<bool> m_activated{false};
     choc::fifo::SingleReaderSingleWriterFIFO<xenakios::CrossThreadMessage> m_from_generic_editor;
@@ -214,7 +215,12 @@ class ClapPluginFormatProcessor : public xenakios::XAudioProcessor
         // have to trust the hosted plugin does this thread safely...
         return m_ext_state->load(m_plug, stream);
     }
-
+    bool renderSetMode(clap_plugin_render_mode mode) noexcept override
+    {
+        if (!m_ext_render_mode)
+            return false;
+        return m_ext_render_mode->set(m_plug, mode);
+    }
     uint32_t remoteControlsPageCount() noexcept override
     {
         if (!m_ext_remote_controls)
