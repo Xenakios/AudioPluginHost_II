@@ -108,6 +108,47 @@ void ClapProcessingEngine::processMessagesFromPluginBlocking()
     }
 }
 
+std::string ClapProcessingEngine::scanPluginFile(std::filesystem::path plugfilepath)
+{
+    auto plugfilename = plugfilepath.generic_string();
+    if (!std::filesystem::exists(plugfilepath))
+        return "Plugin file does not exist " + plugfilename;
+
+    choc::file::DynamicLibrary dll(plugfilename);
+    if (dll.handle)
+    {
+        clap_plugin_entry_t *entry = (clap_plugin_entry_t *)dll.findFunction("clap_entry");
+        if (entry)
+        {
+            entry->init(plugfilename.c_str());
+            auto fac = (clap_plugin_factory_t *)entry->get_factory(CLAP_PLUGIN_FACTORY_ID);
+            auto plugin_count = fac->get_plugin_count(fac);
+            if (plugin_count <= 0)
+            {
+                return "No plugins to manufacture in " + plugfilename;
+            }
+            std::string result;
+            auto plugcount = fac->get_plugin_count(fac);
+            for (int i = 0; i < plugcount; ++i)
+            {
+                auto desc = fac->get_plugin_descriptor(fac, i);
+                if (desc)
+                {
+                    result += std::to_string(i) + " : " + std::string(desc->name) + " [" +
+                              desc->id + "]\n";
+                }
+            }
+            entry->deinit();
+            return result;
+        }
+        else
+            return "No plugin entry point";
+    }
+    else
+        return "could not open dll for " + plugfilename;
+    return "No info";
+}
+
 void ClapProcessingEngine::processToFile(std::string filename, double duration, double samplerate)
 {
     using namespace std::chrono_literals;
@@ -115,7 +156,7 @@ void ClapProcessingEngine::processToFile(std::string filename, double duration, 
     int procblocksize = 64;
     std::atomic<bool> renderloopfinished{false};
     m_plug->activate(samplerate, procblocksize, procblocksize);
-    std::this_thread::sleep_for(1000ms); 
+    std::this_thread::sleep_for(1000ms);
     if (m_plug->renderSetMode(CLAP_RENDER_OFFLINE))
         std::cout << "was able to set offline render mode\n";
     // if (!m_stateFileToLoad.empty())
@@ -123,7 +164,6 @@ void ClapProcessingEngine::processToFile(std::string filename, double duration, 
     //  even offline, do the processing in another another thread because things
     //  can get complicated with plugins like Surge XT because of the thread checks
     std::thread th([&] {
-        
         ClapEventSequence::Iterator eviter(m_seq);
         clap_process cp;
         memset(&cp, 0, sizeof(clap_process));
@@ -190,10 +230,10 @@ void ClapProcessingEngine::processToFile(std::string filename, double duration, 
                 auto ecopy = e.event;
                 ecopy.header.time = (e.timestamp * samplerate) - outcounter;
                 list_in.push((const clap_event_header *)&ecopy);
-                //if (ecopy.header.type == CLAP_EVENT_MIDI)
-                //    std::this_thread::sleep_for(500ms); 
-                // std::cout << "sent event type " << e.event.header.type << " at samplepos "
-                //           << outcounter + ecopy.header.time << "\n";
+                // if (ecopy.header.type == CLAP_EVENT_MIDI)
+                //     std::this_thread::sleep_for(500ms);
+                //  std::cout << "sent event type " << e.event.header.type << " at samplepos "
+                //            << outcounter + ecopy.header.time << "\n";
             }
 
             auto status = m_plug->process(&cp);

@@ -109,6 +109,8 @@ def ssscompens():
 # 😊
 
 def test_choc_window():
+    print(xenakios.ClapEngine.scanPluginFile(r'C:\Program Files\Common Files\CLAP\Conduit.clap'))
+    return
     p = xenakios.ClapEngine(r'C:\Program Files\Common Files\CLAP\Surge Synth Team\Surge XT.clap',0)
     # time.sleep(1)
     # p = xenakios.ClapEngine(r'C:\Program Files\Common Files\CLAP\Surge Synth Team\Surge XT.clappo',0)

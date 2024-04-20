@@ -57,6 +57,7 @@ PYBIND11_MODULE(xenakios, m)
 
     py::class_<ClapProcessingEngine>(m, "ClapEngine")
         .def(py::init<const std::string &, int>())
+        .def_static("scanPluginFile",&ClapProcessingEngine::scanPluginFile)
         .def("setSequence", &ClapProcessingEngine::setSequence)
         .def("getParameters", &ClapProcessingEngine::getParameters)
         .def("getNumParameters", &ClapProcessingEngine::getNumParameters)

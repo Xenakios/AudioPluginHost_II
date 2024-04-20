@@ -560,6 +560,7 @@ class ClapProcessingEngine
         m_seq = seq;
         // m_seq.m_evlist.sortEvents();
     }
+    static std::string scanPluginFile(std::filesystem::path plugfilename);
     ClapProcessingEngine(std::string plugfilename, int plugindex);
     ~ClapProcessingEngine()
     {
