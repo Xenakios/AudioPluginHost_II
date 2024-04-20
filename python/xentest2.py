@@ -106,11 +106,56 @@ def ssscompens():
 
 # ssscompens()
 
+def test_plugin_scan():
+    plugs = xenakios.ClapEngine.scanPluginDirs()
+    for path in plugs:
+        if "BYOD" in str(path):
+            print(xenakios.ClapEngine.scanPluginFile(path))
+        
+    # 
+
+# test_plugin_scan()  
+def test_circle_stuff():
+    p = xenakios.ClapEngine(r'C:\Program Files\Common Files\CLAP\Surge Synth Team\Surge XT.clap',0)
+    seq = xenakios.ClapSequence()
+    t = 0.0
+    freqs = [1.11,2.0,3.0,4.0]
+    amps = [1.2,0.5,0.25,0.1]
+    
+    odur = 30
+    lastx = 0.0
+    lasty = 0.0
+    while (t<odur):
+        x = 0.0
+        y = 0.0
+        for i in range(len(freqs)):
+            x = x + amps[i] * math.cos(t * freqs[i])
+            y = y + amps[i] * math.sin(t * freqs[i])
+        distance = (math.dist([0.0,0.0],[x,y]))
+        semi = round(24.0+30.0*distance)
+        if semi<0:
+            semi = 0
+        if semi>127:
+            semi = 127
+        seq.addNote(time=t,dur=0.2,key=semi)
+        # print(f'{t} {semi}')
+        distance = 0.05+0.2*math.dist([lastx,lasty],[x,y])
+        if distance<0.05:
+            distance = 0.05
+        t = t + distance
+        lastx = x
+        lasty = y
+    p.setSequence(seq)
+    p.processToFile("surgerender.wav",odur+1.0,44100.0)
+
+# print()
+
+test_circle_stuff()
+
 # 😊
 
 def test_choc_window():
-    print(xenakios.ClapEngine.scanPluginFile(r'C:\Program Files\Common Files\CLAP\Conduit.clap'))
-    return
+    
     p = xenakios.ClapEngine(r'C:\Program Files\Common Files\CLAP\Surge Synth Team\Surge XT.clap',0)
     # time.sleep(1)
     # p = xenakios.ClapEngine(r'C:\Program Files\Common Files\CLAP\Surge Synth Team\Surge XT.clappo',0)
@@ -134,6 +179,6 @@ def test_choc_window():
     #    print(p.getParameterInfoString(i))
     
 
-test_choc_window()
+# test_choc_window()
 
 # print(f"yeah{f"{math.factorial(20)}"}")

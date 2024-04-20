@@ -54,6 +54,7 @@ void XapFactory::scanClapPlugin(const std::filesystem::path &path)
 
 void XapFactory::scanClapPlugins()
 {
+    // actually there are more paths we should scan...
     std::filesystem::recursive_directory_iterator dirit(R"(C:\Program Files\Common Files\CLAP)");
     for (auto &f : dirit)
     {

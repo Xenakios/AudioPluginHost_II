@@ -108,6 +108,21 @@ void ClapProcessingEngine::processMessagesFromPluginBlocking()
     }
 }
 
+std::vector<std::filesystem::path> ClapProcessingEngine::scanPluginDirectories()
+{
+    std::vector<std::filesystem::path> result;
+    // actually there are more paths we should scan...and make this cross platform
+    std::filesystem::recursive_directory_iterator dirit(R"(C:\Program Files\Common Files\CLAP)");
+    for (auto &f : dirit)
+    {
+        if (f.is_regular_file() && f.path().extension() == ".clap")
+        {
+            result.push_back(f.path());
+        }
+    }
+    return result;
+}
+
 std::string ClapProcessingEngine::scanPluginFile(std::filesystem::path plugfilepath)
 {
     auto plugfilename = plugfilepath.generic_string();
@@ -156,7 +171,7 @@ void ClapProcessingEngine::processToFile(std::string filename, double duration, 
     int procblocksize = 64;
     std::atomic<bool> renderloopfinished{false};
     m_plug->activate(samplerate, procblocksize, procblocksize);
-    std::this_thread::sleep_for(1000ms);
+    // std::this_thread::sleep_for(1000ms);
     if (m_plug->renderSetMode(CLAP_RENDER_OFFLINE))
         std::cout << "was able to set offline render mode\n";
     // if (!m_stateFileToLoad.empty())
