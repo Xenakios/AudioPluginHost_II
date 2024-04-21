@@ -120,7 +120,7 @@ def test_circle_stuff():
     seq = xenakios.ClapSequence()
     t = 0.0
     freqs = [1.11,2.0,3.0,4.0]
-    amps = [1.2,0.5,0.25,0.1]
+    amps = [1.2,0.0,0.0,0.5]
     
     odur = 30
     lastx = 0.0
@@ -129,8 +129,8 @@ def test_circle_stuff():
         x = 0.0
         y = 0.0
         for i in range(len(freqs)):
-            x = x + amps[i] * math.cos(t * freqs[i])
-            y = y + amps[i] * math.sin(t * freqs[i])
+            x = x + amps[i] * math.cos(2 * math.pi * t * freqs[i])
+            y = y + amps[i] * math.sin(2 * math.pi * t * freqs[i])
         distance = (math.dist([0.0,0.0],[x,y]))
         semi = round(24.0+30.0*distance)
         if semi<0:
@@ -150,7 +150,60 @@ def test_circle_stuff():
 
 # print()
 
-test_circle_stuff()
+# test_circle_stuff()
+
+def rwalk(curval,minval,maxval):
+    step = -0.01+0.02*random.random()
+    newval = curval + step
+    if newval<minval:
+        newval = minval
+    if newval>maxval:
+        newval = maxval
+    return newval
+
+def procession_intro():
+    p = xenakios.ClapEngine(r'C:\Program Files\Common Files\CLAP\NoisePlethoraSynth.clap',0)
+    seq = xenakios.ClapSequence()
+    pulselen = 2.0/32
+    totaldur = 120.0
+    
+    primes = [7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71, 73, 79, 83, 89, 97, 101,103,107,109,113,127,131]
+    noteid = 0
+    xpars = [0.1,0.1,0.1,0.1,0.2,0.2,0.2,0.2,0.2,0.6,0.6,0.6,0.6,0.9,0.9,0.9,0.9]
+    ypars = [0.9,0.8,0.7,0.6,0.5,0.4,0.3,0.2,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9]
+    algos = [0,1,2,3,4,5,6,7,8,9,0,1,2,3,4,5,6,7]
+    # envelope
+    seq.addParameterEvent(time=0,parid=8,val=0.001)
+    seq.addParameterEvent(time=0,parid=9,val=0.5)
+    seq.addParameterEvent(time=0,parid=10,val=0.0)
+    seq.addParameterEvent(time=0,parid=11,val=0.2)
+    
+    for i in range(16):
+        # notelen = pulselen * primes[16-i]
+        notelen = pulselen * (32-i)
+        t = totaldur
+        layerstart = totaldur*0.75/16*i
+        while t >= 0.0:
+            if t>=layerstart:
+                randt = random.random()*0.02
+                tpos = t+randt
+                seq.addNote(time=tpos,dur=notelen*0.5,key=24+i*5,nid=noteid)
+                seq.addParameterEvent(time=tpos,nid=noteid,parid=1,val=rwalk(xpars[i],0.0,1.0))
+                seq.addParameterEvent(time=tpos,nid=noteid,parid=2,val=rwalk(ypars[i],0.0,1.0))
+                # pan
+                pan = -1.0+2.0/16*i
+                seq.addParameterEvent(time=tpos,nid=noteid, parid=7,val=pan)
+                # algo
+                seq.addParameterEvent(time=tpos,parid=6,val=algos[i])
+                noteid = noteid + 1
+                # print(t)
+            t = t - notelen
+        # print(notelen)
+    p.setSequence(seq)
+    
+    p.processToFile("procession_intro.wav",totaldur+5.0,44100.0)
+
+procession_intro()
 
 # 😊
 
