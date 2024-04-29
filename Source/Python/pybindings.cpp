@@ -5,10 +5,10 @@
 #include <pybind11/stl/filesystem.h>
 #include <iostream>
 #include "audio/choc_AudioFileFormat_WAV.h"
-#include "xapdsp.h"
-#include "xap_utils.h"
-#include "offlineclaphost.h"
-#include "dejavurandom.h"
+#include "../Experimental/xapdsp.h"
+#include "../Experimental/xap_utils.h"
+#include "../Experimental/offlineclaphost.h"
+#include "../Experimental/dejavurandom.h"
 
 namespace py = pybind11;
 
