@@ -319,49 +319,11 @@ void ClapProcessingEngine::saveStateToFile(const std::filesystem::path &filepath
             "Can not store state of plugin that doesn't implement plugin descriptor");
 }
 
-void ClapProcessingEngine::openPluginGUIBlocking()
-{
-    // m_plug->mainthread_id() = std::this_thread::get_id();
-    choc::ui::setWindowsDPIAwareness(); // For Windows, we need to tell the OS we're
-                                        // high-DPI-aware
-    m_plug->activate(44100.0, 512, 512);
-    m_plug->guiCreate("win32", false);
-    uint32_t pw = 0;
-    uint32_t ph = 0;
-    m_plug->guiGetSize(&pw, &ph);
-    choc::ui::DesktopWindow window({100, 100, (int)pw, (int)ph});
-
-    window.setWindowTitle("CHOC Window");
-    window.setResizable(true);
-    window.setMinimumSize(300, 300);
-    window.setMaximumSize(1500, 1200);
-    window.windowClosed = [this] {
-        m_plug->guiDestroy();
-        choc::messageloop::stop();
-    };
-
-    clap_window clapwin;
-    clapwin.api = "win32";
-    clapwin.win32 = window.getWindowHandle();
-    m_plug->guiSetParent(&clapwin);
-    m_plug->guiShow();
-    window.toFront();
-    clap::helpers::EventList inlist;
-    clap::helpers::EventList outlist;
-    choc::messageloop::Timer timer(1000, [&inlist, &outlist, this]() {
-        // m_plug->paramsFlush(inlist.clapInputEvents(), outlist.clapOutputEvents());
-        // std::cout << "plugin outputted " << outlist.size() << " output events\n";
-        return true;
-    });
-    choc::messageloop::run();
-    m_plug->deactivate();
-}
-
 void ClapProcessingEngine::loadStateFromFile(const std::filesystem::path &filepath)
 {
     if (!m_plug)
         throw std::runtime_error("No plugin instance");
-    auto str = choc::file::loadFileAsString(filepath);
+    auto str = choc::file::loadFileAsString(filepath.string());
     auto json = choc::json::parse(str);
     if (json.hasObjectMember("plugin_id"))
     {
@@ -403,6 +365,44 @@ void ClapProcessingEngine::loadStateFromFile(const std::filesystem::path &filepa
     }
     else
         throw std::runtime_error("File is not json with a plugin_id");
+}
+
+void ClapProcessingEngine::openPluginGUIBlocking()
+{
+    // m_plug->mainthread_id() = std::this_thread::get_id();
+    choc::ui::setWindowsDPIAwareness(); // For Windows, we need to tell the OS we're
+                                        // high-DPI-aware
+    m_plug->activate(44100.0, 512, 512);
+    m_plug->guiCreate("win32", false);
+    uint32_t pw = 0;
+    uint32_t ph = 0;
+    m_plug->guiGetSize(&pw, &ph);
+    choc::ui::DesktopWindow window({100, 100, (int)pw, (int)ph});
+
+    window.setWindowTitle("CHOC Window");
+    window.setResizable(true);
+    window.setMinimumSize(300, 300);
+    window.setMaximumSize(1500, 1200);
+    window.windowClosed = [this] {
+        m_plug->guiDestroy();
+        choc::messageloop::stop();
+    };
+
+    clap_window clapwin;
+    clapwin.api = "win32";
+    clapwin.win32 = window.getWindowHandle();
+    m_plug->guiSetParent(&clapwin);
+    m_plug->guiShow();
+    window.toFront();
+    clap::helpers::EventList inlist;
+    clap::helpers::EventList outlist;
+    choc::messageloop::Timer timer(1000, [&inlist, &outlist, this]() {
+        // m_plug->paramsFlush(inlist.clapInputEvents(), outlist.clapOutputEvents());
+        // std::cout << "plugin outputted " << outlist.size() << " output events\n";
+        return true;
+    });
+    choc::messageloop::run();
+    m_plug->deactivate();
 }
 
 std::string ClapProcessingEngine::getParameterInfoString(size_t index)

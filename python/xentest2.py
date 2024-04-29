@@ -201,7 +201,7 @@ def procession_intro():
         # print(notelen)
     p.setSequence(seq)
     
-    p.processToFile("procession_intro.wav",totaldur+5.0,44100.0)
+    p.processToFile("procession_intro4.wav",totaldur+5.0,44100.0)
 
 procession_intro()
 
