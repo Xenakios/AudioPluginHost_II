@@ -90,6 +90,8 @@ template <size_t BLOCK_SIZE = 64> class Envelope
         sortPoints();
         clearOutputBlock();
     }
+    auto begin() { return m_points.begin(); }
+    auto end() { return m_points.end(); }
     void addPoint(EnvelopePoint pt)
     {
         m_points.push_back(pt);

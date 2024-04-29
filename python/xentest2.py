@@ -212,15 +212,16 @@ def test_env_points():
     # env.removePoint(90)
     env.addPoint(xep(0.0,1.0))
     env.addPoint(xep(1.0,0.0))
-    env.addPoint(xep(10.0,5.0))
-    print(env.getValueAtPosition(0.0))
-    print(env.getValueAtPosition(0.5))
-    print(env.getValueAtPosition(1.0))
-    print(env.getValueAtPosition(10.0))
-    env.setPoint(-2,xep(10.0,666.0))
-    print(env.getValueAtPosition(9.0))
-    print(env.getValueAtPosition(10.0))
-
+    env.addPoint(xep(10.1,5.45))
+    # print(env.getValueAtPosition(0.0))
+    # print(env.getValueAtPosition(0.5))
+    # print(env.getValueAtPosition(1.0))
+    # print(env.getValueAtPosition(10.0))
+    env.setPoint(2,xep(10.2,-45.111))
+    # print(env.getValueAtPosition(9.0))
+    # print(env.getValueAtPosition(10.0))
+    for pt in env:
+        print(pt)
 
 test_env_points()
 

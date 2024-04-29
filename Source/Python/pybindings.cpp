@@ -57,8 +57,8 @@ PYBIND11_MODULE(xenakios, m)
 
     py::class_<ClapProcessingEngine>(m, "ClapEngine")
         .def(py::init<const std::string &, int>())
-        .def_static("scanPluginFile",&ClapProcessingEngine::scanPluginFile)
-        .def_static("scanPluginDirs",&ClapProcessingEngine::scanPluginDirectories)
+        .def_static("scanPluginFile", &ClapProcessingEngine::scanPluginFile)
+        .def_static("scanPluginDirs", &ClapProcessingEngine::scanPluginDirectories)
         .def("setSequence", &ClapProcessingEngine::setSequence)
         .def("getParameters", &ClapProcessingEngine::getParameters)
         .def("getNumParameters", &ClapProcessingEngine::getNumParameters)
@@ -71,6 +71,10 @@ PYBIND11_MODULE(xenakios, m)
 
     py::class_<xenakios::EnvelopePoint>(m, "EnvelopePoint")
         .def(py::init<double, double>())
+        .def("__repr__",
+             [](const xenakios::EnvelopePoint &a) {
+                 return std::format("EnvelopePoint x={} y={}", a.getX(), a.getY());
+             })
         .def("getX", &xenakios::EnvelopePoint::getX)
         .def("getY", &xenakios::EnvelopePoint::getY);
 
@@ -79,8 +83,12 @@ PYBIND11_MODULE(xenakios, m)
         .def(py::init<std::vector<xenakios::EnvelopePoint>>())
         .def("numPoints", &xenakios::Envelope<ENVBLOCKSIZE>::getNumPoints)
         .def("addPoint", &xenakios::Envelope<ENVBLOCKSIZE>::addPoint)
-        .def("removePoint",&xenakios::Envelope<ENVBLOCKSIZE>::removeEnvelopePointAtIndex)
-        
+        .def("removePoint", &xenakios::Envelope<ENVBLOCKSIZE>::removeEnvelopePointAtIndex)
+        .def("__iter__",
+             [](xenakios::Envelope<ENVBLOCKSIZE> &v) {
+                 return py::make_iterator(v.begin(), v.end());
+             })
+
         .def("getPoint", &xenakios::Envelope<ENVBLOCKSIZE>::getPointSafe)
         .def("setPoint", &xenakios::Envelope<ENVBLOCKSIZE>::setPoint)
         .def("getValueAtPosition", &xenakios::Envelope<ENVBLOCKSIZE>::getValueAtPosition);
