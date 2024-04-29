@@ -80,7 +80,9 @@ PYBIND11_MODULE(xenakios, m)
         .def("numPoints", &xenakios::Envelope<ENVBLOCKSIZE>::getNumPoints)
         .def("addPoint", &xenakios::Envelope<ENVBLOCKSIZE>::addPoint)
         .def("removePoint",&xenakios::Envelope<ENVBLOCKSIZE>::removeEnvelopePointAtIndex)
+        
         .def("getPoint", &xenakios::Envelope<ENVBLOCKSIZE>::getPointSafe)
+        .def("setPoint", &xenakios::Envelope<ENVBLOCKSIZE>::setPoint)
         .def("getValueAtPosition", &xenakios::Envelope<ENVBLOCKSIZE>::getValueAtPosition);
 
     py::class_<MultiModulator>(m, "MultiModulator")

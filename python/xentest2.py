@@ -205,16 +205,22 @@ def procession_intro():
 
 # procession_intro()
 
+xep = xenakios.EnvelopePoint
+
 def test_env_points():
     env = xenakios.Envelope()
     # env.removePoint(90)
-    env.addPoint(xenakios.EnvelopePoint(0.0,1.0))
-    env.addPoint(xenakios.EnvelopePoint(1.0,0.0))
-    env.addPoint(xenakios.EnvelopePoint(10.0,5.0))
+    env.addPoint(xep(0.0,1.0))
+    env.addPoint(xep(1.0,0.0))
+    env.addPoint(xep(10.0,5.0))
     print(env.getValueAtPosition(0.0))
     print(env.getValueAtPosition(0.5))
     print(env.getValueAtPosition(1.0))
     print(env.getValueAtPosition(10.0))
+    env.setPoint(-2,xep(10.0,666.0))
+    print(env.getValueAtPosition(9.0))
+    print(env.getValueAtPosition(10.0))
+
 
 test_env_points()
 

@@ -102,6 +102,10 @@ template <size_t BLOCK_SIZE = 64> class Envelope
             throw std::runtime_error(std::format("Index {} out of range", index));
         m_points.erase(m_points.begin() + index);
     }
+    void removeEnvelopePoints(std::function<bool(EnvelopePoint)> func)
+    {
+        std::erase_if(m_points, func);
+    }
     // use carefully, only when you are going to add at least one point right after this
     void clearAllPoints()
     {
@@ -134,6 +138,13 @@ template <size_t BLOCK_SIZE = 64> class Envelope
         if (index >= m_points.size())
             return m_points.back();
         return m_points[index];
+    }
+    void setPoint(int index, EnvelopePoint pt)
+    {
+        if (index < 0 || index >= m_points.size())
+            throw std::runtime_error(std::format("Index {} out of range", index));
+        m_points[index] = pt;
+        m_sorted = false;
     }
     void sortPoints()
     {

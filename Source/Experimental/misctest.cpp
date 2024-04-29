@@ -908,10 +908,9 @@ inline void test_rtaudio()
     }
 }
 
-template<typename T>
-inline void writeBinaryToStream(std::ostream& os, T v)
+template <typename T> inline void writeBinaryToStream(std::ostream &os, T v)
 {
-    os.write((const char*)&v, sizeof(T));
+    os.write((const char *)&v, sizeof(T));
 }
 
 inline void test_clap_riff()
@@ -933,12 +932,26 @@ inline void test_clap_riff()
         writeBinaryToStream(os, (unsigned char)0);
         writeBinaryToStream(os, (unsigned char)255);
     }
+}
 
+inline void test_env2()
+{
+    xenakios::Envelope env;
+    env.addPoint(xenakios::EnvelopePoint(0.0, 1.0));
+    env.addPoint(xenakios::EnvelopePoint(1.0, 0.0));
+    env.addPoint(xenakios::EnvelopePoint(2.0, 0.5));
+    env.addPoint(xenakios::EnvelopePoint(3.5, 0.99));
+    env.addPoint(xenakios::EnvelopePoint(4.0, 1.00));
+    env.removeEnvelopePoints(
+        [](xenakios::EnvelopePoint pt) { return pt.getX() >= 1.0 && pt.getX() < 3.5; });
+    for (size_t i = 0; i < env.getNumPoints(); ++i)
+        std::cout << env.getPointSafe(i).getX() << " " << env.getPointSafe(i).getY() << "\n";
 }
 
 int main()
 {
-    test_clap_riff();
+    test_env2();
+    // test_clap_riff();
     // test_rtaudio();
     // test_thread_rand();
     // test_file_player_clap();
