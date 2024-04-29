@@ -84,7 +84,7 @@ pybind11_add_module(xenakios
     Source/Experimental/offlineclaphost.cpp
 )
 
-target_compile_definitions(xenakios PRIVATE _USE_MATH_DEFINES=1)
+target_compile_definitions(xenakios PRIVATE _USE_MATH_DEFINES=1 XENPYTHONBINDINGS=1)
 add_custom_command(TARGET xenakios POST_BUILD 
   COMMAND "${CMAKE_COMMAND}" -E copy 
      "$<TARGET_FILE:xenakios>"

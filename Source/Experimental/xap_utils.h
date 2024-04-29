@@ -95,14 +95,13 @@ template <size_t BLOCK_SIZE = 64> class Envelope
         m_points.push_back(pt);
         m_sorted = false;
     }
-    /*
-    void addPoint(double x, double y)
+
+    void removeEnvelopePointAtIndex(int index)
     {
-        m_points.emplace_back(x, y);
-        m_sorted = false;
+        if (index < 0 || index >= m_points.size())
+            throw std::runtime_error(std::format("Index {} out of range", index));
+        m_points.erase(m_points.begin() + index);
     }
-    */
-    void removeEnvelopePointAtIndex(size_t index) { m_points.erase(m_points.begin() + index); }
     // use carefully, only when you are going to add at least one point right after this
     void clearAllPoints()
     {
@@ -170,11 +169,11 @@ template <size_t BLOCK_SIZE = 64> class Envelope
             //           << "\n";
         }
     }
-    double getValueAtPosition(double pos, double sr)
+    double getValueAtPosition(double pos)
     {
         if (!m_sorted)
             sortPoints();
-        processBlock(pos, sr, 2);
+        processBlock(pos, 0.0, 2);
         return outputBlock[0];
     }
     // interpolate_mode :
@@ -185,8 +184,15 @@ template <size_t BLOCK_SIZE = 64> class Envelope
     // elements
     void processBlock(double timepos, double samplerate, int interpolate_mode)
     {
-        // behavior would be undefined if the envelope points are not sorted or if no points
+// behavior would be undefined if the envelope points are not sorted or if no points
+#if XENPYTHONBINDINGS
+        if (!m_sorted)
+            throw std::runtime_error("Envelope points are not sorted");
+        if (m_points.size() == 0)
+            throw std::runtime_error("Envelope has no points to evaluate");
+#else
         assert(m_sorted && m_points.size() > 0);
+#endif
         if (currentPointIndex == -1 || timepos < m_points[currentPointIndex].getX() ||
             timepos >= getPointSafe(currentPointIndex + 1).getX())
         {
@@ -718,5 +724,5 @@ struct clap_event_xen_string
     int32_t target;
     // owned by host, do not free, do not cache, do not mutate
     // only immediately use or copy the contents
-    char* str;
+    char *str;
 };

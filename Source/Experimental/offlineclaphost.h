@@ -260,7 +260,7 @@ inline void generateNoteExpressionsFromEnvelope(ClapEventSequence &targetSeq,
     double t = eventsStartTime;
     while (t < duration + granularity + eventsStartTime)
     {
-        double v = sourceEnvelope.getValueAtPosition(t - eventsStartTime, 0.0);
+        double v = sourceEnvelope.getValueAtPosition(t - eventsStartTime);
         targetSeq.addNoteExpression(t, port, chan, key, note_id, net, v);
         t += granularity;
     }
@@ -275,7 +275,7 @@ inline void generateParameterEventsFromEnvelope(bool is_mod, ClapEventSequence &
     double t = eventsStartTime;
     while (t < duration + granularity + eventsStartTime)
     {
-        double v = sourceEnvelope.getValueAtPosition(t - eventsStartTime, 0.0);
+        double v = sourceEnvelope.getValueAtPosition(t - eventsStartTime);
         targetSeq.addParameterEvent(is_mod, t, port, chan, key, note_id, parid, v);
         t += granularity;
     }

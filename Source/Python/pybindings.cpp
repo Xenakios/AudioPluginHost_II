@@ -79,6 +79,7 @@ PYBIND11_MODULE(xenakios, m)
         .def(py::init<std::vector<xenakios::EnvelopePoint>>())
         .def("numPoints", &xenakios::Envelope<ENVBLOCKSIZE>::getNumPoints)
         .def("addPoint", &xenakios::Envelope<ENVBLOCKSIZE>::addPoint)
+        .def("removePoint",&xenakios::Envelope<ENVBLOCKSIZE>::removeEnvelopePointAtIndex)
         .def("getPoint", &xenakios::Envelope<ENVBLOCKSIZE>::getPointSafe)
         .def("getValueAtPosition", &xenakios::Envelope<ENVBLOCKSIZE>::getValueAtPosition);
 
