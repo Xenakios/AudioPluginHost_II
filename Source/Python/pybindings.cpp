@@ -3,6 +3,7 @@
 #include <optional>
 #include <pybind11/stl.h>
 #include <pybind11/stl/filesystem.h>
+#include <pybind11/functional.h>
 #include <iostream>
 #include "audio/choc_AudioFileFormat_WAV.h"
 #include "../Experimental/xapdsp.h"
@@ -84,6 +85,7 @@ PYBIND11_MODULE(xenakios, m)
         .def("numPoints", &xenakios::Envelope<ENVBLOCKSIZE>::getNumPoints)
         .def("addPoint", &xenakios::Envelope<ENVBLOCKSIZE>::addPoint)
         .def("removePoint", &xenakios::Envelope<ENVBLOCKSIZE>::removeEnvelopePointAtIndex)
+        .def("removePoints", &xenakios::Envelope<ENVBLOCKSIZE>::removeEnvelopePoints)
         .def("__iter__",
              [](xenakios::Envelope<ENVBLOCKSIZE> &v) {
                  return py::make_iterator(v.begin(), v.end());
