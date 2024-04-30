@@ -172,8 +172,8 @@ void ClapProcessingEngine::processToFile(std::string filename, double duration, 
     std::atomic<bool> renderloopfinished{false};
     m_plug->activate(samplerate, procblocksize, procblocksize);
     // std::this_thread::sleep_for(1000ms);
-    if (m_plug->renderSetMode(CLAP_RENDER_OFFLINE))
-        std::cout << "was able to set offline render mode\n";
+    if (!m_plug->renderSetMode(CLAP_RENDER_OFFLINE))
+        std::cout << "was not able to set offline render mode\n";
     // if (!m_stateFileToLoad.empty())
     //     loadStateFromFile(m_stateFileToLoad);
     //  even offline, do the processing in another another thread because things
