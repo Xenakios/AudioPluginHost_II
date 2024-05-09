@@ -2,7 +2,9 @@
 #include <iostream>
 #include "platform/choc_DynamicLibrary.h"
 #include "xaps/clap_xaudioprocessor.h"
+#if !NOJUCE
 #include "xaps/juce_xaudioprocessor.h"
+#endif
 
 namespace xenakios
 {
@@ -66,6 +68,7 @@ void XapFactory::scanClapPlugins()
     }
 }
 
+#if !NOJUCE
 void XapFactory::scanVST3Plugins()
 {
     std::vector<std::string> vst3plugins;
@@ -98,5 +101,8 @@ void XapFactory::scanVST3Plugins()
         }
     }
 }
+#elif
+void XapFactory::scanVST3Plugins() {}
+#endif
 
 } // namespace xenakios

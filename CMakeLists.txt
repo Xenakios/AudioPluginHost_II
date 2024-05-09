@@ -85,7 +85,7 @@ pybind11_add_module(xenakios
     Source/Experimental/xaudiograph.cpp
 )
 
-target_compile_definitions(xenakios PRIVATE _USE_MATH_DEFINES=1 XENPYTHONBINDINGS=1)
+target_compile_definitions(xenakios PRIVATE _USE_MATH_DEFINES=1 XENPYTHONBINDINGS=1 NOJUCE=1)
 add_custom_command(TARGET xenakios POST_BUILD 
   COMMAND "${CMAKE_COMMAND}" -E copy 
      "$<TARGET_FILE:xenakios>"
@@ -97,6 +97,7 @@ add_executable(TestingProgram
     Source/Experimental/misctest.cpp 
     Source/Experimental/xaps/clap_xaudioprocessor.cpp
     Source/Experimental/offlineclaphost.cpp
+    Source/Experimental/xaudiograph.cpp
     libs/rtaudio/RtAudio.cpp  
     )
 # target_link_libraries(TestingProgram PRIVATE rtaudio)
@@ -106,7 +107,7 @@ target_sources(TestingProgram
     PRIVATE
     
 )
-target_compile_definitions(TestingProgram PRIVATE _USE_MATH_DEFINES=1 __WINDOWS_WASAPI__)
+target_compile_definitions(TestingProgram PRIVATE NOJUCE=1 _USE_MATH_DEFINES=1 __WINDOWS_WASAPI__)
 
 # juce::juce_recommended_lto_flags
 # juce_add_bundle_resources_directory(AudioPluginHost2 Assets)

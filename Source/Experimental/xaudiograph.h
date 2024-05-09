@@ -2,7 +2,7 @@
 #include "xaudioprocessor.h"
 #include "xap_utils.h"
 #include "containers/choc_NonAllocatingStableSort.h"
-#if !XENPYTHONBINDINGS
+#if !NOJUCE
 #include "xapfactory.h"
 #endif
 #include <unordered_set>
@@ -110,7 +110,7 @@ class IOProcessor : public xenakios::XAudioProcessor
     }
 };
 
-#if !XENPYTHONBINDINGS
+#if !NOJUCE
 static xenakios::RegisterXap reg_audio_in{"Audio input", "org.xenakios.xupic.graph_io_input",
                                           []() { return std::make_unique<IOProcessor>(true); }};
 

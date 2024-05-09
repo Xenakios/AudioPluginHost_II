@@ -10,8 +10,6 @@
 #include "xap_utils.h"
 #include "concurrentqueue.h"
 #include <chrono>
-// #include "../Plugins/noise-plethora/plugins/NoisePlethoraPlugin.hpp"
-// #include "../Plugins/noise-plethora/plugins/Banks.hpp"
 #include "xapdsp.h"
 #include "audio/choc_AudioFileFormat_WAV.h"
 #include "containers/choc_NonAllocatingStableSort.h"
@@ -24,6 +22,7 @@
 #include "gui/choc_WebView.h"
 #include "text/choc_Files.h"
 #include "RtAudio.h"
+#include "xaudiograph.h"
 
 class object_t
 {
@@ -948,9 +947,15 @@ inline void test_env2()
         std::cout << env.getPointSafe(i).getX() << " " << env.getPointSafe(i).getY() << "\n";
 }
 
+inline void test_no_juce_agraph()
+{
+    XAPGraph g;
+}
+
 int main()
 {
-    test_env2();
+    test_no_juce_agraph();
+    // test_env2();
     // test_clap_riff();
     // test_rtaudio();
     // test_thread_rand();
