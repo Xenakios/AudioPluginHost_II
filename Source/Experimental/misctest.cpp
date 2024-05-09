@@ -949,7 +949,13 @@ inline void test_env2()
 
 inline void test_no_juce_agraph()
 {
-    XAPGraph g;
+    auto g = std::make_unique<XAPGraph>();
+    g->addProcessorAsNode(
+        std::make_unique<ClapPluginFormatProcessor>(
+            R"(C:\Program Files\Common Files\CLAP\Surge Synth Team\Surge XT.clap)", 0),
+        "Surge XT", 0);
+    g->outputNodeId = "Surge XT";
+    g->activate(44100.0, 512, 512);
 }
 
 int main()
