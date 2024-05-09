@@ -949,6 +949,11 @@ inline void test_env2()
 
 inline void test_no_juce_agraph()
 {
+    ClapEventSequence seq;
+    seq.addNote(0.0, 2.0, 0, 0, 60, 0, 1.0, 0.0);
+    seq.addNote(1.0, 2.0, 0, 0, 64, 0, 1.0, 0.0);
+    seq.addNote(2.0, 2.0, 0, 0, 67, 0, 1.0, 0.0);
+    seq.addNote(3.0, 2.0, 0, 0, 72, 0, 1.0, 0.0);
     auto g = std::make_unique<XAPGraph>();
     g->addProcessorAsNode(
         std::make_unique<ClapPluginFormatProcessor>(

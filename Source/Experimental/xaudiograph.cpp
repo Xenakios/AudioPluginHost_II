@@ -1,5 +1,83 @@
 #include "xaudiograph.h"
 
+XAPGraph::XAPGraph()
+{
+    // should be enough for infrequent requests from the UI
+    from_ui_fifo.reset(128);
+    to_ui_fifo.reset(128);
+    // reserve to allow for realtime manipulation, but obviously at some point
+    // might need to allocate...
+    proc_nodes.reserve(1024);
+    runOrder.reserve(1024);
+    // m_graph->addProcessorAsNode(std::make_unique<IOProcessor>(true), "Audio Input", 100);
+    //     m_graph->addProcessorAsNode(std::make_unique<IOProcessor>(false), "Audio Output",
+    //     101);
+}
+
+uint64_t XAPGraph::addProcessorAsNode(std::unique_ptr<xenakios::XAudioProcessor> proc,
+                                      std::string displayid, std::optional<uint64_t> id)
+{
+    // ok, so this a complete mess, how is the id supposed to be used/generated???
+    uint64_t id_to_use = runningNodeID;
+    if (id)
+        id_to_use = *id;
+    proc_nodes.emplace_back(std::make_unique<XAPNode>(std::move(proc), displayid, id_to_use));
+    // auto result = runningNodeID;
+    //++runningNodeID;
+    auto result = proc_nodes.size();
+    return result;
+}
+
+void XAPGraph::handleUIMessages()
+{
+    CTMessage msg;
+    while (from_ui_fifo.pop(msg))
+    {
+        if (msg.op == CTMessage::Opcode::RemoveNodeInputs)
+        {
+            msg.node->inputConnections.clear();
+            updateRunOrder();
+        }
+        if (msg.op == CTMessage::Opcode::RemoveNodeInput)
+        {
+            msg.node->inputConnections.erase(msg.node->inputConnections.begin() +
+                                             msg.connectionIndex);
+            // this might not really require re-evaluating the whole run order,
+            // but for now it will work like this...
+            updateRunOrder();
+        }
+        if (msg.op == CTMessage::Opcode::RemoveNode)
+        {
+            auto sinknode = findNodeByName(outputNodeId);
+            // sink node must remain
+            if (msg.node != sinknode)
+            {
+                removeNode(msg.node);
+            }
+        }
+    }
+}
+
+void XAPGraph::updateRunOrder()
+{
+    for (auto &n : proc_nodes)
+    {
+        n->isActiveInGraph = false;
+    }
+    runOrder = topoSort(findNodeByName(outputNodeId));
+    for (auto &n : runOrder)
+    {
+        n->isActiveInGraph = true;
+    }
+    for (auto &n : proc_nodes)
+    {
+        if (!n->isActiveInGraph)
+        {
+            n->processor->stopProcessing();
+        }
+    }
+}
+
 bool XAPGraph::activate(double sampleRate, uint32_t minFrameCount, uint32_t maxFrameCount) noexcept
 {
     if (proc_nodes.size() == 0)
@@ -11,7 +89,7 @@ bool XAPGraph::activate(double sampleRate, uint32_t minFrameCount, uint32_t maxF
     memset(&transport, 0, sizeof(clap_event_transport));
     double sr = sampleRate;
     m_sr = sampleRate;
-    // std::cout << "**** GRAPH RUN ORDER ****\n";
+    std::cout << "**** GRAPH RUN ORDER ****\n";
     for (auto &n : proc_nodes)
     {
         n->initAudioBuffersFromProcessorInfo(maxFrameCount);
@@ -19,7 +97,7 @@ bool XAPGraph::activate(double sampleRate, uint32_t minFrameCount, uint32_t maxF
     for (auto &n : runOrder)
     {
         n->processor->activate(sr, procbufsize, procbufsize);
-        // std::cout << "\t" << n->displayName << "\n";
+        std::cout << "\t" << n->displayName << "\n";
         for (int i = 0; i < n->processor->audioPortsCount(true); ++i)
         {
             clap_audio_port_info pinfo;

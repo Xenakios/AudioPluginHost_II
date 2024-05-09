@@ -565,40 +565,12 @@ class XAPGraph : public xenakios::XAudioProcessor
     };
     choc::fifo::SingleReaderSingleWriterFIFO<CTMessage> from_ui_fifo;
     choc::fifo::SingleReaderSingleWriterFIFO<CTMessage> to_ui_fifo;
-    XAPGraph()
-    {
-        // should be enough for infrequent requests from the UI
-        from_ui_fifo.reset(128);
-        to_ui_fifo.reset(128);
-        // reserve to allow for realtime manipulation, but obviously at some point
-        // might need to allocate...
-        proc_nodes.reserve(1024);
-        runOrder.reserve(1024);
-        // m_graph->addProcessorAsNode(std::make_unique<IOProcessor>(true), "Audio Input", 100);
-        //     m_graph->addProcessorAsNode(std::make_unique<IOProcessor>(false), "Audio Output",
-        //     101);
-    }
+    XAPGraph();
+    
     std::unique_ptr<IOProcessor> m_input_processor;
     std::unique_ptr<IOProcessor> m_output_processor;
-    void updateRunOrder()
-    {
-        for (auto &n : proc_nodes)
-        {
-            n->isActiveInGraph = false;
-        }
-        runOrder = topoSort(findNodeByName(outputNodeId));
-        for (auto &n : runOrder)
-        {
-            n->isActiveInGraph = true;
-        }
-        for (auto &n : proc_nodes)
-        {
-            if (!n->isActiveInGraph)
-            {
-                n->processor->stopProcessing();
-            }
-        }
-    }
+    void updateRunOrder();
+    
     void removeInputNodeFromNode(XAPNode *targetNode, XAPNode *sourceNode)
     {
         if (targetNode->inputConnections.size() == 0)
@@ -629,48 +601,12 @@ class XAPGraph : public xenakios::XAudioProcessor
             }
         }
     }
-    void handleUIMessages()
-    {
-        CTMessage msg;
-        while (from_ui_fifo.pop(msg))
-        {
-            if (msg.op == CTMessage::Opcode::RemoveNodeInputs)
-            {
-                msg.node->inputConnections.clear();
-                updateRunOrder();
-            }
-            if (msg.op == CTMessage::Opcode::RemoveNodeInput)
-            {
-                msg.node->inputConnections.erase(msg.node->inputConnections.begin() +
-                                                 msg.connectionIndex);
-                // this might not really require re-evaluating the whole run order,
-                // but for now it will work like this...
-                updateRunOrder();
-            }
-            if (msg.op == CTMessage::Opcode::RemoveNode)
-            {
-                auto sinknode = findNodeByName(outputNodeId);
-                // sink node must remain
-                if (msg.node != sinknode)
-                {
-                    removeNode(msg.node);
-                }
-            }
-        }
-    }
+    void handleUIMessages();
+    
     uint64_t addProcessorAsNode(std::unique_ptr<xenakios::XAudioProcessor> proc,
-                                std::string displayid, std::optional<uint64_t> id = {})
-    {
-        uint64_t id_to_use = runningNodeID;
-        if (id)
-            id_to_use = *id;
-        proc_nodes.emplace_back(std::make_unique<XAPNode>(std::move(proc), displayid, id_to_use));
-        // auto result = runningNodeID;
-        //++runningNodeID;
-        auto result = proc_nodes.size();
-        return result;
-    }
-    void removeNodeFromGraph(XAPNode *n) {}
+                                std::string displayid, std::optional<uint64_t> id = {});
+    
+    
     XAPNode *findNodeByID(uint64_t id)
     {
         for (auto &n : proc_nodes)
