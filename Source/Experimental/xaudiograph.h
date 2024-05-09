@@ -1,9 +1,12 @@
 #pragma once
 #include "xaudioprocessor.h"
-#include "JuceHeader.h"
 #include "xap_utils.h"
 #include "containers/choc_NonAllocatingStableSort.h"
+#if !XENPYTHONBINDINGS
 #include "xapfactory.h"
+#endif
+#include <unordered_set>
+#include <iostream>
 
 // utility that is used by the graph to receive and output audio
 // input is got via magical means, output will be available normally
@@ -35,7 +38,7 @@ class IOProcessor : public xenakios::XAudioProcessor
             return 0;
         if (m_is_input && !isInput)
             return 1;
-        
+
         return 0;
     }
     bool audioPortsInfo(uint32_t index, bool isInput,
@@ -107,11 +110,13 @@ class IOProcessor : public xenakios::XAudioProcessor
     }
 };
 
+#if !XENPYTHONBINDINGS
 static xenakios::RegisterXap reg_audio_in{"Audio input", "org.xenakios.xupic.graph_io_input",
-                                        []() { return std::make_unique<IOProcessor>(true); }};
+                                          []() { return std::make_unique<IOProcessor>(true); }};
 
 static xenakios::RegisterXap reg_audio_out{"Audio output", "org.xenakios.xupic.graph_io_output",
-                                        []() { return std::make_unique<IOProcessor>(false); }};
+                                           []() { return std::make_unique<IOProcessor>(false); }};
+#endif
 
 class XAPNode
 {
@@ -283,7 +288,7 @@ class XAPNode
     std::unordered_map<clap_id, double> modulationSums;
     bool modulationWasApplied = false;
     std::unordered_map<clap_id, clap_param_info> parameterInfos;
-    juce::Rectangle<int> nodeSceneBounds;
+    // juce::Rectangle<int> nodeSceneBounds;
 };
 
 inline int findPinIndex(XAPNode *node, XAPNode::ConnectionType type, bool isInput, int port,
@@ -423,8 +428,10 @@ inline std::optional<clap_id> findParameterFromName(xenakios::XAudioProcessor *p
     {
         clap_param_info pinfo;
         proc->paramsInfo(i, &pinfo);
-        juce::String pname(pinfo.name);
-        if (pname.containsIgnoreCase(parNameToFind))
+        std::string pname(pinfo.name);
+        auto it = search(pname.begin(), pname.end(), parNameToFind.begin(), parNameToFind.end(),
+                         [](char a, char b) { return std::tolower(a) == std::tolower(b); });
+        if (it != pname.end())
         {
             return pinfo.id;
         }
@@ -567,9 +574,9 @@ class XAPGraph : public xenakios::XAudioProcessor
         // might need to allocate...
         proc_nodes.reserve(1024);
         runOrder.reserve(1024);
-        //m_graph->addProcessorAsNode(std::make_unique<IOProcessor>(true), "Audio Input", 100);
-        //    m_graph->addProcessorAsNode(std::make_unique<IOProcessor>(false), "Audio Output", 101);
-        
+        // m_graph->addProcessorAsNode(std::make_unique<IOProcessor>(true), "Audio Input", 100);
+        //     m_graph->addProcessorAsNode(std::make_unique<IOProcessor>(false), "Audio Output",
+        //     101);
     }
     std::unique_ptr<IOProcessor> m_input_processor;
     std::unique_ptr<IOProcessor> m_output_processor;
@@ -757,14 +764,14 @@ class XAPGraph : public xenakios::XAudioProcessor
     bool startProcessing() noexcept override
     {
         // error if called again when already started
-        jassert(!m_processing_started);
+        assert(!m_processing_started);
         m_processing_started = true;
         return true;
     }
     void stopProcessing() noexcept override
     {
         // error if called when not already started?
-        jassert(m_processing_started);
+        assert(m_processing_started);
         for (auto &n : runOrder)
         {
             n->processor->stopProcessing();

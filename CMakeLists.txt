@@ -82,6 +82,7 @@ pybind11_add_module(xenakios
     Source/Python/pybindings.cpp
     Source/Experimental/xaps/clap_xaudioprocessor.cpp
     Source/Experimental/offlineclaphost.cpp
+    Source/Experimental/xaudiograph.cpp
 )
 
 target_compile_definitions(xenakios PRIVATE _USE_MATH_DEFINES=1 XENPYTHONBINDINGS=1)
