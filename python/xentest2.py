@@ -161,50 +161,6 @@ def rwalk(curval,minval,maxval):
         newval = maxval
     return newval
 
-def procession_intro():
-    p = xenakios.ClapEngine(r'C:\Program Files\Common Files\CLAP\NoisePlethoraSynth.clap',0)
-    seq = xenakios.ClapSequence()
-    pulselen = 2.0/32
-    totaldur = 120.0
-    
-    primes = [7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71, 73, 79, 83, 89, 97, 101,103,107,109,113,127,131]
-    noteid = 0
-    xpars = [0.1,0.1,0.1,0.1,0.2,0.2,0.2,0.2,0.2,0.6,0.6,0.6,0.6,0.9,0.9,0.9,0.9]
-    ypars = [0.9,0.8,0.7,0.6,0.5,0.4,0.3,0.2,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9]
-    algos = [0,1,2,3,4,5,6,7,8,9,0,1,2,3,4,5,6,7]
-    # envelope
-    seq.addParameterEvent(time=0,parid=8,val=0.001)
-    seq.addParameterEvent(time=0,parid=9,val=0.5)
-    seq.addParameterEvent(time=0,parid=10,val=0.0)
-    seq.addParameterEvent(time=0,parid=11,val=0.2)
-    
-    for i in range(16):
-        # notelen = pulselen * primes[16-i]
-        notelen = pulselen * (32-i)
-        t = totaldur
-        layerstart = totaldur*0.75/16*i
-        while t >= 0.0:
-            if t>=layerstart:
-                randt = random.random()*0.02
-                tpos = t+randt
-                seq.addNote(time=tpos,dur=notelen*0.5,key=24+i*5,nid=noteid)
-                seq.addParameterEvent(time=tpos,nid=noteid,parid=1,val=rwalk(xpars[i],0.0,1.0))
-                seq.addParameterEvent(time=tpos,nid=noteid,parid=2,val=rwalk(ypars[i],0.0,1.0))
-                # pan
-                pan = -1.0+2.0/16*i
-                seq.addParameterEvent(time=tpos,nid=noteid, parid=7,val=pan)
-                # algo
-                seq.addParameterEvent(time=tpos,parid=6,val=algos[i])
-                noteid = noteid + 1
-                # print(t)
-            t = t - notelen
-        # print(notelen)
-    p.setSequence(seq)
-    
-    p.processToFile("procession_intro4.wav",totaldur+5.0,44100.0)
-
-# procession_intro()
-
 xep = xenakios.EnvelopePoint
 
 def test_env_points():
