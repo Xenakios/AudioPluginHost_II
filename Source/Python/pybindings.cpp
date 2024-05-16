@@ -10,8 +10,43 @@
 #include "../Experimental/xap_utils.h"
 #include "../Experimental/offlineclaphost.h"
 #include "../Experimental/dejavurandom.h"
+#include "libMTSMaster.h"
 
 namespace py = pybind11;
+
+class MTSESPSource
+{
+  public:
+    MTSESPSource()
+    {
+        if (MTS_CanRegisterMaster())
+        {
+            MTS_RegisterMaster();
+            std::cout << "registered MTS Master\n";
+            double freqs[128];
+            for (int i = 0; i < 128; ++i)
+            {
+                freqs[i] = 440.0 * std::pow(2.0, (69 - i) / 12.0);
+            }
+            MTS_SetNoteTunings(freqs);
+            MTS_SetScaleName("12tet 440Hz");
+        }
+    }
+    ~MTSESPSource()
+    {
+        MTS_DeregisterMaster();
+        std::cout << "deregistered MTS Master\n";
+    }
+    void setNoteTuning(int midikey, double hz)
+    {
+        if (midikey >= 0 && midikey < 128)
+        {
+            MTS_SetNoteTuning(hz, midikey);
+        }
+    }
+
+  private:
+};
 
 constexpr size_t ENVBLOCKSIZE = 64;
 
@@ -19,6 +54,10 @@ PYBIND11_MODULE(xenakios, m)
 {
     using namespace pybind11::literals;
     m.doc() = "pybind11 xenakios plugin"; // optional module docstring
+
+    py::class_<MTSESPSource>(m, "MTS_Source")
+        .def(py::init<>())
+        .def("setNoteTuning", &MTSESPSource::setNoteTuning);
 
     py::class_<ClapEventSequence>(m, "ClapSequence")
         .def(py::init<>())

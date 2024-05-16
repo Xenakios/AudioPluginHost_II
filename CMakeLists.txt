@@ -23,6 +23,7 @@ include_directories(
     libs/pybind11/include
     libs/sst-voicemanager/include
     libs/rtaudio
+    libs/MTS-ESP/Master
     C:/Users/teemu/AppData/Local/Programs/Python/Python312/include
 )
 
@@ -74,7 +75,7 @@ target_link_libraries(MainHostApp
 )    
 
 # add_subdirectory(libs/fmt EXCLUDE_FROM_ALL)
-add_subdirectory(libs/fmt)
+# add_subdirectory(libs/fmt)
 # add_subdirectory(libs/rtaudio)
 project(cmaketest)
 add_subdirectory(libs/pybind11)
@@ -83,6 +84,7 @@ pybind11_add_module(xenakios
     Source/Experimental/xaps/clap_xaudioprocessor.cpp
     Source/Experimental/offlineclaphost.cpp
     Source/Experimental/xaudiograph.cpp
+    libs/MTS-ESP/Master/libMTSMaster.cpp
 )
 
 target_compile_definitions(xenakios PRIVATE _USE_MATH_DEFINES=1 XENPYTHONBINDINGS=1 NOJUCE=1)
