@@ -22,7 +22,7 @@ class MTSESPSource
         if (MTS_CanRegisterMaster())
         {
             MTS_RegisterMaster();
-            std::cout << "registered MTS Master\n";
+            std::cout << "registered MTS Source\n";
             double freqs[128];
             for (int i = 0; i < 128; ++i)
             {
@@ -35,7 +35,7 @@ class MTSESPSource
     ~MTSESPSource()
     {
         MTS_DeregisterMaster();
-        std::cout << "deregistered MTS Master\n";
+        std::cout << "deregistered MTS Source\n";
     }
     void setNoteTuning(int midikey, double hz)
     {
