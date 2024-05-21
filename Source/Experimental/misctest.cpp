@@ -15,6 +15,7 @@
 #include "containers/choc_NonAllocatingStableSort.h"
 #include "sst/basic-blocks/modulators/SimpleLFO.h"
 #include "sst/basic-blocks/dsp/LanczosResampler.h"
+#include "sst/basic-blocks/dsp/FollowSlewAndSmooth.h"
 #include "sst/basic-blocks/mod-matrix/ModMatrix.h"
 #include "offlineclaphost.h"
 #include "gui/choc_DesktopWindow.h"
@@ -1056,6 +1057,18 @@ inline void test_bluenoise()
         xenakios::DejaVuRandom dvrand(6);
         CorrelatedNoise corrnoise;
         int depth = 1;
+        ClapEventSequence seq;
+        double t = 0.0;
+        std::minstd_rand rng;
+        std::uniform_real_distribution<float> dist{0.0f, 1.0f};
+        while (t < 10.0)
+        {
+            seq.addParameterEvent(false, t, 0, 0, 0, -1, 1, dist(rng));
+            t += 0.5;
+        }
+        sst::basic_blocks::dsp::SlewLimiter slew;
+        
+        ClapEventSequence::Iterator seqiter(seq);
         xenakios::Envelope<64> env;
         env.addPoint({0.0, -1.0});
         env.addPoint({5.0, 1.0});
@@ -1064,18 +1077,40 @@ inline void test_bluenoise()
         env.sortPoints();
         dvrand.setLoopLength(256);
         dvrand.setDejaVu(0.4);
+        float corr = 0.0;
+        float volume = -96.0;
+        corrnoise.setCorrelation(0.0);
+        slew.setParams(250.0, 1.0, outsr);
         for (int i = 0; i < outlen; ++i)
         {
             if (i % 64 == 0)
             {
-                env.processBlock(i / outsr, outsr, 2);
-                bn.setDepth(env.outputBlock[0]);
-                dvrand.setDejaVu(env.outputBlock[0]);
-                corrnoise.setCorrelation(env.outputBlock[0]);
+                // env.processBlock(i / outsr, outsr, 2);
+                // bn.setDepth(env.outputBlock[0]);
+                // dvrand.setDejaVu(env.outputBlock[0]);
+                //  corrnoise.setCorrelation(env.outputBlock[0]);
+                auto evts = seqiter.readNextEvents(64 / outsr);
+                for (auto &ev : evts)
+                {
+                    if (ev.event.header.type == CLAP_EVENT_PARAM_VALUE)
+                    {
+                        auto pev = (clap_event_param_value *)&ev.event;
+                        if (pev->param_id == 0)
+                            corr = pev->value;
+                        if (pev->param_id == 1)
+                        {
+                            volume = pev->value;
+                            
+                        }
+                            
+                    }
+                }
             }
-
+            float slew_volume = slew.step(volume);
+            // slew_volume = xenakios::decibelsToGain(slew_volume);
+            // corrnoise.setCorrelation(slewcorr);
             // buf.getSample(0, i) = -0.5 + 1.0 * dvrand.nextFloat();
-            buf.getSample(0, i) = corrnoise() * 0.5;
+            buf.getSample(0, i) = corrnoise() * slew_volume;
         }
         writer->appendFrames(buf.getView());
     }
