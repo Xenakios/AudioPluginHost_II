@@ -11,6 +11,7 @@
 #include "../Experimental/offlineclaphost.h"
 #include "../Experimental/dejavurandom.h"
 #include "libMTSMaster.h"
+#include "Tunings.h"
 
 namespace py = pybind11;
 
@@ -87,6 +88,8 @@ PYBIND11_MODULE(xenakios, m)
     C(CLAP_NOTE_EXPRESSION_BRIGHTNESS);
     C(CLAP_NOTE_EXPRESSION_PRESSURE);
     C(CLAP_NOTE_EXPRESSION_EXPRESSION);
+    
+    m_const.attr("MIDI_0_FREQ") = Tunings::MIDI_0_FREQ;
 
     py::class_<DejaVuRandom>(m, "DejaVuRandom")
         .def(py::init<unsigned int>())

@@ -24,6 +24,7 @@ include_directories(
     libs/sst-voicemanager/include
     libs/rtaudio
     libs/MTS-ESP/Master
+    libs/tuning-library/include
     C:/Users/teemu/AppData/Local/Programs/Python/Python312/include
 )
 

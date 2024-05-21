@@ -963,9 +963,80 @@ inline void test_no_juce_agraph()
     g->activate(44100.0, 512, 512);
 }
 
+class BlueNoise
+{
+  public:
+    BlueNoise() { m_previous = m_dist(m_rng); }
+    float operator()()
+    {
+        float maxdist = 0.0f;
+        float z0 = 0.0f;
+        for (int i = 0; i < m_depth; ++i)
+        {
+            float z1 = m_dist(m_rng);
+            float dist = std::abs(z1 - m_previous);
+            if (dist > maxdist)
+            {
+                maxdist = dist;
+                z0 = z1;
+            }
+        }
+        m_previous = z0;
+        return m_previous;
+    }
+    void setDepth(int d) { m_depth = std::clamp(d, 1, 32); }
+
+  private:
+    std::minstd_rand m_rng;
+    std::uniform_real_distribution<float> m_dist{0.0f, 1.0f};
+    float m_previous = 0.0f;
+    int m_depth = 4;
+};
+
+inline void test_bluenoise()
+{
+    choc::audio::AudioFileProperties outfileprops;
+    double outsr = 44100;
+    outfileprops.formatName = "WAV";
+    outfileprops.bitDepth = choc::audio::BitDepth::float32;
+    outfileprops.numChannels = 1;
+    outfileprops.sampleRate = outsr;
+    choc::audio::WAVAudioFileFormat<true> wavformat;
+    auto writer = wavformat.createWriter(
+        R"(C:\MusicAudio\sourcesamples\pedalboard\bluenoise01.wav)", outfileprops);
+    if (writer)
+    {
+
+        int outlen = 4 * outsr;
+        choc::buffer::ChannelArrayBuffer<float> buf(1, outlen);
+        BlueNoise bn;
+
+        int depth = 1;
+        xenakios::Envelope<64> env;
+        env.addPoint({0.0, 1.0});
+        env.addPoint({2.0, 16.0});
+        env.addPoint({2.01, 1.0});
+        env.addPoint({3.0, 1.0});
+        env.addPoint({4.0, 32.0});
+        env.sortPoints();
+        for (int i = 0; i < outlen; ++i)
+        {
+            if (i % 64 == 0)
+            {
+                env.processBlock(i / outsr, outsr, 2);
+                bn.setDepth(env.outputBlock[0]);
+            }
+
+            buf.getSample(0, i) = -0.5 + 1.0 * bn();
+        }
+        writer->appendFrames(buf.getView());
+    }
+}
+
 int main()
 {
-    test_no_juce_agraph();
+    test_bluenoise();
+    // test_no_juce_agraph();
     // test_env2();
     // test_clap_riff();
     // test_rtaudio();
