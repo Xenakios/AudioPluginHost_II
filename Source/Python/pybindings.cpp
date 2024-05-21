@@ -91,12 +91,12 @@ PYBIND11_MODULE(xenakios, m)
     
     m_const.attr("MIDI_0_FREQ") = Tunings::MIDI_0_FREQ;
 
-    py::class_<DejaVuRandom>(m, "DejaVuRandom")
+    py::class_<xenakios::DejaVuRandom>(m, "DejaVuRandom")
         .def(py::init<unsigned int>())
-        .def("setLoopLength", &DejaVuRandom::setLoopLength)
-        .def("setDejaVu", &DejaVuRandom::setDejaVu)
-        .def("nextFloat", &DejaVuRandom::nextFloatInRange)
-        .def("nextInt", &DejaVuRandom::nextIntInRange);
+        .def("setLoopLength", &xenakios::DejaVuRandom::setLoopLength)
+        .def("setDejaVu", &xenakios::DejaVuRandom::setDejaVu)
+        .def("nextFloat", &xenakios::DejaVuRandom::nextFloatInRange)
+        .def("nextInt", &xenakios::DejaVuRandom::nextIntInRange);
 
     py::class_<ClapProcessingEngine>(m, "ClapEngine")
         .def(py::init<const std::string &, int>())
