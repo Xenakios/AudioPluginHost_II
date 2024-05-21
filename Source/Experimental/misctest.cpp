@@ -998,9 +998,9 @@ class GoldenRatioNoise
 {
   public:
     GoldenRatioNoise() { m_x0 = m_dist(m_rng); }
-    double operator()() 
-    { 
-        double x1 = std::fmod(m_x0 + 0.618033988749, 1.0); 
+    double operator()()
+    {
+        double x1 = std::fmod(m_x0 + 0.618033988749, 1.0);
         m_x0 = x1;
         return m_x0;
     }
@@ -1009,6 +1009,30 @@ class GoldenRatioNoise
     double m_x0 = 0.0;
     std::minstd_rand m_rng;
     std::uniform_real_distribution<float> m_dist{0.0f, 1.0f};
+};
+
+using namespace sst::basic_blocks;
+
+class CorrelatedNoise
+{
+  public:
+    CorrelatedNoise()
+    {
+        randstate[0] = m_dist(m_rng);
+        randstate[1] = m_dist(m_rng);
+    }
+    float operator()()
+    {
+        return dsp::correlated_noise_o2mk2_supplied_value(randstate[0], randstate[1], m_corr,
+                                                          m_dist(m_rng));
+    }
+    void setCorrelation(float c) { m_corr = std::clamp(c, -1.0f, 1.0f); }
+
+  private:
+    float randstate[2] = {0.0f, 0.0f};
+    float m_corr = 0.0;
+    std::minstd_rand m_rng;
+    std::uniform_real_distribution<float> m_dist{-1.0f, 1.0f};
 };
 
 inline void test_bluenoise()
@@ -1030,14 +1054,13 @@ inline void test_bluenoise()
         BlueNoise bn;
         GoldenRatioNoise grn;
         xenakios::DejaVuRandom dvrand(6);
+        CorrelatedNoise corrnoise;
         int depth = 1;
         xenakios::Envelope<64> env;
-        env.addPoint({0.0, 0.0});
-        env.addPoint({3.0, 0.499});
-        env.addPoint({7.0, 0.499});
-        env.addPoint({7.1, 0.51});
-        env.addPoint({10.0, 0.51});
-        
+        env.addPoint({0.0, -1.0});
+        env.addPoint({5.0, 1.0});
+        env.addPoint({10.0, -1.0});
+
         env.sortPoints();
         dvrand.setLoopLength(256);
         dvrand.setDejaVu(0.4);
@@ -1048,9 +1071,11 @@ inline void test_bluenoise()
                 env.processBlock(i / outsr, outsr, 2);
                 bn.setDepth(env.outputBlock[0]);
                 dvrand.setDejaVu(env.outputBlock[0]);
+                corrnoise.setCorrelation(env.outputBlock[0]);
             }
 
-            buf.getSample(0, i) = -0.5 + 1.0 * dvrand.nextFloat();
+            // buf.getSample(0, i) = -0.5 + 1.0 * dvrand.nextFloat();
+            buf.getSample(0, i) = corrnoise() * 0.5;
         }
         writer->appendFrames(buf.getView());
     }
