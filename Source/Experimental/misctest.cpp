@@ -23,6 +23,7 @@
 #include "text/choc_Files.h"
 #include "RtAudio.h"
 #include "xaudiograph.h"
+#include "dejavurandom.h"
 
 class object_t
 {
@@ -993,6 +994,23 @@ class BlueNoise
     int m_depth = 4;
 };
 
+class GoldenRatioNoise
+{
+  public:
+    GoldenRatioNoise() { m_x0 = m_dist(m_rng); }
+    double operator()() 
+    { 
+        double x1 = std::fmod(m_x0 + 0.618033988749, 1.0); 
+        m_x0 = x1;
+        return m_x0;
+    }
+
+  private:
+    double m_x0 = 0.0;
+    std::minstd_rand m_rng;
+    std::uniform_real_distribution<float> m_dist{0.0f, 1.0f};
+};
+
 inline void test_bluenoise()
 {
     choc::audio::AudioFileProperties outfileprops;
@@ -1007,27 +1025,32 @@ inline void test_bluenoise()
     if (writer)
     {
 
-        int outlen = 4 * outsr;
+        int outlen = 10 * outsr;
         choc::buffer::ChannelArrayBuffer<float> buf(1, outlen);
         BlueNoise bn;
-
+        GoldenRatioNoise grn;
+        xenakios::DejaVuRandom dvrand(6);
         int depth = 1;
         xenakios::Envelope<64> env;
-        env.addPoint({0.0, 1.0});
-        env.addPoint({2.0, 16.0});
-        env.addPoint({2.01, 1.0});
-        env.addPoint({3.0, 1.0});
-        env.addPoint({4.0, 32.0});
+        env.addPoint({0.0, 0.0});
+        env.addPoint({3.0, 0.499});
+        env.addPoint({7.0, 0.499});
+        env.addPoint({7.1, 0.51});
+        env.addPoint({10.0, 0.51});
+        
         env.sortPoints();
+        dvrand.setLoopLength(256);
+        dvrand.setDejaVu(0.4);
         for (int i = 0; i < outlen; ++i)
         {
             if (i % 64 == 0)
             {
                 env.processBlock(i / outsr, outsr, 2);
                 bn.setDepth(env.outputBlock[0]);
+                dvrand.setDejaVu(env.outputBlock[0]);
             }
 
-            buf.getSample(0, i) = -0.5 + 1.0 * bn();
+            buf.getSample(0, i) = -0.5 + 1.0 * dvrand.nextFloat();
         }
         writer->appendFrames(buf.getView());
     }

@@ -11,11 +11,14 @@ inline Type maprange(Type sourceValue, Type sourceRangeMin, Type sourceRangeMax,
     return targetRangeMin + ((targetRangeMax - targetRangeMin) * (sourceValue - sourceRangeMin)) /
                                 (sourceRangeMax - sourceRangeMin);
 }
+namespace xenakios
+{
 
 class DejaVuRandom
 {
   private:
-    std::array<float, 32> m_state;
+    static constexpr size_t maxSlots = 256;
+    std::array<float, maxSlots> m_state;
     using UnderlyingEngine = std::minstd_rand0;
     UnderlyingEngine m_rng;
     int m_loop_index = 0;
@@ -30,7 +33,7 @@ class DejaVuRandom
         for (int i = 0; i < m_state.size(); ++i)
             m_state[i] = m_dist(m_rng);
     }
-    void setLoopLength(int len) { m_loop_len = std::clamp(len, 1, 32); }
+    void setLoopLength(int len) { m_loop_len = std::clamp(len, 1, (int)maxSlots); }
     void setDejaVu(float dv) { m_deja_vu = std::clamp(dv, 0.0f, 1.0f); }
     void setDejaVuEnabled(bool b) { m_deja_vu_enabled = b; }
     float nextFloatInRange(float minv, float maxv)
@@ -95,3 +98,4 @@ class DejaVuRandom
         return next;
     }
 };
+} // namespace xenakios
