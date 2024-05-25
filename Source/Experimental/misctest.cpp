@@ -1063,10 +1063,20 @@ inline void test_bluenoise()
         std::uniform_real_distribution<float> dist{0.0f, 1.0f};
         while (t < 10.0)
         {
-            seq.addParameterEvent(false, t, 0, 0, 0, -1, 1, dist(rng));
+            // seq.addParameterEvent(false, t, 0, 0, 0, -1, 1, dist(rng));
             t += 0.5;
         }
+        seq.addParameterEvent(false, 0.0, 0, 0, 0, -1, 1, 1.0);
+        seq.addParameterEvent(false, 1.0, 0, 0, 0, -1, 1, 1.0);
+        seq.addParameterEvent(false, 2.00, 0, 0, 0, -1, 1, 0.0);
+        seq.addParameterEvent(false, 3.00, 0, 0, 0, -1, 1, 0.0);
+        seq.addParameterEvent(false, 4.00, 0, 0, 0, -1, 1, 0.5);
+        seq.addParameterEvent(false, 5.00, 0, 0, 0, -1, 1, 0.0);
+        seq.addParameterEvent(false, 6.00, 0, 0, 0, -1, 1, 0.25);
+        seq.addParameterEvent(false, 7.00, 0, 0, 0, -1, 1, 0.0);
         sst::basic_blocks::dsp::SlewLimiter slew;
+        slew.setParams(250.0, 1.0, outsr);
+        
         
         ClapEventSequence::Iterator seqiter(seq);
         xenakios::Envelope<64> env;
@@ -1080,7 +1090,7 @@ inline void test_bluenoise()
         float corr = 0.0;
         float volume = -96.0;
         corrnoise.setCorrelation(0.0);
-        slew.setParams(250.0, 1.0, outsr);
+        
         for (int i = 0; i < outlen; ++i)
         {
             if (i % 64 == 0)
