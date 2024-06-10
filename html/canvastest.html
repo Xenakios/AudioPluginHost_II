@@ -16,14 +16,41 @@
                 this.canvas = canvas;
                 this.ctx = canvas.getContext("2d");
                 canvas.addEventListener('mousedown', (event) => {
-                    this.isdragging = true;
+                    var properCoords = this.getEventMousePosition(event);
+                    var hotcurve = this.getCurveIndexAtCoordinates(properCoords[0],properCoords[1]);
+                    this.hotCurve = hotcurve;
+                    if (hotcurve>=0)
+                    {
+                        this.startCoordX = properCoords[0];
+                        this.startCoordY = properCoords[1];
+                        this.isDragging = true;
+                        return;
+                    }
+                    this.isdrawing = true;
                     this.curveToAdd = new Array;
                     this.curveToAdd.push(this.getEventMousePosition(event));
+                    
                     this.draw();
                 });
                 canvas.addEventListener('mousemove', (event) => { 
                     var properCoords = this.getEventMousePosition(event);
-                    if (this.isdragging)
+                    if (this.isDragging && this.hotCurve >= 0)
+                    {
+                        var deltax = properCoords[0] - this.startCoordX;
+                        var deltay = properCoords[1] - this.startCoordY;
+                        // console.log("drag curve "+deltax+" "+deltay);
+                        const cur = this.curves[this.hotCurve];
+                        for (var i=0;i<cur.length;++i)
+                        {
+                            cur[i][0] += deltax;
+                            cur[i][1] += deltay;
+                        }
+                        this.startCoordX = properCoords[0];
+                        this.startCoordY = properCoords[1];
+                        this.draw();
+                        return;
+                    }
+                    if (this.isdrawing)
                     {
                         this.curveToAdd.push(properCoords);
                         this.draw();
@@ -40,11 +67,12 @@
                     }
                 });
                 canvas.addEventListener('mouseup', (event) => { 
-                    this.isdragging = false; 
+                    this.isdrawing = false; 
+                    this.isDragging = false;
                     this.curveToAdd = this.curveToAdd.sort((lhs,rhs) => lhs[0]-rhs[0]);
                     this.curves.push(this.curveToAdd);
-                    console.log("Added curve has "+this.curveToAdd.length+" points");
-                    console.log(this.curveToAdd[0][0]);
+                    // console.log("Added curve has "+this.curveToAdd.length+" points");
+                    // console.log(this.curveToAdd[0][0]);
                     this.draw();
                 });
 
@@ -92,7 +120,7 @@
             {
                 this.ctx.fillStyle = "black";
                 this.ctx.fillRect(0,0,this.canvas.width,this.canvas.height);
-                if (this.isdragging)
+                if (this.isdrawing)
                 {
                     this.ctx.strokeStyle = "green";
                     this.drawCurve(this.curveToAdd);
