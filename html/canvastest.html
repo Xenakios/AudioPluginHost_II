@@ -1,0 +1,115 @@
+<html>
+    <body>
+        <div id="curvecanvasdiv" >YYYYNNNGH </div>
+        
+    </body>
+    <script>
+        class CurvesCanvas {
+            constructor() 
+            {
+                var canvas = document.createElement('canvas');
+                // canvas.id = cid;
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
+                
+                canvas.style.border = "1px solid";
+                this.canvas = canvas;
+                this.ctx = canvas.getContext("2d");
+                canvas.addEventListener('mousedown', (event) => {
+                    this.isdragging = true;
+                    this.curveToAdd = new Array;
+                    this.curveToAdd.push(this.getEventMousePosition(event));
+                    this.draw();
+                });
+                canvas.addEventListener('mousemove', (event) => { 
+                    var properCoords = this.getEventMousePosition(event);
+                    if (this.isdragging)
+                    {
+                        this.curveToAdd.push(properCoords);
+                        this.draw();
+                    } else
+                    {
+                        var hotcurve = this.getCurveIndexAtCoordinates(properCoords[0],properCoords[1]);
+                        if (hotcurve!=this.hotCurve)
+                        {
+                            this.hotCurve = hotcurve;
+                            this.draw();
+                            
+                        }
+                            
+                    }
+                });
+                canvas.addEventListener('mouseup', (event) => { 
+                    this.isdragging = false; 
+                    this.curveToAdd = this.curveToAdd.sort((lhs,rhs) => lhs[0]-rhs[0]);
+                    this.curves.push(this.curveToAdd);
+                    console.log("Added curve has "+this.curveToAdd.length+" points");
+                    console.log(this.curveToAdd[0][0]);
+                    this.draw();
+                });
+
+                document.getElementById("curvecanvasdiv").appendChild(canvas);
+                this.curves = new Array;
+                this.draw();
+            }
+            getCurveIndexAtCoordinates(x,y)
+            {
+                for (var i=0;i<this.curves.length;++i)
+                {
+                    var pt = [this.curves[i][0][0],this.curves[i][0][1]];
+                    var x0 = pt[0] - 10;
+                    var y0 = pt[1] - 10;
+                    var x1 = pt[0] + 10;
+                    var y1 = pt[1] + 10;
+                    if (x>=x0 && x<x1 && y>y0 && y<y1)
+                    {
+                        return i;
+                    }
+                }
+                return -1;
+            }
+            getEventMousePosition(event)
+            {
+                return [event.clientX - this.canvas.offsetLeft, event.clientY - this.canvas.offsetTop];
+                
+            }
+            drawCurve(curv)
+            {
+                this.ctx.beginPath();
+                for (var j=0;j<curv.length;++j)
+                {
+                    if (j < 1)
+                    {
+                        this.ctx.moveTo(curv[j][0],curv[j][1]);
+                    } else
+                    {
+                        this.ctx.lineTo(curv[j][0],curv[j][1]);
+                    }
+                }
+                this.ctx.stroke();
+            }
+            draw()
+            {
+                this.ctx.fillStyle = "black";
+                this.ctx.fillRect(0,0,this.canvas.width,this.canvas.height);
+                if (this.isdragging)
+                {
+                    this.ctx.strokeStyle = "green";
+                    this.drawCurve(this.curveToAdd);
+                }
+                
+                for (var i = 0;i<this.curves.length;++i)
+                {
+                    if (i == this.hotCurve)
+                        this.ctx.strokeStyle = "red";
+                    else this.ctx.strokeStyle = "white";
+                    this.drawCurve(this.curves[i]);
+                }
+                
+                
+            }
+
+        }
+    curvecanvas = new CurvesCanvas;
+    </script>
+</html>
