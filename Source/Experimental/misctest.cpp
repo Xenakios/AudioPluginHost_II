@@ -1123,6 +1123,74 @@ inline void test_bluenoise()
     }
 }
 
+using ms = std::chrono::duration<double, std::milli>;
+using namespace std::chrono_literals;
+
+inline void generateSequenceFromScore(const choc::value::ValueView &score,
+                                      ClapEventSequence &sequence)
+{
+    using clock = std::chrono::system_clock;
+    const auto start_time = clock::now();
+    sequence.m_evlist.clear();
+    int noteid = 0;
+    double curvestart = 0.0;
+    double curve_end = 0.0;
+    for (const auto &curve : score)
+    {
+        if (curve.size() < 2)
+            continue;
+        double startNote = 0;
+        double timepos =
+            xenakios::mapvalue<double>(curve[0][0].get<double>(), 0.0, 1800.0, 0.0, 30.0);
+        curvestart = timepos;
+        double key = xenakios::mapvalue<double>(curve[0][1].get<double>(), 600.0, 0.0, 48.0, 72.0);
+        startNote = key;
+        sequence.addNoteOn(timepos, 0, 0, key, 1.0, noteid);
+        double endpos = curve[curve.size() - 1][0].get<double>();
+        endpos = xenakios::mapvalue<double>(endpos, 0.0, 1800.0, 0.0, 30.0);
+        sequence.addNoteOff(endpos, 0, 0, key, 1.0, noteid);
+        curve_end = endpos;
+
+        double tpos = curvestart;
+        int i = 0;
+        while (tpos < curve_end)
+        {
+            double x0 =
+                xenakios::mapvalue<double>(curve[i][0].get<double>(), 0.0, 1800.0, 0.0, 30.0);
+            double y0 =
+                xenakios::mapvalue<double>(curve[(int)i][1].get<double>(), 600.0, 0.0, 48.0, 72.0);
+            int nextIndex = i + 1;
+            if (nextIndex >= curve.size())
+                --nextIndex;
+            double x1 = xenakios::mapvalue<double>(curve[nextIndex][0].get<double>(), 0.0, 1800.0,
+                                                   0.0, 30.0);
+            double y1 = xenakios::mapvalue<double>(curve[(int)nextIndex][1].get<double>(), 600.0,
+                                                   0.0, 48.0, 72.0);
+
+            double outvalue = y0;
+            double xdiff = x1 - x0;
+            if (xdiff < 0.00001)
+                outvalue = y1;
+            else
+            {
+                double ydiff = y1 - y0;
+                outvalue = y0 + ydiff * ((1.0 / xdiff * (tpos - x0)));
+            }
+            double pitchDiff = outvalue - startNote;
+            sequence.addNoteExpression(tpos, 0, 0, startNote, noteid, CLAP_NOTE_EXPRESSION_TUNING,
+                                       pitchDiff);
+            tpos += 0.005;
+            if (tpos >= x1)
+                ++i;
+        }
+
+        ++noteid;
+    }
+    const ms duration = clock::now() - start_time;
+    std::cout << "finished generating sequence from score in " << duration.count() / 1000.0
+              << " seconds, " << sequence.getNumEvents() << " events" << std::endl;
+}
+
 inline void testWebviewCurveEditor()
 {
     choc::ui::setWindowsDPIAwareness(); // For Windows, we need to tell the OS we're high-DPI-aware
@@ -1139,78 +1207,23 @@ inline void testWebviewCurveEditor()
     choc::ui::WebView webview;
     webview.navigate(R"(C:\develop\AudioPluginHost_mk2\html\canvastest.html)");
     ClapEventSequence sequence;
-    webview.bind(
-        "onScoreChanged", [&sequence](const choc::value::ValueView &args) -> choc::value::Value {
-            int noteid = 0;
-            double curvestart = 0.0;
-            double curve_end = 0.0;
-            for (const auto &curve : args[0])
-            {
-                if (curve.size() < 2)
-                    continue;
-                double startNote = 0;
-                double timepos =
-                    xenakios::mapvalue<double>(curve[0][0].get<double>(), 0.0, 1800.0, 0.0, 30.0);
-                curvestart = timepos;
-                double key =
-                    xenakios::mapvalue<double>(curve[0][1].get<double>(), 600.0, 0.0, 48.0, 72.0);
-                startNote = key;
-                sequence.addNoteOn(timepos, 0, 0, key, 1.0, noteid);
-                double endpos = curve[curve.size() - 1][0].get<double>();
-                endpos = xenakios::mapvalue<double>(endpos, 0.0, 1800.0, 0.0, 30.0);
-                sequence.addNoteOff(endpos, 0, 0, key, 1.0, noteid);
-                curve_end = endpos;
-
-                double tpos = curvestart;
-                int i = 0;
-                while (tpos < curve_end)
-                {
-                    double x0 = xenakios::mapvalue<double>(curve[i][0].get<double>(), 0.0, 1800.0,
-                                                           0.0, 30.0);
-                    double y0 = xenakios::mapvalue<double>(curve[(int)i][1].get<double>(), 600.0,
-                                                           0.0, 48.0, 72.0);
-                    int nextIndex = i + 1;
-                    if (nextIndex >= curve.size())
-                        --nextIndex;
-                    double x1 = xenakios::mapvalue<double>(curve[nextIndex][0].get<double>(), 0.0,
-                                                           1800.0, 0.0, 30.0);
-                    double y1 = xenakios::mapvalue<double>(curve[(int)nextIndex][1].get<double>(),
-                                                           600.0, 0.0, 48.0, 72.0);
-
-                    double outvalue = x0;
-                    double xdiff = x1 - x0;
-                    if (xdiff < 0.00001)
-                        outvalue = y1;
-                    else
-                    {
-                        double ydiff = y1 - y0;
-                        outvalue = y0 + ydiff * ((1.0 / xdiff * (tpos - x0)));
-                    }
-                    double pitchDiff = outvalue - startNote;
-                    sequence.addNoteExpression(tpos, 0, 0, startNote, noteid,
-                                               CLAP_NOTE_EXPRESSION_TUNING, pitchDiff);
-                    tpos += 0.05;
-                    if (tpos >= x1)
-                        ++i;
-                }
-
-                ++noteid;
-            }
-
-            return choc::value::Value{};
-        });
+    webview.bind("onScoreChanged",
+                 [&sequence](const choc::value::ValueView &args) -> choc::value::Value {
+                     generateSequenceFromScore(args[0], sequence);
+                     return choc::value::Value{};
+                 });
     window.setContent(webview.getViewHandle());
     choc::messageloop::run();
     sequence.sortEvents();
     for (auto &e : sequence.m_evlist)
     {
-        std::cout << e.timestamp << " " << e.event.header.type << "\n";
+        // std::cout << e.timestamp << " " << e.event.header.type << "\n";
     }
 
     ClapProcessingEngine eng{R"(C:\Program Files\Common Files\CLAP\Surge Synth Team\Surge XT.clap)",
                              0};
     eng.setSequence(sequence);
-    eng.processToFile(R"(C:\develop\AudioPluginHost_mk2\audio\webview_xupic_offline01.wav)", 30.0,
+    eng.processToFile(R"(C:\develop\AudioPluginHost_mk2\audio\webview_xupic_offline02.wav)", 30.0,
                       44100.0);
 }
 
