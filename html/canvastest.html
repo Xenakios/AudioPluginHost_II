@@ -74,6 +74,7 @@
                     // console.log("Added curve has "+this.curveToAdd.length+" points");
                     // console.log(this.curveToAdd[0][0]);
                     this.draw();
+                    onScoreChanged(this.curves);
                 });
 
                 document.getElementById("curvecanvasdiv").appendChild(canvas);
@@ -139,5 +140,12 @@
 
         }
     curvecanvas = new CurvesCanvas;
+    function reportWindowSize() {
+        curvecanvas.canvas.width = window.innerWidth;
+        curvecanvas.canvas.height = window.innerHeight;
+        curvecanvas.draw();
+    }
+
+    window.onresize = reportWindowSize;
     </script>
 </html>
