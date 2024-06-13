@@ -32,8 +32,8 @@
                     this.hotCurve = hotcurve;
                     if (hotcurve>=0)
                     {
-                        this.startCoordX = properCoords[0];
-                        this.startCoordY = properCoords[1];
+                        this.startCoordX = properCoords.x;
+                        this.startCoordY = properCoords.y;
                         this.isDragging = true;
                         return;
                     }
@@ -96,11 +96,11 @@
             {
                 for (var i=0;i<this.curves.length;++i)
                 {
-                    var pt = [this.curves[i][0][0],this.curves[i][0][1]];
-                    var x0 = pt[0] - 10;
-                    var y0 = pt[1] - 10;
-                    var x1 = pt[0] + 10;
-                    var y1 = pt[1] + 10;
+                    var pt = this.curves[i][0];
+                    var x0 = pt.x - 10;
+                    var y0 = pt.y - 10;
+                    var x1 = pt.x + 10;
+                    var y1 = pt.y + 10;
                     if (x>=x0 && x<x1 && y>y0 && y<y1)
                     {
                         return i;
@@ -150,7 +150,7 @@
 
         }
     curvecanvas = new CurvesCanvas;
-    function reportWindowSize() {
+    function onWindowSized() {
         curvecanvas.canvas.width = window.innerWidth;
         curvecanvas.canvas.height = window.innerHeight;
         curvecanvas.draw();
@@ -161,6 +161,6 @@
         curvecanvas.draw();
         onScoreChanged(curvecanvas.curves,{scoreWidth:curvecanvas.canvas.width,scoreHeigth:curvecanvas.canvas.height});
     }
-    window.onresize = reportWindowSize;
+    window.onresize = onWindowSized;
     </script>
 </html>
