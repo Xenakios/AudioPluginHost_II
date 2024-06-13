@@ -85,7 +85,7 @@
                     // console.log("Added curve has "+this.curveToAdd.length+" points");
                     // console.log(this.curveToAdd[0][0]);
                     this.draw();
-                    onScoreChanged(this.curves);
+                    onScoreChanged(this.curves,{scoreWidth:this.canvas.width,scoreHeigth:this.canvas.height});
                 });
 
                 document.getElementById("curvecanvasdiv").appendChild(canvas);
@@ -159,7 +159,7 @@
     {
         curvecanvas.curves.length = 0;
         curvecanvas.draw();
-        onScoreChanged(curvecanvas.curves);
+        onScoreChanged(curvecanvas.curves,{scoreWidth:curvecanvas.canvas.width,scoreHeigth:curvecanvas.canvas.height});
     }
     window.onresize = reportWindowSize;
     </script>
