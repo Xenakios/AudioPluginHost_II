@@ -1141,12 +1141,12 @@ inline void generateSequenceFromScore(const choc::value::ValueView &score,
             continue;
         double startNote = 0;
         double timepos =
-            xenakios::mapvalue<double>(curve[0][0].get<double>(), 0.0, 1800.0, 0.0, 30.0);
+            xenakios::mapvalue<double>(curve[0]["x"].get<double>(), 0.0, 1800.0, 0.0, 30.0);
         curvestart = timepos;
-        double key = xenakios::mapvalue<double>(curve[0][1].get<double>(), 600.0, 0.0, 48.0, 72.0);
+        double key = xenakios::mapvalue<double>(curve[0]["y"].get<double>(), 600.0, 0.0, 48.0, 72.0);
         startNote = key;
         sequence.addNoteOn(timepos, 0, 0, key, 1.0, noteid);
-        double endpos = curve[curve.size() - 1][0].get<double>();
+        double endpos = curve[curve.size() - 1]["x"].get<double>();
         endpos = xenakios::mapvalue<double>(endpos, 0.0, 1800.0, 0.0, 30.0);
         sequence.addNoteOff(endpos, 0, 0, key, 1.0, noteid);
         curve_end = endpos;
@@ -1156,15 +1156,15 @@ inline void generateSequenceFromScore(const choc::value::ValueView &score,
         while (tpos < curve_end)
         {
             double x0 =
-                xenakios::mapvalue<double>(curve[i][0].get<double>(), 0.0, 1800.0, 0.0, 30.0);
+                xenakios::mapvalue<double>(curve[i]["x"].get<double>(), 0.0, 1800.0, 0.0, 30.0);
             double y0 =
-                xenakios::mapvalue<double>(curve[(int)i][1].get<double>(), 600.0, 0.0, 48.0, 72.0);
+                xenakios::mapvalue<double>(curve[(int)i]["y"].get<double>(), 600.0, 0.0, 48.0, 72.0);
             int nextIndex = i + 1;
             if (nextIndex >= curve.size())
                 --nextIndex;
-            double x1 = xenakios::mapvalue<double>(curve[nextIndex][0].get<double>(), 0.0, 1800.0,
+            double x1 = xenakios::mapvalue<double>(curve[nextIndex]["x"].get<double>(), 0.0, 1800.0,
                                                    0.0, 30.0);
-            double y1 = xenakios::mapvalue<double>(curve[(int)nextIndex][1].get<double>(), 600.0,
+            double y1 = xenakios::mapvalue<double>(curve[(int)nextIndex]["y"].get<double>(), 600.0,
                                                    0.0, 48.0, 72.0);
 
             double outvalue = y0;
@@ -1179,7 +1179,7 @@ inline void generateSequenceFromScore(const choc::value::ValueView &score,
             double pitchDiff = outvalue - startNote;
             sequence.addNoteExpression(tpos, 0, 0, startNote, noteid, CLAP_NOTE_EXPRESSION_TUNING,
                                        pitchDiff);
-            tpos += 0.005;
+            tpos += 0.05;
             if (tpos >= x1)
                 ++i;
         }
@@ -1214,11 +1214,9 @@ inline void testWebviewCurveEditor()
                  });
     window.setContent(webview.getViewHandle());
     choc::messageloop::run();
+    if (sequence.getNumEvents() == 0)
+        return;
     sequence.sortEvents();
-    for (auto &e : sequence.m_evlist)
-    {
-        // std::cout << e.timestamp << " " << e.event.header.type << "\n";
-    }
 
     ClapProcessingEngine eng{R"(C:\Program Files\Common Files\CLAP\Surge Synth Team\Surge XT.clap)",
                              0};
