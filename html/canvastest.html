@@ -1,7 +1,8 @@
 <html>
     <body>
         <div id="topbardiv">
-            <button onclick="clearScore()" type="button">Clear </button>
+            <button onclick="clearScore()" type="button">Clear</button>
+            <button onclick="generateTestScore()" type="button">Test Data</button>
         </div>
         <div id="curvecanvasdiv" > </div>
         
@@ -13,6 +14,13 @@
             {
                 this.x = xcor;
                 this.y = ycor;
+            }
+        }
+        class ScoreEvent
+        {
+            constructor()
+            {
+                
             }
         }
         class CurvesCanvas {
@@ -81,7 +89,8 @@
                     this.isdrawing = false; 
                     this.isDragging = false;
                     this.curveToAdd = this.curveToAdd.sort((lhs,rhs) => lhs.x-rhs.x);
-                    this.curves.push(this.curveToAdd);
+                    this.curves.push(Array.from(this.curveToAdd));
+                    // this.curveToAdd.length = 0;
                     // console.log("Added curve has "+this.curveToAdd.length+" points");
                     // console.log(this.curveToAdd[0][0]);
                     this.draw();
@@ -158,6 +167,24 @@
     function clearScore()
     {
         curvecanvas.curves.length = 0;
+        curvecanvas.draw();
+        onScoreChanged(curvecanvas.curves,{scoreWidth:curvecanvas.canvas.width,scoreHeigth:curvecanvas.canvas.height});
+    }
+    function generateTestScore()
+    {
+        curvecanvas.curves.length = 0;
+        for (var i=0;i<100;++i)
+        {
+            var curv = new Array;
+            var start_time = Math.random()*curvecanvas.canvas.width-50;
+            var end_time = start_time + 50.0;
+            var start_pitch = Math.random()*curvecanvas.canvas.height;
+            var end_pitch = start_pitch + -20.0+40.0*Math.random();
+            // console.log(start_time+" "+end_time+" "+pitch);
+            curv.push(new Point(start_time,start_pitch));
+            curv.push(new Point(end_time,end_pitch));
+            curvecanvas.curves.push(Array.from(curv));
+        }
         curvecanvas.draw();
         onScoreChanged(curvecanvas.curves,{scoreWidth:curvecanvas.canvas.width,scoreHeigth:curvecanvas.canvas.height});
     }
