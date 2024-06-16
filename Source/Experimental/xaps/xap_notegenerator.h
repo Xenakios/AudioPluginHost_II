@@ -9,14 +9,14 @@ class ClapEventSequencerProcessor : public XAPWithJuceGUI
 {
     static constexpr size_t numNoteGeneratorParams = 22;
     double m_sr = 1.0;
-    DejaVuRandom m_dvpitchrand;
-    DejaVuRandom m_dvtimerand;
-    DejaVuRandom m_dvchordrand;
-    DejaVuRandom m_dvvelorand;
-    DejaVuRandom m_dvexpr1rand;
-    DejaVuRandom m_dvexpr2rand;
+    xenakios::DejaVuRandom m_dvpitchrand;
+    xenakios::DejaVuRandom m_dvtimerand;
+    xenakios::DejaVuRandom m_dvchordrand;
+    xenakios::DejaVuRandom m_dvvelorand;
+    xenakios::DejaVuRandom m_dvexpr1rand;
+    xenakios::DejaVuRandom m_dvexpr2rand;
     static constexpr size_t numDejaVuGenerators = 6;
-    DejaVuRandom *m_dv_array[numDejaVuGenerators];
+    xenakios::DejaVuRandom *m_dv_array[numDejaVuGenerators];
     struct SimpleNoteEvent
     {
         SimpleNoteEvent() {}

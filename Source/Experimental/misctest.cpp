@@ -1200,12 +1200,7 @@ inline void generateSequenceFromScore(const choc::value::ValueView &score,
 inline void testWebviewCurveEditor()
 {
     choc::ui::setWindowsDPIAwareness(); // For Windows, we need to tell the OS we're high-DPI-aware
-
-    uint32_t pw = 0;
-    uint32_t ph = 0;
-
     choc::ui::DesktopWindow window({50, 50, (int)1800, (int)600});
-
     window.setResizable(true);
     window.setMinimumSize(200, 100);
     window.setMaximumSize(1920, 1080);

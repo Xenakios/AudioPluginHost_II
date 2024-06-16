@@ -30,6 +30,9 @@ include_directories(
 
 # for "reasons", this is still a console app even though a GUI app is built from it
 # we should have a separate real console app and a real GUI app
+
+add_subdirectory(libs/fmt)
+
 juce_add_console_app(MainHostApp
     PRODUCT_NAME "Console App Example") 
 juce_generate_juce_header(MainHostApp)
@@ -56,6 +59,7 @@ target_sources(MainHostApp
     
 target_compile_definitions(MainHostApp
 PRIVATE
+    NOJUCE=0
     # JUCE_WEB_BROWSER and JUCE_USE_CURL would be on by default, but you might not need them.
     JUCE_WEB_BROWSER=0  # If you remove this, add `NEEDS_WEB_BROWSER TRUE` to the `juce_add_console_app` call
     _USE_MATH_DEFINES=1
@@ -76,7 +80,7 @@ target_link_libraries(MainHostApp
 )    
 
 # add_subdirectory(libs/fmt EXCLUDE_FROM_ALL)
-# add_subdirectory(libs/fmt)
+
 # add_subdirectory(libs/rtaudio)
 project(cmaketest)
 add_subdirectory(libs/pybind11)

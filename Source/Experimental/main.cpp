@@ -864,7 +864,7 @@ class CPUHistory
             m_cpu_min = m_cpu_history[0];
             m_cpu_max = m_cpu_history[m_cpu_history_len - 1];
             m_cpu_history_pos = 0;
-        }    
+        }
     }
 };
 
@@ -873,7 +873,7 @@ class MainComponent : public juce::Component, public juce::Timer, public IHostEx
   public:
     void SayHello() override { m_log_ed.insertTextAtCaret("Hello from extension"); }
     void log(const char *msg) override { m_log_ed.insertTextAtCaret(msg); }
-    
+
     std::vector<std::unique_ptr<XapWindow>> m_xap_windows;
     juce::AudioDeviceManager m_aman;
     std::unique_ptr<XAPGraph> m_graph;
@@ -888,8 +888,7 @@ class MainComponent : public juce::Component, public juce::Timer, public IHostEx
     juce::TextEditor m_log_ed;
     juce::TextButton m_plug_test_but;
     std::unique_ptr<NodeGraphComponent> m_graph_component;
-    
-    
+
     CPUHistory m_cpu_history;
     void handleMessagesFromAudioThread()
     {
@@ -919,7 +918,7 @@ class MainComponent : public juce::Component, public juce::Timer, public IHostEx
     {
         handleMessagesFromAudioThread();
         // int usage = m_aman.getCpuUsage() * 100.0;
-        
+
         juce::String txt;
         if (m_graph && m_graph->m_last_touched_node)
         {
@@ -1022,7 +1021,7 @@ class MainComponent : public juce::Component, public juce::Timer, public IHostEx
     }
     MainComponent()
     {
-        
+
         xenakios::XapFactory::getInstance().scanClapPlugins();
         xenakios::XapFactory::getInstance().scanVST3Plugins();
         addAndMakeVisible(m_log_ed);
@@ -1450,7 +1449,7 @@ class GuiAppApplication : public juce::JUCEApplication
     std::unique_ptr<MainWindow> mainWindow;
 };
 
-#define TESTJUCEGUI 1
+#define TESTJUCEGUI 0
 
 #if TESTJUCEGUI
 
@@ -1526,11 +1525,13 @@ template <typename EventType> inline const EventType *clapDynCast(const clap_eve
             if constexpr (std::is_same_v<EventType, clap_event_midi>)
                 return reinterpret_cast<const clap_event_midi *>(e);
         }
+        /*
         if (e->type == CLAP_EVENT_TRIGGER)
         {
             if constexpr (std::is_same_v<EventType, clap_event_trigger>)
                 return reinterpret_cast<const clap_event_trigger *>(e);
         }
+        */
         if (e->type == CLAP_EVENT_TRANSPORT)
         {
             if constexpr (std::is_same_v<EventType, clap_event_transport>)
@@ -1644,7 +1645,14 @@ void test_filter()
 
 int main()
 {
-    test_filter();
+    auto coeffs =
+        juce::dsp::FilterDesign<float>::designIIRLowpassHighOrderButterworthMethod(3200, 48000, 3);
+    jassert(coeffs.size() == 2);
+    ReferenceCountedObjectPtr<juce::dsp::IIR::Coefficients<float>> somePtr = coeffs[0];
+    auto filterOne = juce::dsp::IIR::Filter<float>(somePtr);
+    ReferenceCountedObjectPtr<juce::dsp::IIR::Coefficients<float>> anotherPtr = coeffs[1];
+    auto filterTwo = juce::dsp::IIR::Filter<float>(anotherPtr);
+    // test_filter();
     // test_polym();
     // test_keyvaluemap<KeyValueTable<clap_id, clap_param_info>>(1000000, "custom kvmap");
     // test_keyvaluemap<std::unordered_map<clap_id, clap_param_info>>(1000000,

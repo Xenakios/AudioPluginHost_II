@@ -4,6 +4,7 @@
 #include "containers/choc_NonAllocatingStableSort.h"
 #if !NOJUCE
 #include "xapfactory.h"
+#include "JuceHeader.h"
 #endif
 #include <unordered_set>
 #include <iostream>
@@ -288,7 +289,9 @@ class XAPNode
     std::unordered_map<clap_id, double> modulationSums;
     bool modulationWasApplied = false;
     std::unordered_map<clap_id, clap_param_info> parameterInfos;
-    // juce::Rectangle<int> nodeSceneBounds;
+#if !NOJUCE
+    juce::Rectangle<int> nodeSceneBounds;
+#endif
 };
 
 inline int findPinIndex(XAPNode *node, XAPNode::ConnectionType type, bool isInput, int port,
