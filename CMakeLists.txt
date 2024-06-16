@@ -25,7 +25,7 @@ include_directories(
     libs/rtaudio
     libs/MTS-ESP/Master
     libs/tuning-library/include
-    C:/Users/teemu/AppData/Local/Programs/Python/Python312/include
+    
 )
 
 # for "reasons", this is still a console app even though a GUI app is built from it
