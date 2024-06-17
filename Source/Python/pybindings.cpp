@@ -45,6 +45,19 @@ class MTSESPSource
             MTS_SetNoteTuning(hz, midikey);
         }
     }
+    void setNoteTuningMap(std::unordered_map<int, double> tunmap)
+    {
+        for (const auto &e : tunmap)
+        {
+            if (e.first >= 0 && e.first < 128)
+            {
+                if (e.second >= 0.0 && e.second < 20000.0)
+                {
+                    MTS_SetNoteTuning(e.second, e.first);
+                }
+            }
+        }
+    }
 
   private:
 };
@@ -58,6 +71,7 @@ PYBIND11_MODULE(xenakios, m)
 
     py::class_<MTSESPSource>(m, "MTS_Source")
         .def(py::init<>())
+        .def("setNoteTuningMap", &MTSESPSource::setNoteTuningMap)
         .def("setNoteTuning", &MTSESPSource::setNoteTuning);
 
     py::class_<ClapEventSequence>(m, "ClapSequence")
@@ -88,7 +102,7 @@ PYBIND11_MODULE(xenakios, m)
     C(CLAP_NOTE_EXPRESSION_BRIGHTNESS);
     C(CLAP_NOTE_EXPRESSION_PRESSURE);
     C(CLAP_NOTE_EXPRESSION_EXPRESSION);
-    
+
     m_const.attr("MIDI_0_FREQ") = Tunings::MIDI_0_FREQ;
 
     py::class_<xenakios::DejaVuRandom>(m, "DejaVuRandom")
