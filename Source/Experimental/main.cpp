@@ -1643,15 +1643,46 @@ void test_filter()
     std::cout << duplicator.state->getRawCoefficients() << "\n";
 }
 
+class MyHost
+{
+  public:
+    MyHost()
+    {
+        pluginmanager.addDefaultFormats();
+        // the single .vst3 file may have multiple plugin types, so we need to deal with an array
+        // of PluginDescriptions
+        juce::OwnedArray<juce::PluginDescription> descs;
+        juce::VST3PluginFormat v3format;
+        v3format.findAllTypesForFile(descs,
+                                     R"(C:\Program Files\Common Files\VST3\mda-vst3.vst3\Contents\x86_64-win\mda-vst3.vst3)");
+        if (descs.size() > 0)
+        {
+            for (int i = 0; i < descs.size(); ++i)
+            {
+                std::cout << i << "\t" << descs[i]->descriptiveName << "\n";
+            }
+            juce::String error;
+            plugin_instance = pluginmanager.createPluginInstance(*descs[0], 44100, 512, error);
+            if (!plugin_instance)
+            {
+                std::cout << error << "\n";
+            }
+            else
+            {
+                std::cout << "created " << descs[0]->descriptiveName << "\n";
+            }
+        }
+    }
+
+  private:
+    juce::AudioPluginFormatManager pluginmanager;
+    std::unique_ptr<juce::AudioPluginInstance> plugin_instance;
+};
+
 int main()
 {
-    auto coeffs =
-        juce::dsp::FilterDesign<float>::designIIRLowpassHighOrderButterworthMethod(3200, 48000, 3);
-    jassert(coeffs.size() == 2);
-    ReferenceCountedObjectPtr<juce::dsp::IIR::Coefficients<float>> somePtr = coeffs[0];
-    auto filterOne = juce::dsp::IIR::Filter<float>(somePtr);
-    ReferenceCountedObjectPtr<juce::dsp::IIR::Coefficients<float>> anotherPtr = coeffs[1];
-    auto filterTwo = juce::dsp::IIR::Filter<float>(anotherPtr);
+    juce::ScopedJuceInitialiser_GUI gi;
+    MyHost host;
     // test_filter();
     // test_polym();
     // test_keyvaluemap<KeyValueTable<clap_id, clap_param_info>>(1000000, "custom kvmap");

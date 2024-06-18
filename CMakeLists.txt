@@ -19,7 +19,6 @@ include_directories(
     libs/fmt/include
     libs/sst-jucegui/include
     libs/concurrentqueue
-    libs/WDL
     libs/pybind11/include
     libs/sst-voicemanager/include
     libs/rtaudio
@@ -46,7 +45,7 @@ target_sources(MainHostApp
         Source/Experimental/xaps/fileplayer_xaudioprocessor.cpp
         Source/Experimental/xaps/clap_xaudioprocessor.cpp
         Source/Experimental/xaudioprocessor.cpp
-        Source/Experimental/wdl_resampler_adapter.cpp
+        
         
         libs/sst-jucegui/src/sst/jucegui/components/Knob.cpp
         libs/sst-jucegui/src/sst/jucegui/components/HSlider.cpp
@@ -54,7 +53,7 @@ target_sources(MainHostApp
         libs/sst-jucegui/src/sst/jucegui/components/ComponentBase.cpp
         libs/sst-jucegui/src/sst/jucegui/style/StyleSheet.cpp
         libs/sst-jucegui/src/sst/jucegui/style/StyleAndSettingsConsumer.cpp
-        libs/WDL/WDL/resample.cpp
+        
         )
     
 target_compile_definitions(MainHostApp
