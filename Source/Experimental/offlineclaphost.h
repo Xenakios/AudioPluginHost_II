@@ -612,7 +612,7 @@ class ClapProcessingEngine
     }
     std::string getParameterInfoString(size_t chainIndex, size_t index);
 
-    void saveStateToFile(const std::filesystem::path &filepath);
+    void saveStateToFile(size_t chainIndex, const std::filesystem::path &filepath);
     void loadStateFromFile(const std::filesystem::path &filepath);
     std::string m_stateFileToLoad;
     void enqueueStateFile(std::string filename) { m_stateFileToLoad = filename; }

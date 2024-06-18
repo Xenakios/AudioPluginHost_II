@@ -347,11 +347,11 @@ void ClapProcessingEngine::processToFile(std::string filename, double duration, 
     }
 }
 
-void ClapProcessingEngine::saveStateToFile(const std::filesystem::path &filepath)
+void ClapProcessingEngine::saveStateToFile(size_t chainIndex, const std::filesystem::path &filepath)
 {
-    /*
-    if (!m_plug)
-        throw std::runtime_error("No plugin instance");
+    if (chainIndex >= m_chain.size())
+        throw std::runtime_error("Chain index out of bounds");
+    auto m_plug = m_chain[chainIndex]->m_proc.get();
     clap_plugin_descriptor desc;
     if (m_plug->getDescriptor(&desc))
     {
@@ -383,7 +383,6 @@ void ClapProcessingEngine::saveStateToFile(const std::filesystem::path &filepath
     else
         throw std::runtime_error(
             "Can not store state of plugin that doesn't implement plugin descriptor");
-    */
 }
 
 void ClapProcessingEngine::loadStateFromFile(const std::filesystem::path &filepath)
