@@ -3,7 +3,7 @@
 
 using namespace std::chrono_literals;
 
-ClapProcessingEngine::ClapProcessingEngine(std::string plugfilename, int plugindex)
+ClapProcessingEngine::ClapProcessingEngine()
 {
 
     m_to_plugin_thread_fifo.reset(64);
@@ -14,8 +14,8 @@ ClapProcessingEngine::ClapProcessingEngine(std::string plugfilename, int plugind
 
         Message msg;
         msg.op = Message::Op::CreatePlugin;
-        msg.action = plugfilename;
-        msg.idata = plugindex;
+        // msg.action = plugfilename;
+        // msg.idata = plugindex;
         m_to_plugin_thread_fifo.push(msg);
         m_plugin_thread = std::make_unique<std::thread>([this]() {
             std::cout << "start plugin thread\n";
@@ -32,12 +32,13 @@ ClapProcessingEngine::ClapProcessingEngine(std::string plugfilename, int plugind
                     if (msg.op == Message::Op::DestroyPlugin)
                     {
                         std::cout << "Message::Op::DestroyPlugin\n";
-                        m_plug = nullptr;
+                        // m_plug = nullptr;
                         return;
                     }
                     if (msg.op == Message::Op::CreatePlugin)
                     {
                         std::cout << "Message::Op::CreatePlugin\n";
+                        /*
                         m_plug = std::make_unique<ClapPluginFormatProcessor>(msg.action, msg.idata);
                         if (m_plug)
                         {
@@ -52,6 +53,7 @@ ClapProcessingEngine::ClapProcessingEngine(std::string plugfilename, int plugind
                             m_from_plugin_thread_fifo.push(omsg);
                             return;
                         }
+                        */
                     }
                 }
                 std::this_thread::sleep_for(10ms);
@@ -64,6 +66,7 @@ ClapProcessingEngine::ClapProcessingEngine(std::string plugfilename, int plugind
     else
     {
         // ClapPluginFormatProcessor::mainthread_id() = std::this_thread::get_id();
+        /*
         m_plug = std::make_unique<ClapPluginFormatProcessor>(plugfilename, plugindex);
         if (m_plug)
         {
@@ -75,6 +78,40 @@ ClapProcessingEngine::ClapProcessingEngine(std::string plugfilename, int plugind
         }
         else
             throw std::runtime_error("Could not create CLAP plugin");
+        */
+    }
+}
+
+void ClapProcessingEngine::addProcessorToChain(std::string plugfilename, int pluginindex)
+{
+    auto plug = std::make_unique<ClapPluginFormatProcessor>(plugfilename, pluginindex);
+    if (plug)
+    {
+        auto chainEntry = std::make_unique<ProcessorEntry>();
+        clap_plugin_descriptor desc;
+        if (plug->getDescriptor(&desc))
+        {
+            std::cout << "created : " << desc.name << "\n";
+            chainEntry->name = desc.name;
+        }
+        chainEntry->m_proc = std::move(plug);
+        m_chain.push_back(std::move(chainEntry));
+    }
+    else
+    {
+        throw std::runtime_error("Could not create CLAP plugin");
+    }
+}
+
+void ClapProcessingEngine::removeProcessorFromChain(int index)
+{
+    if (index >= 0 && index < m_chain.size())
+    {
+        m_chain.erase(m_chain.begin() + index);
+    }
+    else
+    {
+        throw std::runtime_error("Processor index out of range");
     }
 }
 
@@ -97,10 +134,10 @@ void ClapProcessingEngine::processMessagesFromPluginBlocking()
             if (imsg.op == Message::Op::CreationSucceeded)
             {
                 clap_plugin_descriptor desc;
-                if (m_plug->getDescriptor(&desc))
-                {
-                    std::cout << "created : " << desc.name << "\n";
-                }
+                // if (m_plug->getDescriptor(&desc))
+                //{
+                //     std::cout << "created : " << desc.name << "\n";
+                // }
                 return;
             }
         }
@@ -167,19 +204,29 @@ std::string ClapProcessingEngine::scanPluginFile(std::filesystem::path plugfilep
 void ClapProcessingEngine::processToFile(std::string filename, double duration, double samplerate)
 {
     using namespace std::chrono_literals;
-    m_seq.sortEvents();
+
     int procblocksize = 64;
     std::atomic<bool> renderloopfinished{false};
-    m_plug->activate(samplerate, procblocksize, procblocksize);
-    // std::this_thread::sleep_for(1000ms);
-    if (!m_plug->renderSetMode(CLAP_RENDER_OFFLINE))
-        std::cout << "was not able to set offline render mode\n";
+    for (auto &c : m_chain)
+    {
+        c->m_seq.sortEvents();
+        if (!c->m_proc->activate(samplerate, procblocksize, procblocksize))
+            std::cout << "could not activate " << c->name << "\n";
+        if (!c->m_proc->renderSetMode(CLAP_RENDER_OFFLINE))
+            std::cout << "was not able to set offline render mode for " << c->name << "\n";
+    }
+
     // if (!m_stateFileToLoad.empty())
     //     loadStateFromFile(m_stateFileToLoad);
     //  even offline, do the processing in another another thread because things
     //  can get complicated with plugins like Surge XT because of the thread checks
     std::thread th([&] {
-        ClapEventSequence::Iterator eviter(m_seq);
+        std::vector<ClapEventSequence::Iterator> eviters;
+        for (auto &p : m_chain)
+        {
+            eviters.emplace_back(p->m_seq);
+        }
+
         clap_process cp;
         memset(&cp, 0, sizeof(clap_process));
         cp.frames_count = procblocksize;
@@ -220,8 +267,11 @@ void ClapProcessingEngine::processToFile(std::string filename, double duration, 
         clap::helpers::EventList list_out;
         cp.in_events = list_in.clapInputEvents();
         cp.out_events = list_out.clapOutputEvents();
+        for (auto &p : m_chain)
+        {
+            p->m_proc->startProcessing();
+        }
 
-        m_plug->startProcessing();
         int outcounter = 0;
         int outlensamples = duration * samplerate;
         choc::audio::AudioFileProperties outfileprops;
@@ -231,7 +281,7 @@ void ClapProcessingEngine::processToFile(std::string filename, double duration, 
         outfileprops.sampleRate = samplerate;
         choc::audio::WAVAudioFileFormat<true> wavformat;
         auto writer = wavformat.createWriter(filename, outfileprops);
-        eviter.setTime(0.0);
+        // eviter.setTime(0.0);
         int blockcount = 0;
         using clock = std::chrono::system_clock;
         using ms = std::chrono::duration<double, std::milli>;
@@ -239,23 +289,26 @@ void ClapProcessingEngine::processToFile(std::string filename, double duration, 
         using namespace std::chrono_literals;
         while (outcounter < outlensamples)
         {
-            auto blockevts = eviter.readNextEvents(procblocksize / samplerate);
-            for (auto &e : blockevts)
-            {
-                auto ecopy = e.event;
-                ecopy.header.time = (e.timestamp * samplerate) - outcounter;
-                list_in.push((const clap_event_header *)&ecopy);
-                // if (ecopy.header.type == CLAP_EVENT_MIDI)
-                //     std::this_thread::sleep_for(500ms);
-                //  std::cout << "sent event type " << e.event.header.type << " at samplepos "
-                //            << outcounter + ecopy.header.time << "\n";
-            }
-
-            auto status = m_plug->process(&cp);
-            if (status == CLAP_PROCESS_ERROR)
-                throw std::runtime_error("Clap processing failed");
-            list_out.clear();
             list_in.clear();
+            list_out.clear();
+            for (size_t i = 0; i < m_chain.size(); ++i)
+            {
+
+                auto blockevts = eviters[i].readNextEvents(procblocksize / samplerate);
+                for (auto &e : blockevts)
+                {
+                    auto ecopy = e.event;
+                    ecopy.header.time = (e.timestamp * samplerate) - outcounter;
+                    list_in.push((const clap_event_header *)&ecopy);
+                }
+
+                auto status = m_chain[i]->m_proc->process(&cp);
+                if (status == CLAP_PROCESS_ERROR)
+                    throw std::runtime_error("Clap processing failed");
+                list_in.clear();
+                list_out.clear();
+                choc::buffer::copy(inputbuffer, outputbuffer);
+            }
             uint32_t framesToWrite = std::min(outlensamples - outcounter, procblocksize);
             auto writeSectionView =
                 outputbuffer.getSection(choc::buffer::ChannelRange{0, 2}, {0, framesToWrite});
@@ -266,7 +319,11 @@ void ClapProcessingEngine::processToFile(std::string filename, double duration, 
             outcounter += procblocksize;
         }
         const ms duration = clock::now() - start_time;
-        m_plug->stopProcessing();
+        for (auto &p : m_chain)
+        {
+            p->m_proc->stopProcessing();
+        }
+
         writer->flush();
         std::cout << "finished in " << duration.count() / 1000.0 << " seconds\n";
         renderloopfinished = true;
@@ -275,15 +332,22 @@ void ClapProcessingEngine::processToFile(std::string filename, double duration, 
     // fake event loop to flush the on main thread requests from the plugin
     while (!renderloopfinished)
     {
-        m_plug->runMainThreadTasks();
+        for (auto &p : m_chain)
+        {
+            p->m_proc->runMainThreadTasks();
+        }
         std::this_thread::sleep_for(5ms);
     }
     th.join();
-    m_plug->deactivate();
+    for (auto &p : m_chain)
+    {
+        p->m_proc->deactivate();
+    }
 }
 
 void ClapProcessingEngine::saveStateToFile(const std::filesystem::path &filepath)
 {
+    /*
     if (!m_plug)
         throw std::runtime_error("No plugin instance");
     clap_plugin_descriptor desc;
@@ -317,10 +381,12 @@ void ClapProcessingEngine::saveStateToFile(const std::filesystem::path &filepath
     else
         throw std::runtime_error(
             "Can not store state of plugin that doesn't implement plugin descriptor");
+    */
 }
 
 void ClapProcessingEngine::loadStateFromFile(const std::filesystem::path &filepath)
 {
+    /*
     if (!m_plug)
         throw std::runtime_error("No plugin instance");
     auto str = choc::file::loadFileAsString(filepath.string());
@@ -365,10 +431,12 @@ void ClapProcessingEngine::loadStateFromFile(const std::filesystem::path &filepa
     }
     else
         throw std::runtime_error("File is not json with a plugin_id");
+    */
 }
 
 void ClapProcessingEngine::openPluginGUIBlocking()
 {
+#ifdef FOO999
     // m_plug->mainthread_id() = std::this_thread::get_id();
     choc::ui::setWindowsDPIAwareness(); // For Windows, we need to tell the OS we're
                                         // high-DPI-aware
@@ -403,12 +471,14 @@ void ClapProcessingEngine::openPluginGUIBlocking()
     });
     choc::messageloop::run();
     m_plug->deactivate();
+#endif
 }
 
-std::string ClapProcessingEngine::getParameterInfoString(size_t index)
+std::string ClapProcessingEngine::getParameterInfoString(size_t chainIndex, size_t index)
 {
     std::string result;
     result.reserve(128);
+    auto m_plug = m_chain[chainIndex]->m_proc.get();
     if (index >= 0 && m_plug->paramsCount())
     {
         clap_param_info pinfo;

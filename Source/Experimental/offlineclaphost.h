@@ -530,9 +530,15 @@ class MultiModulator
 
 class ClapProcessingEngine
 {
-    std::unique_ptr<ClapPluginFormatProcessor> m_plug;
 
   public:
+    struct ProcessorEntry
+    {
+        std::unique_ptr<ClapPluginFormatProcessor> m_proc;
+        ClapEventSequence m_seq;
+        std::string name;
+    };
+    std::vector<std::unique_ptr<ProcessorEntry>> m_chain;
     struct Message
     {
         enum class Op
@@ -552,17 +558,20 @@ class ClapProcessingEngine
     };
     choc::fifo::SingleReaderSingleWriterFIFO<Message> m_to_plugin_thread_fifo;
     choc::fifo::SingleReaderSingleWriterFIFO<Message> m_from_plugin_thread_fifo;
-    ClapEventSequence m_seq;
+
     std::unique_ptr<std::thread> m_plugin_thread;
     void processMessagesFromPluginBlocking();
-    void setSequence(ClapEventSequence seq)
+    void setSequence(int targetProcessorIndex, ClapEventSequence seq)
     {
-        m_seq = seq;
-        // m_seq.m_evlist.sortEvents();
+        if (targetProcessorIndex >= 0 && targetProcessorIndex < m_chain.size())
+        {
+            seq.sortEvents();
+            m_chain[targetProcessorIndex]->m_seq = seq;
+        }
     }
     static std::vector<std::filesystem::path> scanPluginDirectories();
     static std::string scanPluginFile(std::filesystem::path plugfilename);
-    ClapProcessingEngine(std::string plugfilename, int plugindex);
+    ClapProcessingEngine();
     ~ClapProcessingEngine()
     {
         Message msg;
@@ -573,8 +582,11 @@ class ClapProcessingEngine
             m_plugin_thread->join();
         }
     }
-    std::map<std::string, clap_id> getParameters()
+    void addProcessorToChain(std::string plugfilename, int pluginindex);
+    void removeProcessorFromChain(int index);
+    std::map<std::string, clap_id> getParameters(size_t chainIndex)
     {
+        auto m_plug = m_chain[chainIndex]->m_proc.get();
         std::map<std::string, clap_id> result;
         for (size_t i = 0; i < m_plug->paramsCount(); ++i)
         {
@@ -586,8 +598,11 @@ class ClapProcessingEngine
         }
         return result;
     }
-    size_t getNumParameters() { return m_plug->paramsCount(); }
-    std::string getParameterInfoString(size_t index);
+    size_t getNumParameters(size_t chainIndex)
+    {
+        return m_chain[chainIndex]->m_proc->paramsCount();
+    }
+    std::string getParameterInfoString(size_t chainIndex, size_t index);
 
     void saveStateToFile(const std::filesystem::path &filepath);
     void loadStateFromFile(const std::filesystem::path &filepath);
@@ -601,6 +616,7 @@ class ClapProcessingEngine
     std::unique_ptr<choc::ui::DesktopWindow> m_desktopwindow;
     void openPersistentWindow(std::string title)
     {
+#ifdef FOO17373
         std::thread th([this, title]() {
             OleInitialize(nullptr);
             // m_plug->mainthread_id() = std::this_thread::get_id();
@@ -653,5 +669,6 @@ class ClapProcessingEngine
             OleUninitialize();
         });
         th.detach();
+#endif
     }
 };
