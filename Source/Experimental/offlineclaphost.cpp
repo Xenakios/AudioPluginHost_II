@@ -239,6 +239,7 @@ void ClapProcessingEngine::processToFile(std::string filename, double duration, 
         inbufs[0].latency = 0;
         auto ichansdata = inputbuffer.getView().data.channels;
         inbufs[0].data32 = (float **)ichansdata;
+        inbufs[0].data64 = nullptr;
         cp.audio_inputs = inbufs;
 
         cp.audio_outputs_count = 1;
@@ -250,6 +251,7 @@ void ClapProcessingEngine::processToFile(std::string filename, double duration, 
         outbufs[0].latency = 0;
         auto chansdata = outputbuffer.getView().data.channels;
         outbufs[0].data32 = (float **)chansdata;
+        outbufs[0].data64 = nullptr;
         cp.audio_outputs = outbufs;
 
         clap_event_transport transport;

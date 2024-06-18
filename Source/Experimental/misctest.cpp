@@ -1222,8 +1222,31 @@ inline void test_chained_offline()
     ClapProcessingEngine eng;
     eng.addProcessorToChain(R"(C:\Program Files\Common Files\CLAP\Surge Synth Team\Surge XT.clap)",
                             0);
+    eng.addProcessorToChain(R"(C:\Program Files\Common Files\CLAP\Airwindows Consolidated.clap)",
+                            0);
+    auto pars = eng.getParameters(1);
+    for (auto &p : pars)
+        std::cout << p.first << " " << p.second << "\n";
     eng.m_chain[0]->m_seq.addNote(0.0, 2.0, 0, 0, 60, 0, 1.0, 0.0);
-    eng.processToFile(R"(C:\develop\AudioPluginHost_mk2\audio\chain_offline_01.wav)", 5.0,
+    eng.m_chain[0]->m_seq.addNote(0.1, 2.0, 0, 0, 65, 0, 1.0, 0.0);
+    eng.m_chain[0]->m_seq.addNote(2.0, 2.0, 0, 0, 67, 0, 1.0, 0.0);
+    eng.m_chain[0]->m_seq.addNote(2.1, 2.0, 0, 0, 72, 0, 1.0, 0.0);
+    eng.m_chain[0]->m_seq.addNote(4.0, 2.0, 0, 0, 74, 0, 1.0, 0.0);
+    eng.m_chain[0]->m_seq.addNote(4.1, 5.0, 0, 0, 79, 0, 1.0, 0.0);
+    xenakios::Envelope mixenv;
+    mixenv.addPoint({0.0, 0.0});
+    mixenv.addPoint({5.0, 1.0});
+    mixenv.addPoint({10.0, 0.0});
+    mixenv.sortPoints();
+    double t = 0.0;
+    while (t < 16.0)
+    {
+        double parval = mixenv.getValueAtPosition(t);
+        eng.m_chain[1]->m_seq.addParameterEvent(false, t, 0, 0, 0, 0, 2944917344, parval);
+        t += 0.1;
+    }
+
+    eng.processToFile(R"(C:\develop\AudioPluginHost_mk2\audio\chain_offline_02.wav)", 16.0,
                       44100.0);
 }
 
