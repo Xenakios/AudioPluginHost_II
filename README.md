@@ -5,5 +5,5 @@ new application instead, because of the massive changes needed all around for ev
 to support Clap plugins. 
 
 This is currently completely non-functional for end users. Hopefully some sort of
-working alpha/beta version will be ready during 2023.
+working alpha/beta version will be ready before 2025.
 
