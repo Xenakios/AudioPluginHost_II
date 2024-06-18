@@ -1236,7 +1236,7 @@ inline void test_chained_offline()
     xenakios::Envelope mixenv;
     mixenv.addPoint({0.0, 0.0});
     mixenv.addPoint({5.0, 1.0});
-    mixenv.addPoint({10.0, 0.0});
+    mixenv.addPoint({16.0, 0.0});
     mixenv.sortPoints();
     double t = 0.0;
     while (t < 16.0)

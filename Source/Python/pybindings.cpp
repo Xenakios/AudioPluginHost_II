@@ -113,7 +113,8 @@ PYBIND11_MODULE(xenakios, m)
         .def("nextInt", &xenakios::DejaVuRandom::nextIntInRange);
 
     py::class_<ClapProcessingEngine>(m, "ClapEngine")
-        .def(py::init<const std::string &, int>())
+        .def(py::init<>())
+        .def("addPlugin",&ClapProcessingEngine::addProcessorToChain)
         .def_static("scanPluginFile", &ClapProcessingEngine::scanPluginFile)
         .def_static("scanPluginDirs", &ClapProcessingEngine::scanPluginDirectories)
         .def("setSequence", &ClapProcessingEngine::setSequence)
