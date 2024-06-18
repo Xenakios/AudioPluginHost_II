@@ -539,28 +539,7 @@ class ClapProcessingEngine
         std::string name;
     };
     std::vector<std::unique_ptr<ProcessorEntry>> m_chain;
-    struct Message
-    {
-        enum class Op
-        {
-            CreatePlugin,
-            CreationFailed,
-            CreationSucceeded,
-            DestroyPlugin,
-            ShowGUI,
-            EndThread
-        };
-        Op op;
-        std::string action;
-        int idata = 0;
-        Message() {}
-        Message(std::string act) : action(act) {}
-    };
-    choc::fifo::SingleReaderSingleWriterFIFO<Message> m_to_plugin_thread_fifo;
-    choc::fifo::SingleReaderSingleWriterFIFO<Message> m_from_plugin_thread_fifo;
 
-    std::unique_ptr<std::thread> m_plugin_thread;
-    void processMessagesFromPluginBlocking();
     void setSequence(int targetProcessorIndex, ClapEventSequence seq)
     {
         if (targetProcessorIndex >= 0 && targetProcessorIndex < m_chain.size())
@@ -572,21 +551,13 @@ class ClapProcessingEngine
     static std::vector<std::filesystem::path> scanPluginDirectories();
     static std::string scanPluginFile(std::filesystem::path plugfilename);
     ClapProcessingEngine();
-    ~ClapProcessingEngine()
-    {
-        Message msg;
-        msg.op = Message::Op::DestroyPlugin;
-        m_to_plugin_thread_fifo.push(msg);
-        if (m_plugin_thread)
-        {
-            m_plugin_thread->join();
-        }
-    }
+    ~ClapProcessingEngine();
+
     void addProcessorToChain(std::string plugfilename, int pluginindex);
     void removeProcessorFromChain(int index);
-    ClapEventSequence& getSequence(size_t chainIndex)
+    ClapEventSequence &getSequence(size_t chainIndex)
     {
-        if (chainIndex>=0 && chainIndex<m_chain.size())
+        if (chainIndex >= 0 && chainIndex < m_chain.size())
         {
             return m_chain[chainIndex]->m_seq;
         }
@@ -613,7 +584,7 @@ class ClapProcessingEngine
     std::string getParameterInfoString(size_t chainIndex, size_t index);
 
     void saveStateToFile(size_t chainIndex, const std::filesystem::path &filepath);
-    void loadStateFromFile(const std::filesystem::path &filepath);
+    void loadStateFromFile(size_t chainIndex, const std::filesystem::path &filepath);
     std::string m_stateFileToLoad;
     void enqueueStateFile(std::string filename) { m_stateFileToLoad = filename; }
 

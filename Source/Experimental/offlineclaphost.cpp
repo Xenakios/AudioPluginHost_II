@@ -3,84 +3,9 @@
 
 using namespace std::chrono_literals;
 
-ClapProcessingEngine::ClapProcessingEngine()
-{
+ClapProcessingEngine::ClapProcessingEngine() {}
 
-    m_to_plugin_thread_fifo.reset(64);
-    m_from_plugin_thread_fifo.reset(64);
-    bool plugin_in_another_thread = false;
-    if (plugin_in_another_thread)
-    {
-
-        Message msg;
-        msg.op = Message::Op::CreatePlugin;
-        // msg.action = plugfilename;
-        // msg.idata = plugindex;
-        m_to_plugin_thread_fifo.push(msg);
-        m_plugin_thread = std::make_unique<std::thread>([this]() {
-            std::cout << "start plugin thread\n";
-            // ClapPluginFormatProcessor::mainthread_id() = std::this_thread::get_id();
-            while (true)
-            {
-                Message msg;
-                while (m_to_plugin_thread_fifo.pop(msg))
-                {
-                    if (msg.op == Message::Op::EndThread)
-                    {
-                        return;
-                    }
-                    if (msg.op == Message::Op::DestroyPlugin)
-                    {
-                        std::cout << "Message::Op::DestroyPlugin\n";
-                        // m_plug = nullptr;
-                        return;
-                    }
-                    if (msg.op == Message::Op::CreatePlugin)
-                    {
-                        std::cout << "Message::Op::CreatePlugin\n";
-                        /*
-                        m_plug = std::make_unique<ClapPluginFormatProcessor>(msg.action, msg.idata);
-                        if (m_plug)
-                        {
-                            Message omsg;
-                            omsg.op = Message::Op::CreationSucceeded;
-                            m_from_plugin_thread_fifo.push(omsg);
-                        }
-                        else
-                        {
-                            Message omsg;
-                            omsg.op = Message::Op::CreationFailed;
-                            m_from_plugin_thread_fifo.push(omsg);
-                            return;
-                        }
-                        */
-                    }
-                }
-                std::this_thread::sleep_for(10ms);
-            }
-            std::cout << "end plugin thread\n";
-        });
-        processMessagesFromPluginBlocking();
-        return;
-    }
-    else
-    {
-        // ClapPluginFormatProcessor::mainthread_id() = std::this_thread::get_id();
-        /*
-        m_plug = std::make_unique<ClapPluginFormatProcessor>(plugfilename, plugindex);
-        if (m_plug)
-        {
-            clap_plugin_descriptor desc;
-            if (m_plug->getDescriptor(&desc))
-            {
-                std::cout << "created : " << desc.name << "\n";
-            }
-        }
-        else
-            throw std::runtime_error("Could not create CLAP plugin");
-        */
-    }
-}
+ClapProcessingEngine::~ClapProcessingEngine() {}
 
 void ClapProcessingEngine::addProcessorToChain(std::string plugfilename, int pluginindex)
 {
@@ -112,36 +37,6 @@ void ClapProcessingEngine::removeProcessorFromChain(int index)
     else
     {
         throw std::runtime_error("Processor index out of range");
-    }
-}
-
-void ClapProcessingEngine::processMessagesFromPluginBlocking()
-{
-    bool hadMessages = false;
-    while (!hadMessages)
-    {
-        Message imsg;
-        while (m_from_plugin_thread_fifo.pop(imsg))
-        {
-            hadMessages = true;
-            if (imsg.op == Message::Op::CreationFailed)
-            {
-                m_plugin_thread->join();
-                m_plugin_thread = nullptr;
-                throw std::runtime_error("Could not create CLAP plugin");
-                return;
-            }
-            if (imsg.op == Message::Op::CreationSucceeded)
-            {
-                clap_plugin_descriptor desc;
-                // if (m_plug->getDescriptor(&desc))
-                //{
-                //     std::cout << "created : " << desc.name << "\n";
-                // }
-                return;
-            }
-        }
-        std::this_thread::sleep_for(10ms);
     }
 }
 
@@ -385,11 +280,12 @@ void ClapProcessingEngine::saveStateToFile(size_t chainIndex, const std::filesys
             "Can not store state of plugin that doesn't implement plugin descriptor");
 }
 
-void ClapProcessingEngine::loadStateFromFile(const std::filesystem::path &filepath)
+void ClapProcessingEngine::loadStateFromFile(size_t chainIndex,
+                                             const std::filesystem::path &filepath)
 {
-    /*
-    if (!m_plug)
-        throw std::runtime_error("No plugin instance");
+    if (chainIndex >= m_chain.size())
+        throw std::runtime_error("Chain index out of bounds");
+    auto m_plug = m_chain[chainIndex]->m_proc.get();
     auto str = choc::file::loadFileAsString(filepath.string());
     auto json = choc::json::parse(str);
     if (json.hasObjectMember("plugin_id"))
@@ -432,7 +328,6 @@ void ClapProcessingEngine::loadStateFromFile(const std::filesystem::path &filepa
     }
     else
         throw std::runtime_error("File is not json with a plugin_id");
-    */
 }
 
 void ClapProcessingEngine::openPluginGUIBlocking(size_t chainIndex)
