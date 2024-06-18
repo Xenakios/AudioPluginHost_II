@@ -619,7 +619,7 @@ class ClapProcessingEngine
 
     void processToFile(std::string filename, double duration, double samplerate);
 
-    void openPluginGUIBlocking();
+    void openPluginGUIBlocking(size_t chainIndex);
 
     std::unique_ptr<choc::ui::DesktopWindow> m_desktopwindow;
     void openPersistentWindow(std::string title)

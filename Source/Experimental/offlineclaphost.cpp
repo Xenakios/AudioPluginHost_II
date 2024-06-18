@@ -436,24 +436,30 @@ void ClapProcessingEngine::loadStateFromFile(const std::filesystem::path &filepa
     */
 }
 
-void ClapProcessingEngine::openPluginGUIBlocking()
+void ClapProcessingEngine::openPluginGUIBlocking(size_t chainIndex)
 {
-#ifdef FOO999
-    // m_plug->mainthread_id() = std::this_thread::get_id();
+    if (chainIndex >= m_chain.size())
+        throw std::runtime_error("Chain index out of bounds");
     choc::ui::setWindowsDPIAwareness(); // For Windows, we need to tell the OS we're
                                         // high-DPI-aware
+    auto m_plug = m_chain[chainIndex]->m_proc.get();
     m_plug->activate(44100.0, 512, 512);
     m_plug->guiCreate("win32", false);
     uint32_t pw = 0;
     uint32_t ph = 0;
     m_plug->guiGetSize(&pw, &ph);
     choc::ui::DesktopWindow window({100, 100, (int)pw, (int)ph});
-
     window.setWindowTitle("CHOC Window");
+    clap_plugin_descriptor desc;
+    if (m_plug->getDescriptor(&desc))
+    {
+        window.setWindowTitle(desc.name);
+    }
+
     window.setResizable(true);
     window.setMinimumSize(300, 300);
     window.setMaximumSize(1500, 1200);
-    window.windowClosed = [this] {
+    window.windowClosed = [this, m_plug] {
         m_plug->guiDestroy();
         choc::messageloop::stop();
     };
@@ -473,7 +479,6 @@ void ClapProcessingEngine::openPluginGUIBlocking()
     });
     choc::messageloop::run();
     m_plug->deactivate();
-#endif
 }
 
 std::string ClapProcessingEngine::getParameterInfoString(size_t chainIndex, size_t index)
