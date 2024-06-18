@@ -584,6 +584,14 @@ class ClapProcessingEngine
     }
     void addProcessorToChain(std::string plugfilename, int pluginindex);
     void removeProcessorFromChain(int index);
+    ClapEventSequence& getSequence(size_t chainIndex)
+    {
+        if (chainIndex>=0 && chainIndex<m_chain.size())
+        {
+            return m_chain[chainIndex]->m_seq;
+        }
+        throw std::runtime_error("Sequence chain index of out bounds");
+    }
     std::map<std::string, clap_id> getParameters(size_t chainIndex)
     {
         auto m_plug = m_chain[chainIndex]->m_proc.get();
