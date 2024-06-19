@@ -1,6 +1,7 @@
 #pragma once
 
 #include <random>
+#include <algorithm>
 
 namespace xenakios
 {
@@ -26,6 +27,7 @@ class BlueNoise
         m_previous = z0;
         return m_previous;
     }
+    
     void setDepth(int d) { m_depth = std::clamp(d, 1, 32); }
 
   private:
