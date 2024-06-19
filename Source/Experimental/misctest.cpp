@@ -25,6 +25,7 @@
 #include "RtAudio.h"
 #include "xaudiograph.h"
 #include "dejavurandom.h"
+#include "bluenoise.h"
 
 class object_t
 {
@@ -953,36 +954,6 @@ inline void test_no_juce_agraph()
     g->activate(44100.0, 512, 512);
 }
 
-class BlueNoise
-{
-  public:
-    BlueNoise() { m_previous = m_dist(m_rng); }
-    float operator()()
-    {
-        float maxdist = 0.0f;
-        float z0 = 0.0f;
-        for (int i = 0; i < m_depth; ++i)
-        {
-            float z1 = m_dist(m_rng);
-            float dist = std::abs(z1 - m_previous);
-            if (dist > maxdist)
-            {
-                maxdist = dist;
-                z0 = z1;
-            }
-        }
-        m_previous = z0;
-        return m_previous;
-    }
-    void setDepth(int d) { m_depth = std::clamp(d, 1, 32); }
-
-  private:
-    std::minstd_rand m_rng;
-    std::uniform_real_distribution<float> m_dist{0.0f, 1.0f};
-    float m_previous = 0.0f;
-    int m_depth = 4;
-};
-
 class GoldenRatioNoise
 {
   public:
@@ -1026,6 +997,8 @@ class CorrelatedNoise
 
 inline void test_bluenoise()
 {
+    BlueNoise bn{777};
+    return;
     choc::audio::AudioFileProperties outfileprops;
     double outsr = 44100;
     outfileprops.formatName = "WAV";
@@ -1252,9 +1225,9 @@ inline void test_chained_offline()
 
 int main()
 {
-    test_chained_offline();
+    // test_chained_offline();
     // testWebviewCurveEditor();
-    // test_bluenoise();
+    test_bluenoise();
     // test_no_juce_agraph();
     // test_env2();
     // test_clap_riff();

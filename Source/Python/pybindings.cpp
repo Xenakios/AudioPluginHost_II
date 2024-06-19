@@ -12,6 +12,7 @@
 #include "../Experimental/dejavurandom.h"
 #include "libMTSMaster.h"
 #include "Tunings.h"
+#include "../Experimental/bluenoise.h"
 
 namespace py = pybind11;
 
@@ -111,6 +112,11 @@ PYBIND11_MODULE(xenakios, m)
         .def("setDejaVu", &xenakios::DejaVuRandom::setDejaVu)
         .def("nextFloat", &xenakios::DejaVuRandom::nextFloatInRange)
         .def("nextInt", &xenakios::DejaVuRandom::nextIntInRange);
+
+    py::class_<xenakios::BlueNoise>(m, "BlueNoise")
+        .def(py::init<unsigned int>())
+        .def("setDepth", &xenakios::BlueNoise::setDepth)
+        .def("nextFloat", &xenakios::BlueNoise::operator());
 
     py::class_<ClapProcessingEngine>(m, "ClapEngine")
         .def(py::init<>())
