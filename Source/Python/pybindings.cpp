@@ -20,6 +20,7 @@ namespace py = pybind11;
 inline void writeArrayToFile(const py::array_t<double> &arr, double samplerate,
                              std::filesystem::path path)
 {
+    
     uint32_t numChans = arr.shape(0);
     choc::audio::AudioFileProperties outfileprops;
     outfileprops.formatName = "WAV";
@@ -31,6 +32,7 @@ inline void writeArrayToFile(const py::array_t<double> &arr, double samplerate,
     if (writer)
     {
         py::buffer_info buf1 = arr.request();
+        
         double *ptr1 = static_cast<double *>(buf1.ptr);
         std::vector<double *> ptrs;
         uint32_t numFrames = buf1.size / numChans;
