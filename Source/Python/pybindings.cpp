@@ -20,10 +20,11 @@ namespace py = pybind11;
 inline void writeArrayToFile(const py::array_t<double> &arr, double samplerate,
                              std::filesystem::path path)
 {
+    uint32_t numChans = arr.shape(0);
     choc::audio::AudioFileProperties outfileprops;
     outfileprops.formatName = "WAV";
     outfileprops.bitDepth = choc::audio::BitDepth::float32;
-    outfileprops.numChannels = arr.ndim();
+    outfileprops.numChannels = numChans;
     outfileprops.sampleRate = samplerate;
     choc::audio::WAVAudioFileFormat<true> wavformat;
     auto writer = wavformat.createWriter(path.string(), outfileprops);
@@ -32,11 +33,11 @@ inline void writeArrayToFile(const py::array_t<double> &arr, double samplerate,
         py::buffer_info buf1 = arr.request();
         double *ptr1 = static_cast<double *>(buf1.ptr);
         std::vector<double *> ptrs;
-        uint32_t numFrames = buf1.size / arr.ndim();
-        for (size_t i = 0; i < arr.ndim(); ++i)
+        uint32_t numFrames = buf1.size / numChans;
+        for (size_t i = 0; i < numChans; ++i)
             ptrs.push_back(ptr1 + i * numFrames);
         choc::buffer::SeparateChannelLayout<double> layout(ptrs.data(), 0);
-        choc::buffer::ChannelArrayView<double> bufview(layout, {(uint32_t)arr.ndim(), numFrames});
+        choc::buffer::ChannelArrayView<double> bufview(layout, {numChans, numFrames});
         std::cout << bufview.getNumChannels() << " " << bufview.getNumFrames() << "\n";
         if (!writer->appendFrames(bufview))
             throw std::runtime_error("Could not write to audio file");
