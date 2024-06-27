@@ -14,7 +14,7 @@ namespace xenakios
 using ParamDesc = sst::basic_blocks::params::ParamMetaData;
 
 /*
-We mirror Clap C++ plugin helper as much as possible/sensible, but we do assume certain
+We mirror the Clap C++ plugin helper as much as possible/sensible, but we do assume certain
 things are implemented even though not required by the official Clap standard, such
 as audio/MIDI processing, parameters, state etc
 */
@@ -109,6 +109,8 @@ class XAudioProcessor
     {
         return false;
     }
+
+    virtual void runMainThreadTasks() noexcept {}
 
     // the original Clap C++ helper methods for GUI.
     // We really might not want to handle *all* this, but I wonder

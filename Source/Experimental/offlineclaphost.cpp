@@ -9,7 +9,8 @@ ClapProcessingEngine::~ClapProcessingEngine() {}
 
 void ClapProcessingEngine::addProcessorToChain(std::string plugfilename, int pluginindex)
 {
-    auto plug = std::make_unique<ClapPluginFormatProcessor>(plugfilename, pluginindex);
+    std::unique_ptr<xenakios::XAudioProcessor> plug;
+    plug = std::make_unique<ClapPluginFormatProcessor>(plugfilename, pluginindex);
     if (plug)
     {
         auto chainEntry = std::make_unique<ProcessorEntry>();

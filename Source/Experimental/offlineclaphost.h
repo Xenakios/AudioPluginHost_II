@@ -534,7 +534,7 @@ class ClapProcessingEngine
   public:
     struct ProcessorEntry
     {
-        std::unique_ptr<ClapPluginFormatProcessor> m_proc;
+        std::unique_ptr<xenakios::XAudioProcessor> m_proc;
         ClapEventSequence m_seq;
         std::string name;
     };

@@ -92,7 +92,7 @@ class ClapPluginFormatProcessor : public xenakios::XAudioProcessor
     */
     std::thread::id mainThreadId;
     choc::fifo::SingleReaderSingleWriterFIFO<std::function<void()>> on_main_thread_fifo;
-    void runMainThreadTasks()
+    void runMainThreadTasks() noexcept override
     {
         std::function<void()> task;
         while (on_main_thread_fifo.pop(task))

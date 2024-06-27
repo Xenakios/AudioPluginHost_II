@@ -38,7 +38,6 @@ inline void writeArrayToFile(const py::array_t<double> &arr, double samplerate,
             ptrs.push_back(ptr1 + i * numFrames);
         choc::buffer::SeparateChannelLayout<double> layout(ptrs.data(), 0);
         choc::buffer::ChannelArrayView<double> bufview(layout, {numChans, numFrames});
-        std::cout << bufview.getNumChannels() << " " << bufview.getNumFrames() << "\n";
         if (!writer->appendFrames(bufview))
             throw std::runtime_error("Could not write to audio file");
         writer->flush();
