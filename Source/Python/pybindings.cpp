@@ -3,6 +3,7 @@
 #include <optional>
 #include <pybind11/stl.h>
 #include <pybind11/stl/filesystem.h>
+#include <pybind11/numpy.h>
 #include <pybind11/functional.h>
 #include <iostream>
 #include "audio/choc_AudioFileFormat_WAV.h"
@@ -15,6 +16,35 @@
 #include "../Experimental/bluenoise.h"
 
 namespace py = pybind11;
+
+inline void writeArrayToFile(const py::array_t<double> &arr, double samplerate,
+                             std::filesystem::path path)
+{
+    choc::audio::AudioFileProperties outfileprops;
+    outfileprops.formatName = "WAV";
+    outfileprops.bitDepth = choc::audio::BitDepth::float32;
+    outfileprops.numChannels = arr.ndim();
+    outfileprops.sampleRate = samplerate;
+    choc::audio::WAVAudioFileFormat<true> wavformat;
+    auto writer = wavformat.createWriter(path.string(), outfileprops);
+    if (writer)
+    {
+        py::buffer_info buf1 = arr.request();
+        double *ptr1 = static_cast<double *>(buf1.ptr);
+        std::vector<double *> ptrs;
+        uint32_t numFrames = buf1.size / arr.ndim();
+        for (size_t i = 0; i < arr.ndim(); ++i)
+            ptrs.push_back(ptr1 + i * numFrames);
+        choc::buffer::SeparateChannelLayout<double> layout(ptrs.data(), 0);
+        choc::buffer::ChannelArrayView<double> bufview(layout, {(uint32_t)arr.ndim(), numFrames});
+        std::cout << bufview.getNumChannels() << " " << bufview.getNumFrames() << "\n";
+        if (!writer->appendFrames(bufview))
+            throw std::runtime_error("Could not write to audio file");
+        writer->flush();
+    }
+    else
+        throw std::runtime_error("Could not create audio file writer");
+}
 
 class MTSESPSource
 {
@@ -166,6 +196,8 @@ PYBIND11_MODULE(xenakios, m)
         .def("setOutputAsParameterModulation", &MultiModulator::setOutputAsParameterModulation)
         .def("setConnection", &MultiModulator::setConnection)
         .def("setLFOProps", &MultiModulator::setLFOProps);
+
+    m.def("writeArrayToFile", &writeArrayToFile);
 
     m.def("generateNoteExpressionsFromEnvelope", &generateNoteExpressionsFromEnvelope, "",
           py::arg("targetSequence"), py::arg("sourceEnvelope"), py::arg("eventsStartTime"),

@@ -111,8 +111,6 @@ void ClapProcessingEngine::processToFile(std::string filename, double duration, 
             std::cout << "was not able to set offline render mode for " << c->name << "\n";
     }
 
-    // if (!m_stateFileToLoad.empty())
-    //     loadStateFromFile(m_stateFileToLoad);
     //  even offline, do the processing in another another thread because things
     //  can get complicated with plugins like Surge XT because of the thread checks
     std::thread th([&] {
