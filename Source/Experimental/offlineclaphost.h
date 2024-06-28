@@ -555,6 +555,7 @@ class ClapProcessingEngine
 
     void addProcessorToChain(std::string plugfilename, int pluginindex);
     void removeProcessorFromChain(int index);
+    
     ClapEventSequence &getSequence(size_t chainIndex)
     {
         if (chainIndex >= 0 && chainIndex < m_chain.size())

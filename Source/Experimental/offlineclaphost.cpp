@@ -1,5 +1,6 @@
 #include "offlineclaphost.h"
 #include "text/choc_Files.h"
+#include "xaps/xap_memorybufferplayer.h"
 
 using namespace std::chrono_literals;
 
@@ -12,7 +13,7 @@ void ClapProcessingEngine::addProcessorToChain(std::string plugfilename, int plu
     std::unique_ptr<xenakios::XAudioProcessor> plug;
     if (plugfilename == "XenakiosMemoryBufferPlayer")
     {
-        // plug = std::make_unique<XapMemoryBufferPlayer>();
+        plug = std::make_unique<XapMemoryBufferPlayer>();
     }
     else
     {
