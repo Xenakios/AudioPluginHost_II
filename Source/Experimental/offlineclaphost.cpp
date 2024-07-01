@@ -106,7 +106,8 @@ std::string ClapProcessingEngine::scanPluginFile(std::filesystem::path plugfilep
     return "No info";
 }
 
-void ClapProcessingEngine::processToFile(std::string filename, double duration, double samplerate)
+void ClapProcessingEngine::processToFile(std::string filename, double duration, double samplerate,
+                                         int numoutchans)
 {
     using namespace std::chrono_literals;
 
@@ -117,8 +118,8 @@ void ClapProcessingEngine::processToFile(std::string filename, double duration, 
         c->m_seq.sortEvents();
         if (!c->m_proc->activate(samplerate, procblocksize, procblocksize))
             std::cout << "could not activate " << c->name << "\n";
-        if (!c->m_proc->renderSetMode(CLAP_RENDER_OFFLINE))
-            std::cout << "was not able to set offline render mode for " << c->name << "\n";
+        // if (!c->m_proc->renderSetMode(CLAP_RENDER_OFFLINE))
+        //     std::cout << "was not able to set offline render mode for " << c->name << "\n";
     }
 
     //  even offline, do the processing in another another thread because things
@@ -129,15 +130,16 @@ void ClapProcessingEngine::processToFile(std::string filename, double duration, 
         {
             eviters.emplace_back(p->m_seq);
         }
-
+        numoutchans = std::clamp(numoutchans, 1, 256);
         clap_process cp;
         memset(&cp, 0, sizeof(clap_process));
         cp.frames_count = procblocksize;
         cp.audio_inputs_count = 1;
-        choc::buffer::ChannelArrayBuffer<float> inputbuffer{2, (unsigned int)procblocksize};
+        choc::buffer::ChannelArrayBuffer<float> inputbuffer{(unsigned int)numoutchans,
+                                                            (unsigned int)procblocksize};
         inputbuffer.clear();
         clap_audio_buffer inbufs[1];
-        inbufs[0].channel_count = 2;
+        inbufs[0].channel_count = numoutchans;
         inbufs[0].constant_mask = 0;
         inbufs[0].latency = 0;
         auto ichansdata = inputbuffer.getView().data.channels;
@@ -146,10 +148,12 @@ void ClapProcessingEngine::processToFile(std::string filename, double duration, 
         cp.audio_inputs = inbufs;
 
         cp.audio_outputs_count = 1;
-        choc::buffer::ChannelArrayBuffer<float> outputbuffer{2, (unsigned int)procblocksize};
+
+        choc::buffer::ChannelArrayBuffer<float> outputbuffer{(unsigned int)numoutchans,
+                                                             (unsigned int)procblocksize};
         outputbuffer.clear();
         clap_audio_buffer outbufs[1];
-        outbufs[0].channel_count = 2;
+        outbufs[0].channel_count = numoutchans;
         outbufs[0].constant_mask = 0;
         outbufs[0].latency = 0;
         auto chansdata = outputbuffer.getView().data.channels;
@@ -182,7 +186,7 @@ void ClapProcessingEngine::processToFile(std::string filename, double duration, 
         choc::audio::AudioFileProperties outfileprops;
         outfileprops.formatName = "WAV";
         outfileprops.bitDepth = choc::audio::BitDepth::float32;
-        outfileprops.numChannels = 2;
+        outfileprops.numChannels = numoutchans;
         outfileprops.sampleRate = samplerate;
         choc::audio::WAVAudioFileFormat<true> wavformat;
         auto writer = wavformat.createWriter(filename, outfileprops);
@@ -215,8 +219,8 @@ void ClapProcessingEngine::processToFile(std::string filename, double duration, 
                 choc::buffer::copy(inputbuffer, outputbuffer);
             }
             uint32_t framesToWrite = std::min(outlensamples - outcounter, procblocksize);
-            auto writeSectionView =
-                outputbuffer.getSection(choc::buffer::ChannelRange{0, 2}, {0, framesToWrite});
+            auto writeSectionView = outputbuffer.getSection(
+                choc::buffer::ChannelRange{0, (unsigned int)numoutchans}, {0, framesToWrite});
             writer->appendFrames(writeSectionView);
             // std::cout << outcounter << " ";
             cp.steady_time = outcounter;

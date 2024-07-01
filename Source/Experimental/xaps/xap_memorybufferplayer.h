@@ -2,13 +2,14 @@
 
 #include "audio/choc_SampleBuffers.h"
 #include "../xaudioprocessor.h"
+#include <vector>
 
 class XapMemoryBufferPlayer : public xenakios::XAudioProcessor
 {
 
   public:
     using BufViewType = choc::buffer::ChannelArrayView<double>;
-    XapMemoryBufferPlayer() {}
+    XapMemoryBufferPlayer() { m_routings.reserve(64); }
 
     uint32_t audioPortsCount(bool isInput) const noexcept override
     {
@@ -40,6 +41,7 @@ class XapMemoryBufferPlayer : public xenakios::XAudioProcessor
     {
         auto inEvents = process->in_events;
         auto sz = inEvents->size(inEvents);
+        auto outchans = process->audio_outputs[0].channel_count;
         for (uint32_t i = 0; i < sz; ++i)
         {
             auto ev = inEvents->get(inEvents, i);
@@ -52,51 +54,53 @@ class XapMemoryBufferPlayer : public xenakios::XAudioProcessor
                 m_inputsr = bufev->samplerate;
                 std::cout << "set buffer " << m_playbuf << " with " << m_playbufframes << " frames "
                           << bufev->numchans << " channels\n";
+                m_routings.clear();
+                if (outchans >= 2 && m_playbufchans == 1)
+                {
+                    for (int j = 0; j < outchans; ++j)
+                    {
+                        m_routings.emplace_back(0, j);
+                    }
+                }
+                if (outchans == m_playbufchans)
+                {
+                    for (int j = 0; j < outchans; ++j)
+                    {
+                        m_routings.emplace_back(j, j);
+                    }
+                }
             }
         }
         auto nframes = process->frames_count;
-        auto outchans = process->audio_outputs[0].channel_count;
-        if (m_playbufframes == 0)
+
+        for (int i = 0; i < nframes; ++i)
         {
-            for (int i = 0; i < nframes; ++i)
+            for (int j = 0; j < outchans; ++j)
             {
-                for (int j = 0; j < outchans; ++j)
-                {
-                    process->audio_outputs[0].data32[j][i] = 0.0f;
-                }
+                process->audio_outputs[0].data32[j][i] = 0.0f;
             }
-            return CLAP_PROCESS_CONTINUE;
         }
         int inchans = m_playbufchans;
-        if (inchans == 1 && outchans == 2)
+        auto cachedpos = 0;
+        for (const auto &r : m_routings)
         {
-            for (int i = 0; i < nframes; ++i)
+            cachedpos = m_bufplaypos;
+            if (r.srcchan < inchans && r.destchan < outchans)
             {
-                double s = m_playbuf[m_bufplaypos];
-                for (int j = 0; j < outchans; ++j)
+                int buf_offset = m_playbufframes * r.srcchan;
+                for (int i = 0; i < nframes; ++i)
                 {
-                    process->audio_outputs[0].data32[j][i] = s;
-                }
-                ++m_bufplaypos;
-                if (m_bufplaypos == m_playbufframes)
-                {
-                    m_bufplaypos = 0;
+                    process->audio_outputs[0].data32[r.destchan][i] +=
+                        m_playbuf[buf_offset + cachedpos];
+                    ++cachedpos;
+                    if (cachedpos >= m_playbufframes)
+                    {
+                        cachedpos = 0;
+                    }
                 }
             }
         }
-        if (inchans == 2 && outchans == 2)
-        {
-            for (int i = 0; i < nframes; ++i)
-            {
-                process->audio_outputs[0].data32[0][i] = m_playbuf[m_bufplaypos];
-                process->audio_outputs[0].data32[1][i] = m_playbuf[m_playbufframes + m_bufplaypos];
-                ++m_bufplaypos;
-                if (m_bufplaypos == m_playbufframes)
-                {
-                    m_bufplaypos = 0;
-                }
-            }
-        }
+        m_bufplaypos = cachedpos;
         return CLAP_PROCESS_CONTINUE;
     }
 
@@ -107,4 +111,12 @@ class XapMemoryBufferPlayer : public xenakios::XAudioProcessor
     double m_inputsr = 0.0;
     double m_outsr = 0.0;
     int m_bufplaypos = 0;
+    struct Routing
+    {
+        Routing() {}
+        Routing(int src, int dest) : srcchan(src), destchan(dest) {}
+        int srcchan = 0;
+        int destchan = 0;
+    };
+    std::vector<Routing> m_routings;
 };

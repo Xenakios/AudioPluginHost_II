@@ -607,7 +607,7 @@ class ClapProcessingEngine
     std::string m_stateFileToLoad;
     void enqueueStateFile(std::string filename) { m_stateFileToLoad = filename; }
 
-    void processToFile(std::string filename, double duration, double samplerate);
+    void processToFile(std::string filename, double duration, double samplerate, int numoutchans);
 
     void openPluginGUIBlocking(size_t chainIndex);
 

@@ -96,6 +96,23 @@ class MTSESPSource
 
 constexpr size_t ENVBLOCKSIZE = 64;
 
+inline void addAudioBufferEvent(ClapEventSequence &seq, double time, int32_t target,
+                                const py::array_t<double> &arr, int32_t samplerate)
+{
+    uint32_t numChans = arr.shape(0);
+    if (arr.ndim() == 1)
+        numChans = 1;
+    if (numChans > 256)
+        throw std::runtime_error("Numpy array has an unreasonable number of channels " +
+                                 std::to_string(numChans) + ", max supported is 256 channels");
+    py::buffer_info buf1 = arr.request();
+    double *ptr1 = static_cast<double *>(buf1.ptr);
+    uint32_t numframes = buf1.size / numChans;
+    if (arr.ndim() == 1)
+        numframes = arr.shape(0);
+    seq.addAudioBufferEvent(time, target, ptr1, numChans, numframes, samplerate);
+}
+
 PYBIND11_MODULE(xenakios, m)
 {
     using namespace pybind11::literals;
@@ -112,21 +129,7 @@ PYBIND11_MODULE(xenakios, m)
         .def("getSizeInBytes", &ClapEventSequence::getApproxSizeInBytes)
         .def("addString", &ClapEventSequence::addString)
         .def("addStringEvent", &ClapEventSequence::addStringEvent)
-        .def("addAudioBufferEvent",
-             [](ClapEventSequence &seq, double time, int32_t target, const py::array_t<double> &arr,
-                int32_t samplerate) {
-                 // double time, int32_t target, double *buf, int32_t numchans,
-                 // int32_t numframes, int32_t samplerate
-                 uint32_t numChans = arr.shape(0);
-                 if (arr.ndim() == 1)
-                    numChans = 1;
-                 py::buffer_info buf1 = arr.request();
-                 double *ptr1 = static_cast<double *>(buf1.ptr);
-                 uint32_t numframes = buf1.size / numChans;
-                 if (arr.ndim() == 1)
-                    numframes = arr.shape(0);
-                 seq.addAudioBufferEvent(time, target, ptr1, numChans, numframes, samplerate);
-             })
+        .def("addAudioBufferEvent", addAudioBufferEvent)
         .def("addNoteOn", &ClapEventSequence::addNoteOn)
         .def("addNoteOff", &ClapEventSequence::addNoteOff)
         .def("addNote", &ClapEventSequence::addNote, "time"_a = 0.0, "dur"_a = 0.05, "port"_a = 0,
@@ -178,7 +181,8 @@ PYBIND11_MODULE(xenakios, m)
         .def("openWindow", &ClapProcessingEngine::openPersistentWindow)
         .def("saveStateToFile", &ClapProcessingEngine::saveStateToFile)
         .def("loadStateFromFile", &ClapProcessingEngine::loadStateFromFile)
-        .def("processToFile", &ClapProcessingEngine::processToFile);
+        .def("processToFile", &ClapProcessingEngine::processToFile, "filename"_a, "duration"_a,
+             "samplerate"_a, "numoutchannels"_a = 2);
 
     py::class_<xenakios::EnvelopePoint>(m, "EnvelopePoint")
         .def(py::init<double, double>())
