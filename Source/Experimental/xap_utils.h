@@ -739,3 +739,15 @@ struct clap_event_xen_string
     // only immediately use or copy the contents
     char *str;
 };
+
+#define XENAKIOS_AUDIOBUFFER_MSG 60001
+
+struct clap_event_xen_audiobuffer
+{
+    clap_event_header header;
+    int32_t target;
+    double* buffer;
+    int32_t numchans;
+    int32_t numframes;
+    int32_t samplerate;
+};

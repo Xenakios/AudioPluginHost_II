@@ -30,6 +30,7 @@ class ClapEventSequence
         clap_event_note_expression_t noteexpression;
         clap_event_transport_t transport;
         clap_event_xen_string xstr;
+        clap_event_xen_audiobuffer xabuf;
     };
     struct Event
     {
@@ -113,6 +114,23 @@ class ClapEventSequence
                                                        key, note_id, 0);
             m_evlist.push_back(Event(time, &ev));
         }
+    }
+    void addAudioBufferEvent(double time, int32_t target, double *buf, int32_t numchans,
+                             int32_t numframes, int32_t samplerate)
+    {
+        clap_event_xen_audiobuffer ev;
+        ev.header.flags = 0;
+        ev.header.size = sizeof(clap_event_xen_audiobuffer);
+        ev.header.space_id = 666;
+        ev.header.time = 0;
+        ev.header.type = XENAKIOS_AUDIOBUFFER_MSG;
+        ev.target = target;
+        ev.buffer = buf;
+        ev.numchans = numchans;
+        ev.numframes = numframes;
+        ev.samplerate = samplerate;
+        ev.target = target;
+        m_evlist.push_back(Event(time, &ev));
     }
     std::unordered_map<int, std::string> sequenceStrings;
     void addString(int id, std::string str) { sequenceStrings[id] = str; }
@@ -555,7 +573,7 @@ class ClapProcessingEngine
 
     void addProcessorToChain(std::string plugfilename, int pluginindex);
     void removeProcessorFromChain(int index);
-    
+
     ClapEventSequence &getSequence(size_t chainIndex)
     {
         if (chainIndex >= 0 && chainIndex < m_chain.size())
