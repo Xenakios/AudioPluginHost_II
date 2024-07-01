@@ -41,6 +41,7 @@ class XapMemoryBufferPlayer : public xenakios::XAudioProcessor
     {
         auto inEvents = process->in_events;
         auto sz = inEvents->size(inEvents);
+        
         auto outchans = process->audio_outputs[0].channel_count;
         for (uint32_t i = 0; i < sz; ++i)
         {
@@ -55,20 +56,13 @@ class XapMemoryBufferPlayer : public xenakios::XAudioProcessor
                 std::cout << "set buffer " << m_playbuf << " with " << m_playbufframes << " frames "
                           << bufev->numchans << " channels\n";
                 m_routings.clear();
-                if (outchans >= 2 && m_playbufchans == 1)
+                
+                for (int j = 0; j < outchans; ++j)
                 {
-                    for (int j = 0; j < outchans; ++j)
-                    {
-                        m_routings.emplace_back(0, j);
-                    }
+                    int inchantouse = j % m_playbufchans;
+                    m_routings.emplace_back(inchantouse, j);
                 }
-                if (outchans == m_playbufchans)
-                {
-                    for (int j = 0; j < outchans; ++j)
-                    {
-                        m_routings.emplace_back(j, j);
-                    }
-                }
+                
             }
         }
         auto nframes = process->frames_count;
@@ -80,12 +74,11 @@ class XapMemoryBufferPlayer : public xenakios::XAudioProcessor
                 process->audio_outputs[0].data32[j][i] = 0.0f;
             }
         }
-        int inchans = m_playbufchans;
         auto cachedpos = 0;
         for (const auto &r : m_routings)
         {
             cachedpos = m_bufplaypos;
-            if (r.srcchan < inchans && r.destchan < outchans)
+            if (r.srcchan < m_playbufchans && r.destchan < outchans)
             {
                 int buf_offset = m_playbufframes * r.srcchan;
                 for (int i = 0; i < nframes; ++i)
