@@ -130,6 +130,7 @@ PYBIND11_MODULE(xenakios, m)
         .def("addString", &ClapEventSequence::addString)
         .def("addStringEvent", &ClapEventSequence::addStringEvent)
         .def("addAudioBufferEvent", addAudioBufferEvent)
+        .def("addAudioRoutingEvent", &ClapEventSequence::addAudioRoutingEvent)
         .def("addNoteOn", &ClapEventSequence::addNoteOn)
         .def("addNoteOff", &ClapEventSequence::addNoteOff)
         .def("addNote", &ClapEventSequence::addNote, "time"_a = 0.0, "dur"_a = 0.05, "port"_a = 0,

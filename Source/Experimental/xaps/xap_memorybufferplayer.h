@@ -41,7 +41,7 @@ class XapMemoryBufferPlayer : public xenakios::XAudioProcessor
     {
         auto inEvents = process->in_events;
         auto sz = inEvents->size(inEvents);
-        
+
         auto outchans = process->audio_outputs[0].channel_count;
         for (uint32_t i = 0; i < sz; ++i)
         {
@@ -53,16 +53,36 @@ class XapMemoryBufferPlayer : public xenakios::XAudioProcessor
                 m_playbufchans = bufev->numchans;
                 m_playbufframes = bufev->numframes;
                 m_inputsr = bufev->samplerate;
+                m_bufplaypos = 0;
                 std::cout << "set buffer " << m_playbuf << " with " << m_playbufframes << " frames "
                           << bufev->numchans << " channels\n";
-                m_routings.clear();
-                
-                for (int j = 0; j < outchans; ++j)
+            }
+            if (ev->type == XENAKIOS_ROUTING_MSG)
+            {
+                auto roev = (clap_event_xen_audiorouting *)ev;
+                if (roev->opcode == 0)
                 {
-                    int inchantouse = j % m_playbufchans;
-                    m_routings.emplace_back(inchantouse, j);
+                    m_routings.clear();
                 }
-                
+                if (roev->opcode == 1)
+                {
+                    m_routings.clear();
+                    for (int j = 0; j < outchans; ++j)
+                    {
+                        int inchantouse = j % m_playbufchans;
+                        m_routings.emplace_back(inchantouse, j);
+                    }
+                }
+                if (roev->opcode == 2)
+                {
+                    std::cout << "connecting " << roev->src << " to " << roev->dest << "\n";
+                    m_routings.emplace_back(roev->src, roev->dest);
+                }
+                if (roev->opcode == 3)
+                {
+                    auto numremoved = std::erase(m_routings, Routing(roev->src, roev->dest));
+                    std::cout << "removed " << numremoved << " connections\n";
+                }
             }
         }
         auto nframes = process->frames_count;
@@ -74,26 +94,29 @@ class XapMemoryBufferPlayer : public xenakios::XAudioProcessor
                 process->audio_outputs[0].data32[j][i] = 0.0f;
             }
         }
-        auto cachedpos = 0;
-        for (const auto &r : m_routings)
+        if (m_playbuf)
         {
-            cachedpos = m_bufplaypos;
-            if (r.srcchan < m_playbufchans && r.destchan < outchans)
+            auto cachedpos = 0;
+            for (const auto &r : m_routings)
             {
-                int buf_offset = m_playbufframes * r.srcchan;
-                for (int i = 0; i < nframes; ++i)
+                cachedpos = m_bufplaypos;
+                if (r.srcchan < m_playbufchans && r.destchan < outchans)
                 {
-                    process->audio_outputs[0].data32[r.destchan][i] +=
-                        m_playbuf[buf_offset + cachedpos];
-                    ++cachedpos;
-                    if (cachedpos >= m_playbufframes)
+                    int buf_offset = m_playbufframes * r.srcchan;
+                    for (int i = 0; i < nframes; ++i)
                     {
-                        cachedpos = 0;
+                        process->audio_outputs[0].data32[r.destchan][i] +=
+                            m_playbuf[buf_offset + cachedpos];
+                        ++cachedpos;
+                        if (cachedpos >= m_playbufframes)
+                        {
+                            cachedpos = 0;
+                        }
                     }
                 }
             }
+            m_bufplaypos = cachedpos;
         }
-        m_bufplaypos = cachedpos;
         return CLAP_PROCESS_CONTINUE;
     }
 
@@ -110,6 +133,10 @@ class XapMemoryBufferPlayer : public xenakios::XAudioProcessor
         Routing(int src, int dest) : srcchan(src), destchan(dest) {}
         int srcchan = 0;
         int destchan = 0;
+        bool operator==(const Routing &other) const
+        {
+            return srcchan == other.srcchan && destchan == other.destchan;
+        }
     };
     std::vector<Routing> m_routings;
 };

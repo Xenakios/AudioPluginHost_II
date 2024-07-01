@@ -31,6 +31,7 @@ class ClapEventSequence
         clap_event_transport_t transport;
         clap_event_xen_string xstr;
         clap_event_xen_audiobuffer xabuf;
+        clap_event_xen_audiorouting xrout;
     };
     struct Event
     {
@@ -130,6 +131,20 @@ class ClapEventSequence
         ev.numframes = numframes;
         ev.samplerate = samplerate;
         ev.target = target;
+        m_evlist.push_back(Event(time, &ev));
+    }
+    void addAudioRoutingEvent(double time, int32_t target, int32_t opcode, int32_t src, int32_t dest)
+    {
+        clap_event_xen_audiorouting ev;
+        ev.header.flags = 0;
+        ev.header.size = sizeof(clap_event_xen_audiorouting);
+        ev.header.space_id = 666;
+        ev.header.time = 0;
+        ev.header.type = XENAKIOS_ROUTING_MSG;
+        ev.target = target;
+        ev.opcode = opcode;
+        ev.src = src;
+        ev.dest = dest;
         m_evlist.push_back(Event(time, &ev));
     }
     std::unordered_map<int, std::string> sequenceStrings;

@@ -751,3 +751,15 @@ struct clap_event_xen_audiobuffer
     int32_t numframes;
     int32_t samplerate;
 };
+
+#define XENAKIOS_ROUTING_MSG 60002
+
+struct clap_event_xen_audiorouting
+{
+    clap_event_header header;
+    int32_t target;
+    // 0 clear all, 1 apply default, 2 connect src to dest, 3 disconnect src from dest
+    int32_t opcode;
+    int32_t src;
+    int32_t dest;
+};
