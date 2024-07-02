@@ -39,6 +39,7 @@ class XapMemoryBufferPlayer : public xenakios::XAudioProcessor
     }
     clap_process_status process(const clap_process *process) noexcept override
     {
+        int fadelensamples = m_outsr * 0.25;
         auto inEvents = process->in_events;
         auto sz = inEvents->size(inEvents);
 
@@ -62,26 +63,46 @@ class XapMemoryBufferPlayer : public xenakios::XAudioProcessor
                 auto roev = (clap_event_xen_audiorouting *)ev;
                 if (roev->opcode == 0)
                 {
-                    m_routings.clear();
+                    for(auto& r : m_routings)
+                    {
+                        r.fadedir = -1;
+                        r.fadecounter = 0;
+                    }
+                    
                 }
                 if (roev->opcode == 1)
                 {
-                    m_routings.clear();
+                    for(auto& r : m_routings)
+                    {
+                        r.fadedir = -1;
+                        r.fadecounter = 0;
+                    }
                     for (int j = 0; j < outchans; ++j)
                     {
                         int inchantouse = j % m_playbufchans;
                         m_routings.emplace_back(inchantouse, j);
+                        m_routings.back().fadecounter = 0;
+                        m_routings.back().fadedir = 1;
                     }
                 }
                 if (roev->opcode == 2)
                 {
                     std::cout << "connecting " << roev->src << " to " << roev->dest << "\n";
                     m_routings.emplace_back(roev->src, roev->dest);
+                    m_routings.back().fadedir = 1;
+                    m_routings.back().fadecounter = 0;
                 }
                 if (roev->opcode == 3)
                 {
-                    auto numremoved = std::erase(m_routings, Routing(roev->src, roev->dest));
-                    std::cout << "removed " << numremoved << " connections\n";
+                    for (auto &r : m_routings)
+                    {
+                        if (r.srcchan == roev->src && r.destchan == roev->dest)
+                        {
+                            r.fadecounter = 0;
+                            r.fadedir = -1;
+                        }
+                    }
+                    
                 }
             }
         }
@@ -97,7 +118,7 @@ class XapMemoryBufferPlayer : public xenakios::XAudioProcessor
         if (m_playbuf)
         {
             auto cachedpos = 0;
-            for (const auto &r : m_routings)
+            for (auto &r : m_routings)
             {
                 cachedpos = m_bufplaypos;
                 if (r.srcchan < m_playbufchans && r.destchan < outchans)
@@ -105,8 +126,17 @@ class XapMemoryBufferPlayer : public xenakios::XAudioProcessor
                     int buf_offset = m_playbufframes * r.srcchan;
                     for (int i = 0; i < nframes; ++i)
                     {
+                        float gain = 0.0f;
+                        if (r.fadedir == 1)
+                            gain = xenakios::mapvalue<float>(r.fadecounter, 0, fadelensamples, 0.0f,
+                                                             1.0f);
+                        else if (r.fadedir == -1 && r.fadecounter < fadelensamples)
+                            gain = xenakios::mapvalue<float>(r.fadecounter, 0, fadelensamples, 1.0f,
+                                                             0.0f);
+                        gain = std::clamp(gain, 0.0f, 1.0f);
                         process->audio_outputs[0].data32[r.destchan][i] +=
-                            m_playbuf[buf_offset + cachedpos];
+                            m_playbuf[buf_offset + cachedpos] * gain;
+                        ++r.fadecounter;
                         ++cachedpos;
                         if (cachedpos >= m_playbufframes)
                         {
@@ -117,6 +147,16 @@ class XapMemoryBufferPlayer : public xenakios::XAudioProcessor
             }
             m_bufplaypos = cachedpos;
         }
+
+        for (int i = m_routings.size() - 1; i >= 0; i--)
+        {
+            auto &r = m_routings[i];
+            if (r.fadecounter >= fadelensamples && r.fadedir == -1)
+            {
+                m_routings.erase(m_routings.begin() + i);
+            }
+        }
+
         return CLAP_PROCESS_CONTINUE;
     }
 
@@ -137,6 +177,8 @@ class XapMemoryBufferPlayer : public xenakios::XAudioProcessor
         {
             return srcchan == other.srcchan && destchan == other.destchan;
         }
+        int fadedir = 0;
+        int fadecounter = 0;
     };
     std::vector<Routing> m_routings;
 };
