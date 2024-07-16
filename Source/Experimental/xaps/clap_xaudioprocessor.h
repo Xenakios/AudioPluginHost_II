@@ -137,7 +137,7 @@ class ClapPluginFormatProcessor : public xenakios::XAudioProcessor
     }
     uint32_t tailGet() const noexcept override
     {
-        if (!m_plug)
+        if (!m_plug || !m_ext_plugin_tail)
             return 0;
         return m_ext_plugin_tail->get(m_plug);
     }

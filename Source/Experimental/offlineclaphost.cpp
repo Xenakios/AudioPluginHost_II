@@ -109,10 +109,13 @@ std::string ClapProcessingEngine::scanPluginFile(std::filesystem::path plugfilep
 void ClapProcessingEngine::processToFile(std::string filename, double duration, double samplerate,
                                          int numoutchans)
 {
+    if (m_chain.size() == 0)
+        throw std::runtime_error("There are no plugins in the chain to process");
     using namespace std::chrono_literals;
 
     int procblocksize = 64;
     std::atomic<bool> renderloopfinished{false};
+    double maxTailSeconds = 0.0;
     for (auto &c : m_chain)
     {
         c->m_seq.sortEvents();
@@ -120,8 +123,15 @@ void ClapProcessingEngine::processToFile(std::string filename, double duration, 
             std::cout << "could not activate " << c->name << "\n";
         // if (!c->m_proc->renderSetMode(CLAP_RENDER_OFFLINE))
         //     std::cout << "was not able to set offline render mode for " << c->name << "\n";
+        auto tail = c->m_proc->tailGet() / samplerate;
+        if (tail > 0.0)
+        {
+            std::cout << c->name << " has tail of " << tail << " seconds\n";
+        }
+        maxTailSeconds = std::max(tail, maxTailSeconds);
     }
-
+    // if more than 15 seconds, it's likely infinite
+    maxTailSeconds = std::min(maxTailSeconds, 15.0);
     //  even offline, do the processing in another another thread because things
     //  can get complicated with plugins like Surge XT because of the thread checks
     std::thread th([&] {
@@ -190,7 +200,9 @@ void ClapProcessingEngine::processToFile(std::string filename, double duration, 
         outfileprops.sampleRate = samplerate;
         choc::audio::WAVAudioFileFormat<true> wavformat;
         auto writer = wavformat.createWriter(filename, outfileprops);
-        // eviter.setTime(0.0);
+        if (!writer)
+            throw std::runtime_error("Could not create audio file for writing: " + filename);
+
         int blockcount = 0;
         using clock = std::chrono::system_clock;
         using ms = std::chrono::duration<double, std::milli>;

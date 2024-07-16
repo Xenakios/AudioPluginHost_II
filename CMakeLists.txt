@@ -83,6 +83,7 @@ target_link_libraries(MainHostApp
 # add_subdirectory(libs/rtaudio)
 project(cmaketest)
 add_subdirectory(libs/pybind11)
+# set (PYBIND11_PYTHON_VERSION "3.12")
 pybind11_add_module(xenakios 
     Source/Python/pybindings.cpp
     Source/Experimental/xaps/clap_xaudioprocessor.cpp
@@ -90,6 +91,8 @@ pybind11_add_module(xenakios
     Source/Experimental/xaudiograph.cpp
     libs/MTS-ESP/Master/libMTSMaster.cpp
 )
+
+# PYBIND11_FINDPYTHON=ON
 
 target_compile_definitions(xenakios PRIVATE _USE_MATH_DEFINES=1 XENPYTHONBINDINGS=1 NOJUCE=1)
 add_custom_command(TARGET xenakios POST_BUILD 
