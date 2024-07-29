@@ -857,7 +857,7 @@ int MyRtAudioCallback(void *outputBuffer, void *inputBuffer, unsigned int nFrame
                       double streamTime, RtAudioStreamStatus status, void *userData)
 {
     float *fbuf = (float *)outputBuffer;
-    std::uniform_real_distribution<float> dist(-0.05f, 0.05f);
+    std::uniform_real_distribution<float> dist(-0.1f, 0.1f);
     for (int i = 0; i < nFrames; ++i)
     {
         float osample = dist(rng);
@@ -887,7 +887,10 @@ inline void test_rtaudio()
         return;
     }
     std::cout << "stream opened with size " << bframes << "\n";
-    ra.startStream();
+    if (ra.startStream() != RTAUDIO_NO_ERROR)
+    {
+        std::cout << "error startng stream\n";
+    }
     using namespace std::chrono_literals;
     std::this_thread::sleep_for(1000ms);
     return;
@@ -997,7 +1000,7 @@ class CorrelatedNoise
 
 inline void test_bluenoise()
 {
-    BlueNoise bn{777};
+    xenakios::BlueNoise bn{777};
     return;
     choc::audio::AudioFileProperties outfileprops;
     double outsr = 44100;
@@ -1013,7 +1016,7 @@ inline void test_bluenoise()
 
         int outlen = 10 * outsr;
         choc::buffer::ChannelArrayBuffer<float> buf(1, outlen);
-        BlueNoise bn;
+        xenakios::BlueNoise bn;
         GoldenRatioNoise grn;
         xenakios::DejaVuRandom dvrand(6);
         CorrelatedNoise corrnoise;
@@ -1187,7 +1190,7 @@ inline void testWebviewCurveEditor()
                             0);
     eng.setSequence(0, sequence);
     eng.processToFile(R"(C:\develop\AudioPluginHost_mk2\audio\webview_xupic_offline02.wav)", 30.0,
-                      44100.0);
+                      44100.0, 2);
 }
 
 inline void test_chained_offline()
@@ -1219,15 +1222,25 @@ inline void test_chained_offline()
         t += 0.1;
     }
 
-    eng.processToFile(R"(C:\develop\AudioPluginHost_mk2\audio\chain_offline_02.wav)", 16.0,
-                      44100.0);
+    eng.processToFile(R"(C:\develop\AudioPluginHost_mk2\audio\chain_offline_02.wav)", 16.0, 44100.0,
+                      2);
 }
+
+class ArrTest
+{
+  public:
+    float arr[44100][2] = {0.1f};
+};
 
 int main()
 {
+    auto at = std::make_unique<ArrTest>();
+    for (int i = 0; i < 100; ++i)
+        std::cout << at->arr[i][1] << " ";
+    std::cout << "\n";
     // test_chained_offline();
     // testWebviewCurveEditor();
-    test_bluenoise();
+    // test_bluenoise();
     // test_no_juce_agraph();
     // test_env2();
     // test_clap_riff();
