@@ -253,9 +253,9 @@ class ClapEventSequence
     struct IteratorSampleTime
     {
         /// Creates an iterator positioned at the start of the sequence.
-        IteratorSampleTime(const ClapEventSequence &s, dpuble sr) : owner(s), sampleRate(sr) {}
-        IteratorSampleTime(const Iterator &) = default;
-        IteratorSampleTime(Iterator &&) = default;
+        IteratorSampleTime(const ClapEventSequence &s, double sr) : owner(s), sampleRate(sr) {}
+        IteratorSampleTime(const IteratorSampleTime &) = default;
+        IteratorSampleTime(IteratorSampleTime &&) = default;
 
         /// Seeks the iterator to the given time
 

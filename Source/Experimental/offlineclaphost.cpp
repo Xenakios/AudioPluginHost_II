@@ -135,12 +135,12 @@ void ClapProcessingEngine::processToFile(std::string filename, double duration, 
     //  even offline, do the processing in another another thread because things
     //  can get complicated with plugins like Surge XT because of the thread checks
     std::thread th([&] {
-        std::vector<ClapEventSequence::Iterator> eviters;
+        std::vector<ClapEventSequence::IteratorSampleTime> eviters;
         int events_in_seqs = 0;
         for (auto &p : m_chain)
         {
             events_in_seqs += p->m_seq.getNumEvents();
-            eviters.emplace_back(p->m_seq);
+            eviters.emplace_back(p->m_seq, samplerate);
         }
         numoutchans = std::clamp(numoutchans, 1, 256);
         clap_process cp;
@@ -219,12 +219,12 @@ void ClapProcessingEngine::processToFile(std::string filename, double duration, 
             double pos_seconds = outcounter / samplerate;
             for (size_t i = 0; i < m_chain.size(); ++i)
             {
-                double diff = (eviters[i].getTime() * samplerate) - outcounter;
-                if (std::abs(diff) >= 0.001)
+                int diff = eviters[i].getTime() - outcounter;
+                if (std::abs(diff) != 0)
                 {
                     // std::cout << pos_seconds << " time has drifted " << diff << "\n";
                 }
-                auto blockevts = eviters[i].readNextEvents(blocksizeseconds);
+                auto blockevts = eviters[i].readNextEvents(procblocksize);
                 for (auto &e : blockevts)
                 {
                     auto ecopy = e.event;
@@ -269,8 +269,8 @@ void ClapProcessingEngine::processToFile(std::string filename, double duration, 
         }
 
         writer->flush();
-        std::cout << events_in_seqs << " events in sequecnes, sent " << eventssent
-                  << " events to plugin\n";
+        // std::cout << events_in_seqs << " events in sequecnes, sent " << eventssent
+        //          << " events to plugin\n";
         std::cout << "finished in " << duration.count() / 1000.0 << " seconds\n";
         renderloopfinished = true;
     });
