@@ -1234,6 +1234,16 @@ class ArrTest
 
 inline void test_tempomap()
 {
+    double sr = 44100.0;
+    choc::audio::WAVAudioFileFormat<true> format;
+    choc::audio::AudioFileProperties props;
+    props.bitDepth = choc::audio::BitDepth::float32;
+    props.formatName = "WAV";
+    props.numChannels = 1;
+    props.sampleRate = sr;
+    auto writer = format.createWriter("tempomap.wav", props);
+    choc::buffer::ChannelArrayBuffer<float> buffer{1, (unsigned int)sr * 16};
+    buffer.clear();
     TempoMap tm;
     // std::cout << tm.beatPosToSeconds(1.0) << "\n";
     tm.setStaticBPM(60.0);
@@ -1241,16 +1251,23 @@ inline void test_tempomap()
 
     tm.m_bpm_envelope.addPoint({0.0, 120.0, xenakios::EnvelopePoint::Shape::Abrupt});
     tm.m_bpm_envelope.addPoint({4.0, 60.0, xenakios::EnvelopePoint::Shape::Abrupt});
-    tm.m_bpm_envelope.addPoint({8.0, 240.0, xenakios::EnvelopePoint::Shape::Linear});
-    tm.m_bpm_envelope.addPoint({16.0, 60.0, xenakios::EnvelopePoint::Shape::Abrupt});
+    tm.m_bpm_envelope.addPoint({8.0, 480.0, xenakios::EnvelopePoint::Shape::Linear});
+    tm.m_bpm_envelope.addPoint({40.0, 60.0, xenakios::EnvelopePoint::Shape::Abrupt});
     tm.updateMapping();
     double b = 0.0;
-    while (b < 17.0)
+    while (b < 40.0)
     {
-        std::cout << b << "\t" << tm.m_bpm_envelope.getValueAtPosition(b) << "\t"
-                  << tm.beatPosToSeconds(b) << "\n";
-        b += 1.0;
+        double secpos = tm.beatPosToSeconds(b);
+        int bufindex = secpos * sr;
+        if (bufindex >= 0 && bufindex < buffer.getNumFrames())
+        {
+            buffer.getSample(0, bufindex) = 0.9f;
+        }
+        // std::cout << b << "\t" << tm.m_bpm_envelope.getValueAtPosition(b) << "\t"
+        //          << secpos << "\n";
+        b += 0.5;
     }
+    writer->appendFrames(buffer.getView());
 }
 
 int main()
