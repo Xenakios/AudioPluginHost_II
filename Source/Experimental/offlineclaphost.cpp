@@ -136,8 +136,10 @@ void ClapProcessingEngine::processToFile(std::string filename, double duration, 
     //  can get complicated with plugins like Surge XT because of the thread checks
     std::thread th([&] {
         std::vector<ClapEventSequence::Iterator> eviters;
+        int events_in_seqs = 0;
         for (auto &p : m_chain)
         {
+            events_in_seqs += p->m_seq.getNumEvents();
             eviters.emplace_back(p->m_seq);
         }
         numoutchans = std::clamp(numoutchans, 1, 256);
@@ -208,19 +210,40 @@ void ClapProcessingEngine::processToFile(std::string filename, double duration, 
         using ms = std::chrono::duration<double, std::milli>;
         const auto start_time = clock::now();
         using namespace std::chrono_literals;
+        double blocksizeseconds = (double)procblocksize / samplerate;
+        int eventssent = 0;
         while (outcounter < outlensamples)
         {
             list_in.clear();
             list_out.clear();
+            double pos_seconds = outcounter / samplerate;
             for (size_t i = 0; i < m_chain.size(); ++i)
             {
-
-                auto blockevts = eviters[i].readNextEvents(procblocksize / samplerate);
+                double diff = (eviters[i].getTime() * samplerate) - outcounter;
+                if (std::abs(diff) >= 0.001)
+                {
+                    // std::cout << pos_seconds << " time has drifted " << diff << "\n";
+                }
+                auto blockevts = eviters[i].readNextEvents(blocksizeseconds);
                 for (auto &e : blockevts)
                 {
                     auto ecopy = e.event;
                     ecopy.header.time = (e.timestamp * samplerate) - outcounter;
+                    if (ecopy.header.time >= cp.frames_count)
+                    {
+                        std::cout << pos_seconds << " event time position error "
+                                  << ecopy.header.time << "\t" << diff << "\n";
+                        ecopy.header.time = cp.frames_count - 1;
+                    }
+                    if (ecopy.header.type == CLAP_EVENT_PARAM_VALUE)
+                    {
+                        auto aev = (clap_event_param_value *)&ecopy;
+                        // std::cout << outcounter / samplerate << "\t" << aev->param_id << "\t"
+                        //          << aev->value << "\t" << aev->header.time << "\n";
+                    }
+
                     list_in.push((const clap_event_header *)&ecopy);
+                    ++eventssent;
                 }
 
                 auto status = m_chain[i]->m_proc->process(&cp);
@@ -230,7 +253,7 @@ void ClapProcessingEngine::processToFile(std::string filename, double duration, 
                 list_out.clear();
                 choc::buffer::copy(inputbuffer, outputbuffer);
             }
-            uint32_t framesToWrite = std::min(outlensamples - outcounter, procblocksize);
+            uint32_t framesToWrite = std::min(int(outlensamples - outcounter), procblocksize);
             auto writeSectionView = outputbuffer.getSection(
                 choc::buffer::ChannelRange{0, (unsigned int)numoutchans}, {0, framesToWrite});
             writer->appendFrames(writeSectionView);
@@ -246,6 +269,8 @@ void ClapProcessingEngine::processToFile(std::string filename, double duration, 
         }
 
         writer->flush();
+        std::cout << events_in_seqs << " events in sequecnes, sent " << eventssent
+                  << " events to plugin\n";
         std::cout << "finished in " << duration.count() / 1000.0 << " seconds\n";
         renderloopfinished = true;
     });

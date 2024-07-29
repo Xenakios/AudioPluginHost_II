@@ -133,7 +133,8 @@ class ClapEventSequence
         ev.target = target;
         m_evlist.push_back(Event(time, &ev));
     }
-    void addAudioRoutingEvent(double time, int32_t target, int32_t opcode, int32_t src, int32_t dest)
+    void addAudioRoutingEvent(double time, int32_t target, int32_t opcode, int32_t src,
+                              int32_t dest)
     {
         clap_event_xen_audiorouting ev;
         ev.header.flags = 0;
@@ -247,6 +248,61 @@ class ClapEventSequence
         const ClapEventSequence &owner;
         double currentTime = 0;
         size_t nextIndex = 0;
+    };
+
+    struct IteratorSampleTime
+    {
+        /// Creates an iterator positioned at the start of the sequence.
+        IteratorSampleTime(const ClapEventSequence &s, dpuble sr) : owner(s), sampleRate(sr) {}
+        IteratorSampleTime(const Iterator &) = default;
+        IteratorSampleTime(Iterator &&) = default;
+
+        /// Seeks the iterator to the given time
+
+        void setTime(int64_t newTimeStamp)
+        {
+            auto eventData = owner.m_evlist.data();
+
+            while (nextIndex != 0 &&
+                   eventData[nextIndex - 1].timestamp * sampleRate >= newTimeStamp)
+                --nextIndex;
+
+            while (nextIndex < owner.m_evlist.size() &&
+                   eventData[nextIndex].timestamp * sampleRate < newTimeStamp)
+                ++nextIndex;
+
+            currentTime = newTimeStamp;
+        }
+
+        /// Returns the current iterator time
+        int64_t getTime() const noexcept { return currentTime; }
+
+        /// Returns a set of events which lie between the current time, up to (but not
+        /// including) the given duration. This function then increments the iterator to
+        /// set its current time to the end of this block.
+
+        choc::span<const ClapEventSequence::Event> readNextEvents(int duration)
+        {
+            auto start = nextIndex;
+            auto eventData = owner.m_evlist.data();
+            auto end = start;
+            auto total = owner.m_evlist.size();
+            auto endTime = currentTime + duration;
+            currentTime = endTime;
+
+            while (end < total && eventData[end].timestamp * sampleRate < endTime)
+                ++end;
+
+            nextIndex = end;
+
+            return {eventData + start, eventData + end};
+        }
+
+      private:
+        const ClapEventSequence &owner;
+        int64_t currentTime = 0;
+        size_t nextIndex = 0;
+        double sampleRate = 0.0;
     };
 };
 
