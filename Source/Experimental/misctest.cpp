@@ -1232,12 +1232,30 @@ class ArrTest
     float arr[44100][2] = {0.1f};
 };
 
+inline void test_tempomap()
+{
+    TempoMap tm;
+    // std::cout << tm.beatPosToSeconds(1.0) << "\n";
+    tm.setStaticBPM(60.0);
+    // std::cout << tm.beatPosToSeconds(1.0) << "\n";
+
+    tm.m_bpm_envelope.addPoint({0.0, 120.0, xenakios::EnvelopePoint::Shape::Abrupt});
+    tm.m_bpm_envelope.addPoint({4.0, 60.0, xenakios::EnvelopePoint::Shape::Abrupt});
+    tm.m_bpm_envelope.addPoint({8.0, 240.0, xenakios::EnvelopePoint::Shape::Linear});
+    tm.m_bpm_envelope.addPoint({16.0, 60.0, xenakios::EnvelopePoint::Shape::Abrupt});
+    tm.updateMapping();
+    double b = 0.0;
+    while (b < 17.0)
+    {
+        std::cout << b << "\t" << tm.m_bpm_envelope.getValueAtPosition(b) << "\t"
+                  << tm.beatPosToSeconds(b) << "\n";
+        b += 1.0;
+    }
+}
+
 int main()
 {
-    auto at = std::make_unique<ArrTest>();
-    for (int i = 0; i < 100; ++i)
-        std::cout << at->arr[i][1] << " ";
-    std::cout << "\n";
+    test_tempomap();
     // test_chained_offline();
     // testWebviewCurveEditor();
     // test_bluenoise();

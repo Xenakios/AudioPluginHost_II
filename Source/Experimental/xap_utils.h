@@ -46,6 +46,7 @@ class EnvelopePoint
     {
         Linear,
         Hold,
+        Abrupt,
         Last
     };
     EnvelopePoint() {}
@@ -128,6 +129,10 @@ template <size_t BLOCK_SIZE = 64> class Envelope
             if (value < 0.99)
                 return 0.0;
             return xenakios::mapvalue(value, 0.99, 1.0, 0.0, 1.0);
+        }
+        if (shape == EnvelopePoint::Shape::Abrupt)
+        {
+            return 0.0;
         }
         return value;
     }
@@ -229,7 +234,8 @@ template <size_t BLOCK_SIZE = 64> class Envelope
             else
             {
                 double ydiff = y1 - y0;
-                outvalue = y0 + ydiff * ((1.0 / xdiff * (timepos - x0)));
+                double normpos = ((1.0 / xdiff * (timepos - x0)));
+                outvalue = y0 + ydiff * getShapedValue(normpos, pt0.getShape(), 0.0, 0.0);
             }
             if (interpolate_mode == 1)
             {
@@ -746,7 +752,7 @@ struct clap_event_xen_audiobuffer
 {
     clap_event_header header;
     int32_t target;
-    double* buffer;
+    double *buffer;
     int32_t numchans;
     int32_t numframes;
     int32_t samplerate;

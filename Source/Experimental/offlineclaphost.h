@@ -631,6 +631,44 @@ class MultiModulator
     std::array<OutputProps, 8> outputprops;
 };
 
+class TempoMap
+{
+  public:
+    TempoMap() { m_beat_to_secs_map.reserve(65536); }
+    double beatPosToSeconds(double beatpos)
+    {
+        if (!isEnvelopeActive())
+            return 60.0 / m_static_bpm * beatpos;
+        int index = beatpos * 4;
+        if (index >= 0 && index < m_beat_to_secs_map.size())
+            return m_beat_to_secs_map[index];
+        return 60.0 / m_static_bpm * beatpos;
+    }
+    bool isEnvelopeActive() { return m_bpm_envelope.getNumPoints() > 0; }
+    void setStaticBPM(double bpm) { m_static_bpm = std::clamp(bpm, 5.0, 1000.0); }
+    xenakios::Envelope<64> m_bpm_envelope;
+    void updateMapping()
+    {
+        double lastbeat = m_bpm_envelope.getPointSafe(m_bpm_envelope.getNumPoints() - 1).getX();
+        int num_to_eval = 4 * std::round(lastbeat);
+        double beat = 0.0;
+        double t = 0.0;
+        m_beat_to_secs_map.clear();
+        while (beat < lastbeat + 1.0)
+        {
+            double bpm = m_bpm_envelope.getValueAtPosition(beat);
+            m_beat_to_secs_map.push_back(t);
+            t += 60.0 / bpm * 0.25;
+            beat += 0.25;
+        }
+    }
+
+  private:
+    double m_static_bpm = 120.0;
+
+    std::vector<double> m_beat_to_secs_map;
+};
+
 class ClapProcessingEngine
 {
 
