@@ -116,6 +116,18 @@ class ClapEventSequence
             m_evlist.push_back(Event(time, &ev));
         }
     }
+    void addTransportEvent(double time, double tempo)
+    {
+        clap_event_transport ev;
+        ev.header.flags = 0;
+        ev.header.size = sizeof(clap_event_transport);
+        ev.header.space_id = CLAP_CORE_EVENT_SPACE_ID;
+        ev.header.time = 0;
+        ev.header.type = CLAP_EVENT_TRANSPORT;
+        ev.tempo = tempo;
+        ev.flags = CLAP_TRANSPORT_HAS_TEMPO;
+        m_evlist.push_back(Event(time, &ev));
+    }
     void addAudioBufferEvent(double time, int32_t target, double *buf, int32_t numchans,
                              int32_t numframes, int32_t samplerate)
     {
@@ -249,7 +261,9 @@ class ClapEventSequence
         double currentTime = 0;
         size_t nextIndex = 0;
     };
-
+    // to avoid issues with accumulating time counts going out of sync,
+    // this iterator deals with time positions as samples and needs to be provided
+    // the current playback sample rate
     struct IteratorSampleTime
     {
         /// Creates an iterator positioned at the start of the sequence.

@@ -141,6 +141,7 @@ PYBIND11_MODULE(xenakios, m)
              "time"_a = 0.0, "port"_a = -1, "ch"_a = -1, "key"_a = -1, "nid"_a = -1, "parid"_a,
              "val"_a)
         .def("addProgramChange", &ClapEventSequence::addProgramChange)
+        .def("addTransportEvent", &ClapEventSequence::addTransportEvent)
         .def("addNoteExpression", &ClapEventSequence::addNoteExpression);
 
     py::module m_const = m.def_submodule("constants", "Constants");

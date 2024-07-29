@@ -210,7 +210,7 @@ void ClapProcessingEngine::processToFile(std::string filename, double duration, 
         using ms = std::chrono::duration<double, std::milli>;
         const auto start_time = clock::now();
         using namespace std::chrono_literals;
-        double blocksizeseconds = (double)procblocksize / samplerate;
+
         int eventssent = 0;
         while (outcounter < outlensamples)
         {
@@ -219,11 +219,6 @@ void ClapProcessingEngine::processToFile(std::string filename, double duration, 
             double pos_seconds = outcounter / samplerate;
             for (size_t i = 0; i < m_chain.size(); ++i)
             {
-                int diff = eviters[i].getTime() - outcounter;
-                if (std::abs(diff) != 0)
-                {
-                    // std::cout << pos_seconds << " time has drifted " << diff << "\n";
-                }
                 auto blockevts = eviters[i].readNextEvents(procblocksize);
                 for (auto &e : blockevts)
                 {
@@ -231,17 +226,29 @@ void ClapProcessingEngine::processToFile(std::string filename, double duration, 
                     ecopy.header.time = (e.timestamp * samplerate) - outcounter;
                     if (ecopy.header.time >= cp.frames_count)
                     {
-                        std::cout << pos_seconds << " event time position error "
-                                  << ecopy.header.time << "\t" << diff << "\n";
+                        // this should not happen but in case it does, place the event at the last
+                        // buffer sample position
                         ecopy.header.time = cp.frames_count - 1;
                     }
                     if (ecopy.header.type == CLAP_EVENT_PARAM_VALUE)
                     {
                         auto aev = (clap_event_param_value *)&ecopy;
                         // std::cout << outcounter / samplerate << "\t" << aev->param_id << "\t"
-                        //          << aev->value << "\t" << aev->header.time << "\n";
+                        //          << aev->value << "\t"
+                        //          << (outcounter + aev->header.time) / samplerate << "\n";
                     }
-
+                    if (ecopy.header.type == CLAP_EVENT_TRANSPORT)
+                    {
+                        auto tev = (clap_event_transport *)&ecopy;
+                        if (tev->flags & CLAP_TRANSPORT_HAS_TEMPO)
+                        {
+                            std::cout << pos_seconds << " transport event with tempo " << tev->tempo
+                                      << "\n";
+                        } else
+                        {
+                            std::cout << pos_seconds << " transport event with unsupported properties\n";
+                        }
+                    }
                     list_in.push((const clap_event_header *)&ecopy);
                     ++eventssent;
                 }
@@ -262,16 +269,18 @@ void ClapProcessingEngine::processToFile(std::string filename, double duration, 
 
             outcounter += procblocksize;
         }
-        const ms duration = clock::now() - start_time;
+        const ms render_duration = clock::now() - start_time;
+        double rtfactor = (duration * 1000.0) / render_duration.count();
         for (auto &p : m_chain)
         {
             p->m_proc->stopProcessing();
         }
-
+        // writer->getProperties().metadata
         writer->flush();
         // std::cout << events_in_seqs << " events in sequecnes, sent " << eventssent
         //          << " events to plugin\n";
-        std::cout << "finished in " << duration.count() / 1000.0 << " seconds\n";
+        std::cout << "finished in " << render_duration.count() / 1000.0 << " seconds, " << rtfactor
+                  << "x realtime\n";
         renderloopfinished = true;
     });
     using namespace std::chrono_literals;
