@@ -91,10 +91,16 @@ pybind11_add_module(xenakios
     Source/Experimental/xaudiograph.cpp
     libs/MTS-ESP/Master/libMTSMaster.cpp
 )
-
+target_link_libraries(xenakios PRIVATE juce::juce_core juce::juce_audio_utils)
 # PYBIND11_FINDPYTHON=ON
 
-target_compile_definitions(xenakios PRIVATE _USE_MATH_DEFINES=1 XENPYTHONBINDINGS=1 NOJUCE=1)
+target_compile_definitions(xenakios PRIVATE 
+    _USE_MATH_DEFINES=1 
+    XENPYTHONBINDINGS=1 
+    NOJUCE=1
+    JUCE_PLUGINHOST_VST3=1
+    )
+    
 add_custom_command(TARGET xenakios POST_BUILD 
   COMMAND "${CMAKE_COMMAND}" -E copy 
      "$<TARGET_FILE:xenakios>"

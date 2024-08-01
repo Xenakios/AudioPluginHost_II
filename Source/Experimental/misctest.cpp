@@ -26,6 +26,7 @@
 #include "xaudiograph.h"
 #include "dejavurandom.h"
 #include "bluenoise.h"
+#include <variant>
 
 class object_t
 {
@@ -422,7 +423,7 @@ inline void test_lanczos()
         srprovider.initTables();
         using LFOType =
             sst::basic_blocks::modulators::SimpleLFO<SRProvider<BLOCK_SIZE>, BLOCK_SIZE>;
-        LFOType lfo1(&srprovider, 1);
+        LFOType lfo1(&srprovider);
         xenakios::Envelope<BLOCK_SIZE> rate_env{
             {{0.0, 36.0}, {2.5, -12.0}, {5.0, 0.0}, {5.1, 6.0}, {8.0, 6.0}, {10.0, -7.0}}};
         xenakios::Envelope<BLOCK_SIZE> deform_env{
@@ -1270,9 +1271,38 @@ inline void test_tempomap()
     writer->appendFrames(buffer.getView());
 }
 
+// helper type for the visitor #4
+template <class... Ts> struct overloaded : Ts...
+{
+    using Ts::operator()...;
+};
+
+inline void test_clapvariant()
+{
+    std::vector<std::variant<clap_event_note, clap_event_param_value, clap_event_note_expression>>
+        events;
+    events.push_back(xenakios::make_event_note(0, CLAP_EVENT_NOTE_ON, 0, 0, 60, -1, 1.0));
+    events.push_back(xenakios::make_event_param_value(0, 666, 0.5, nullptr, -1, -1, -1, -1));
+    events.push_back(xenakios::make_event_note(100, CLAP_EVENT_NOTE_OFF, 0, 0, 60, -1, 1.0));
+    events.push_back(xenakios::make_event_note_expression(200, 0, 0, 0, 60, -1, 0.333));
+    for (auto &e : events)
+    {
+        std::visit(overloaded{[](const clap_event_note &nev) {
+                                  std::cout << "note event with key " << nev.key << "\n";
+                              },
+                              [](const clap_event_param_value &pev) {
+                                  std::cout << "param value event with param id " << pev.param_id
+                                            << "\n";
+                              },
+                              [](const auto &ukn) { std::cout << "unhandled event\n"; }},
+                   e);
+    }
+}
+
 int main()
 {
-    test_tempomap();
+    test_clapvariant();
+    // test_tempomap();
     // test_chained_offline();
     // testWebviewCurveEditor();
     // test_bluenoise();

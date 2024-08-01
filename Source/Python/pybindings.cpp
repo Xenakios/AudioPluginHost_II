@@ -14,8 +14,18 @@
 #include "libMTSMaster.h"
 #include "Tunings.h"
 #include "../Experimental/bluenoise.h"
+// #include "juce_core/juce_core.h"
+#include "juce_audio_utils/juce_audio_utils.h"
 
 namespace py = pybind11;
+
+inline void juceTest()
+{
+    juce::AudioPluginFormatManager mana;
+    mana.addDefaultFormats();
+    for(auto& e : mana.getFormats())
+        std::cout << e->getName() << "\n";
+}
 
 inline void writeArrayToFile(const py::array_t<double> &arr, double samplerate,
                              std::filesystem::path path)
@@ -220,6 +230,7 @@ PYBIND11_MODULE(xenakios, m)
         .def("setLFOProps", &MultiModulator::setLFOProps);
 
     m.def("writeArrayToFile", &writeArrayToFile);
+    m.def("juceTest", &juceTest);
 
     m.def("generateNoteExpressionsFromEnvelope", &generateNoteExpressionsFromEnvelope, "",
           py::arg("targetSequence"), py::arg("sourceEnvelope"), py::arg("eventsStartTime"),
