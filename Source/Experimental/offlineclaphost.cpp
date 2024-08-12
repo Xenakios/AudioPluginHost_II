@@ -244,9 +244,11 @@ void ClapProcessingEngine::processToFile(std::string filename, double duration, 
                         {
                             std::cout << pos_seconds << " transport event with tempo " << tev->tempo
                                       << "\n";
-                        } else
+                        }
+                        else
                         {
-                            std::cout << pos_seconds << " transport event with unsupported properties\n";
+                            std::cout << pos_seconds
+                                      << " transport event with unsupported properties\n";
                         }
                     }
                     list_in.push((const clap_event_header *)&ecopy);
@@ -415,7 +417,6 @@ void ClapProcessingEngine::openPluginGUIBlocking(size_t chainIndex)
         m_plug->guiDestroy();
         choc::messageloop::stop();
     };
-
     clap_window clapwin;
     clapwin.api = "win32";
     clapwin.win32 = window.getWindowHandle();

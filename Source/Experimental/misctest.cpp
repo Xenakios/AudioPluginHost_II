@@ -1299,9 +1299,35 @@ inline void test_clapvariant()
     }
 }
 
+using ParameterView = choc::buffer::MonoView<float>;
+using AudioView = choc::buffer::ChannelArrayBuffer<float>;
+
+static inline void chocmultiply(AudioView target, ParameterView other)
+{
+    auto target_it = target.getIterator(0);
+    auto other_it = other.getIterator(0);
+
+    for (choc::buffer::FrameCount i = 0; i < target.getNumFrames(); ++i)
+    {
+        *target_it *= *(other_it++);
+        ++target_it;
+    }
+}
+
+inline void test_chocbuf()
+{
+    int bufsize = 512;
+    choc::buffer::ChannelArrayBuffer<float> buffer{2,
+                                                   static_cast<choc::buffer::FrameCount>(bufsize)};
+    // choc::buffer::MonoBuffer<float> gainbuffer{(unsigned int)1, (unsigned int)256};
+    auto gainbuffer = choc::buffer::createMonoBuffer(256, []() { return 0.0f; });
+    // chocmultiply(buffer.getView(), gainbuffer.getView());
+}
+
 int main()
 {
-    test_clapvariant();
+    test_chocbuf();
+    // test_clapvariant();
     // test_tempomap();
     // test_chained_offline();
     // testWebviewCurveEditor();

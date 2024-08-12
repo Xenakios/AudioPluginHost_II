@@ -1,9 +1,13 @@
 #pragma once
 
 #include <vector>
-#include <optional>
+#include <filesystem>
 #include <map>
 #include <iostream>
+
+#include "audio/choc_AudioFileFormat.h"
+#include "memory/choc_Base64.h"
+#include "audio/choc_SampleBuffers.h"
 #include "audio/choc_AudioFileFormat_WAV.h"
 #include "xapdsp.h"
 #include "xap_utils.h"
