@@ -91,7 +91,8 @@ pybind11_add_module(xenakios
     Source/Experimental/xaudiograph.cpp
     libs/MTS-ESP/Master/libMTSMaster.cpp
 )
-target_link_libraries(xenakios PRIVATE juce::juce_core juce::juce_audio_utils)
+# target_link_libraries(xenakios PRIVATE juce::juce_core juce::juce_audio_utils)
+
 # PYBIND11_FINDPYTHON=ON
 
 target_compile_definitions(xenakios PRIVATE 
@@ -106,6 +107,15 @@ add_custom_command(TARGET xenakios POST_BUILD
      "$<TARGET_FILE:xenakios>"
      "C:/Users/teemu/AppData/Local/Programs/Python/Python312/Lib/site-packages/$<TARGET_FILE_NAME:xenakios>" 
   COMMENT "Copying to output directory")
+
+add_custom_command(TARGET xenakios POST_BUILD 
+  COMMAND pybind11-stubgen 
+  "xenakios" 
+  "-o" 
+  "C:/Users/teemu/AppData/Local/Programs/Python/Python312/Lib/site-packages"
+     
+  COMMENT "Generating Python stubs")
+
 
 # this is used for simple C++ testing/experimenting stuff without Juce
 add_executable(TestingProgram 

@@ -19,7 +19,6 @@ void ClapProcessingEngine::addProcessorToChain(std::string plugfilename, int plu
     {
         plug = std::make_unique<ClapPluginFormatProcessor>(plugfilename, pluginindex);
     }
-
     if (plug)
     {
         auto chainEntry = std::make_unique<ProcessorEntry>();
