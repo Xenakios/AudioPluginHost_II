@@ -21,9 +21,8 @@
 #include "Tunings.h"
 #include "../Experimental/bluenoise.h"
 
-
-
 namespace py = pybind11;
+
 #if !NOJUCE
 inline void juceTest(std::string plugfilename)
 {
