@@ -1,5 +1,6 @@
 #include "clap_xaudioprocessor.h"
 #include <iostream>
+#include <stdexcept>
 
 #ifndef JUCE_CORE_H_INCLUDED
 WebViewGenericEditor::WebViewGenericEditor(xenakios::XAudioProcessor *xap) : m_xap(xap)
@@ -147,6 +148,9 @@ ClapPluginFormatProcessor::ClapPluginFormatProcessor(std::string plugfilename, i
                 std::cout << "no plugins to manufacture\n";
                 return;
             }
+            if (plugindex >= plugin_count)
+                throw std::runtime_error("Plugin index out of bounds, maximum allowed is " +
+                                         std::to_string(plugin_count - 1));
             auto desc = fac->get_plugin_descriptor(fac, plugindex);
             if (desc)
             {
