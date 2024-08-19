@@ -1,6 +1,12 @@
 #include "offlineclaphost.h"
+#include "clap/ext/audio-ports.h"
+#include "clap/ext/note-ports.h"
+#include "clap/plugin.h"
 #include "text/choc_Files.h"
 #include "xaps/xap_memorybufferplayer.h"
+#include <cstring>
+#include <format>
+#include <stdexcept>
 
 using namespace std::chrono_literals;
 
@@ -120,8 +126,16 @@ void ClapProcessingEngine::processToFile(std::string filename, double duration, 
         c->m_seq.sortEvents();
         if (!c->m_proc->activate(samplerate, procblocksize, procblocksize))
             std::cout << "could not activate " << c->name << "\n";
-        // if (!c->m_proc->renderSetMode(CLAP_RENDER_OFFLINE))
-        //     std::cout << "was not able to set offline render mode for " << c->name << "\n";
+        for (int i = 0; i < c->m_proc->audioPortsCount(true); ++i)
+        {
+            clap_audio_port_info_t apinfo;
+            c->m_proc->audioPortsInfo(i, true, &apinfo);
+            std::cout << "port " << i << " has " << apinfo.channel_count
+                      << " audio input channels\n";
+        }
+
+        if (!c->m_proc->renderSetMode(CLAP_RENDER_OFFLINE))
+            std::cout << "was not able to set offline render mode for " << c->name << "\n";
         auto tail = c->m_proc->tailGet() / samplerate;
         if (tail > 0.0)
         {
@@ -158,18 +172,23 @@ void ClapProcessingEngine::processToFile(std::string filename, double duration, 
         inbufs[0].data64 = nullptr;
         cp.audio_inputs = inbufs;
 
-        cp.audio_outputs_count = 1;
+        constexpr size_t numports = 20;
+        std::vector<choc::buffer::ChannelArrayBuffer<float>> outputbuffers;
+        outputbuffers.reserve(numports);
+        cp.audio_outputs_count = numports;
+        clap_audio_buffer outbufs[32];
+        for (int i = 0; i < numports; ++i)
+        {
+            outputbuffers.emplace_back((unsigned int)numoutchans, (unsigned int)procblocksize);
+            outputbuffers.back().clear();
+            outbufs[i].channel_count = numoutchans;
+            outbufs[i].constant_mask = 0;
+            outbufs[i].latency = 0;
+            auto chansdata = outputbuffers.back().getView().data.channels;
+            outbufs[i].data32 = (float **)chansdata;
+            outbufs[i].data64 = nullptr;
+        }
 
-        choc::buffer::ChannelArrayBuffer<float> outputbuffer{(unsigned int)numoutchans,
-                                                             (unsigned int)procblocksize};
-        outputbuffer.clear();
-        clap_audio_buffer outbufs[1];
-        outbufs[0].channel_count = numoutchans;
-        outbufs[0].constant_mask = 0;
-        outbufs[0].latency = 0;
-        auto chansdata = outputbuffer.getView().data.channels;
-        outbufs[0].data32 = (float **)chansdata;
-        outbufs[0].data64 = nullptr;
         cp.audio_outputs = outbufs;
 
         clap_event_transport transport;
@@ -259,10 +278,10 @@ void ClapProcessingEngine::processToFile(std::string filename, double duration, 
                     throw std::runtime_error("Clap processing failed");
                 list_in.clear();
                 list_out.clear();
-                choc::buffer::copy(inputbuffer, outputbuffer);
+                choc::buffer::copy(inputbuffer, outputbuffers[0]);
             }
             uint32_t framesToWrite = std::min(int(outlensamples - outcounter), procblocksize);
-            auto writeSectionView = outputbuffer.getSection(
+            auto writeSectionView = outputbuffers[0].getSection(
                 choc::buffer::ChannelRange{0, (unsigned int)numoutchans}, {0, framesToWrite});
             writer->appendFrames(writeSectionView);
             // std::cout << outcounter << " ";
@@ -301,7 +320,8 @@ void ClapProcessingEngine::processToFile(std::string filename, double duration, 
     }
 }
 
-void ClapProcessingEngine::saveStateToFile(size_t chainIndex, const std::filesystem::path &filepath)
+void ClapProcessingEngine::saveStateToJSONFile(size_t chainIndex,
+                                               const std::filesystem::path &filepath)
 {
     if (chainIndex >= m_chain.size())
         throw std::runtime_error("Chain index out of bounds");
@@ -339,8 +359,8 @@ void ClapProcessingEngine::saveStateToFile(size_t chainIndex, const std::filesys
             "Can not store state of plugin that doesn't implement plugin descriptor");
 }
 
-void ClapProcessingEngine::loadStateFromFile(size_t chainIndex,
-                                             const std::filesystem::path &filepath)
+void ClapProcessingEngine::loadStateFromJSONFile(size_t chainIndex,
+                                                 const std::filesystem::path &filepath)
 {
     if (chainIndex >= m_chain.size())
         throw std::runtime_error("Chain index out of bounds");
@@ -387,6 +407,93 @@ void ClapProcessingEngine::loadStateFromFile(size_t chainIndex,
     }
     else
         throw std::runtime_error("File is not json with a plugin_id");
+}
+
+void ClapProcessingEngine::saveStateToBinaryFile(size_t chainIndex,
+                                                 const std::filesystem::path &filepath)
+{
+    if (chainIndex >= m_chain.size())
+        throw std::runtime_error("Processor index out of bounds");
+    auto plug = m_chain[chainIndex]->m_proc.get();
+    clap_plugin_descriptor desc;
+    if (!plug->getDescriptor(&desc))
+    {
+        throw std::runtime_error("Can't save state of plugin without descriptor");
+    }
+    std::ofstream ofs(filepath, std::ios::binary);
+    if (ofs.is_open())
+    {
+        ofs.write("CLAPSTATE   ", 12);
+        int version = 0;
+        ofs.write((const char *)&version, sizeof(int));
+        int len = strlen(desc.id);
+        ofs.write((const char *)&len, sizeof(int));
+        ofs.write(desc.id, len);
+        clap_ostream costream;
+        costream.ctx = &ofs;
+        // returns the number of bytes written; -1 on write error
+        // int64_t(CLAP_ABI *write)(const struct clap_ostream *stream, const void *buffer,
+        // uint64_t size);
+        costream.write = [](const struct clap_ostream *stream, const void *buffer, uint64_t size) {
+            std::cout << "plugin asked to write " << size << " bytes\n";
+            auto &ctxofs = *((std::ofstream *)stream->ctx);
+            ctxofs.write((const char *)buffer, size);
+            return int64_t(size);
+        };
+        if (plug->stateSave(&costream))
+        {
+            std::cout << ofs.tellp() << " bytes written to file\n";
+        }
+    }
+}
+
+void ClapProcessingEngine::loadStateFromBinaryFile(size_t chainIndex,
+                                                   const std::filesystem::path &filepath)
+{
+    if (chainIndex >= m_chain.size())
+        throw std::runtime_error("Processor index out of bounds");
+    auto plug = m_chain[chainIndex]->m_proc.get();
+    clap_plugin_descriptor desc;
+    if (!plug->getDescriptor(&desc))
+    {
+        throw std::runtime_error("Can't load state of plugin without descriptor");
+    }
+    std::ifstream ins(filepath, std::ios::binary);
+    if (ins.is_open())
+    {
+        char magic[13];
+        memset(magic, 0, 13);
+        ins.read(magic, 12);
+        if (strcmp(magic, "CLAPSTATE   "))
+        {
+            throw std::runtime_error("Invalid magic in file");
+        }
+        int i = -1;
+        ins.read((char *)&i, sizeof(int));
+        std::cout << "clap state version " << i << "\n";
+        ins.read((char *)&i, sizeof(int));
+        std::cout << "clap id len : " << i << "\n";
+        std::string id;
+        id.resize(i);
+        ins.read(id.data(), i);
+        std::cout << "clap id : " << id << "\n";
+        if (strcmp(desc.id, id.c_str()) != 0)
+        {
+            throw std::runtime_error(std::format("{} can't load state saved from {}", desc.id, id));
+        }
+        clap_istream clapistream;
+        clapistream.ctx = &ins;
+        // returns the number of bytes read; 0 indicates end of file and -1 a read error
+        // int64_t(CLAP_ABI *read)(const struct clap_istream *stream, void *buffer, uint64_t
+        // size);
+        clapistream.read = [](const struct clap_istream *stream, void *buffer, uint64_t size) {
+            auto &ctxifstream = *(std::ifstream *)stream->ctx;
+            ctxifstream.read((char *)buffer, size);
+            // std::cout << "stream gcount " << ctxifstream.gcount() << "\n";
+            return int64_t(ctxifstream.gcount());
+        };
+        plug->stateLoad(&clapistream);
+    }
 }
 
 void ClapProcessingEngine::openPluginGUIBlocking(size_t chainIndex)

@@ -1,3 +1,4 @@
+#include <fstream>
 #include <iostream>
 #include <memory>
 #include <vector>
@@ -7,6 +8,8 @@
 #include <algorithm>
 #include <cassert>
 #include <random>
+#include "clap/plugin.h"
+#include "clap/stream.h"
 #include "xap_utils.h"
 #include "concurrentqueue.h"
 #include <chrono>
@@ -23,6 +26,7 @@
 #include "gui/choc_WebView.h"
 #include "text/choc_Files.h"
 #include "RtAudio.h"
+#include "xaps/clap_xaudioprocessor.h"
 #include "xaudiograph.h"
 #include "dejavurandom.h"
 #include "bluenoise.h"
@@ -696,8 +700,96 @@ inline void test_clapvariant()
     }
 }
 
+inline void test_binary_clap_state()
+{
+    auto clap = std::make_unique<ClapPluginFormatProcessor>(
+        R"(C:\Program Files\Common Files\CLAP\Surge Synth Team\Surge XT.clap)", 0);
+    std::string filename = R"(C:\develop\AudioPluginHost_mk2\clapstatetests\sfxtestfile.bin)";
+    if (true)
+    {
+        std::ofstream ofs(filename, std::ios::binary);
+        if (ofs.is_open())
+        {
+            clap_plugin_descriptor desc;
+            clap->getDescriptor(&desc);
+            ofs.write("CLAPSTATE   ", 12);
+            int version = 0;
+            ofs.write((const char *)&version, sizeof(int));
+            int len = strlen(desc.id);
+            ofs.write((const char *)&len, sizeof(int));
+            ofs.write(desc.id, len);
+            clap_ostream costream;
+            costream.ctx = &ofs;
+            // returns the number of bytes written; -1 on write error
+            // int64_t(CLAP_ABI *write)(const struct clap_ostream *stream, const void *buffer,
+            // uint64_t size);
+            costream.write = [](const struct clap_ostream *stream, const void *buffer,
+                                uint64_t size) {
+                std::cout << "plugin asked to write " << size << " bytes\n";
+                auto &ctxofs = *((std::ofstream *)stream->ctx);
+                ctxofs.write((const char *)buffer, size);
+                return int64_t(size);
+            };
+            if (clap->stateSave(&costream))
+            {
+                std::cout << ofs.tellp() << " bytes written to file\n";
+            }
+        }
+    }
+    {
+        std::ifstream ins(filename, std::ios::binary);
+        if (ins.is_open())
+        {
+            char magic[13];
+            memset(magic, 0, 13);
+            ins.read(magic, 12);
+            if (strcmp(magic, "CLAPSTATE   "))
+            {
+                std::cout << "invalid magic in file " << magic << "\n";
+                return;
+            }
+            int i = -1;
+            ins.read((char *)&i, sizeof(int));
+            std::cout << "clap state version " << i << "\n";
+            ins.read((char *)&i, sizeof(int));
+            std::cout << "clap id len : " << i << "\n";
+            std::string id;
+            id.resize(i);
+            ins.read(id.data(), i);
+            std::cout << "clap id : " << id << "\n";
+            clap_istream clapistream;
+            clapistream.ctx = &ins;
+            // returns the number of bytes read; 0 indicates end of file and -1 a read error
+            // int64_t(CLAP_ABI *read)(const struct clap_istream *stream, void *buffer, uint64_t
+            // size);
+            clapistream.read = [](const struct clap_istream *stream, void *buffer, uint64_t size) {
+                auto &ctxifstream = *(std::ifstream *)stream->ctx;
+                ctxifstream.read((char *)buffer, size);
+                std::cout << "stream gcount " << ctxifstream.gcount() << "\n";
+                return int64_t(ctxifstream.gcount());
+            };
+            clap->stateLoad(&clapistream);
+        }
+    }
+}
+
+inline void test_sc()
+{
+    ClapProcessingEngine eng;
+    eng.addProcessorToChain(
+        R"(C:\Program Files\Common Files\CLAP\Surge Synth Team\Shortcircuit XT.clap)", 0);
+    eng.loadStateFromBinaryFile(0,
+                                R"(C:\develop\AudioPluginHost_mk2\clapstatetests\SCtestfile.bin)");
+    auto &seq = eng.getSequence(0);
+    seq.addNote(0.5, 4.0, 0, 1, 60, 0, 1.0, 0.0);
+    eng.processToFile(R"(C:\develop\AudioPluginHost_mk2\clapstatetests\SCtestfile.wav)", 5.0,
+                      44100.0, 2);
+}
+
 int main()
 {
+    test_sc();
+    // test_binary_clap_state();
     // test_clapvariant();
     // test_tempomap();
     // test_chained_offline();

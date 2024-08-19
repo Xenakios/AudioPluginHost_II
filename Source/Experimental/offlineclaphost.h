@@ -729,10 +729,10 @@ class ClapProcessingEngine
     }
     std::string getParameterInfoString(size_t chainIndex, size_t index);
 
-    void saveStateToFile(size_t chainIndex, const std::filesystem::path &filepath);
-    void loadStateFromFile(size_t chainIndex, const std::filesystem::path &filepath);
-    std::string m_stateFileToLoad;
-    void enqueueStateFile(std::string filename) { m_stateFileToLoad = filename; }
+    void saveStateToJSONFile(size_t chainIndex, const std::filesystem::path &filepath);
+    void loadStateFromJSONFile(size_t chainIndex, const std::filesystem::path &filepath);
+    void saveStateToBinaryFile(size_t chainIndex, const std::filesystem::path &filepath);
+    void loadStateFromBinaryFile(size_t chainIndex, const std::filesystem::path &filepath);
 
     void processToFile(std::string filename, double duration, double samplerate, int numoutchans);
 

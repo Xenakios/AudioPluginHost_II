@@ -32,7 +32,7 @@ inline void juceTest(std::string plugfilename)
     juce::OwnedArray<juce::PluginDescription> descarr;
     juce::VST3PluginFormat vst3;
     vst3.findAllTypesForFile(descarr, plugfilename);
-    for (auto& e : descarr)
+    for (auto &e : descarr)
     {
         std::cout << e->name << "\t" << e->fileOrIdentifier << "\n";
     }
@@ -41,7 +41,7 @@ inline void juceTest(std::string plugfilename)
 inline void writeArrayToFile(const py::array_t<double> &arr, double samplerate,
                              std::filesystem::path path)
 {
-    
+
     uint32_t numChans = arr.shape(0);
     choc::audio::AudioFileProperties outfileprops;
     outfileprops.formatName = "WAV";
@@ -157,8 +157,8 @@ PYBIND11_MODULE(xenakios, m)
         .def("addNoteOff", &ClapEventSequence::addNoteOff)
         .def("addNote", &ClapEventSequence::addNote, "time"_a = 0.0, "dur"_a = 0.05, "port"_a = 0,
              "ch"_a = 0, "key"_a, "nid"_a = -1, "velo"_a = 1.0, "retune"_a = 0.0)
-        .def("addNoteFloatPitch", &ClapEventSequence::addNoteF, "time"_a = 0.0, "dur"_a = 0.05, "port"_a = 0,
-             "ch"_a = 0, "pitch"_a, "nid"_a = -1, "velo"_a = 1.0)
+        .def("addNoteFloatPitch", &ClapEventSequence::addNoteF, "time"_a = 0.0, "dur"_a = 0.05,
+             "port"_a = 0, "ch"_a = 0, "pitch"_a, "nid"_a = -1, "velo"_a = 1.0)
         .def("addParameterEvent", &ClapEventSequence::addParameterEvent, "ismod"_a = false,
              "time"_a = 0.0, "port"_a = -1, "ch"_a = -1, "key"_a = -1, "nid"_a = -1, "parid"_a,
              "val"_a)
@@ -178,7 +178,6 @@ PYBIND11_MODULE(xenakios, m)
     C(CLAP_NOTE_EXPRESSION_EXPRESSION);
 
     m_const.attr("MIDI_0_FREQ") = Tunings::MIDI_0_FREQ;
-
 
     py::class_<xenakios::DejaVuRandom>(m, "DejaVuRandom")
         .def(py::init<unsigned int>())
@@ -204,8 +203,8 @@ PYBIND11_MODULE(xenakios, m)
         .def("getParameterInfoString", &ClapProcessingEngine::getParameterInfoString)
         .def("showGUIBlocking", &ClapProcessingEngine::openPluginGUIBlocking)
         .def("openWindow", &ClapProcessingEngine::openPersistentWindow)
-        .def("saveStateToFile", &ClapProcessingEngine::saveStateToFile)
-        .def("loadStateFromFile", &ClapProcessingEngine::loadStateFromFile)
+        .def("saveStateToBinaryFile", &ClapProcessingEngine::saveStateToBinaryFile)
+        .def("loadStateFromBinaryFile", &ClapProcessingEngine::loadStateFromBinaryFile)
         .def("processToFile", &ClapProcessingEngine::processToFile, "filename"_a, "duration"_a,
              "samplerate"_a, "numoutchannels"_a = 2);
 
