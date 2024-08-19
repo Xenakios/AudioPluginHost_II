@@ -1,5 +1,6 @@
 #pragma once
 
+#include <unordered_map>
 #include <vector>
 #include <filesystem>
 #include <map>
@@ -733,10 +734,19 @@ class ClapProcessingEngine
     void loadStateFromJSONFile(size_t chainIndex, const std::filesystem::path &filepath);
     void saveStateToBinaryFile(size_t chainIndex, const std::filesystem::path &filepath);
     void loadStateFromBinaryFile(size_t chainIndex, const std::filesystem::path &filepath);
-
+    std::unordered_map<size_t, std::filesystem::path> deferredStateFiles;
+    void loadStateFromBinaryFileDeferred(size_t chainIndex, const std::filesystem::path &filepath)
+    {
+        deferredStateFiles[chainIndex] = filepath;
+    }
+    choc::audio::AudioFileProperties outfileprops;
+    clap_audio_buffer outbufs[32];
+    std::vector<choc::buffer::ChannelArrayBuffer<float>> outputbuffers;
+    clap::helpers::EventList list_in;
+    clap::helpers::EventList list_out;
     void processToFile(std::string filename, double duration, double samplerate, int numoutchans);
 
-    void openPluginGUIBlocking(size_t chainIndex);
+    void openPluginGUIBlocking(size_t chainIndex, bool closeImmediately);
 
     std::unique_ptr<choc::ui::DesktopWindow> m_desktopwindow;
     void openPersistentWindow(std::string title)

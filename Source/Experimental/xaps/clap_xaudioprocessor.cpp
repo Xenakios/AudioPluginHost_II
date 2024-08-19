@@ -119,7 +119,7 @@ ClapPluginFormatProcessor::ClapPluginFormatProcessor(std::string plugfilename, i
     };
 #else
     xen_host_info.request_callback = [](const struct clap_host *host_) {
-        std::cout << "plug requested callback on main thread\n";
+        // std::cout << "plug requested callback on main thread\n";
         auto claphost = (ClapPluginFormatProcessor *)host_->host_data;
         bool suc = claphost->on_main_thread_fifo.push(
             [claphost]() { claphost->m_plug->on_main_thread(claphost->m_plug); });
@@ -242,6 +242,9 @@ bool ClapPluginFormatProcessor::activate(double sampleRate, uint32_t minFrameCou
             m_ext_render_mode =
                 (clap_plugin_render *)m_plug->get_extension(m_plug, CLAP_EXT_RENDER);
             return true;
+        } else
+        {
+           std::cout << "could not activate plugin!\n";
         }
     }
     return false;

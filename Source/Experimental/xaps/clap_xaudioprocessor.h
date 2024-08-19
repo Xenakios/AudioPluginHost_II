@@ -9,7 +9,7 @@
 #include "../xap_utils.h"
 #include "../xap_extensions.h"
 #include <thread>
-
+#include <iostream>
 #ifndef JUCE_CORE_H_INCLUDED
 #include "gui/choc_WebView.h"
 #include "gui/choc_DesktopWindow.h"
@@ -83,13 +83,7 @@ class ClapPluginFormatProcessor : public xenakios::XAudioProcessor
             m_processingStarted = false;
         }
     }
-    /*
-    static std::thread::id& mainthread_id()
-    {
-        static std::thread::id id;
-        return id;
-    }
-    */
+    
     std::thread::id mainThreadId;
     choc::fifo::SingleReaderSingleWriterFIFO<std::function<void()>> on_main_thread_fifo;
     void runMainThreadTasks() noexcept override

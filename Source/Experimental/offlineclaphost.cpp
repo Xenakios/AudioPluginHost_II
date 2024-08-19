@@ -1,7 +1,11 @@
 #include "offlineclaphost.h"
+#include "audio/choc_SampleBuffers.h"
+#include "clap/audio-buffer.h"
 #include "clap/ext/audio-ports.h"
 #include "clap/ext/note-ports.h"
 #include "clap/plugin.h"
+#include "clap/process.h"
+#include "gui/choc_MessageLoop.h"
 #include "text/choc_Files.h"
 #include "xaps/xap_memorybufferplayer.h"
 #include <cstring>
@@ -10,7 +14,14 @@
 
 using namespace std::chrono_literals;
 
-ClapProcessingEngine::ClapProcessingEngine() {}
+ClapProcessingEngine::ClapProcessingEngine()
+{
+    outputbuffers.resize(32);
+    for (int i = 0; i < 32; ++i)
+    {
+        memset(&outbufs[i], 0, sizeof(clap_audio_buffer));
+    }
+}
 
 ClapProcessingEngine::~ClapProcessingEngine() {}
 
@@ -34,6 +45,7 @@ void ClapProcessingEngine::addProcessorToChain(std::string plugfilename, int plu
             std::cout << "created : " << desc.name << "\n";
             chainEntry->name = desc.name;
         }
+        plug->runMainThreadTasks();
         chainEntry->m_proc = std::move(plug);
         m_chain.push_back(std::move(chainEntry));
     }
@@ -121,11 +133,17 @@ void ClapProcessingEngine::processToFile(std::string filename, double duration, 
     int procblocksize = 64;
     std::atomic<bool> renderloopfinished{false};
     double maxTailSeconds = 0.0;
+    size_t chainIndex = 0;
     for (auto &c : m_chain)
     {
         c->m_seq.sortEvents();
         if (!c->m_proc->activate(samplerate, procblocksize, procblocksize))
             std::cout << "could not activate " << c->name << "\n";
+        if (deferredStateFiles.count(chainIndex))
+        {
+            loadStateFromBinaryFile(chainIndex, deferredStateFiles[chainIndex]);
+        }
+        ++chainIndex;
         for (int i = 0; i < c->m_proc->audioPortsCount(true); ++i)
         {
             clap_audio_port_info_t apinfo;
@@ -134,14 +152,15 @@ void ClapProcessingEngine::processToFile(std::string filename, double duration, 
                       << " audio input channels\n";
         }
 
-        if (!c->m_proc->renderSetMode(CLAP_RENDER_OFFLINE))
-            std::cout << "was not able to set offline render mode for " << c->name << "\n";
+        // if (!c->m_proc->renderSetMode(CLAP_RENDER_OFFLINE))
+        //     std::cout << "was not able to set offline render mode for " << c->name << "\n";
         auto tail = c->m_proc->tailGet() / samplerate;
         if (tail > 0.0)
         {
             std::cout << c->name << " has tail of " << tail << " seconds\n";
         }
         maxTailSeconds = std::max(tail, maxTailSeconds);
+        c->m_proc->runMainThreadTasks();
     }
     // if more than 15 seconds, it's likely infinite
     maxTailSeconds = std::min(maxTailSeconds, 15.0);
@@ -172,20 +191,22 @@ void ClapProcessingEngine::processToFile(std::string filename, double duration, 
         inbufs[0].data64 = nullptr;
         cp.audio_inputs = inbufs;
 
-        constexpr size_t numports = 20;
-        std::vector<choc::buffer::ChannelArrayBuffer<float>> outputbuffers;
-        outputbuffers.reserve(numports);
+        constexpr size_t numports = 21;
+
         cp.audio_outputs_count = numports;
-        clap_audio_buffer outbufs[32];
+
         for (int i = 0; i < numports; ++i)
         {
-            outputbuffers.emplace_back((unsigned int)numoutchans, (unsigned int)procblocksize);
-            outputbuffers.back().clear();
+            outputbuffers[i] = choc::buffer::ChannelArrayBuffer<float>((unsigned int)2,
+                                                                       (unsigned int)procblocksize);
+            outputbuffers[i].clear();
             outbufs[i].channel_count = numoutchans;
             outbufs[i].constant_mask = 0;
             outbufs[i].latency = 0;
-            auto chansdata = outputbuffers.back().getView().data.channels;
+            auto chansdata = outputbuffers[i].getView().data.channels;
+
             outbufs[i].data32 = (float **)chansdata;
+
             outbufs[i].data64 = nullptr;
         }
 
@@ -193,17 +214,18 @@ void ClapProcessingEngine::processToFile(std::string filename, double duration, 
 
         clap_event_transport transport;
         memset(&transport, 0, sizeof(clap_event_transport));
-        cp.transport = &transport;
+
         transport.tempo = 120;
+        transport.tsig_denom = 4;
+        transport.tsig_num = 4;
         transport.header.flags = 0;
         transport.header.size = sizeof(clap_event_transport);
         transport.header.space_id = CLAP_CORE_EVENT_SPACE_ID;
         transport.header.time = 0;
         transport.header.type = CLAP_EVENT_TRANSPORT;
         transport.flags = CLAP_TRANSPORT_IS_PLAYING;
+        cp.transport = nullptr;
 
-        clap::helpers::EventList list_in;
-        clap::helpers::EventList list_out;
         cp.in_events = list_in.clapInputEvents();
         cp.out_events = list_out.clapOutputEvents();
         for (auto &p : m_chain)
@@ -213,7 +235,7 @@ void ClapProcessingEngine::processToFile(std::string filename, double duration, 
 
         int outcounter = 0;
         int outlensamples = duration * samplerate;
-        choc::audio::AudioFileProperties outfileprops;
+
         outfileprops.formatName = "WAV";
         outfileprops.bitDepth = choc::audio::BitDepth::float32;
         outfileprops.numChannels = numoutchans;
@@ -274,7 +296,7 @@ void ClapProcessingEngine::processToFile(std::string filename, double duration, 
                 }
 
                 auto status = m_chain[i]->m_proc->process(&cp);
-                if (status == CLAP_PROCESS_ERROR)
+                if (status == CLAP_PROCESS_ERROR || status == CLAP_PROCESS_SLEEP)
                     throw std::runtime_error("Clap processing failed");
                 list_in.clear();
                 list_out.clear();
@@ -493,13 +515,15 @@ void ClapProcessingEngine::loadStateFromBinaryFile(size_t chainIndex,
             return int64_t(ctxifstream.gcount());
         };
         plug->stateLoad(&clapistream);
+        plug->runMainThreadTasks();
     }
 }
 
-void ClapProcessingEngine::openPluginGUIBlocking(size_t chainIndex)
+void ClapProcessingEngine::openPluginGUIBlocking(size_t chainIndex, bool closeImmediately)
 {
     if (chainIndex >= m_chain.size())
         throw std::runtime_error("Chain index out of bounds");
+    choc::messageloop::initialise();
     choc::ui::setWindowsDPIAwareness(); // For Windows, we need to tell the OS we're
                                         // high-DPI-aware
     auto m_plug = m_chain[chainIndex]->m_proc.get();
@@ -529,13 +553,16 @@ void ClapProcessingEngine::openPluginGUIBlocking(size_t chainIndex)
     m_plug->guiSetParent(&clapwin);
     m_plug->guiShow();
     window.toFront();
-    clap::helpers::EventList inlist;
-    clap::helpers::EventList outlist;
-    choc::messageloop::Timer timer(1000, [&inlist, &outlist, this]() {
-        // m_plug->paramsFlush(inlist.clapInputEvents(), outlist.clapOutputEvents());
-        // std::cout << "plugin outputted " << outlist.size() << " output events\n";
-        return true;
-    });
+    
+    if (closeImmediately)
+    {
+        choc::messageloop::Timer timer(5000, [this, m_plug]() {
+            m_plug->guiDestroy();
+            choc::messageloop::stop();
+            return false;
+        });
+    }
+
     choc::messageloop::run();
     m_plug->deactivate();
 }

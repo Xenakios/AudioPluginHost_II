@@ -775,15 +775,24 @@ inline void test_binary_clap_state()
 
 inline void test_sc()
 {
-    ClapProcessingEngine eng;
-    eng.addProcessorToChain(
+    auto eng = std::make_unique<ClapProcessingEngine>();
+    eng->addProcessorToChain(
         R"(C:\Program Files\Common Files\CLAP\Surge Synth Team\Shortcircuit XT.clap)", 0);
-    eng.loadStateFromBinaryFile(0,
-                                R"(C:\develop\AudioPluginHost_mk2\clapstatetests\SCtestfile.bin)");
-    auto &seq = eng.getSequence(0);
-    seq.addNote(0.5, 4.0, 0, 1, 60, 0, 1.0, 0.0);
-    eng.processToFile(R"(C:\develop\AudioPluginHost_mk2\clapstatetests\SCtestfile.wav)", 5.0,
-                      44100.0, 2);
+    eng->loadStateFromBinaryFile(0,
+                                 R"(C:\develop\AudioPluginHost_mk2\clapstatetests\SCtestfile.bin)");
+    Sleep(1000);
+    // eng->openPluginGUIBlocking(0, false);
+    // eng->saveStateToBinaryFile(0,
+    //                           R"(C:\develop\AudioPluginHost_mk2\clapstatetests\SCtestfile.bin)");
+    auto &seq = eng->getSequence(0);
+    seq.addNote(0.0, 4.0, 0, 0, 60, -1, 1.0, 0.0);
+    seq.addNote(0.1, 4.0, 0, 0, 67, -1, 1.0, 0.0);
+    seq.addNote(0.2, 4.0, 0, 0, 53, -1, 1.0, 0.0);
+    seq.addNote(0.3, 4.0, 0, 0, 58, -1, 1.0, 0.0);
+    seq.addNote(0.4, 4.0, 0, 0, 51, -1, 1.0, 0.0);
+    seq.addNote(2.0, 4.0, 0, 0, 40, -1, 1.0, 0.0);
+    eng->processToFile(R"(C:\develop\AudioPluginHost_mk2\clapstatetests\SCtestfile.wav)", 5.0,
+                       44100.0, 2);
 }
 
 int main()
