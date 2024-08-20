@@ -137,6 +137,14 @@ void ClapProcessingEngine::processToFile(std::string filename, double duration, 
     for (auto &c : m_chain)
     {
         c->m_seq.sortEvents();
+        std::cout << std::format("{} has {} audio output ports\n", c->name,
+                                 c->m_proc->audioPortsCount(false));
+        for (int i = 0; i < c->m_proc->audioPortsCount(false); ++i)
+        {
+            clap_audio_port_info_t apinfo;
+            c->m_proc->audioPortsInfo(i, false, &apinfo);
+            std::cout << std::format("\t{} : {} channels\n", i, apinfo.channel_count);
+        }
         if (!c->m_proc->activate(samplerate, procblocksize, procblocksize))
             std::cout << "could not activate " << c->name << "\n";
         if (deferredStateFiles.count(chainIndex))
@@ -144,13 +152,7 @@ void ClapProcessingEngine::processToFile(std::string filename, double duration, 
             loadStateFromBinaryFile(chainIndex, deferredStateFiles[chainIndex]);
         }
         ++chainIndex;
-        for (int i = 0; i < c->m_proc->audioPortsCount(true); ++i)
-        {
-            clap_audio_port_info_t apinfo;
-            c->m_proc->audioPortsInfo(i, true, &apinfo);
-            std::cout << "port " << i << " has " << apinfo.channel_count
-                      << " audio input channels\n";
-        }
+        
 
         // if (!c->m_proc->renderSetMode(CLAP_RENDER_OFFLINE))
         //     std::cout << "was not able to set offline render mode for " << c->name << "\n";
@@ -191,7 +193,7 @@ void ClapProcessingEngine::processToFile(std::string filename, double duration, 
         inbufs[0].data64 = nullptr;
         cp.audio_inputs = inbufs;
 
-        constexpr size_t numports = 21;
+        constexpr size_t numports = 1;
 
         cp.audio_outputs_count = numports;
 
@@ -553,7 +555,7 @@ void ClapProcessingEngine::openPluginGUIBlocking(size_t chainIndex, bool closeIm
     m_plug->guiSetParent(&clapwin);
     m_plug->guiShow();
     window.toFront();
-    
+
     if (closeImmediately)
     {
         choc::messageloop::Timer timer(5000, [this, m_plug]() {

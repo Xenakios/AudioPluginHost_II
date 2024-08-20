@@ -780,10 +780,10 @@ inline void test_sc()
         R"(C:\Program Files\Common Files\CLAP\Surge Synth Team\Shortcircuit XT.clap)", 0);
     eng->loadStateFromBinaryFile(0,
                                  R"(C:\develop\AudioPluginHost_mk2\clapstatetests\SCtestfile.bin)");
-    Sleep(1000);
-    // eng->openPluginGUIBlocking(0, false);
-    // eng->saveStateToBinaryFile(0,
-    //                           R"(C:\develop\AudioPluginHost_mk2\clapstatetests\SCtestfile.bin)");
+    // Sleep(1000);
+    //  eng->openPluginGUIBlocking(0, false);
+    //  eng->saveStateToBinaryFile(0,
+    //                            R"(C:\develop\AudioPluginHost_mk2\clapstatetests\SCtestfile.bin)");
     auto &seq = eng->getSequence(0);
     seq.addNote(0.0, 4.0, 0, 0, 60, -1, 1.0, 0.0);
     seq.addNote(0.1, 4.0, 0, 0, 67, -1, 1.0, 0.0);
