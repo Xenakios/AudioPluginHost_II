@@ -11,6 +11,8 @@
 #include "../Experimental/xap_utils.h"
 #include "../Experimental/offlineclaphost.h"
 #include "../Experimental/dejavurandom.h"
+#include "../Experimental/xen_modulators.h"
+
 #if !NOJUCE
 #include "juce_audio_processors/juce_audio_processors.h"
 #include "juce_core/juce_core.h"
@@ -235,7 +237,11 @@ PYBIND11_MODULE(xenakios, m)
 
     py::class_<MultiModulator>(m, "MultiModulator")
         .def(py::init<double>())
-        .def("applyToSequence", &MultiModulator::applyToSequence)
+        .def("applyToSequence",
+             [](MultiModulator &m, ClapEventSequence &s, double start, double dur) 
+             {
+                m.applyToSequence(s, start, dur);
+             })
         .def("setOutputAsParameter", &MultiModulator::setOutputAsParameter)
         .def("setOutputAsParameterModulation", &MultiModulator::setOutputAsParameterModulation)
         .def("setConnection", &MultiModulator::setConnection)
