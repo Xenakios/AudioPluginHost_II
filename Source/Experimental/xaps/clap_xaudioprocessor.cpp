@@ -242,9 +242,10 @@ bool ClapPluginFormatProcessor::activate(double sampleRate, uint32_t minFrameCou
             m_ext_render_mode =
                 (clap_plugin_render *)m_plug->get_extension(m_plug, CLAP_EXT_RENDER);
             return true;
-        } else
+        }
+        else
         {
-           std::cout << "could not activate plugin!\n";
+            std::cout << "could not activate plugin!\n";
         }
     }
     return false;
@@ -455,5 +456,91 @@ bool ClapPluginFormatProcessor::getDescriptor(clap_plugin_descriptor *desc) cons
     if (!m_plug)
         return false;
     *desc = *m_plug->desc;
+    return true;
+}
+bool ClapPluginFormatProcessor::guiCreate(const char *api, bool isFloating) noexcept
+{
+    if (m_ext_gui)
+    {
+        return m_ext_gui->create(m_plug, "win32", false);
+    }
+    m_webview_ed = std::make_unique<WebViewGenericEditor>(this);
+    return true;
+}
+void ClapPluginFormatProcessor::guiDestroy() noexcept
+{
+    if (m_ext_gui)
+    {
+        m_ext_gui->destroy(m_plug);
+    }
+    m_webview_ed = nullptr;
+}
+bool ClapPluginFormatProcessor::guiShow() noexcept
+{
+    if (m_ext_gui)
+    {
+        return m_ext_gui->show(m_plug);
+    }
+    return true;
+}
+bool ClapPluginFormatProcessor::guiHide() noexcept
+{
+    if (m_ext_gui)
+    {
+        return m_ext_gui->hide(m_plug);
+    }
+    return true;
+}
+bool ClapPluginFormatProcessor::guiGetSize(uint32_t *width, uint32_t *height) noexcept
+{
+
+    if (m_ext_gui)
+    {
+        return m_ext_gui->get_size(m_plug, width, height);
+    }
+    *width = 500;
+    *height = paramsCount() * 25;
+    return true;
+}
+bool ClapPluginFormatProcessor::guiCanResize() const noexcept
+{
+    if (m_ext_gui)
+    {
+        return m_ext_gui->can_resize(m_plug);
+    }
+    return false;
+}
+bool ClapPluginFormatProcessor::guiAdjustSize(uint32_t *width, uint32_t *height) noexcept
+{
+    if (m_ext_gui)
+    {
+        return m_ext_gui->adjust_size(m_plug, width, height);
+    }
+    return false;
+}
+bool ClapPluginFormatProcessor::guiSetSize(uint32_t width, uint32_t height) noexcept
+{
+    if (m_ext_gui)
+    {
+        uint32_t w = width;
+        uint32_t h = height;
+        if (guiAdjustSize(&w, &h))
+        {
+            return m_ext_gui->set_size(m_plug, w, h);
+        }
+    }
+    return false;
+}
+bool ClapPluginFormatProcessor::guiSetParent(const clap_window *window) noexcept
+{
+    if (m_ext_gui)
+    {
+        clap_window win;
+        win.api = "win32";
+        win.win32 = window->win32;
+        return m_ext_gui->set_parent(m_plug, &win);
+    }
+    choc::ui::DesktopWindow *dwp = (choc::ui::DesktopWindow *)window->ptr;
+    dwp->setContent(m_webview_ed->m_webview->getViewHandle());
     return true;
 }

@@ -37,7 +37,7 @@ class ClapPluginFormatProcessor : public xenakios::XAudioProcessor
     std::atomic<bool> m_processingStarted{false};
     std::atomic<bool> m_activated{false};
     choc::fifo::SingleReaderSingleWriterFIFO<xenakios::CrossThreadMessage> m_from_generic_editor;
-
+    std::unique_ptr<WebViewGenericEditor> m_webview_ed;
     enum ProcState
     {
         PS_Stopped,
@@ -46,12 +46,17 @@ class ClapPluginFormatProcessor : public xenakios::XAudioProcessor
         PS_StopRequested
     };
     std::atomic<ProcState> m_processing_state{PS_Stopped};
+    std::vector<clap_param_info> m_param_infos;
+    IHostExtension *m_host_ext = nullptr;
+    clap_plugin_tail *m_ext_plugin_tail = nullptr;
+    clap_plugin_audio_ports *m_ext_audio_ports = nullptr;
+    clap_plugin_note_ports *m_ext_note_ports = nullptr;
+    clap_plugin_gui *m_ext_gui = nullptr;
 
   public:
     ClapPluginFormatProcessor(std::string plugfilename, int plugindex);
     ~ClapPluginFormatProcessor() override;
-    
-    std::vector<clap_param_info> m_param_infos;
+
     bool getDescriptor(clap_plugin_descriptor *desc) const override;
     bool startProcessing() noexcept override;
     void stopProcessing() noexcept override;
@@ -59,8 +64,6 @@ class ClapPluginFormatProcessor : public xenakios::XAudioProcessor
     std::thread::id mainThreadId;
     choc::fifo::SingleReaderSingleWriterFIFO<std::function<void()>> on_main_thread_fifo;
     void runMainThreadTasks() noexcept override;
-    IHostExtension *m_host_ext = nullptr;
-    
 
     uint32_t notePortsCount(bool isInput) const noexcept override;
     bool notePortsInfo(uint32_t index, bool isInput,
@@ -77,9 +80,7 @@ class ClapPluginFormatProcessor : public xenakios::XAudioProcessor
     bool paramsValue(clap_id paramId, double *value) noexcept override;
     bool paramsValueToText(clap_id paramId, double value, char *display,
                            uint32_t size) noexcept override;
-    clap_plugin_tail *m_ext_plugin_tail = nullptr;
-    clap_plugin_audio_ports *m_ext_audio_ports = nullptr;
-    clap_plugin_note_ports *m_ext_note_ports = nullptr;
+
     uint32_t audioPortsCount(bool isInput) const noexcept override;
 
     bool audioPortsInfo(uint32_t index, bool isInput,
@@ -99,7 +100,6 @@ class ClapPluginFormatProcessor : public xenakios::XAudioProcessor
     bool remoteControlsPageGet(uint32_t pageIndex,
                                clap_remote_controls_page *page) noexcept override;
 
-    clap_plugin_gui *m_ext_gui = nullptr;
     void initGUIExtension();
 #ifdef JUCE_CORE_H_INCLUDED
     std::unique_ptr<juce::Component> m_generic_editor;
@@ -221,97 +221,19 @@ class ClapPluginFormatProcessor : public xenakios::XAudioProcessor
     }
 #else
 
-    std::unique_ptr<WebViewGenericEditor> m_webview_ed;
     // if external plugin doesn't implement GUI, we'll use our generic editor,
     bool implementsGui() const noexcept override { return true; }
-    bool guiCreate(const char *api, bool isFloating) noexcept override
-    {
-        if (m_ext_gui)
-        {
-            return m_ext_gui->create(m_plug, "win32", false);
-        }
-        m_webview_ed = std::make_unique<WebViewGenericEditor>(this);
-        return true;
-    }
-    void guiDestroy() noexcept override
-    {
-        if (m_ext_gui)
-        {
-            m_ext_gui->destroy(m_plug);
-        }
-        m_webview_ed = nullptr;
-    }
+    bool guiCreate(const char *api, bool isFloating) noexcept override;
+    void guiDestroy() noexcept override;
 
-    bool guiShow() noexcept override
-    {
-        if (m_ext_gui)
-        {
-            return m_ext_gui->show(m_plug);
-        }
-        return true;
-    }
-    bool guiHide() noexcept override
-    {
-        if (m_ext_gui)
-        {
-            return m_ext_gui->hide(m_plug);
-        }
-        return true;
-    }
-    bool guiGetSize(uint32_t *width, uint32_t *height) noexcept override
-    {
-
-        if (m_ext_gui)
-        {
-            return m_ext_gui->get_size(m_plug, width, height);
-        }
-        *width = 500;
-        *height = paramsCount() * 25;
-        return true;
-    }
-    bool guiCanResize() const noexcept override
-    {
-        if (m_ext_gui)
-        {
-            return m_ext_gui->can_resize(m_plug);
-        }
-        return false;
-    }
+    bool guiShow() noexcept override;
+    bool guiHide() noexcept override;
+    bool guiGetSize(uint32_t *width, uint32_t *height) noexcept override;
+    bool guiCanResize() const noexcept override;
     // virtual bool guiGetResizeHints(clap_gui_resize_hints_t *hints) noexcept { return false; }
-    bool guiAdjustSize(uint32_t *width, uint32_t *height) noexcept override
-    {
-        if (m_ext_gui)
-        {
-            return m_ext_gui->adjust_size(m_plug, width, height);
-        }
-        return false;
-    }
-    bool guiSetSize(uint32_t width, uint32_t height) noexcept override
-    {
-        if (m_ext_gui)
-        {
-            uint32_t w = width;
-            uint32_t h = height;
-            if (guiAdjustSize(&w, &h))
-            {
-                return m_ext_gui->set_size(m_plug, w, h);
-            }
-        }
-        return false;
-    }
+    bool guiAdjustSize(uint32_t *width, uint32_t *height) noexcept override;
+    bool guiSetSize(uint32_t width, uint32_t height) noexcept override;
 
-    bool guiSetParent(const clap_window *window) noexcept override
-    {
-        if (m_ext_gui)
-        {
-            clap_window win;
-            win.api = "win32";
-            win.win32 = window->win32;
-            return m_ext_gui->set_parent(m_plug, &win);
-        }
-        choc::ui::DesktopWindow *dwp = (choc::ui::DesktopWindow *)window->ptr;
-        dwp->setContent(m_webview_ed->m_webview->getViewHandle());
-        return true;
-    }
+    bool guiSetParent(const clap_window *window) noexcept override;
 #endif
 };
