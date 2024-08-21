@@ -16,6 +16,7 @@
 #include "xapdsp.h"
 #include "audio/choc_AudioFileFormat_WAV.h"
 #include "containers/choc_NonAllocatingStableSort.h"
+#include "xen_modulators.h"
 #include "sst/basic-blocks/modulators/SimpleLFO.h"
 #include "sst/basic-blocks/dsp/LanczosResampler.h"
 #include "sst/basic-blocks/dsp/FollowSlewAndSmooth.h"
