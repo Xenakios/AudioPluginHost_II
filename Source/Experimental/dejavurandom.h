@@ -13,7 +13,10 @@ inline Type maprange(Type sourceValue, Type sourceRangeMin, Type sourceRangeMax,
 }
 namespace xenakios
 {
-
+/*
+This should be cleaned up a bit...
+Random number generator with a history that can repeat or shuffle
+*/
 class DejaVuRandom
 {
   private:

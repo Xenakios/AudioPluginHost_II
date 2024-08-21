@@ -5,7 +5,8 @@
 
 namespace xenakios
 {
-
+// Noise that tends to produce values as far as possible from the current value
+// especially with higher depths 
 class BlueNoise
 {
   public:

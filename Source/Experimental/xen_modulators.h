@@ -175,6 +175,7 @@ class MultiModulator
         for (auto &e : outputprops)
             e = OutputProps();
     }
+    // use a template here because the ClapEventSequence is in the offlinehost header for now
     template<typename SeqType>
     void applyToSequence(SeqType &destSeq, double startTime, double duration)
     {
