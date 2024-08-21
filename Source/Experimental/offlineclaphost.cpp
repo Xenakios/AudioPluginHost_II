@@ -1,6 +1,7 @@
 #include "offlineclaphost.h"
 #include "audio/choc_SampleBuffers.h"
 #include "clap/audio-buffer.h"
+#include "clap/events.h"
 #include "clap/ext/audio-ports.h"
 #include "clap/ext/note-ports.h"
 #include "clap/plugin.h"
@@ -152,7 +153,6 @@ void ClapProcessingEngine::processToFile(std::string filename, double duration, 
             loadStateFromBinaryFile(chainIndex, deferredStateFiles[chainIndex]);
         }
         ++chainIndex;
-        
 
         // if (!c->m_proc->renderSetMode(CLAP_RENDER_OFFLINE))
         //     std::cout << "was not able to set offline render mode for " << c->name << "\n";
@@ -618,4 +618,105 @@ std::string ClapProcessingEngine::getParameterInfoString(size_t chainIndex, size
         }
     }
     return result;
+}
+
+void ClapEventSequence::addTransportEvent(double time, double tempo)
+{
+    clap_event_transport ev{.header{.flags = 0,
+                                    .time = 0,
+                                    .size = sizeof(clap_event_transport),
+                                    .space_id = CLAP_CORE_EVENT_SPACE_ID,
+                                    .type = CLAP_EVENT_TRANSPORT},
+                            .tempo = tempo,
+                            .tsig_denom = 4,
+                            .tsig_num = 4,
+                            .flags = CLAP_TRANSPORT_HAS_TEMPO};
+    m_evlist.push_back(Event(time, &ev));
+}
+void ClapProcessingEngine::setSequence(int targetProcessorIndex, ClapEventSequence seq)
+{
+    if (targetProcessorIndex >= 0 && targetProcessorIndex < m_chain.size())
+    {
+        seq.sortEvents();
+        m_chain[targetProcessorIndex]->m_seq = seq;
+    }
+}
+ClapEventSequence &ClapProcessingEngine::getSequence(size_t chainIndex)
+{
+    if (chainIndex >= 0 && chainIndex < m_chain.size())
+    {
+        return m_chain[chainIndex]->m_seq;
+    }
+    throw std::runtime_error("Sequence chain index of out bounds");
+}
+std::map<std::string, clap_id> ClapProcessingEngine::getParameters(size_t chainIndex)
+{
+    auto m_plug = m_chain[chainIndex]->m_proc.get();
+    std::map<std::string, clap_id> result;
+    for (size_t i = 0; i < m_plug->paramsCount(); ++i)
+    {
+        clap_param_info pinfo;
+        if (m_plug->paramsInfo(i, &pinfo))
+        {
+            result[std::string(pinfo.name)] = pinfo.id;
+        }
+    }
+    return result;
+}
+void ClapProcessingEngine::openPersistentWindow(std::string title)
+{
+#ifdef FOO17373
+    std::thread th([this, title]() {
+        OleInitialize(nullptr);
+        // m_plug->mainthread_id() = std::this_thread::get_id();
+        choc::ui::setWindowsDPIAwareness(); // For Windows, we need to tell the OS we're
+                                            // high-DPI-aware
+        m_plug->guiCreate("win32", false);
+        uint32_t pw = 0;
+        uint32_t ph = 0;
+        m_plug->guiGetSize(&pw, &ph);
+        m_desktopwindow =
+            std::make_unique<choc::ui::DesktopWindow>(choc::ui::Bounds{100, 100, (int)pw, (int)ph});
+
+        m_desktopwindow->setWindowTitle("CHOC Window");
+        m_desktopwindow->setResizable(true);
+        m_desktopwindow->setMinimumSize(300, 300);
+        m_desktopwindow->setMaximumSize(1500, 1200);
+        m_desktopwindow->windowClosed = [this] {
+            m_plug->guiDestroy();
+            choc::messageloop::stop();
+        };
+
+        clap_window clapwin;
+        clapwin.api = "win32";
+        clapwin.win32 = m_desktopwindow->getWindowHandle();
+        m_plug->guiSetParent(&clapwin);
+        m_plug->guiShow();
+        m_desktopwindow->toFront();
+        choc::messageloop::run();
+        m_desktopwindow = nullptr;
+        OleUninitialize();
+        return;
+        // choc::messageloop::initialise();
+        OleInitialize(nullptr);
+        choc::ui::setWindowsDPIAwareness();
+        m_desktopwindow =
+            std::make_unique<choc::ui::DesktopWindow>(choc::ui::Bounds{100, 100, 300, 200});
+        m_desktopwindow->setWindowTitle(title);
+        m_desktopwindow->toFront();
+        m_desktopwindow->windowClosed = [this] {
+            // std::cout << "window closed\n";
+            // using namespace std::chrono_literals;
+            // std::this_thread::sleep_for(1000ms);
+
+            choc::messageloop::stop();
+        };
+        choc::messageloop::run();
+        // std::cout << "finished message loop\n";
+        m_desktopwindow = nullptr;
+
+        OleUninitialize();
+    });
+    th.detach();
+#endif
 }

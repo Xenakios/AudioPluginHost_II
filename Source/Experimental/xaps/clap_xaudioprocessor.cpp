@@ -296,3 +296,164 @@ clap_process_status ClapPluginFormatProcessor::process(const clap_process *proce
     }
     return m_plug->process(m_plug, &processCtxCopy);
 }
+uint32_t ClapPluginFormatProcessor::audioPortsCount(bool isInput) const noexcept
+{
+    if (!m_ext_audio_ports)
+        return 0;
+    return m_ext_audio_ports->count(m_plug, isInput);
+}
+bool ClapPluginFormatProcessor::audioPortsInfo(uint32_t index, bool isInput,
+                                               clap_audio_port_info *info) const noexcept
+{
+    if (!m_ext_audio_ports)
+        return false;
+    return m_ext_audio_ports->get(m_plug, index, isInput, info);
+}
+void ClapPluginFormatProcessor::paramsFlush(const clap_input_events *in,
+                                            const clap_output_events *out) noexcept
+{
+    if (m_ext_params)
+    {
+        // FIXME should flush events from the GenericEditor too
+        m_ext_params->flush(m_plug, in, out);
+    }
+}
+bool ClapPluginFormatProcessor::stateSave(const clap_ostream *stream) noexcept
+{
+    if (!m_ext_state)
+        return false;
+    return m_ext_state->save(m_plug, stream);
+}
+bool ClapPluginFormatProcessor::stateLoad(const clap_istream *stream) noexcept
+{
+    if (!m_ext_state)
+        return false;
+    // have to trust the hosted plugin does this thread safely...
+    return m_ext_state->load(m_plug, stream);
+}
+bool ClapPluginFormatProcessor::renderSetMode(clap_plugin_render_mode mode) noexcept
+{
+    if (!m_ext_render_mode)
+        return false;
+    return m_ext_render_mode->set(m_plug, mode);
+}
+uint32_t ClapPluginFormatProcessor::remoteControlsPageCount() noexcept
+{
+    if (!m_ext_remote_controls)
+        return 0;
+    return m_ext_remote_controls->count(m_plug);
+}
+bool ClapPluginFormatProcessor::remoteControlsPageGet(uint32_t pageIndex,
+                                                      clap_remote_controls_page *page) noexcept
+{
+    if (!m_ext_remote_controls)
+        return false;
+    return m_ext_remote_controls->get(m_plug, pageIndex, page);
+}
+void ClapPluginFormatProcessor::initGUIExtension()
+{
+    m_ext_gui = (clap_plugin_gui *)m_plug->get_extension(m_plug, CLAP_EXT_GUI);
+}
+bool ClapPluginFormatProcessor::paramsValueToText(clap_id paramId, double value, char *display,
+                                                  uint32_t size) noexcept
+{
+    if (m_ext_params)
+        return m_ext_params->value_to_text(m_plug, paramId, value, display, size);
+    return false;
+}
+bool ClapPluginFormatProcessor::paramsValue(clap_id paramId, double *value) noexcept
+{
+    if (m_ext_params)
+        return m_ext_params->get_value(m_plug, paramId, value);
+    return false;
+}
+bool ClapPluginFormatProcessor::paramsInfo(uint32_t paramIndex,
+                                           clap_param_info *info) const noexcept
+{
+    return m_ext_params->get_info(m_plug, paramIndex, info);
+}
+void ClapPluginFormatProcessor::initParamsExtension()
+{
+    if (m_plug)
+    {
+        if (!m_ext_params)
+        {
+            m_ext_params = (clap_plugin_params_t *)m_plug->get_extension(m_plug, CLAP_EXT_PARAMS);
+        }
+    }
+}
+uint32_t ClapPluginFormatProcessor::tailGet() const noexcept
+{
+    if (!m_plug || !m_ext_plugin_tail)
+        return 0;
+    return m_ext_plugin_tail->get(m_plug);
+}
+void ClapPluginFormatProcessor::deactivate() noexcept
+{
+    if (m_plug)
+    {
+        m_plug->deactivate(m_plug);
+        m_activated = false;
+    }
+}
+void ClapPluginFormatProcessor::onPluginRequestedResizeInternal(uint32_t w, uint32_t h)
+{
+    // DBG("Plugin requested to be resized to " << (int)w << " " << (int)h);
+    if (OnPluginRequestedResize)
+        OnPluginRequestedResize(w, h);
+}
+bool ClapPluginFormatProcessor::notePortsInfo(uint32_t index, bool isInput,
+                                              clap_note_port_info *info) const noexcept
+{
+    if (!m_ext_note_ports)
+        return false;
+    return m_ext_note_ports->get(m_plug, index, isInput, info);
+}
+uint32_t ClapPluginFormatProcessor::notePortsCount(bool isInput) const noexcept
+{
+    if (!m_ext_note_ports)
+        return 0;
+    return m_ext_note_ports->count(m_plug, isInput);
+}
+void ClapPluginFormatProcessor::runMainThreadTasks() noexcept
+{
+    std::function<void()> task;
+    while (on_main_thread_fifo.pop(task))
+    {
+        task();
+    }
+}
+void ClapPluginFormatProcessor::stopProcessing() noexcept
+{
+    if (!m_plug)
+        return;
+    // error if stopProcessing called when already stopped?
+    if (m_processingStarted)
+    {
+        // jassert(m_processingStarted);
+        m_plug->stop_processing(m_plug);
+        m_processingStarted = false;
+    }
+}
+bool ClapPluginFormatProcessor::startProcessing() noexcept
+{
+    if (!m_plug)
+        return false;
+    // it is an error to call startProcessing when processing has already started
+    assert(!m_processingStarted);
+    if (m_plug->start_processing(m_plug))
+    {
+        m_processingStarted = true;
+        return true;
+    }
+    // something went wrong in the plugin when starting processing
+    assert(false);
+    return false;
+}
+bool ClapPluginFormatProcessor::getDescriptor(clap_plugin_descriptor *desc) const
+{
+    if (!m_plug)
+        return false;
+    *desc = *m_plug->desc;
+    return true;
+}
