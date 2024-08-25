@@ -103,8 +103,7 @@ std::string ClapProcessingEngine::scanPluginFile(std::filesystem::path plugfilep
                 return "No plugins to manufacture in " + plugfilename;
             }
             std::string result;
-            auto plugcount = fac->get_plugin_count(fac);
-            for (int i = 0; i < plugcount; ++i)
+            for (uint32_t i = 0; i < plugin_count; ++i)
             {
                 auto desc = fac->get_plugin_descriptor(fac, i);
                 if (desc)
@@ -298,7 +297,7 @@ void ClapProcessingEngine::processToFile(std::string filename, double duration, 
                 }
 
                 auto status = m_chain[i]->m_proc->process(&cp);
-                if (status == CLAP_PROCESS_ERROR || status == CLAP_PROCESS_SLEEP)
+                if (status == CLAP_PROCESS_ERROR)
                     throw std::runtime_error("Clap processing failed");
                 list_in.clear();
                 list_out.clear();
@@ -319,12 +318,12 @@ void ClapProcessingEngine::processToFile(std::string filename, double duration, 
         {
             p->m_proc->stopProcessing();
         }
-        // writer->getProperties().metadata
         writer->flush();
         // std::cout << events_in_seqs << " events in sequecnes, sent " << eventssent
         //          << " events to plugin\n";
-        std::cout << "finished in " << render_duration.count() / 1000.0 << " seconds, " << rtfactor
-                  << "x realtime\n";
+        std::cout << std::format("finished in {} seconds, {}x realtime",
+                                 render_duration.count() / 1000.0, rtfactor);
+
         renderloopfinished = true;
     });
     using namespace std::chrono_literals;
