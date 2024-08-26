@@ -145,12 +145,13 @@ ClapPluginFormatProcessor::ClapPluginFormatProcessor(std::string plugfilename, i
             auto plugin_count = fac->get_plugin_count(fac);
             if (plugin_count <= 0)
             {
-                std::cout << "no plugins to manufacture\n";
-                return;
+                throw std::runtime_error(
+                    "No plugins to manufacture, likely an error in the plugin");
             }
-            if (plugindex >= plugin_count)
-                throw std::runtime_error("Plugin index out of bounds, maximum allowed is " +
-                                         std::to_string(plugin_count - 1));
+            if (plugindex < 0 || plugindex >= plugin_count)
+                throw std::runtime_error(
+                    std::format("Plugin index {} is out of bounds, allowed range is 0 - {}",
+                                plugindex, plugin_count - 1));
             auto desc = fac->get_plugin_descriptor(fac, plugindex);
             if (desc)
             {
@@ -191,13 +192,13 @@ ClapPluginFormatProcessor::ClapPluginFormatProcessor(std::string plugfilename, i
                 m_from_generic_editor.reset(2048);
             }
             else
-                std::cout << "could not create clap plugin instance\n";
+                throw std::runtime_error("could not create clap plugin instance");
         }
         else
-            std::cout << "could not get clap plugin entry point function\n";
+            throw std::runtime_error("could not get clap plugin entry point");
     }
     else
-        std::cout << "could not load clap dll " << plugfilename << "\n";
+        throw std::runtime_error(std::format("could not load clap dll {}", plugfilename));
 }
 
 ClapPluginFormatProcessor::~ClapPluginFormatProcessor()
