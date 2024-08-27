@@ -827,6 +827,7 @@ class GrainDelay
         {
             int mindelay = 0.1 * m_samplerate;
             int maxdelay = 1.0 * m_samplerate;
+            int delaysamples = xenakios::mapvalue<float>(m_pos, 0.0f, 1.0f, mindelay, maxdelay);
             std::uniform_int_distribution<int> delaydist{mindelay, maxdelay};
             std::uniform_real_distribution<float> pitchdist{-0.0f, 0.0f};
             float panrange = xenakios::mapvalue(m_pan_width, 0.0f, 1.0f, 0.0f, 0.5f);
@@ -849,11 +850,12 @@ class GrainDelay
                     ph.pan = pandist(m_rng);
                     sst::basic_blocks::dsp::pan_laws::monoEqualPower(ph.pan, ph.panmatrix);
                     ph.outputbufferpos = 0;
-                    int actualDelay = delaydist(m_rng);
+                    int actualDelay = delaysamples; // delaydist(m_rng);
                     ph.bufferreadpos = m_writepos - actualDelay;
                     if (ph.bufferreadpos < 0)
                     {
                         ph.bufferreadpos = m_buffer.getNumFrames() - std::abs(ph.bufferreadpos);
+                        assert(ph.bufferreadpos >= 0 && ph.bufferreadpos < m_buffer.getNumFrames());
                     }
                     int numplayheads = 0;
                     for (auto &p : m_playheads)
@@ -926,6 +928,8 @@ class GrainDelay
     void setCenterPitch(float p) { m_center_pitch = std::clamp(p, -12.0f, 12.0f); }
     // 0 = 1Hz, -1 = 0.5 Hz, 2 = 2.0 Hz etc
     void setGrainRateOctaves(float r) { m_grainrate = std::pow(2.0, r); }
+    // 0 closest to write head, 1 furthest from write head
+    void setPosition(float p) { m_pos = std::clamp(p, 0.0f, 1.0f); }
     int maxplayheads_used = 0;
 
   private:
@@ -934,7 +938,8 @@ class GrainDelay
     bool m_input_frozen = false;
     float m_pan_width = 0.0f;
     float m_center_pitch = 0.0f;
-    double m_samplerate = 1.0;
+    float m_samplerate = 1.0;
+    float m_pos = 0.0;
     struct Playhead
     {
         Playhead()
