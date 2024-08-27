@@ -822,8 +822,8 @@ class GrainDelay
 
         if (m_grainphase == 0.0) // begin new grain
         {
-            std::uniform_int_distribution<int> delaydist{8192, m_delaylen/4};
-            std::uniform_real_distribution<float> pitchdist{-2.0f, 2.0f};
+            std::uniform_int_distribution<int> delaydist{8192, 8192};
+            std::uniform_real_distribution<float> pitchdist{-0.0f, 0.0f};
             float panrange = xenakios::mapvalue(m_pan_width, 0.0f, 1.0f, 0.0f, 0.5f);
             std::uniform_real_distribution<float> pandist{0.5f - panrange, 0.5f + panrange};
             const float pitches[4] = {0.0f, 4.0f, 7.0f, 12.0f};
@@ -976,11 +976,16 @@ inline void test_grain_delay()
         panenvelope.addPoint({5.0, 1.0});
         panenvelope.addPoint({10.0, 0.0});
         xenakios::Envelope<64> freeze_env;
-        freeze_env.addPoint({0.0f,0.0f});
-        freeze_env.addPoint({2.0f,0.0f});
-        freeze_env.addPoint({2.1f,1.0f});
-        freeze_env.addPoint({6.0f,1.0f});
-        freeze_env.addPoint({6.1f,0.0f});
+        freeze_env.addPoint({0.0f, 0.0f});
+        freeze_env.addPoint({2.0f, 0.0f});
+        freeze_env.addPoint({2.1f, 1.0f});
+        freeze_env.addPoint({4.0f, 1.0f});
+        freeze_env.addPoint({4.1f, 0.0f});
+        freeze_env.addPoint({6.6f, 0.0f});
+        freeze_env.addPoint({6.7f, 1.0f});
+        freeze_env.addPoint({7.7f, 1.0f});
+        freeze_env.addPoint({7.8f, 0.0f});
+        const char *freezepattern = "0101010101";
         for (int i = 0; i < outlen; ++i)
         {
             float insample = sourceBuffer.getSample(0, inplaypos);
@@ -989,8 +994,11 @@ inline void test_grain_delay()
                 inplaypos = 0;
             float secondspos = i / 44100.0f;
             float panwidth = panenvelope.getValueAtPosition(secondspos);
-            proc->setPanWidth(panwidth);
-            bool freeze = freeze_env.getValueAtPosition(secondspos);
+            // proc->setPanWidth(panwidth);
+            int findex = secondspos;
+            findex = std::clamp(findex, 0, 9);
+            // bool freeze = freeze_env.getValueAtPosition(secondspos);
+            bool freeze = freezepattern[findex] == '1';
             proc->setInputFrozen(freeze);
             proc->process(insample, insample);
             outputBuffer.getSample(0, i) = proc->outputFrame[0];
