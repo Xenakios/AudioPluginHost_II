@@ -802,15 +802,18 @@ inline void test_sc()
 class GrainDelay
 {
   public:
-    GrainDelay()
+    GrainDelay() {}
+    std::array<float, 2> outputFrame;
+    void prepareToPlay(double sampleRate)
     {
-        m_buffer = {2, 10 * 44100};
+        m_samplerate = sampleRate;
+        m_buffer = {2, (unsigned int)(10.0 * m_samplerate)};
         m_buffer.clear();
         m_writepos = m_buffer.getNumFrames() - 1;
     }
-    std::array<float, 2> outputFrame;
     void process(float inLeft, float inRight)
     {
+        assert(m_samplerate > 1.0);
         if (!m_input_frozen)
         {
             m_buffer.getSample(0, m_writepos) = inLeft;
@@ -822,7 +825,9 @@ class GrainDelay
 
         if (m_grainphase == 0.0) // begin new grain
         {
-            std::uniform_int_distribution<int> delaydist{8192, 44100};
+            int mindelay = 0.1 * m_samplerate;
+            int maxdelay = 1.0 * m_samplerate;
+            std::uniform_int_distribution<int> delaydist{mindelay, maxdelay};
             std::uniform_real_distribution<float> pitchdist{-0.0f, 0.0f};
             float panrange = xenakios::mapvalue(m_pan_width, 0.0f, 1.0f, 0.0f, 0.5f);
             std::uniform_real_distribution<float> pandist{0.5f - panrange, 0.5f + panrange};
@@ -832,14 +837,14 @@ class GrainDelay
                 if (!ph.isActive)
                 {
                     ph.isActive = true;
-                    ph.lensamples = 0.1 * 44100;
+                    ph.lensamples = 0.1 * m_samplerate;
                     ph.playpos = 0;
                     float pitch = pitchdist(m_rng);
                     // pitch = pitches[m_graincounter % 4];
                     pitch = m_center_pitch;
                     ph.rate = std::pow(2.0f, pitch / 12.0f);
-                    ph.m_resampler.sri = 44100.0f;
-                    ph.m_resampler.sro = 44100.0f / ph.rate;
+                    ph.m_resampler.sri = m_samplerate;
+                    ph.m_resampler.sro = m_samplerate / ph.rate;
                     ph.m_resampler.dPhaseO = ph.m_resampler.sri / ph.m_resampler.sro;
                     ph.pan = pandist(m_rng);
                     sst::basic_blocks::dsp::pan_laws::monoEqualPower(ph.pan, ph.panmatrix);
@@ -861,7 +866,7 @@ class GrainDelay
                 }
             }
         }
-        m_grainphase += 1.0 / 44100.0 * m_grainrate;
+        m_grainphase += 1.0 / m_samplerate * m_grainrate;
         if (m_grainphase >= 1.0)
         {
             m_grainphase = 0.0;
@@ -926,10 +931,10 @@ class GrainDelay
   private:
     choc::buffer::ChannelArrayBuffer<float> m_buffer;
     int m_writepos = 0;
-    int m_delaylen = 44100;
     bool m_input_frozen = false;
     float m_pan_width = 0.0f;
     float m_center_pitch = 0.0f;
+    double m_samplerate = 1.0;
     struct Playhead
     {
         Playhead()
@@ -987,6 +992,7 @@ inline void test_grain_delay()
         choc::buffer::ChannelArrayBuffer<float> outputBuffer(2, outlen);
         outputBuffer.clear();
         auto proc = std::make_unique<GrainDelay>();
+        proc->prepareToPlay(44100);
         int inplaypos = 0;
         xenakios::Envelope<64> panenvelope;
         panenvelope.addPoint({0.0, 0.0});
