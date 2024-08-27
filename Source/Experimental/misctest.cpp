@@ -836,6 +836,7 @@ class GrainDelay
                     ph.playpos = 0;
                     float pitch = pitchdist(m_rng);
                     // pitch = pitches[m_graincounter % 4];
+                    pitch = m_center_pitch;
                     ph.rate = std::pow(2.0f, pitch / 12.0f);
                     ph.m_resampler.sri = 44100.0f;
                     ph.m_resampler.sro = 44100.0f / ph.rate;
@@ -910,6 +911,7 @@ class GrainDelay
     }
     void setInputFrozen(bool b) { m_input_frozen = b; }
     void setPanWidth(float w) { m_pan_width = w; }
+    void setCenterPitch(float p) { m_center_pitch = std::clamp(p, -12.0f, 12.0f); }
 
   private:
     choc::buffer::ChannelArrayBuffer<float> m_buffer;
@@ -917,6 +919,7 @@ class GrainDelay
     int m_delaylen = 44100;
     bool m_input_frozen = false;
     float m_pan_width = 0.0f;
+    float m_center_pitch = 0.0f;
     struct Playhead
     {
         Playhead()
@@ -949,7 +952,7 @@ inline void test_grain_delay()
     choc::audio::AudioFileFormatList flist;
     flist.addFormat(std::make_unique<choc::audio::WAVAudioFileFormat<false>>());
 
-    auto reader = flist.createReader(R"(C:\MusicAudio\sourcesamples\count.wav)");
+    auto reader = flist.createReader(R"(C:\MusicAudio\sourcesamples\sheila.wav)");
     // auto reader =
     //    flist.createReader(R"(C:\MusicAudio\sourcesamples\test_signals\440hz_sine_0db.wav)");
     if (reader)
@@ -966,7 +969,7 @@ inline void test_grain_delay()
         choc::audio::WAVAudioFileFormat<true> wav;
         auto writer = wav.createWriter(
             R"(C:\develop\AudioPluginHost_mk2\clapstatetests\graindelayout01.wav)", outprops);
-        unsigned int outlen = 10 * 44100;
+        unsigned int outlen = 20 * 44100;
         choc::buffer::ChannelArrayBuffer<float> outputBuffer(2, outlen);
         outputBuffer.clear();
         auto proc = std::make_unique<GrainDelay>();
@@ -985,7 +988,14 @@ inline void test_grain_delay()
         freeze_env.addPoint({6.7f, 1.0f});
         freeze_env.addPoint({7.7f, 1.0f});
         freeze_env.addPoint({7.8f, 0.0f});
-        const char *freezepattern = "0101010101";
+        xenakios::Envelope<64> pitch_env;
+        pitch_env.addPoint({0.0, 0.0});
+        pitch_env.addPoint({2.0, 0.0});
+        pitch_env.addPoint({10.0, 12.0});
+        pitch_env.addPoint({16.0, -12.0});
+        pitch_env.addPoint({19.0, 0.0});
+        bool frozen = true;
+        float drywet = 0.76f;
         for (int i = 0; i < outlen; ++i)
         {
             float insample = sourceBuffer.getSample(0, inplaypos);
@@ -995,14 +1005,21 @@ inline void test_grain_delay()
             float secondspos = i / 44100.0f;
             float panwidth = panenvelope.getValueAtPosition(secondspos);
             // proc->setPanWidth(panwidth);
-            int findex = secondspos;
-            findex = std::clamp(findex, 0, 9);
-            // bool freeze = freeze_env.getValueAtPosition(secondspos);
-            bool freeze = freezepattern[findex] == '1';
-            proc->setInputFrozen(freeze);
+
+            if (i % 22050 == 0)
+                frozen = !frozen;
+            if (frozen)
+                proc->setPanWidth(0.0f);
+            else
+                proc->setPanWidth(0.9);
+            proc->setInputFrozen(frozen);
+            float pitch = pitch_env.getValueAtPosition(secondspos);
+            proc->setCenterPitch(pitch);
             proc->process(insample, insample);
-            outputBuffer.getSample(0, i) = proc->outputFrame[0];
-            outputBuffer.getSample(1, i) = proc->outputFrame[1];
+            float outLeft = drywet * proc->outputFrame[0] + insample * (1.0f - drywet);
+            float outRight = drywet * proc->outputFrame[1] + insample * (1.0f - drywet);
+            outputBuffer.getSample(0, i) = outLeft;
+            outputBuffer.getSample(1, i) = outRight;
         }
         writer->appendFrames(outputBuffer.getView());
     }
