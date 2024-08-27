@@ -822,7 +822,7 @@ class GrainDelay
 
         if (m_grainphase == 0.0) // begin new grain
         {
-            std::uniform_int_distribution<int> delaydist{8192, 8192};
+            std::uniform_int_distribution<int> delaydist{8192, 44100};
             std::uniform_real_distribution<float> pitchdist{-0.0f, 0.0f};
             float panrange = xenakios::mapvalue(m_pan_width, 0.0f, 1.0f, 0.0f, 0.5f);
             std::uniform_real_distribution<float> pandist{0.5f - panrange, 0.5f + panrange};
@@ -861,8 +861,8 @@ class GrainDelay
                 }
             }
         }
-        m_grainphase += 1.0;
-        if (m_grainphase >= 0.01 * 44100)
+        m_grainphase += 1.0 / 44100.0 * m_grainrate;
+        if (m_grainphase >= 1.0)
         {
             m_grainphase = 0.0;
             ++m_graincounter;
@@ -919,6 +919,8 @@ class GrainDelay
     void setInputFrozen(bool b) { m_input_frozen = b; }
     void setPanWidth(float w) { m_pan_width = w; }
     void setCenterPitch(float p) { m_center_pitch = std::clamp(p, -12.0f, 12.0f); }
+    // 0 = 1Hz, -1 = 0.5 Hz, 2 = 2.0 Hz etc
+    void setGrainRateOctaves(float r) { m_grainrate = std::pow(2.0, r); }
     int maxplayheads_used = 0;
 
   private:
@@ -951,6 +953,7 @@ class GrainDelay
     };
     std::array<Playhead, 32> m_playheads;
     double m_grainphase = 0.0;
+    double m_grainrate = 1.0;
     std::minstd_rand0 m_rng;
     int m_graincounter = 0;
 };
@@ -1001,14 +1004,21 @@ inline void test_grain_delay()
         pitch_env.addPoint({2.0, 0.0});
         pitch_env.addPoint({10.0, 12.0});
         pitch_env.addPoint({16.0, -12.0});
+        pitch_env.addPoint({17.5, -11.0});
         pitch_env.addPoint({19.0, 0.0});
+        xenakios::Envelope<64> rate_env;
+        rate_env.addPoint({0.0, 0.0});
+        rate_env.addPoint({2.0, 0.0});
+        rate_env.addPoint({10.0, 7.0});
+        rate_env.addPoint({15.0, 7.0});
+        rate_env.addPoint({20.0, -1.0});
         bool frozen = true;
-        float drywet = 0.76f;
+        float drywet = 1.0f;
         for (int i = 0; i < outlen; ++i)
         {
             float insample = sourceBuffer.getSample(0, inplaypos);
             ++inplaypos;
-            if (inplaypos == inProps.numFrames)
+            if (inplaypos >= 4.4 * 44100)
                 inplaypos = 0;
             float secondspos = i / 44100.0f;
             float panwidth = panenvelope.getValueAtPosition(secondspos);
@@ -1019,10 +1029,12 @@ inline void test_grain_delay()
             if (frozen)
                 proc->setPanWidth(0.0f);
             else
-                proc->setPanWidth(0.9);
-            proc->setInputFrozen(frozen);
+                proc->setPanWidth(0.0);
+            // proc->setInputFrozen(frozen);
             float pitch = pitch_env.getValueAtPosition(secondspos);
-            proc->setCenterPitch(pitch);
+            // proc->setCenterPitch(pitch);
+            float rate = rate_env.getValueAtPosition(secondspos);
+            proc->setGrainRateOctaves(rate);
             proc->process(insample, insample);
             float outLeft = drywet * proc->outputFrame[0] + insample * (1.0f - drywet);
             float outRight = drywet * proc->outputFrame[1] + insample * (1.0f - drywet);
