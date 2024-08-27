@@ -23,6 +23,7 @@
 #include "sst/basic-blocks/dsp/LanczosResampler.h"
 #include "sst/basic-blocks/dsp/FollowSlewAndSmooth.h"
 #include "sst/basic-blocks/mod-matrix/ModMatrix.h"
+#include "sst/basic-blocks/dsp/PanLaws.h"
 #include "offlineclaphost.h"
 #include "gui/choc_DesktopWindow.h"
 #include "gui/choc_MessageLoop.h"
@@ -810,15 +811,21 @@ class GrainDelay
     std::array<float, 2> outputFrame;
     void process(float inLeft, float inRight)
     {
-        m_buffer.getSample(0, m_writepos) = inLeft;
-        m_buffer.getSample(1, m_writepos) = inRight;
-        ++m_writepos;
-        if (m_writepos == m_buffer.getNumFrames())
-            m_writepos = 0;
+        if (!m_input_frozen)
+        {
+            m_buffer.getSample(0, m_writepos) = inLeft;
+            m_buffer.getSample(1, m_writepos) = inRight;
+            ++m_writepos;
+            if (m_writepos == m_buffer.getNumFrames())
+                m_writepos = 0;
+        }
+
         if (m_grainphase == 0.0) // begin new grain
         {
-            std::uniform_int_distribution<int> dist{m_delaylen / 2, m_delaylen};
+            std::uniform_int_distribution<int> delaydist{8192, m_delaylen/4};
             std::uniform_real_distribution<float> pitchdist{-2.0f, 2.0f};
+            float panrange = xenakios::mapvalue(m_pan_width, 0.0f, 1.0f, 0.0f, 0.5f);
+            std::uniform_real_distribution<float> pandist{0.5f - panrange, 0.5f + panrange};
             const float pitches[4] = {0.0f, 4.0f, 7.0f, 12.0f};
             for (auto &ph : m_playheads)
             {
@@ -828,17 +835,15 @@ class GrainDelay
                     ph.lensamples = 0.1 * 44100;
                     ph.playpos = 0;
                     float pitch = pitchdist(m_rng);
-                    pitch = pitches[m_graincounter % 4];
+                    // pitch = pitches[m_graincounter % 4];
                     ph.rate = std::pow(2.0f, pitch / 12.0f);
                     ph.m_resampler.sri = 44100.0f;
                     ph.m_resampler.sro = 44100.0f / ph.rate;
-                    // ph.m_resampler.dPhaseI = 0.0;
-                    // ph.m_resampler.phaseI = 0.0;
-                    // ph.m_resampler.phaseO = 0.0;
                     ph.m_resampler.dPhaseO = ph.m_resampler.sri / ph.m_resampler.sro;
-                    ph.pan = 0.5f;
+                    ph.pan = pandist(m_rng);
+                    sst::basic_blocks::dsp::pan_laws::monoEqualPower(ph.pan, ph.panmatrix);
                     ph.outputbufferpos = 0;
-                    int actualDelay = dist(m_rng);
+                    int actualDelay = delaydist(m_rng);
                     ph.bufferreadpos = m_writepos - actualDelay;
                     if (ph.bufferreadpos < 0)
                     {
@@ -849,7 +854,7 @@ class GrainDelay
             }
         }
         m_grainphase += 1.0;
-        if (m_grainphase >= 0.05 * 44100)
+        if (m_grainphase >= 0.025 * 44100)
         {
             m_grainphase = 0.0;
             ++m_graincounter;
@@ -893,8 +898,8 @@ class GrainDelay
                                                      1.0f, 0.0f);
                 resampledLeft *= gain * 0.5f;
                 resampledRight *= gain * 0.5f;
-                outputFrame[0] += resampledLeft;
-                outputFrame[1] += resampledRight;
+                outputFrame[0] += resampledLeft * ph.panmatrix[0];
+                outputFrame[1] += resampledRight * ph.panmatrix[3];
                 ++ph.playpos;
                 if (ph.playpos == ph.lensamples)
                 {
@@ -903,11 +908,15 @@ class GrainDelay
             }
         }
     }
+    void setInputFrozen(bool b) { m_input_frozen = b; }
+    void setPanWidth(float w) { m_pan_width = w; }
 
   private:
     choc::buffer::ChannelArrayBuffer<float> m_buffer;
     int m_writepos = 0;
     int m_delaylen = 44100;
+    bool m_input_frozen = false;
+    float m_pan_width = 0.0f;
     struct Playhead
     {
         Playhead()
@@ -915,6 +924,8 @@ class GrainDelay
             for (int i = 0; i < 2; ++i)
                 for (int j = 0; j < 64; ++j)
                     outputbuffer[i][j] = 0.0f;
+            for (int i = 0; i < 4; ++i)
+                panmatrix[i] = 0.0f;
         }
         bool isActive = false;
         float rate = 1.0f;
@@ -925,6 +936,7 @@ class GrainDelay
         float outputbuffer[2][64];
         int outputbufferpos = 0;
         sst::basic_blocks::dsp::LanczosResampler<64> m_resampler{44100.0f, 44100.0f};
+        sst::basic_blocks::dsp::pan_laws::panmatrix_t panmatrix;
     };
     std::array<Playhead, 32> m_playheads;
     double m_grainphase = 0.0;
@@ -959,12 +971,27 @@ inline void test_grain_delay()
         outputBuffer.clear();
         auto proc = std::make_unique<GrainDelay>();
         int inplaypos = 0;
+        xenakios::Envelope<64> panenvelope;
+        panenvelope.addPoint({0.0, 0.0});
+        panenvelope.addPoint({5.0, 1.0});
+        panenvelope.addPoint({10.0, 0.0});
+        xenakios::Envelope<64> freeze_env;
+        freeze_env.addPoint({0.0f,0.0f});
+        freeze_env.addPoint({2.0f,0.0f});
+        freeze_env.addPoint({2.1f,1.0f});
+        freeze_env.addPoint({6.0f,1.0f});
+        freeze_env.addPoint({6.1f,0.0f});
         for (int i = 0; i < outlen; ++i)
         {
             float insample = sourceBuffer.getSample(0, inplaypos);
             ++inplaypos;
             if (inplaypos == inProps.numFrames)
                 inplaypos = 0;
+            float secondspos = i / 44100.0f;
+            float panwidth = panenvelope.getValueAtPosition(secondspos);
+            proc->setPanWidth(panwidth);
+            bool freeze = freeze_env.getValueAtPosition(secondspos);
+            proc->setInputFrozen(freeze);
             proc->process(insample, insample);
             outputBuffer.getSample(0, i) = proc->outputFrame[0];
             outputBuffer.getSample(1, i) = proc->outputFrame[1];
