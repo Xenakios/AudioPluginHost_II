@@ -4,6 +4,8 @@
 #include <vector>
 #include <span>
 #include <array>
+#include "audio/choc_AudioFileFormat.h"
+#include "audio/choc_SampleBuffers.h"
 #include "clap/clap.h"
 #include <algorithm>
 #include <cassert>
@@ -796,9 +798,187 @@ inline void test_sc()
                        44100.0, 2);
 }
 
+class GrainDelay
+{
+  public:
+    GrainDelay()
+    {
+        m_buffer = {2, 10 * 44100};
+        m_buffer.clear();
+        m_writepos = m_buffer.getNumFrames() - 1;
+    }
+    std::array<float, 2> outputFrame;
+    void process(float inLeft, float inRight)
+    {
+        m_buffer.getSample(0, m_writepos) = inLeft;
+        m_buffer.getSample(1, m_writepos) = inRight;
+        ++m_writepos;
+        if (m_writepos == m_buffer.getNumFrames())
+            m_writepos = 0;
+        if (m_grainphase == 0.0) // begin new grain
+        {
+            std::uniform_int_distribution<int> dist{m_delaylen / 2, m_delaylen};
+            std::uniform_real_distribution<float> pitchdist{-2.0f, 2.0f};
+            const float pitches[4] = {0.0f, 4.0f, 7.0f, 12.0f};
+            for (auto &ph : m_playheads)
+            {
+                if (!ph.isActive)
+                {
+                    ph.isActive = true;
+                    ph.lensamples = 0.1 * 44100;
+                    ph.playpos = 0;
+                    float pitch = pitchdist(m_rng);
+                    pitch = pitches[m_graincounter % 4];
+                    ph.rate = std::pow(2.0f, pitch / 12.0f);
+                    ph.m_resampler.sri = 44100.0f;
+                    ph.m_resampler.sro = 44100.0f / ph.rate;
+                    // ph.m_resampler.dPhaseI = 0.0;
+                    // ph.m_resampler.phaseI = 0.0;
+                    // ph.m_resampler.phaseO = 0.0;
+                    ph.m_resampler.dPhaseO = ph.m_resampler.sri / ph.m_resampler.sro;
+                    ph.pan = 0.5f;
+                    ph.outputbufferpos = 0;
+                    int actualDelay = dist(m_rng);
+                    ph.bufferreadpos = m_writepos - actualDelay;
+                    if (ph.bufferreadpos < 0)
+                    {
+                        ph.bufferreadpos = m_buffer.getNumFrames() - std::abs(ph.bufferreadpos);
+                    }
+                    break;
+                }
+            }
+        }
+        m_grainphase += 1.0;
+        if (m_grainphase >= 0.05 * 44100)
+        {
+            m_grainphase = 0.0;
+            ++m_graincounter;
+        }
+        outputFrame[0] = 0.0f;
+        outputFrame[1] = 0.0f;
+        for (auto &ph : m_playheads)
+        {
+            if (ph.isActive)
+            {
+                if (ph.outputbufferpos == 0)
+                {
+
+                    ph.m_resampler.dPhaseO = ph.m_resampler.sri / ph.m_resampler.sro;
+                    int required = ph.m_resampler.inputsRequiredToGenerateOutputs(64);
+                    for (int i = 0; i < required; ++i)
+                    {
+                        float leftGrainOut = m_buffer.getSample(0, ph.bufferreadpos);
+                        float rightGrainOut = m_buffer.getSample(1, ph.bufferreadpos);
+                        ph.m_resampler.push(leftGrainOut, rightGrainOut);
+                        ++ph.bufferreadpos;
+                        if (ph.bufferreadpos == m_buffer.getNumFrames())
+                        {
+                            ph.bufferreadpos = 0;
+                        }
+                    }
+
+                    auto produced =
+                        ph.m_resampler.populateNext(ph.outputbuffer[0], ph.outputbuffer[1], 64);
+                }
+                float resampledLeft = ph.outputbuffer[0][ph.outputbufferpos];
+                float resampledRight = ph.outputbuffer[1][ph.outputbufferpos];
+                ++ph.outputbufferpos;
+                if (ph.outputbufferpos == 64)
+                    ph.outputbufferpos = 0;
+                float gain = 1.0f;
+                if (ph.playpos < ph.lensamples / 2)
+                    gain = xenakios::mapvalue<float>(ph.playpos, 0, ph.lensamples / 2, 0.0f, 1.0f);
+                if (ph.playpos >= ph.lensamples / 2)
+                    gain = xenakios::mapvalue<float>(ph.playpos, ph.lensamples / 2, ph.lensamples,
+                                                     1.0f, 0.0f);
+                resampledLeft *= gain * 0.5f;
+                resampledRight *= gain * 0.5f;
+                outputFrame[0] += resampledLeft;
+                outputFrame[1] += resampledRight;
+                ++ph.playpos;
+                if (ph.playpos == ph.lensamples)
+                {
+                    ph.isActive = false;
+                }
+            }
+        }
+    }
+
+  private:
+    choc::buffer::ChannelArrayBuffer<float> m_buffer;
+    int m_writepos = 0;
+    int m_delaylen = 44100;
+    struct Playhead
+    {
+        Playhead()
+        {
+            for (int i = 0; i < 2; ++i)
+                for (int j = 0; j < 64; ++j)
+                    outputbuffer[i][j] = 0.0f;
+        }
+        bool isActive = false;
+        float rate = 1.0f;
+        int bufferreadpos = 0;
+        int playpos = 0;
+        int lensamples = 0;
+        float pan = 0.5f;
+        float outputbuffer[2][64];
+        int outputbufferpos = 0;
+        sst::basic_blocks::dsp::LanczosResampler<64> m_resampler{44100.0f, 44100.0f};
+    };
+    std::array<Playhead, 32> m_playheads;
+    double m_grainphase = 0.0;
+    std::minstd_rand0 m_rng;
+    int m_graincounter = 0;
+};
+
+inline void test_grain_delay()
+{
+    choc::audio::AudioFileFormatList flist;
+    flist.addFormat(std::make_unique<choc::audio::WAVAudioFileFormat<false>>());
+
+    auto reader = flist.createReader(R"(C:\MusicAudio\sourcesamples\count.wav)");
+    // auto reader =
+    //    flist.createReader(R"(C:\MusicAudio\sourcesamples\test_signals\440hz_sine_0db.wav)");
+    if (reader)
+    {
+        auto inProps = reader->getProperties();
+        unsigned int numInChans = inProps.numChannels;
+        choc::buffer::ChannelArrayBuffer<float> sourceBuffer{1, (unsigned int)inProps.numFrames};
+        reader->readFrames(0, sourceBuffer.getView());
+        choc::audio::AudioFileProperties outprops;
+        outprops.bitDepth = choc::audio::BitDepth::float32;
+        outprops.formatName = "WAV";
+        outprops.numChannels = 2;
+        outprops.sampleRate = 44100;
+        choc::audio::WAVAudioFileFormat<true> wav;
+        auto writer = wav.createWriter(
+            R"(C:\develop\AudioPluginHost_mk2\clapstatetests\graindelayout01.wav)", outprops);
+        unsigned int outlen = 10 * 44100;
+        choc::buffer::ChannelArrayBuffer<float> outputBuffer(2, outlen);
+        outputBuffer.clear();
+        auto proc = std::make_unique<GrainDelay>();
+        int inplaypos = 0;
+        for (int i = 0; i < outlen; ++i)
+        {
+            float insample = sourceBuffer.getSample(0, inplaypos);
+            ++inplaypos;
+            if (inplaypos == inProps.numFrames)
+                inplaypos = 0;
+            proc->process(insample, insample);
+            outputBuffer.getSample(0, i) = proc->outputFrame[0];
+            outputBuffer.getSample(1, i) = proc->outputFrame[1];
+        }
+        writer->appendFrames(outputBuffer.getView());
+    }
+    else
+        std::cout << "could not open file\n";
+}
+
 int main()
 {
-    test_sc();
+    test_grain_delay();
+    // test_sc();
     // test_binary_clap_state();
     // test_clapvariant();
     // test_tempomap();

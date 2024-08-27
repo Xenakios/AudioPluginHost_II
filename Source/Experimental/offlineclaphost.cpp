@@ -120,7 +120,7 @@ std::string ClapProcessingEngine::scanPluginFile(std::filesystem::path plugfilep
     }
     else
         return "could not open dll for " + plugfilename;
-    return "No info";
+    return "No info (should not happen)";
 }
 
 void ClapProcessingEngine::processToFile(std::string filename, double duration, double samplerate,
