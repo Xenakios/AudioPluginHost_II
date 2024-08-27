@@ -850,12 +850,19 @@ class GrainDelay
                     {
                         ph.bufferreadpos = m_buffer.getNumFrames() - std::abs(ph.bufferreadpos);
                     }
+                    int numplayheads = 0;
+                    for (auto &p : m_playheads)
+                    {
+                        if (p.isActive)
+                            ++numplayheads;
+                    }
+                    maxplayheads_used = std::max(maxplayheads_used, numplayheads);
                     break;
                 }
             }
         }
         m_grainphase += 1.0;
-        if (m_grainphase >= 0.025 * 44100)
+        if (m_grainphase >= 0.01 * 44100)
         {
             m_grainphase = 0.0;
             ++m_graincounter;
@@ -912,6 +919,7 @@ class GrainDelay
     void setInputFrozen(bool b) { m_input_frozen = b; }
     void setPanWidth(float w) { m_pan_width = w; }
     void setCenterPitch(float p) { m_center_pitch = std::clamp(p, -12.0f, 12.0f); }
+    int maxplayheads_used = 0;
 
   private:
     choc::buffer::ChannelArrayBuffer<float> m_buffer;
@@ -1022,6 +1030,7 @@ inline void test_grain_delay()
             outputBuffer.getSample(1, i) = outRight;
         }
         writer->appendFrames(outputBuffer.getView());
+        std::cout << proc->maxplayheads_used << " playheads were activated at most\n";
     }
     else
         std::cout << "could not open file\n";
