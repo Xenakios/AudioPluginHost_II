@@ -963,14 +963,17 @@ inline void test_grain_delay()
     choc::audio::AudioFileFormatList flist;
     flist.addFormat(std::make_unique<choc::audio::WAVAudioFileFormat<false>>());
 
-    auto reader = flist.createReader(R"(C:\MusicAudio\sourcesamples\sheila.wav)");
+    auto reader = flist.createReader(
+        R"(C:\MusicAudio\sourcesamples\ilkka virran romu pieno\trashpiano01a.wav)");
+    // auto reader = flist.createReader(R"(C:\MusicAudio\sourcesamples\sheila.wav)");
     // auto reader =
     //    flist.createReader(R"(C:\MusicAudio\sourcesamples\test_signals\440hz_sine_0db.wav)");
     if (reader)
     {
         auto inProps = reader->getProperties();
         unsigned int numInChans = inProps.numChannels;
-        choc::buffer::ChannelArrayBuffer<float> sourceBuffer{1, (unsigned int)inProps.numFrames};
+        choc::buffer::ChannelArrayBuffer<float> sourceBuffer{inProps.numChannels,
+                                                             (unsigned int)inProps.numFrames};
         reader->readFrames(0, sourceBuffer.getView());
         choc::audio::AudioFileProperties outprops;
         outprops.bitDepth = choc::audio::BitDepth::float32;
@@ -1002,23 +1005,28 @@ inline void test_grain_delay()
         xenakios::Envelope<64> pitch_env;
         pitch_env.addPoint({0.0, 0.0});
         pitch_env.addPoint({2.0, 0.0});
+        pitch_env.addPoint({2.0, 0.0});
         pitch_env.addPoint({10.0, 12.0});
+
         pitch_env.addPoint({16.0, -12.0});
         pitch_env.addPoint({17.5, -11.0});
         pitch_env.addPoint({19.0, 0.0});
         xenakios::Envelope<64> rate_env;
-        rate_env.addPoint({0.0, 0.0});
-        rate_env.addPoint({2.0, 0.0});
+        rate_env.addPoint({0.0, 3.0});
+        rate_env.addPoint({2.0, 3.0});
         rate_env.addPoint({10.0, 7.0});
-        rate_env.addPoint({15.0, 7.0});
+        rate_env.addPoint({15.0, 8.0});
         rate_env.addPoint({20.0, -1.0});
         bool frozen = true;
         float drywet = 1.0f;
         for (int i = 0; i < outlen; ++i)
         {
-            float insample = sourceBuffer.getSample(0, inplaypos);
+            float insampleLeft = sourceBuffer.getSample(0, inplaypos);
+            float insampleRight = insampleLeft;
+            if (inProps.numChannels == 2)
+                insampleRight = sourceBuffer.getSample(1, inplaypos);
             ++inplaypos;
-            if (inplaypos >= 4.4 * 44100)
+            if (inplaypos >= inProps.numFrames)
                 inplaypos = 0;
             float secondspos = i / 44100.0f;
             float panwidth = panenvelope.getValueAtPosition(secondspos);
@@ -1032,12 +1040,12 @@ inline void test_grain_delay()
                 proc->setPanWidth(0.0);
             // proc->setInputFrozen(frozen);
             float pitch = pitch_env.getValueAtPosition(secondspos);
-            // proc->setCenterPitch(pitch);
+            proc->setCenterPitch(pitch);
             float rate = rate_env.getValueAtPosition(secondspos);
             proc->setGrainRateOctaves(rate);
-            proc->process(insample, insample);
-            float outLeft = drywet * proc->outputFrame[0] + insample * (1.0f - drywet);
-            float outRight = drywet * proc->outputFrame[1] + insample * (1.0f - drywet);
+            proc->process(insampleLeft, insampleRight);
+            float outLeft = drywet * proc->outputFrame[0] + insampleLeft * (1.0f - drywet);
+            float outRight = drywet * proc->outputFrame[1] + insampleRight * (1.0f - drywet);
             outputBuffer.getSample(0, i) = outLeft;
             outputBuffer.getSample(1, i) = outRight;
         }
