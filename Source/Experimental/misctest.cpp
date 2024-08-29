@@ -838,7 +838,9 @@ class GrainDelay
                 if (!ph.isActive)
                 {
                     ph.isActive = true;
-                    ph.lensamples = 0.1 * m_samplerate;
+                    float shapedsize = std::pow(m_size, 3.0f);
+                    float lenseconds = xenakios::mapvalue(shapedsize, 0.0f, 1.0f, 0.01f, 1.0f);
+                    ph.lensamples = lenseconds * m_samplerate;
                     ph.playpos = 0;
                     float pitch = pitchdist(m_rng);
                     // pitch = pitches[m_graincounter % 4];
@@ -926,20 +928,22 @@ class GrainDelay
     void setInputFrozen(bool b) { m_input_frozen = b; }
     void setPanWidth(float w) { m_pan_width = w; }
     void setCenterPitch(float p) { m_center_pitch = std::clamp(p, -12.0f, 12.0f); }
-    // 0 = 1Hz, -1 = 0.5 Hz, 2 = 2.0 Hz etc
+    // -1 = 0.5Hz, 0 = 1Hz, 1 = 2Hz, 2 = 4Hz, 3 = 8Hz etc
     void setGrainRateOctaves(float r) { m_grainrate = std::pow(2.0, r); }
     // 0 closest to write head, 1 furthest from write head
     void setPosition(float p) { m_pos = std::clamp(p, 0.0f, 1.0f); }
+    void setSize(float sz) { m_size = std::clamp(sz, 0.0f, 1.0f); }
     int maxplayheads_used = 0;
 
   private:
-    choc::buffer::ChannelArrayBuffer<float> m_buffer;
-    int m_writepos = 0;
+    alignas(32) choc::buffer::ChannelArrayBuffer<float> m_buffer;
+    alignas(32) int m_writepos = 0;
     bool m_input_frozen = false;
     float m_pan_width = 0.0f;
     float m_center_pitch = 0.0f;
     float m_samplerate = 1.0;
     float m_pos = 0.0;
+    float m_size = 0.5;
     struct Playhead
     {
         Playhead()
@@ -956,12 +960,12 @@ class GrainDelay
         int playpos = 0;
         int lensamples = 0;
         float pan = 0.5f;
-        float outputbuffer[2][64];
+        alignas(32) float outputbuffer[2][64];
         int outputbufferpos = 0;
-        sst::basic_blocks::dsp::LanczosResampler<64> m_resampler{44100.0f, 44100.0f};
-        sst::basic_blocks::dsp::pan_laws::panmatrix_t panmatrix;
+        alignas(32) sst::basic_blocks::dsp::LanczosResampler<64> m_resampler{44100.0f, 44100.0f};
+        alignas(32) sst::basic_blocks::dsp::pan_laws::panmatrix_t panmatrix;
     };
-    std::array<Playhead, 32> m_playheads;
+    alignas(32) std::array<Playhead, 32> m_playheads;
     double m_grainphase = 0.0;
     double m_grainrate = 1.0;
     std::minstd_rand0 m_rng;
@@ -973,9 +977,9 @@ inline void test_grain_delay()
     choc::audio::AudioFileFormatList flist;
     flist.addFormat(std::make_unique<choc::audio::WAVAudioFileFormat<false>>());
 
-    auto reader = flist.createReader(
-        R"(C:\MusicAudio\sourcesamples\ilkka virran romu pieno\trashpiano01a.wav)");
-    // auto reader = flist.createReader(R"(C:\MusicAudio\sourcesamples\sheila.wav)");
+    // auto reader = flist.createReader(
+    //     R"(C:\MusicAudio\sourcesamples\ilkka virran romu pieno\trashpiano01a.wav)");
+    auto reader = flist.createReader(R"(C:\MusicAudio\sourcesamples\sheila.wav)");
     // auto reader =
     //    flist.createReader(R"(C:\MusicAudio\sourcesamples\test_signals\440hz_sine_0db.wav)");
     if (reader)
@@ -1028,6 +1032,10 @@ inline void test_grain_delay()
         rate_env.addPoint({10.0, 7.0});
         rate_env.addPoint({15.0, 8.0});
         rate_env.addPoint({20.0, -1.0});
+        xenakios::Envelope<64> size_env;
+        size_env.addPoint({0.0, 0.0});
+        size_env.addPoint({10.0, 0.6});
+        size_env.addPoint({20.0, 0.0});
         bool frozen = true;
         float drywet = 1.0f;
         for (int i = 0; i < outlen; ++i)
@@ -1051,9 +1059,13 @@ inline void test_grain_delay()
                 proc->setPanWidth(0.0);
             // proc->setInputFrozen(frozen);
             float pitch = pitch_env.getValueAtPosition(secondspos);
-            proc->setCenterPitch(pitch);
+            proc->setCenterPitch(-3.0);
             float rate = rate_env.getValueAtPosition(secondspos);
-            proc->setGrainRateOctaves(rate);
+            proc->setGrainRateOctaves(6.0);
+            float sz = size_env.getValueAtPosition(secondspos);
+            proc->setSize(0.4);
+            float pos = 0.4 + 0.2 * std::sin(2 * 3.141592653 / 44100 * i * 1.25);
+            proc->setPosition(pos);
             proc->process(insampleLeft, insampleRight);
             float outLeft = drywet * proc->outputFrame[0] + insampleLeft * (1.0f - drywet);
             float outRight = drywet * proc->outputFrame[1] + insampleRight * (1.0f - drywet);
