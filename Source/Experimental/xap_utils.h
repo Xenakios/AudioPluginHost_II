@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <optional>
 #include "containers/choc_NonAllocatingStableSort.h"
+#include <format>
 
 #define XENAKIOS_CLAP_NAMESPACE 11111
 
@@ -21,6 +22,43 @@ template <typename T> inline clap_id to_clap_id(T x) { return static_cast<clap_i
 
 namespace xenakios
 {
+
+struct Xoroshiro128Plus {
+	uint64_t state[2] = {};
+
+	void seed(uint64_t s0, uint64_t s1) {
+		state[0] = s0;
+		state[1] = s1;
+		// A bad seed will give a bad first result, so shift the state
+		operator()();
+	}
+
+	bool isSeeded() {
+		return state[0] || state[1];
+	}
+
+	static uint64_t rotl(uint64_t x, int k) {
+		return (x << k) | (x >> (64 - k));
+	}
+
+	uint64_t operator()() {
+		uint64_t s0 = state[0];
+		uint64_t s1 = state[1];
+		uint64_t result = s0 + s1;
+
+		s1 ^= s0;
+		state[0] = rotl(s0, 55) ^ s1 ^ (s1 << 14);
+		state[1] = rotl(s1, 36);
+
+		return result;
+	}
+	constexpr uint64_t min() const {
+		return 0;
+	}
+	constexpr uint64_t max() const {
+		return UINT64_MAX;
+	}
+};
 
 /** Remaps a value from a source range to a target range. */
 template <typename Type>

@@ -3,6 +3,7 @@
 #include <random>
 #include <array>
 #include <algorithm>
+#include "xap_utils.h"
 
 template <typename Type>
 inline Type maprange(Type sourceValue, Type sourceRangeMin, Type sourceRangeMax,
@@ -22,7 +23,7 @@ class DejaVuRandom
   private:
     static constexpr size_t maxSlots = 256;
     std::array<float, maxSlots> m_state;
-    using UnderlyingEngine = std::minstd_rand0;
+    using UnderlyingEngine = xenakios::Xoroshiro128Plus;
     UnderlyingEngine m_rng;
     int m_loop_index = 0;
     int m_loop_len = 8;
@@ -31,7 +32,7 @@ class DejaVuRandom
     bool m_deja_vu_enabled = true;
 
   public:
-    DejaVuRandom(unsigned int seed) : m_rng(seed)
+    DejaVuRandom(unsigned int seed) : m_rng{seed, 65537}
     {
         for (int i = 0; i < m_state.size(); ++i)
             m_state[i] = m_dist(m_rng);
@@ -85,10 +86,7 @@ class DejaVuRandom
                 float prob = maprange(m_deja_vu, 0.5f, 1.0f, 1.0f, 0.0f);
                 if (m_dist(m_rng) >= prob)
                 {
-                    std::uniform_int_distribution<int> selectdist(0, m_loop_len - 1);
-                    // int slot = selectdist(m_rng);
-                    // m_state[slot] = m_rng();
-                    m_loop_index = selectdist(m_rng);
+                    m_loop_index = mapvalue<float>(m_dist(m_rng), 0.0f, 1.0f, 0, m_loop_len - 1);
                 }
             }
             /*
