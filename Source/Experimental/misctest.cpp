@@ -968,7 +968,7 @@ class GrainDelay
     alignas(32) std::array<Playhead, 32> m_playheads;
     double m_grainphase = 0.0;
     double m_grainrate = 1.0;
-    std::minstd_rand0 m_rng;
+    xenakios::Xoroshiro128Plus m_rng;
     int m_graincounter = 0;
 };
 

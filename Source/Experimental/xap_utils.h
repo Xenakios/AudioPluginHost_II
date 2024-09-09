@@ -24,10 +24,28 @@ template <typename T> inline clap_id to_clap_id(T x) { return static_cast<clap_i
 namespace xenakios
 {
 
+/* Remaps a value from a source range to a target range. Explodes if source range has zero size.
+ */
+template <typename Type>
+Type mapvalue(Type sourceValue, Type sourceRangeMin, Type sourceRangeMax, Type targetRangeMin,
+              Type targetRangeMax)
+{
+    return targetRangeMin + ((targetRangeMax - targetRangeMin) * (sourceValue - sourceRangeMin)) /
+                                (sourceRangeMax - sourceRangeMin);
+}
+
+/*
+ The C++ standard library random stuff can be a bit bonkers(*) at times,
+ so we have this custom class which has a decent enough random base generator
+ and some simple methods for getting values out as floats etc...
+
+(*) See for example the Microsoft implementation of std::uniform_int_distribution...
+*/
+
 struct Xoroshiro128Plus
 {
     // have some non-zero init state to avoid the zero init state problem
-    // which would cause omly zeros to be produced
+    // which would cause only zeros to be produced
     uint64_t state[2] = {1000000, 100007};
 
     void seed(uint64_t s0, uint64_t s1)
@@ -56,32 +74,22 @@ struct Xoroshiro128Plus
     }
     constexpr uint64_t min() const { return 0; }
     constexpr uint64_t max() const { return UINT64_MAX; }
-    double nextFloat64()
-    {
-        return (*this)() * 5.421010862427522e-20;
-    }
+    double nextFloat64() { return (*this)() * 5.421010862427522e-20; }
     uint32_t nextUint32()
     {
         // Take top 32 bits which has better randomness properties
         return (*this)() >> 32;
     }
-    float nextFloat()
+    float nextFloat() { return nextUint32() * 2.32830629e-10f; }
+    float nextFloatInRange(float minvalue, float maxvalue)
     {
-        return nextUint32() * 2.32830629e-10f;
+        return mapvalue(nextFloat(), 0.0f, 1.0f, minvalue, maxvalue);
     }
-    
+    double nextFloat64InRange(double minvalue, double maxvalue)
+    {
+        return mapvalue(nextFloat64(), 0.0, 1.0, minvalue, maxvalue);
+    }
 };
-
-/** Remaps a value from a source range to a target range. */
-template <typename Type>
-Type mapvalue(Type sourceValue, Type sourceRangeMin, Type sourceRangeMax, Type targetRangeMin,
-              Type targetRangeMax)
-{
-    // jassert (! approximatelyEqual (sourceRangeMax, sourceRangeMin)); // mapping from a range of
-    // zero will produce NaN!
-    return targetRangeMin + ((targetRangeMax - targetRangeMin) * (sourceValue - sourceRangeMin)) /
-                                (sourceRangeMax - sourceRangeMin);
-}
 
 template <typename Type>
 static Type decibelsToGain(Type decibels, Type minusInfinityDb = Type(-100))
