@@ -5,6 +5,7 @@
 #include "clap/clap.h"
 #include <algorithm>
 #include <cstdint>
+#include <limits>
 #include <optional>
 #include "containers/choc_NonAllocatingStableSort.h"
 #include <format>
@@ -75,6 +76,7 @@ struct Xoroshiro128Plus
     constexpr uint64_t min() const { return 0; }
     constexpr uint64_t max() const { return UINT64_MAX; }
     double nextFloat64() { return (*this)() * 5.421010862427522e-20; }
+    uint64_t nextUint64() { return (*this)(); }
     uint32_t nextUint32()
     {
         // Take top 32 bits which has better randomness properties
@@ -88,6 +90,25 @@ struct Xoroshiro128Plus
     double nextFloat64InRange(double minvalue, double maxvalue)
     {
         return mapvalue(nextFloat64(), 0.0, 1.0, minvalue, maxvalue);
+    }
+    int nextInt32InRange(int minval, int maxval)
+    {
+        assert(maxval > minval);
+        return minval + (nextUint32() % (maxval - minval));
+    }
+    double nextCauchy(double location, double scale)
+    {
+        double z = nextFloat64();
+        return location + scale * std::tan(M_PI * (z - 0.5));
+    }
+    // pretty good substitute for Gauss
+    double nextHypCos(double location, double scale)
+    {
+        // we can't do the final calculation with exactly 0.0 or 1.0, so clamp
+        // there might be some other ways to deal with this, but this shall suffice for now
+        double z = std::clamp(nextFloat64(), std::numeric_limits<double>::epsilon(),
+                              1.0 - std::numeric_limits<double>::epsilon());
+        return location + scale * (2.0 / M_PI * std::log(std::tan(M_PI / 2.0 * z)));
     }
 };
 
