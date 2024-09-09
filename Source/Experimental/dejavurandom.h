@@ -1,6 +1,5 @@
 #pragma once
 
-#include <random>
 #include <array>
 #include <algorithm>
 #include "xap_utils.h"
@@ -28,14 +27,13 @@ class DejaVuRandom
     int m_loop_index = 0;
     int m_loop_len = 8;
     float m_deja_vu = 0.0;
-    std::uniform_real_distribution<float> m_dist{0.0f, 1.0f};
     bool m_deja_vu_enabled = true;
 
   public:
     DejaVuRandom(unsigned int seed) : m_rng{seed, 65537}
     {
         for (int i = 0; i < m_state.size(); ++i)
-            m_state[i] = m_dist(m_rng);
+            m_state[i] = m_rng.nextFloat();
     }
     void setLoopLength(int len) { m_loop_len = std::clamp(len, 1, (int)maxSlots); }
     void setDejaVu(float dv) { m_deja_vu = std::clamp(dv, 0.0f, 1.0f); }
@@ -54,7 +52,7 @@ class DejaVuRandom
     {
         if (!m_deja_vu_enabled)
         {
-            return m_dist(m_rng);
+            return m_rng.nextFloat();
         }
         auto next = m_state[m_loop_index];
         bool rewinded = false;
@@ -69,12 +67,12 @@ class DejaVuRandom
             if (m_deja_vu >= 0.0f && m_deja_vu <= 0.5f)
             {
                 float prob = maprange(m_deja_vu, 0.0f, 0.5f, 0.0f, 1.0f);
-                if (m_dist(m_rng) >= prob)
+                if (m_rng.nextFloat() >= prob)
                 {
                     // rotate state left and generate new random number to end of loop
                     std::rotate(m_state.begin(), m_state.begin() + 1, m_state.begin() + m_loop_len);
                     assert((m_loop_len - 1) >= 0);
-                    m_state[m_loop_len - 1] = m_dist(m_rng);
+                    m_state[m_loop_len - 1] = m_rng.nextFloat();
                     --m_loop_index;
                     if (m_loop_index < 0)
                         m_loop_index = m_loop_len - 1;
@@ -84,9 +82,10 @@ class DejaVuRandom
             // (m_deja_vu > 0.5f) // && m_deja_vu < 0.9f)
             {
                 float prob = maprange(m_deja_vu, 0.5f, 1.0f, 1.0f, 0.0f);
-                if (m_dist(m_rng) >= prob)
+                if (m_rng.nextFloat() >= prob)
                 {
-                    m_loop_index = mapvalue<float>(m_dist(m_rng), 0.0f, 1.0f, 0, m_loop_len - 1);
+                    m_loop_index =
+                        mapvalue<float>(m_rng.nextFloat(), 0.0f, 1.0f, 0, m_loop_len - 1);
                 }
             }
             /*
