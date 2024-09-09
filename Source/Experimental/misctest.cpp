@@ -1084,7 +1084,8 @@ inline void test_xoroshirorandom()
     // xenakios::Xoroshiro128Plus rng{65537, 32771};
     xenakios::Xoroshiro128Plus rng;
     for (int i = 0; i < 10; ++i)
-        std::cout << rng() * 5.421010862427522e-20 << "\n";
+        std::cout << rng.nextFloat() << "\n";
+    // std::cout << rng() * 5.421010862427522e-20 << "\n";
 }
 
 int main()

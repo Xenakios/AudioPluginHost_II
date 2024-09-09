@@ -4,6 +4,7 @@
 #include "containers/choc_SingleReaderSingleWriterFIFO.h"
 #include "clap/clap.h"
 #include <algorithm>
+#include <cstdint>
 #include <optional>
 #include "containers/choc_NonAllocatingStableSort.h"
 #include <format>
@@ -27,7 +28,7 @@ struct Xoroshiro128Plus
 {
     // have some non-zero init state to avoid the zero init state problem
     // which would cause omly zeros to be produced
-    uint64_t state[2] = {1000000,100007};
+    uint64_t state[2] = {1000000, 100007};
 
     void seed(uint64_t s0, uint64_t s1)
     {
@@ -55,6 +56,20 @@ struct Xoroshiro128Plus
     }
     constexpr uint64_t min() const { return 0; }
     constexpr uint64_t max() const { return UINT64_MAX; }
+    double nextFloat64()
+    {
+        return (*this)() * 5.421010862427522e-20;
+    }
+    uint32_t nextUint32()
+    {
+        // Take top 32 bits which has better randomness properties
+        return (*this)() >> 32;
+    }
+    float nextFloat()
+    {
+        return nextUint32() * 2.32830629e-10f;
+    }
+    
 };
 
 /** Remaps a value from a source range to a target range. */

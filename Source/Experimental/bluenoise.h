@@ -2,7 +2,6 @@
 
 #include "xap_utils.h"
 #include <algorithm>
-#include <random>
 
 namespace xenakios
 {
@@ -11,14 +10,14 @@ namespace xenakios
 class BlueNoise
 {
   public:
-    BlueNoise(unsigned int seed = 0) : m_rng{seed, 1} { m_previous = m_dist(m_rng); }
+    BlueNoise(unsigned int seed = 0) : m_rng{seed, 1} { m_previous = m_rng.nextFloat(); }
     float operator()()
     {
         float maxdist = 0.0f;
         float z0 = 0.0f;
         for (int i = 0; i < m_depth; ++i)
         {
-            float z1 = m_dist(m_rng);
+            float z1 = m_rng.nextFloat();
             float dist = std::abs(z1 - m_previous);
             if (dist > maxdist)
             {
@@ -35,7 +34,6 @@ class BlueNoise
 
   private:
     xenakios::Xoroshiro128Plus m_rng;
-    std::uniform_real_distribution<float> m_dist{0.0f, 1.0f};
     float m_previous = 0.0f;
     int m_depth = 4;
 };
