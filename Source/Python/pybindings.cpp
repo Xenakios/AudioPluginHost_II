@@ -43,7 +43,7 @@ inline void juceTest(std::string plugfilename)
 inline void writeArrayToFile(const py::array_t<double> &arr, double samplerate,
                              std::filesystem::path path)
 {
-
+    
     uint32_t numChans = arr.shape(0);
     choc::audio::AudioFileProperties outfileprops;
     outfileprops.formatName = "WAV";
@@ -191,6 +191,7 @@ PYBIND11_MODULE(xenakios, m)
     py::class_<xenakios::BlueNoise>(m, "BlueNoise")
         .def(py::init<unsigned int>())
         .def("setDepth", &xenakios::BlueNoise::setDepth)
+        .def("getDepth", &xenakios::BlueNoise::getDepth)
         .def("nextFloat", &xenakios::BlueNoise::operator());
 
     py::class_<ClapProcessingEngine>(m, "ClapEngine")

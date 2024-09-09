@@ -804,10 +804,10 @@ class GrainDelay
   public:
     GrainDelay() {}
     std::array<float, 2> outputFrame;
-    void prepareToPlay(double sampleRate)
+    void prepareToPlay(double sampleRate, double maxDelayLenSeconds)
     {
         m_samplerate = sampleRate;
-        m_buffer = {2, (unsigned int)(10.0 * m_samplerate)};
+        m_buffer = {2, (unsigned int)(maxDelayLenSeconds * m_samplerate)};
         m_buffer.clear();
         m_writepos = m_buffer.getNumFrames() - 1;
     }
@@ -1001,7 +1001,7 @@ inline void test_grain_delay()
         choc::buffer::ChannelArrayBuffer<float> outputBuffer(2, outlen);
         outputBuffer.clear();
         auto proc = std::make_unique<GrainDelay>();
-        proc->prepareToPlay(44100);
+        proc->prepareToPlay(44100.0, 10.0);
         int inplaypos = 0;
         xenakios::Envelope<64> panenvelope;
         panenvelope.addPoint({0.0, 0.0});

@@ -30,7 +30,7 @@ class BlueNoise
     }
     
     void setDepth(int d) { m_depth = std::clamp(d, 1, 32); }
-
+    int getDepth() const { return m_depth; }
   private:
     std::minstd_rand m_rng;
     std::uniform_real_distribution<float> m_dist{0.0f, 1.0f};

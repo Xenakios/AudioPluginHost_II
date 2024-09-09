@@ -83,7 +83,7 @@ target_link_libraries(MainHostApp
 # add_subdirectory(libs/rtaudio)
 project(cmaketest)
 add_subdirectory(libs/pybind11)
-# set (PYBIND11_PYTHON_VERSION "3.12")
+# set (PYBIND11_PYTHON_VERSION "3.13")
 pybind11_add_module(xenakios 
     Source/Python/pybindings.cpp
     Source/Experimental/xaps/clap_xaudioprocessor.cpp
@@ -105,17 +105,16 @@ target_compile_definitions(xenakios PRIVATE
 add_custom_command(TARGET xenakios POST_BUILD 
   COMMAND "${CMAKE_COMMAND}" -E copy 
      "$<TARGET_FILE:xenakios>"
-     "C:/Users/teemu/AppData/Local/Programs/Python/Python312/Lib/site-packages/$<TARGET_FILE_NAME:xenakios>" 
+     "C:/Users/teemu/AppData/Local/Programs/Python/Python313/Lib/site-packages/$<TARGET_FILE_NAME:xenakios>" 
   COMMENT "Copying to output directory")
 
 add_custom_command(TARGET xenakios POST_BUILD 
   COMMAND pybind11-stubgen 
   "xenakios" 
   "-o" 
-  "C:/Users/teemu/AppData/Local/Programs/Python/Python312/Lib/site-packages"
+  "C:/Users/teemu/AppData/Local/Programs/Python/Python313/Lib/site-packages"
      
   COMMENT "Generating Python stubs")
-
 
 # this is used for simple C++ testing/experimenting stuff without Juce
 add_executable(TestingProgram 
