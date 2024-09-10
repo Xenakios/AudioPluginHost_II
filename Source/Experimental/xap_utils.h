@@ -41,19 +41,26 @@ Type mapvalue(Type sourceValue, Type sourceRangeMin, Type sourceRangeMax, Type t
  and some simple methods for getting values out as floats etc...
 
 (*) See for example the Microsoft implementation of std::uniform_int_distribution...
+Or the Cauchy distribution, which won't allow a scale factor of 0 to be used, while 
+useful for our audio/music applications as a special case.
 */
 
 struct Xoroshiro128Plus
 {
     // have some non-zero init state to avoid the zero init state problem
     // which would cause only zeros to be produced
-    uint64_t state[2] = {1000000, 100007};
-
+    uint64_t state[2] = {4294967311, 100007};
+    Xoroshiro128Plus()
+    {
+        // experimentally known that after seeding, useful to advance the state,
+        // otoh this might be optimized out by the compiler...?
+        operator()();
+    }
+    Xoroshiro128Plus(uint64_t s1, uint64_t s2) : state{s1, s2} { operator()(); }
     void seed(uint64_t s0, uint64_t s1)
     {
         state[0] = s0;
         state[1] = s1;
-        // A bad seed will give a bad first result, so shift the state
         operator()();
     }
 
@@ -80,7 +87,7 @@ struct Xoroshiro128Plus
     uint32_t nextUint32()
     {
         // Take top 32 bits which has better randomness properties
-        return (*this)() >> 32;
+        return operator()() >> 32;
     }
     float nextFloat() { return nextUint32() * 2.32830629e-10f; }
     float nextFloatInRange(float minvalue, float maxvalue)

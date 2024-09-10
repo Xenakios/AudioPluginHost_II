@@ -1081,6 +1081,10 @@ inline void test_grain_delay()
 
 inline void test_xoroshirorandom()
 {
+    xenakios::Xoroshiro128Plus xr;
+    for (int i = 0; i < 10; ++i)
+        std::cout << xr.nextHypCos(0.0, 0.1) << "\n";
+    return;
     for (double z = 0.0; z < 1.1; z += 0.1)
     {
         double z1 = z;
@@ -1092,10 +1096,7 @@ inline void test_xoroshirorandom()
     }
 
     return;
-    xenakios::Xoroshiro128Plus xr;
-    for (int i = 0; i < 10; ++i)
-        std::cout << xr.nextCauchy(0.0, 0.1) << "\n";
-    return;
+    
     xenakios::DejaVuRandom dj{2};
     dj.setDejaVu(0.4);
     for (int i = 0; i < 20; ++i)
