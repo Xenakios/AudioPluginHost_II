@@ -1,4 +1,5 @@
 #include "offlineclaphost.h"
+#include "RtAudio.h"
 #include "audio/choc_SampleBuffers.h"
 #include "clap/audio-buffer.h"
 #include "clap/events.h"
@@ -8,6 +9,7 @@
 #include "clap/process.h"
 #include "gui/choc_MessageLoop.h"
 #include "text/choc_Files.h"
+#include "xap_utils.h"
 #include "xaps/xap_memorybufferplayer.h"
 #include <cstring>
 #include <format>
@@ -22,6 +24,7 @@ ClapProcessingEngine::ClapProcessingEngine()
     {
         memset(&outbufs[i], 0, sizeof(clap_audio_buffer));
     }
+    m_rtaudio = std::make_unique<RtAudio>();
 }
 
 ClapProcessingEngine::~ClapProcessingEngine() {}
@@ -341,6 +344,94 @@ void ClapProcessingEngine::processToFile(std::string filename, double duration, 
     {
         p->m_proc->deactivate();
     }
+}
+
+std::vector<std::string> ClapProcessingEngine::getDeviceNames()
+{
+    auto devices = m_rtaudio->getDeviceIds();
+    std::vector<std::string> result;
+    for (auto &d : devices)
+    {
+        auto dinfo = m_rtaudio->getDeviceInfo(d);
+        auto str = std::format("{} : {}", d, dinfo.name);
+        if (dinfo.isDefaultOutput)
+            str += " DEFAULT OUT";
+        if (dinfo.isDefaultInput)
+            str += " DEFAULT IN)";
+        result.push_back(str);
+    }
+    return result;
+}
+
+int CPECallback(void *outputBuffer, void *inputBuffer, unsigned int nFrames, double streamTime,
+                RtAudioStreamStatus status, void *userData)
+{
+    float *fbuf = (float *)outputBuffer;
+    ClapProcessingEngine &cpe = *(ClapProcessingEngine *)userData;
+    ClapProcessingEngine::TestToneMessage msg;
+    while (cpe.m_to_test_tone_fifo.pop(msg))
+    {
+        if (msg.parid == 0)
+        {
+            cpe.m_testTone.pitch = msg.value;
+        }
+
+        if (msg.parid == 1)
+            cpe.m_testTone.gain = xenakios::decibelsToGain(msg.value);
+    }
+    for (int i = 0; i < nFrames; ++i)
+    {
+        float pitch = cpe.m_testTone.freqslew.step(cpe.m_testTone.pitch);
+        double hz = 256.0 * std::pow(2.0, pitch / 12.0);
+        cpe.m_testTone.phaseinc = M_PI * 2 / cpe.m_testTone.samplerate * hz;
+        float gain = cpe.m_testTone.gainslew.step(cpe.m_testTone.gain);
+        float osample = std::sin(cpe.m_testTone.phase) * gain;
+
+        for (int j = 0; j < 2; ++j)
+        {
+            fbuf[i * 2 + j] = osample;
+        }
+        cpe.m_testTone.phase += cpe.m_testTone.phaseinc;
+    }
+    return 0;
+}
+
+void ClapProcessingEngine::startStreaming(unsigned int id, double sampleRate,
+                                          int preferredBufferSize)
+{
+    m_testTone.gainslew.setParams(50.0, 1.0, sampleRate);
+    m_testTone.freqslew.setParams(50.0, 12.0, sampleRate);
+    m_to_test_tone_fifo.reset(512);
+    m_to_test_tone_fifo.push({0, 12.0});
+    m_to_test_tone_fifo.push({1, -12.0});
+    m_testTone.samplerate = sampleRate;
+    RtAudio::StreamParameters outpars;
+    outpars.deviceId = id;
+    outpars.firstChannel = 0;
+    outpars.nChannels = 2;
+    unsigned int bframes = preferredBufferSize;
+    auto err = m_rtaudio->openStream(&outpars, nullptr, RTAUDIO_FLOAT32, sampleRate, &bframes,
+                                     CPECallback, this, nullptr);
+    if (err != RTAUDIO_NO_ERROR)
+    {
+        throw std::runtime_error("Error opening RTAudio stream");
+    }
+    err = m_rtaudio->startStream();
+    if (err != RTAUDIO_NO_ERROR)
+    {
+        throw std::runtime_error("Error starting RTAudio stream");
+    }
+}
+
+void ClapProcessingEngine::stopStreaming()
+{
+    if (m_rtaudio->isStreamOpen())
+        m_rtaudio->stopStream();
+}
+
+void ClapProcessingEngine::postMessage(int parid, double value)
+{
+    m_to_test_tone_fifo.push({parid, value});
 }
 
 void ClapProcessingEngine::saveStateToJSONFile(size_t chainIndex,

@@ -7,6 +7,7 @@
 #include <iostream>
 
 #include "audio/choc_AudioFileFormat.h"
+#include "containers/choc_SingleReaderSingleWriterFIFO.h"
 #include "memory/choc_Base64.h"
 #include "audio/choc_SampleBuffers.h"
 #include "audio/choc_AudioFileFormat_WAV.h"
@@ -17,6 +18,8 @@
 
 #include "gui/choc_DesktopWindow.h"
 #include "gui/choc_MessageLoop.h"
+#include "sst/basic-blocks/dsp/FollowSlewAndSmooth.h"
+#include "RtAudio.h"
 
 class ClapEventSequence
 {
@@ -430,4 +433,26 @@ class ClapProcessingEngine
 
     std::unique_ptr<choc::ui::DesktopWindow> m_desktopwindow;
     void openPersistentWindow(std::string title);
+    std::unique_ptr<RtAudio> m_rtaudio;
+    std::vector<std::string> getDeviceNames();
+    void startStreaming(unsigned int id, double sampleRate, int preferredBufferSize);
+    void stopStreaming();
+    void postMessage(int parid, double value);
+    struct TestToneMessage
+    {
+        int parid = -1;
+        double value = 0.0;
+    };
+    choc::fifo::SingleReaderSingleWriterFIFO<TestToneMessage> m_to_test_tone_fifo;
+    struct TestTone
+    {
+        double phase = 0.0;
+        double phaseinc = 0.0;
+        double gain = 0.0;
+        double pitch = 0.0;
+        sst::basic_blocks::dsp::SlewLimiter gainslew;
+        sst::basic_blocks::dsp::SlewLimiter freqslew;
+        double samplerate = 0.0;
+    };
+    TestTone m_testTone;
 };

@@ -43,7 +43,7 @@ inline void juceTest(std::string plugfilename)
 inline void writeArrayToFile(const py::array_t<double> &arr, double samplerate,
                              std::filesystem::path path)
 {
-    
+
     uint32_t numChans = arr.shape(0);
     choc::audio::AudioFileProperties outfileprops;
     outfileprops.formatName = "WAV";
@@ -206,6 +206,10 @@ PYBIND11_MODULE(xenakios, m)
         .def("getParameterInfoString", &ClapProcessingEngine::getParameterInfoString)
         .def("showGUIBlocking", &ClapProcessingEngine::openPluginGUIBlocking)
         .def("openWindow", &ClapProcessingEngine::openPersistentWindow)
+        .def("getDeviceNames", &ClapProcessingEngine::getDeviceNames)
+        .def("startStreaming", &ClapProcessingEngine::startStreaming)
+        .def("postMessage", &ClapProcessingEngine::postMessage)
+        .def("stopStreaming", &ClapProcessingEngine::stopStreaming)
         .def("saveStateToBinaryFile", &ClapProcessingEngine::saveStateToBinaryFile)
         .def("loadStateFromBinaryFile", &ClapProcessingEngine::loadStateFromBinaryFile)
         .def("processToFile", &ClapProcessingEngine::processToFile, "filename"_a, "duration"_a,
@@ -238,11 +242,8 @@ PYBIND11_MODULE(xenakios, m)
 
     py::class_<MultiModulator>(m, "MultiModulator")
         .def(py::init<double>())
-        .def("applyToSequence",
-             [](MultiModulator &m, ClapEventSequence &s, double start, double dur) 
-             {
-                m.applyToSequence(s, start, dur);
-             })
+        .def("applyToSequence", [](MultiModulator &m, ClapEventSequence &s, double start,
+                                   double dur) { m.applyToSequence(s, start, dur); })
         .def("setOutputAsParameter", &MultiModulator::setOutputAsParameter)
         .def("setOutputAsParameterModulation", &MultiModulator::setOutputAsParameterModulation)
         .def("setConnection", &MultiModulator::setConnection)

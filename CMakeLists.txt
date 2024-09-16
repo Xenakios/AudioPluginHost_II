@@ -90,6 +90,7 @@ pybind11_add_module(xenakios
     Source/Experimental/offlineclaphost.cpp
     Source/Experimental/xaudiograph.cpp
     libs/MTS-ESP/Master/libMTSMaster.cpp
+    libs/rtaudio/RtAudio.cpp 
 )
 # target_link_libraries(xenakios PRIVATE juce::juce_core juce::juce_audio_utils)
 
@@ -100,6 +101,7 @@ target_compile_definitions(xenakios PRIVATE
     XENPYTHONBINDINGS=1 
     NOJUCE=1
     JUCE_PLUGINHOST_VST3=1
+    __WINDOWS_WASAPI__
     )
     
 add_custom_command(TARGET xenakios POST_BUILD 
