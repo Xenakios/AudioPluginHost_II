@@ -369,12 +369,20 @@ void ClapProcessingEngine::processAudio(float *outputBuffer, float *inputBuffer,
     TestToneMessage msg;
     while (m_to_test_tone_fifo.pop(msg))
     {
-        if (msg.parid == 0)
+        m_delayed_messages.push_back({msg.timePos + m_samplePlayPos, msg.parid, msg.value});
+    }
+    for (auto &dm : m_delayed_messages)
+    {
+        if (dm.timePos >= m_samplePlayPos && dm.timePos < m_samplePlayPos + nFrames)
         {
-            m_testTone.pitch = msg.value;
+            // std::cout << "delayed message at " << m_samplePlayPos << "\n";
+            if (dm.parid == 0)
+            {
+                m_testTone.pitch = dm.value;
+            }
+            else if (dm.parid == 1)
+                m_testTone.gain = xenakios::decibelsToGain(dm.value);
         }
-        else if (msg.parid == 1)
-            m_testTone.gain = xenakios::decibelsToGain(msg.value);
     }
     for (int i = 0; i < nFrames; ++i)
     {
@@ -390,6 +398,7 @@ void ClapProcessingEngine::processAudio(float *outputBuffer, float *inputBuffer,
         }
         m_testTone.phase += m_testTone.phaseinc;
     }
+    m_samplePlayPos += nFrames;
 }
 
 int CPECallback(void *outputBuffer, void *inputBuffer, unsigned int nFrames, double streamTime,
@@ -405,11 +414,13 @@ int CPECallback(void *outputBuffer, void *inputBuffer, unsigned int nFrames, dou
 void ClapProcessingEngine::startStreaming(unsigned int id, double sampleRate,
                                           int preferredBufferSize)
 {
+    m_delayed_messages.reserve(512);
+    m_delayed_messages.clear();
     m_testTone.gainslew.setParams(50.0, 1.0, sampleRate);
     m_testTone.freqslew.setParams(50.0, 12.0, sampleRate);
     m_to_test_tone_fifo.reset(512);
-    m_to_test_tone_fifo.push({0, 12.0});
-    m_to_test_tone_fifo.push({1, -12.0});
+    m_to_test_tone_fifo.push({0, 0, 12.0});
+    m_to_test_tone_fifo.push({0, 1, -12.0});
     m_testTone.samplerate = sampleRate;
     RtAudio::StreamParameters outpars;
     outpars.deviceId = id;
@@ -435,9 +446,10 @@ void ClapProcessingEngine::stopStreaming()
         m_rtaudio->stopStream();
 }
 
-void ClapProcessingEngine::postMessage(int parid, double value)
+void ClapProcessingEngine::postMessage(double delay, int parid, double value)
 {
-    m_to_test_tone_fifo.push({parid, value});
+    int64_t timeStamp = delay * m_testTone.samplerate;
+    m_to_test_tone_fifo.push({timeStamp, parid, value});
 }
 
 void ClapProcessingEngine::saveStateToJSONFile(size_t chainIndex,

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <unordered_map>
 #include <vector>
 #include <filesystem>
@@ -437,13 +438,15 @@ class ClapProcessingEngine
     std::vector<std::string> getDeviceNames();
     void startStreaming(unsigned int id, double sampleRate, int preferredBufferSize);
     void stopStreaming();
-    void postMessage(int parid, double value);
+    void postMessage(double delay, int parid, double value);
     struct TestToneMessage
     {
+        int64_t timePos = 0;
         int parid = -1;
         double value = 0.0;
     };
     choc::fifo::SingleReaderSingleWriterFIFO<TestToneMessage> m_to_test_tone_fifo;
+    std::vector<TestToneMessage> m_delayed_messages;
     struct TestTone
     {
         double phase = 0.0;
@@ -455,5 +458,6 @@ class ClapProcessingEngine
         double samplerate = 0.0;
     };
     TestTone m_testTone;
+    int64_t m_samplePlayPos = 0;
     void processAudio(float *outputBuffer, float *inputBuffer, unsigned int nFrames);
 };
