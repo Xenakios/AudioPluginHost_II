@@ -455,4 +455,5 @@ class ClapProcessingEngine
         double samplerate = 0.0;
     };
     TestTone m_testTone;
+    void processAudio(float *outputBuffer, float *inputBuffer, unsigned int nFrames);
 };

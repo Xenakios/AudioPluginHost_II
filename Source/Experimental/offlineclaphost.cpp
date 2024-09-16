@@ -363,36 +363,42 @@ std::vector<std::string> ClapProcessingEngine::getDeviceNames()
     return result;
 }
 
-int CPECallback(void *outputBuffer, void *inputBuffer, unsigned int nFrames, double streamTime,
-                RtAudioStreamStatus status, void *userData)
+void ClapProcessingEngine::processAudio(float *outputBuffer, float *inputBuffer,
+                                        unsigned int nFrames)
 {
-    float *fbuf = (float *)outputBuffer;
-    ClapProcessingEngine &cpe = *(ClapProcessingEngine *)userData;
-    ClapProcessingEngine::TestToneMessage msg;
-    while (cpe.m_to_test_tone_fifo.pop(msg))
+    TestToneMessage msg;
+    while (m_to_test_tone_fifo.pop(msg))
     {
         if (msg.parid == 0)
         {
-            cpe.m_testTone.pitch = msg.value;
+            m_testTone.pitch = msg.value;
         }
-
-        if (msg.parid == 1)
-            cpe.m_testTone.gain = xenakios::decibelsToGain(msg.value);
+        else if (msg.parid == 1)
+            m_testTone.gain = xenakios::decibelsToGain(msg.value);
     }
     for (int i = 0; i < nFrames; ++i)
     {
-        float pitch = cpe.m_testTone.freqslew.step(cpe.m_testTone.pitch);
+        float pitch = m_testTone.freqslew.step(m_testTone.pitch);
         double hz = 256.0 * std::pow(2.0, pitch / 12.0);
-        cpe.m_testTone.phaseinc = M_PI * 2 / cpe.m_testTone.samplerate * hz;
-        float gain = cpe.m_testTone.gainslew.step(cpe.m_testTone.gain);
-        float osample = std::sin(cpe.m_testTone.phase) * gain;
+        m_testTone.phaseinc = M_PI * 2 / m_testTone.samplerate * hz;
+        float gain = m_testTone.gainslew.step(m_testTone.gain);
+        float osample = std::sin(m_testTone.phase) * gain;
 
         for (int j = 0; j < 2; ++j)
         {
-            fbuf[i * 2 + j] = osample;
+            outputBuffer[i * 2 + j] = osample;
         }
-        cpe.m_testTone.phase += cpe.m_testTone.phaseinc;
+        m_testTone.phase += m_testTone.phaseinc;
     }
+}
+
+int CPECallback(void *outputBuffer, void *inputBuffer, unsigned int nFrames, double streamTime,
+                RtAudioStreamStatus status, void *userData)
+{
+    float *fobuf = (float *)outputBuffer;
+    float *fibuf = (float *)inputBuffer;
+    ClapProcessingEngine &cpe = *(ClapProcessingEngine *)userData;
+    cpe.processAudio(fobuf, fibuf, nFrames);
     return 0;
 }
 
