@@ -14,6 +14,7 @@
 #include <cstring>
 #include <format>
 #include <stdexcept>
+#include <vector>
 
 using namespace std::chrono_literals;
 
@@ -375,6 +376,7 @@ void ClapProcessingEngine::processAudio(float *outputBuffer, float *inputBuffer,
     {
         if (dm.timePos >= m_samplePlayPos && dm.timePos < m_samplePlayPos + nFrames)
         {
+            dm.timePos = -1;
             // std::cout << "delayed message at " << m_samplePlayPos << "\n";
             if (dm.parid == 0)
             {
@@ -398,6 +400,7 @@ void ClapProcessingEngine::processAudio(float *outputBuffer, float *inputBuffer,
         }
         m_testTone.phase += m_testTone.phaseinc;
     }
+    std::erase_if(m_delayed_messages, [](auto &&dm) { return dm.timePos == -1; });
     m_samplePlayPos += nFrames;
 }
 
@@ -444,6 +447,8 @@ void ClapProcessingEngine::stopStreaming()
 {
     if (m_rtaudio->isStreamOpen())
         m_rtaudio->stopStream();
+    if (m_delayed_messages.size() > 0)
+        std::cout << m_delayed_messages.size() << " delayed messages left\n";
 }
 
 void ClapProcessingEngine::postMessage(double delay, int parid, double value)
