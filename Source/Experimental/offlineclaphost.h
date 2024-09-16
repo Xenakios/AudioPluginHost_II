@@ -385,6 +385,79 @@ class TempoMap
     std::vector<double> m_beat_to_secs_map;
 };
 
+class TestSineSynth
+{
+  public:
+    TestSineSynth() { m_voices.resize(16); }
+    void prepare(double samplerate, int bufsize)
+    {
+        m_sr = samplerate;
+        m_mixbuf.resize(bufsize * 2);
+    }
+    void startNote(int key, float gain)
+    {
+        for (auto &v : m_voices)
+        {
+            if (!v.isActive)
+            {
+                v.isActive = true;
+                v.key = key;
+                float hz = 440.0 * std::pow(2.0, (key - 69) / 12.0);
+                v.phaseinc = 2 * M_PI / m_sr * hz;
+                v.gate = true;
+                v.fadecounter = 0;
+                v.gain = gain;
+                break;
+            }
+        }
+    }
+    void stopNote(int key)
+    {
+        for (auto &v : m_voices)
+        {
+            if (v.isActive && v.key == key)
+            {
+                v.gate = false;
+                break;
+            }
+        }
+    }
+    void process(float &outLeft, float &outRight)
+    {
+        outLeft = 0.0f;
+        outRight = 0.0f;
+        for (auto &v : m_voices)
+        {
+            if (v.isActive)
+            {
+                float vout = std::sin(v.phase) * v.gain;
+                outLeft += vout;
+                outRight += vout;
+                v.phase += v.phaseinc;
+                if (!v.gate)
+                {
+                    v.isActive = false;
+                }
+            }
+        }
+    }
+
+  private:
+    struct Voice
+    {
+        bool isActive = false;
+        int key = 0;
+        double phase = 0.0;
+        double phaseinc = 0.0;
+        double gain = 0.0;
+        bool gate = false;
+        int fadecounter = 0;
+    };
+    std::vector<Voice> m_voices;
+    double m_sr = 0.0;
+    std::vector<float> m_mixbuf;
+};
+
 class ClapProcessingEngine
 {
 
@@ -438,26 +511,12 @@ class ClapProcessingEngine
     std::vector<std::string> getDeviceNames();
     void startStreaming(unsigned int id, double sampleRate, int preferredBufferSize);
     void stopStreaming();
-    void postMessage(double delay, int parid, double value);
-    struct TestToneMessage
-    {
-        int64_t timePos = 0;
-        int parid = -1;
-        double value = 0.0;
-    };
-    choc::fifo::SingleReaderSingleWriterFIFO<TestToneMessage> m_to_test_tone_fifo;
-    std::vector<TestToneMessage> m_delayed_messages;
-    struct TestTone
-    {
-        double phase = 0.0;
-        double phaseinc = 0.0;
-        double gain = 0.0;
-        double pitch = 0.0;
-        sst::basic_blocks::dsp::SlewLimiter gainslew;
-        sst::basic_blocks::dsp::SlewLimiter freqslew;
-        double samplerate = 0.0;
-    };
-    TestTone m_testTone;
+    void postNoteMessage(double delay, double duration, int key, double velo);
+    
+    choc::fifo::SingleReaderSingleWriterFIFO<ClapEventSequence::Event> m_to_test_tone_fifo;
+    std::vector<ClapEventSequence::Event> m_delayed_messages;
+    
+    TestSineSynth m_synth;
     int64_t m_samplePlayPos = 0;
     void processAudio(float *outputBuffer, float *inputBuffer, unsigned int nFrames);
 };

@@ -367,40 +367,40 @@ std::vector<std::string> ClapProcessingEngine::getDeviceNames()
 void ClapProcessingEngine::processAudio(float *outputBuffer, float *inputBuffer,
                                         unsigned int nFrames)
 {
-    TestToneMessage msg;
+    ClapEventSequence::Event msg;
     while (m_to_test_tone_fifo.pop(msg))
     {
-        m_delayed_messages.push_back({msg.timePos + m_samplePlayPos, msg.parid, msg.value});
+        ClapEventSequence::Event msgcopy{msg};
+        msgcopy.timestamp = msg.timestamp + m_samplePlayPos;
+        m_delayed_messages.push_back(msgcopy);
     }
     for (auto &dm : m_delayed_messages)
     {
-        if (dm.timePos >= m_samplePlayPos && dm.timePos < m_samplePlayPos + nFrames)
+        if (dm.timestamp >= m_samplePlayPos && dm.timestamp < m_samplePlayPos + nFrames)
         {
-            dm.timePos = -1;
+            dm.timestamp = -1.0;
             // std::cout << "delayed message at " << m_samplePlayPos << "\n";
-            if (dm.parid == 0)
+            if (dm.event.header.type == CLAP_EVENT_NOTE_ON)
             {
-                m_testTone.pitch = dm.value;
+                auto nev = (clap_event_note *)&dm.event;
+                m_synth.startNote(nev->key, nev->velocity);
             }
-            else if (dm.parid == 1)
-                m_testTone.gain = xenakios::decibelsToGain(dm.value);
+            if (dm.event.header.type == CLAP_EVENT_NOTE_OFF)
+            {
+                auto nev = (clap_event_note *)&dm.event;
+                m_synth.stopNote(nev->key);
+            }
         }
     }
     for (int i = 0; i < nFrames; ++i)
     {
-        float pitch = m_testTone.freqslew.step(m_testTone.pitch);
-        double hz = 256.0 * std::pow(2.0, pitch / 12.0);
-        m_testTone.phaseinc = M_PI * 2 / m_testTone.samplerate * hz;
-        float gain = m_testTone.gainslew.step(m_testTone.gain);
-        float osample = std::sin(m_testTone.phase) * gain;
-
-        for (int j = 0; j < 2; ++j)
-        {
-            outputBuffer[i * 2 + j] = osample;
-        }
-        m_testTone.phase += m_testTone.phaseinc;
+        float outLeft = 0.0f;
+        float outRight = 0.0f;
+        m_synth.process(outLeft, outRight);
+        outputBuffer[i * 2 + 0] = outLeft;
+        outputBuffer[i * 2 + 1] = outRight;
     }
-    std::erase_if(m_delayed_messages, [](auto &&dm) { return dm.timePos == -1; });
+    std::erase_if(m_delayed_messages, [](auto &&dm) { return dm.timestamp < 0.0; });
     m_samplePlayPos += nFrames;
 }
 
@@ -419,12 +419,11 @@ void ClapProcessingEngine::startStreaming(unsigned int id, double sampleRate,
 {
     m_delayed_messages.reserve(512);
     m_delayed_messages.clear();
-    m_testTone.gainslew.setParams(50.0, 1.0, sampleRate);
-    m_testTone.freqslew.setParams(50.0, 12.0, sampleRate);
+
     m_to_test_tone_fifo.reset(512);
-    m_to_test_tone_fifo.push({0, 0, 12.0});
-    m_to_test_tone_fifo.push({0, 1, -12.0});
-    m_testTone.samplerate = sampleRate;
+
+    m_synth.prepare(sampleRate, preferredBufferSize);
+
     RtAudio::StreamParameters outpars;
     outpars.deviceId = id;
     outpars.firstChannel = 0;
@@ -451,10 +450,13 @@ void ClapProcessingEngine::stopStreaming()
         std::cout << m_delayed_messages.size() << " delayed messages left\n";
 }
 
-void ClapProcessingEngine::postMessage(double delay, int parid, double value)
+void ClapProcessingEngine::postNoteMessage(double delay, double duration, int key, double velo)
 {
-    int64_t timeStamp = delay * m_testTone.samplerate;
-    m_to_test_tone_fifo.push({timeStamp, parid, value});
+    double sr = m_rtaudio->getStreamSampleRate();
+    auto ev = xenakios::make_event_note(0, CLAP_EVENT_NOTE_ON, -1, -1, key, -1, velo);
+    m_to_test_tone_fifo.push(ClapEventSequence::Event(delay * sr, &ev));
+    ev = xenakios::make_event_note(0, CLAP_EVENT_NOTE_OFF, -1, -1, key, -1, velo);
+    m_to_test_tone_fifo.push(ClapEventSequence::Event((delay + duration) * sr, &ev));
 }
 
 void ClapProcessingEngine::saveStateToJSONFile(size_t chainIndex,
