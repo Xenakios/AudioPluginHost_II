@@ -512,11 +512,14 @@ class ClapProcessingEngine
     void startStreaming(unsigned int id, double sampleRate, int preferredBufferSize);
     void stopStreaming();
     void postNoteMessage(double delay, double duration, int key, double velo);
-    
+
     choc::fifo::SingleReaderSingleWriterFIFO<ClapEventSequence::Event> m_to_test_tone_fifo;
     std::vector<ClapEventSequence::Event> m_delayed_messages;
-    
+
     TestSineSynth m_synth;
     int64_t m_samplePlayPos = 0;
-    void processAudio(float *outputBuffer, float *inputBuffer, unsigned int nFrames);
+    void processAudio(choc::buffer::ChannelArrayView<float> outputBuffer,
+                      choc::buffer::ChannelArrayView<float> inputBuffer);
+    choc::buffer::ChannelArrayBuffer<float> outputConversionBuffer;
+    choc::buffer::ChannelArrayBuffer<float> inputConversionBuffer;
 };

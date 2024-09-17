@@ -363,10 +363,10 @@ std::vector<std::string> ClapProcessingEngine::getDeviceNames()
     }
     return result;
 }
-
-void ClapProcessingEngine::processAudio(float *outputBuffer, float *inputBuffer,
-                                        unsigned int nFrames)
+void ClapProcessingEngine::processAudio(choc::buffer::ChannelArrayView<float> outputBuffer,
+                                        choc::buffer::ChannelArrayView<float> inputBuffer)
 {
+    auto nFrames = outputBuffer.getNumFrames();
     ClapEventSequence::Event msg;
     while (m_to_test_tone_fifo.pop(msg))
     {
@@ -392,13 +392,14 @@ void ClapProcessingEngine::processAudio(float *outputBuffer, float *inputBuffer,
             }
         }
     }
-    for (int i = 0; i < nFrames; ++i)
+
+    for (unsigned int i = 0; i < nFrames; ++i)
     {
         float outLeft = 0.0f;
         float outRight = 0.0f;
         m_synth.process(outLeft, outRight);
-        outputBuffer[i * 2 + 0] = outLeft;
-        outputBuffer[i * 2 + 1] = outRight;
+        outputBuffer.getSample(0, i) = outLeft;
+        outputBuffer.getSample(1, i) = outRight;
     }
     std::erase_if(m_delayed_messages, [](auto &&dm) { return dm.timestamp < 0.0; });
     m_samplePlayPos += nFrames;
@@ -410,7 +411,12 @@ int CPECallback(void *outputBuffer, void *inputBuffer, unsigned int nFrames, dou
     float *fobuf = (float *)outputBuffer;
     float *fibuf = (float *)inputBuffer;
     ClapProcessingEngine &cpe = *(ClapProcessingEngine *)userData;
-    cpe.processAudio(fobuf, fibuf, nFrames);
+    cpe.processAudio(cpe.outputConversionBuffer, cpe.inputConversionBuffer);
+    for (unsigned int i = 0; i < nFrames; ++i)
+    {
+        fobuf[i * 2 + 0] = cpe.outputConversionBuffer.getSample(0, i);
+        fobuf[i * 2 + 1] = cpe.outputConversionBuffer.getSample(1, i);
+    }
     return 0;
 }
 
@@ -431,6 +437,8 @@ void ClapProcessingEngine::startStreaming(unsigned int id, double sampleRate,
     unsigned int bframes = preferredBufferSize;
     auto err = m_rtaudio->openStream(&outpars, nullptr, RTAUDIO_FLOAT32, sampleRate, &bframes,
                                      CPECallback, this, nullptr);
+    outputConversionBuffer = choc::buffer::ChannelArrayBuffer<float>{2, bframes};
+    inputConversionBuffer = choc::buffer::ChannelArrayBuffer<float>{2, bframes};
     if (err != RTAUDIO_NO_ERROR)
     {
         throw std::runtime_error("Error opening RTAudio stream");
