@@ -363,8 +363,8 @@ std::vector<std::string> ClapProcessingEngine::getDeviceNames()
     }
     return result;
 }
-void ClapProcessingEngine::processAudio(choc::buffer::ChannelArrayView<float> outputBuffer,
-                                        choc::buffer::ChannelArrayView<float> inputBuffer)
+void ClapProcessingEngine::processAudio(choc::buffer::ChannelArrayView<float> inputBuffer,
+                                        choc::buffer::ChannelArrayView<float> outputBuffer)
 {
     auto nFrames = outputBuffer.getNumFrames();
     ClapEventSequence::Event msg;
@@ -411,7 +411,7 @@ int CPECallback(void *outputBuffer, void *inputBuffer, unsigned int nFrames, dou
     float *fobuf = (float *)outputBuffer;
     float *fibuf = (float *)inputBuffer;
     ClapProcessingEngine &cpe = *(ClapProcessingEngine *)userData;
-    cpe.processAudio(cpe.outputConversionBuffer, cpe.inputConversionBuffer);
+    cpe.processAudio(cpe.inputConversionBuffer, cpe.outputConversionBuffer);
     for (unsigned int i = 0; i < nFrames; ++i)
     {
         fobuf[i * 2 + 0] = cpe.outputConversionBuffer.getSample(0, i);

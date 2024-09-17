@@ -518,8 +518,8 @@ class ClapProcessingEngine
 
     TestSineSynth m_synth;
     int64_t m_samplePlayPos = 0;
-    void processAudio(choc::buffer::ChannelArrayView<float> outputBuffer,
-                      choc::buffer::ChannelArrayView<float> inputBuffer);
+    void processAudio(choc::buffer::ChannelArrayView<float> inputBuffer,
+                      choc::buffer::ChannelArrayView<float> outputBuffer);
     choc::buffer::ChannelArrayBuffer<float> outputConversionBuffer;
     choc::buffer::ChannelArrayBuffer<float> inputConversionBuffer;
 };
