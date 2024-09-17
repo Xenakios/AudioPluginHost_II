@@ -16,6 +16,7 @@
 #include <stdexcept>
 #include <vector>
 
+
 using namespace std::chrono_literals;
 
 ClapProcessingEngine::ClapProcessingEngine()

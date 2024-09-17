@@ -21,6 +21,7 @@
 #include "gui/choc_MessageLoop.h"
 #include "sst/basic-blocks/dsp/FollowSlewAndSmooth.h"
 #include "RtAudio.h"
+#include "sst/basic-blocks/modulators/ADSREnvelope.h"
 
 class ClapEventSequence
 {
@@ -385,28 +386,72 @@ class TempoMap
     std::vector<double> m_beat_to_secs_map;
 };
 
+struct SRProviderB
+{
+    static constexpr int BLOCK_SIZE = 32;
+    static constexpr int BLOCK_SIZE_OS = BLOCK_SIZE * 2;
+    SRProviderB() { initTables(); }
+    alignas(32) float table_envrate_linear[512];
+    double samplerate = 44100.0;
+    void initTables()
+    {
+        double dsamplerate_os = samplerate * 2;
+        for (int i = 0; i < 512; ++i)
+        {
+            double k =
+                dsamplerate_os * pow(2.0, (((double)i - 256.0) / 16.0)) / (double)BLOCK_SIZE_OS;
+            table_envrate_linear[i] = (float)(1.f / k);
+        }
+    }
+    float envelope_rate_linear_nowrap(float x)
+    {
+        x *= 16.f;
+        x += 256.f;
+        int e = std::clamp<int>((int)x, 0, 0x1ff - 1);
+
+        float a = x - (float)e;
+
+        return (1 - a) * table_envrate_linear[e & 0x1ff] +
+               a * table_envrate_linear[(e + 1) & 0x1ff];
+    }
+};
+
 class TestSineSynth
 {
   public:
-    TestSineSynth() { m_voices.resize(16); }
+    SRProviderB srprovider;
+    TestSineSynth()
+    {
+        for (int i = 0; i < 16; ++i)
+        {
+            auto v = std::make_unique<Voice>(&srprovider);
+            m_voices.push_back(std::move(v));
+        }
+    }
     void prepare(double samplerate, int bufsize)
     {
         m_sr = samplerate;
+        srprovider.samplerate = samplerate;
+        srprovider.initTables();
+        for(auto& v : m_voices)
+        {
+            v->volEnv.onSampleRateChanged();
+        }
         m_mixbuf.resize(bufsize * 2);
     }
     void startNote(int key, float gain)
     {
         for (auto &v : m_voices)
         {
-            if (!v.isActive)
+            if (!v->isActive)
             {
-                v.isActive = true;
-                v.key = key;
+                v->isActive = true;
+                v->key = key;
                 float hz = 440.0 * std::pow(2.0, (key - 69) / 12.0);
-                v.phaseinc = 2 * M_PI / m_sr * hz;
-                v.gate = true;
-                v.fadecounter = 0;
-                v.gain = gain;
+                v->phaseinc = 2 * M_PI / m_sr * hz;
+                v->gate = true;
+                v->gain = gain;
+                v->volEnv.attackFrom(0.0f, 0.0f, 0, true);
                 break;
             }
         }
@@ -415,9 +460,9 @@ class TestSineSynth
     {
         for (auto &v : m_voices)
         {
-            if (v.isActive && v.key == key)
+            if (v->isActive && v->key == key)
             {
-                v.gate = false;
+                v->gate = false;
                 break;
             }
         }
@@ -428,32 +473,44 @@ class TestSineSynth
         outRight = 0.0f;
         for (auto &v : m_voices)
         {
-            if (v.isActive)
+            if (v->isActive)
             {
-                float vout = std::sin(v.phase) * v.gain;
+                if (blockCounter == 0)
+                {
+                    v->volEnv.processBlock(0.5, 0.1, 1.0, 0.5, 1, 1, 1, v->gate);
+                }
+                float envGain = v->volEnv.outputCache[blockCounter];
+                float vout = std::sin(v->phase) * v->gain * envGain;
                 outLeft += vout;
                 outRight += vout;
-                v.phase += v.phaseinc;
-                if (!v.gate)
+                v->phase += v->phaseinc;
+                if (v->volEnv.stage == decltype(v->volEnv)::s_eoc)
                 {
-                    v.isActive = false;
+                    v->isActive = false;
                 }
             }
         }
+        ++blockCounter;
+        if (blockCounter == 32)
+        {
+            blockCounter = 0;
+        }
     }
+    int blockCounter = 0;
 
   private:
     struct Voice
     {
+        Voice(SRProviderB *srp) : volEnv(srp) {}
         bool isActive = false;
         int key = 0;
         double phase = 0.0;
         double phaseinc = 0.0;
         double gain = 0.0;
         bool gate = false;
-        int fadecounter = 0;
+        sst::basic_blocks::modulators::ADSREnvelope<SRProviderB, 32> volEnv;
     };
-    std::vector<Voice> m_voices;
+    std::vector<std::unique_ptr<Voice>> m_voices;
     double m_sr = 0.0;
     std::vector<float> m_mixbuf;
 };
