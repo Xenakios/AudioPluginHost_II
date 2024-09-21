@@ -176,10 +176,10 @@ class MultiModulator
             e = OutputProps();
     }
     // use a template here because the ClapEventSequence is in the offlinehost header for now
-    template<typename SeqType>
+    template <typename SeqType>
     void applyToSequence(SeqType &destSeq, double startTime, double duration)
     {
-        m.prepare(rt);
+        m.prepare(rt, sr, blocklen);
         double tpos = startTime;
         double gran = (blocklen / sr);
         while (tpos < startTime + duration)
