@@ -132,7 +132,7 @@ class ClapProcessingEngine
         deferredStateFiles[chainIndex] = filepath;
     }
     choc::audio::AudioFileProperties outfileprops;
-    clap_audio_buffer outbufs[32];
+    clap_audio_buffer m_clap_outbufs[32];
     std::vector<choc::buffer::ChannelArrayBuffer<float>> outputbuffers;
     clap::helpers::EventList list_in;
     clap::helpers::EventList list_out;
@@ -162,6 +162,7 @@ class ClapProcessingEngine
     double m_samplerate = 0.0;
     int64_t m_transportposSamples = 0;
     std::atomic<bool> m_processorsNeedStarting{false};
+    std::atomic<bool> m_processorsNeedStopping{false};
     std::atomic<bool> m_isPrepared{false};
     clap_process m_clap_process;
 };

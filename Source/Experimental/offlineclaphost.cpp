@@ -25,7 +25,7 @@ ClapProcessingEngine::ClapProcessingEngine()
     outputbuffers.resize(32);
     for (int i = 0; i < 32; ++i)
     {
-        memset(&outbufs[i], 0, sizeof(clap_audio_buffer));
+        memset(&m_clap_outbufs[i], 0, sizeof(clap_audio_buffer));
     }
 }
 
@@ -206,17 +206,17 @@ void ClapProcessingEngine::processToFile(std::string filename, double duration, 
             outputbuffers[i] = choc::buffer::ChannelArrayBuffer<float>((unsigned int)2,
                                                                        (unsigned int)procblocksize);
             outputbuffers[i].clear();
-            outbufs[i].channel_count = numoutchans;
-            outbufs[i].constant_mask = 0;
-            outbufs[i].latency = 0;
+            m_clap_outbufs[i].channel_count = numoutchans;
+            m_clap_outbufs[i].constant_mask = 0;
+            m_clap_outbufs[i].latency = 0;
             auto chansdata = outputbuffers[i].getView().data.channels;
 
-            outbufs[i].data32 = (float **)chansdata;
+            m_clap_outbufs[i].data32 = (float **)chansdata;
 
-            outbufs[i].data64 = nullptr;
+            m_clap_outbufs[i].data64 = nullptr;
         }
 
-        cp.audio_outputs = outbufs;
+        cp.audio_outputs = m_clap_outbufs;
 
         clap_event_transport transport;
         memset(&transport, 0, sizeof(clap_event_transport));
@@ -372,6 +372,15 @@ void ClapProcessingEngine::processAudio(choc::buffer::ChannelArrayView<float> in
 {
     assert(m_isPrepared);
     assert(inputBuffer.getNumFrames() == outputBuffer.getNumFrames());
+    if (m_processorsNeedStopping)
+    {
+        for (auto& c : m_chain)
+        {
+            c->m_proc->stopProcessing();
+        }
+        outputBuffer.clear();
+        return;
+    }
     if (m_processorsNeedStarting)
     {
         for (auto &c : m_chain)
@@ -385,6 +394,9 @@ void ClapProcessingEngine::processAudio(choc::buffer::ChannelArrayView<float> in
     int procblocksize = outputBuffer.getNumFrames();
     double pos_seconds = m_transportposSamples / m_samplerate;
     m_clap_process.frames_count = procblocksize;
+    m_clap_process.transport = nullptr;
+    m_clap_process.in_events = list_in.clapInputEvents();
+    m_clap_process.out_events = list_out.clapOutputEvents();
     for (size_t i = 0; i < m_chain.size(); ++i)
     {
         auto blockevts = m_chain[i]->m_eviter->readNextEvents(procblocksize);
@@ -429,6 +441,7 @@ void ClapProcessingEngine::processAudio(choc::buffer::ChannelArrayView<float> in
         list_out.clear();
         // choc::buffer::copy(inputbuffer, outputbuffers[0]);
     }
+    choc::buffer::copy(outputBuffer, outputbuffers[0]);
     return;
     auto nFrames = outputBuffer.getNumFrames();
     ClapEventSequence::Event msg;
@@ -531,6 +544,18 @@ void ClapProcessingEngine::prepareToPlay(double sampleRate, int maxBufferSize)
     }
     m_processorsNeedStarting = true;
     m_isPrepared = true;
+    m_clap_process.audio_inputs_count = 0;
+    m_clap_process.audio_inputs = nullptr;
+    m_clap_process.audio_outputs_count = 1;
+    m_clap_process.audio_outputs = m_clap_outbufs;
+    m_clap_outbufs[0].channel_count = 2;
+    m_clap_outbufs[0].constant_mask = 0;
+    m_clap_outbufs[0].latency = 0;
+    m_clap_outbufs[0].data64 = nullptr;
+    outputbuffers.clear();
+    outputbuffers.emplace_back((unsigned int)2, (unsigned int)maxBufferSize);
+    outputbuffers.back().clear();
+    m_clap_outbufs[0].data32 = (float **)outputbuffers.back().getView().data.channels;
 }
 
 void ClapProcessingEngine::startStreaming(unsigned int id, double sampleRate,
@@ -549,7 +574,7 @@ void ClapProcessingEngine::startStreaming(unsigned int id, double sampleRate,
     auto err = m_rtaudio->openStream(&outpars, nullptr, RTAUDIO_FLOAT32, sampleRate, &bframes,
                                      CPECallback, this, nullptr);
     m_synth.prepare(sampleRate, bframes);
-    // prepareToPlay(sampleRate, bframes);
+    prepareToPlay(sampleRate, bframes);
     outputConversionBuffer = choc::buffer::ChannelArrayBuffer<float>{2, bframes};
     inputConversionBuffer = choc::buffer::ChannelArrayBuffer<float>{2, bframes};
     if (err != RTAUDIO_NO_ERROR)
@@ -565,10 +590,15 @@ void ClapProcessingEngine::startStreaming(unsigned int id, double sampleRate,
 
 void ClapProcessingEngine::stopStreaming()
 {
+    m_processorsNeedStopping = true;
+    // aaaaarrrrggghhh....
+    using namespace std::chrono_literals;
+    std::this_thread::sleep_for(100ms);
     if (m_rtaudio->isStreamOpen())
         m_rtaudio->stopStream();
     if (m_delayed_messages.size() > 0)
         std::cout << m_delayed_messages.size() << " delayed messages left\n";
+    
 }
 
 void ClapProcessingEngine::postNoteMessage(double delay, double duration, int key, double velo)

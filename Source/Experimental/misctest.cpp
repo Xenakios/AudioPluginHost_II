@@ -1117,8 +1117,8 @@ inline void test_testsinesyn()
 {
     auto synth = std::make_unique<TestSineSynth>();
     synth->prepare(44100, 512);
-    //float L alignas(16)[sfx::core::ConcreteConfig::blockSize],
-    //        R alignas(16)[sfx::core::ConcreteConfig::blockSize];
+    // float L alignas(16)[sfx::core::ConcreteConfig::blockSize],
+    //         R alignas(16)[sfx::core::ConcreteConfig::blockSize];
     for (int i = 0; i < 1024; ++i)
     {
         float L = 0.0f;
@@ -1127,9 +1127,23 @@ inline void test_testsinesyn()
     }
 }
 
+inline void test_clapengineRT()
+{
+    auto eng = std::make_unique<ClapProcessingEngine>();
+    eng->addProcessorToChain(R"(C:\Program Files\Common Files\CLAP\Surge Synth Team\Surge XT.clap)",
+                            0);
+    auto &seq = eng->getSequence(0);
+    seq.addNote(0.0, 1.0, 0, 0, 60, -1, 1.0, 0.0);
+    eng->startStreaming(132, 44100.0, 256);
+    using namespace std::chrono_literals;
+    std::this_thread::sleep_for(2500ms);
+    eng->stopStreaming();
+}
+
 int main()
 {
-    test_testsinesyn();
+    test_clapengineRT();
+    // test_testsinesyn();
     // test_xoroshirorandom();
     // test_grain_delay();
     // test_sc();
