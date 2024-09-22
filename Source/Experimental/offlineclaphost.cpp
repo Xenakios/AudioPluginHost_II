@@ -133,8 +133,6 @@ void ClapProcessingEngine::processToFile(std::string filename, double duration, 
 {
     if (m_chain.size() == 0)
         throw std::runtime_error("There are no plugins in the chain to process");
-    using namespace std::chrono_literals;
-
     int procblocksize = 64;
     std::atomic<bool> renderloopfinished{false};
     double maxTailSeconds = 0.0;
@@ -255,8 +253,6 @@ void ClapProcessingEngine::processToFile(std::string filename, double duration, 
         using clock = std::chrono::system_clock;
         using ms = std::chrono::duration<double, std::milli>;
         const auto start_time = clock::now();
-        using namespace std::chrono_literals;
-
         int eventssent = 0;
         while (outcounter < outlensamples)
         {
@@ -331,7 +327,7 @@ void ClapProcessingEngine::processToFile(std::string filename, double duration, 
 
         renderloopfinished = true;
     });
-    using namespace std::chrono_literals;
+    
     // fake event loop to flush the on main thread requests from the plugin
     while (!renderloopfinished)
     {
@@ -517,6 +513,8 @@ void ClapProcessingEngine::prepareToPlay(double sampleRate, int maxBufferSize)
     for (auto &c : m_chain)
     {
         c->m_seq.sortEvents();
+        if (!c->m_proc->activate(sampleRate, procblocksize, procblocksize))
+            std::cout << "could not activate " << c->name << "\n";
         std::cout << std::format("{} has {} audio output ports\n", c->name,
                                  c->m_proc->audioPortsCount(false));
         for (int i = 0; i < c->m_proc->audioPortsCount(false); ++i)
@@ -525,11 +523,10 @@ void ClapProcessingEngine::prepareToPlay(double sampleRate, int maxBufferSize)
             c->m_proc->audioPortsInfo(i, false, &apinfo);
             std::cout << std::format("\t{} : {} channels\n", i, apinfo.channel_count);
         }
-        if (!c->m_proc->activate(sampleRate, procblocksize, procblocksize))
-            std::cout << "could not activate " << c->name << "\n";
+        
         if (deferredStateFiles.count(chainIndex))
         {
-            loadStateFromBinaryFile(chainIndex, deferredStateFiles[chainIndex]);
+            // loadStateFromBinaryFile(chainIndex, deferredStateFiles[chainIndex]);
         }
         ++chainIndex;
 
@@ -598,7 +595,6 @@ void ClapProcessingEngine::stopStreaming()
 {
     m_processorsState = ProcState::NeedsStopping;
     // aaaaarrrrggghhh....
-    using namespace std::chrono_literals;
     std::this_thread::sleep_for(100ms);
     if (m_rtaudio->isStreamOpen())
         m_rtaudio->stopStream();

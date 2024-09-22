@@ -1133,7 +1133,9 @@ inline void test_clapengineRT()
     eng->addProcessorToChain(R"(C:\Program Files\Common Files\CLAP\Surge Synth Team\Surge XT.clap)",
                             0);
     auto &seq = eng->getSequence(0);
-    seq.addNote(0.0, 1.0, 0, 0, 60, -1, 1.0, 0.0);
+    seq.addNote(0.0, 1.0, 0, 0, 60, -1, 0.5, 0.0);
+    seq.addNote(0.5, 1.0, 0, 0, 67, -1, 0.5, 0.0);
+    seq.addNote(1.0, 1.0, 0, 0, 74, -1, 0.5, 0.0);
     eng->startStreaming(132, 44100.0, 256);
     using namespace std::chrono_literals;
     std::this_thread::sleep_for(2500ms);
