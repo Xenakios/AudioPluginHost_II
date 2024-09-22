@@ -370,6 +370,59 @@ std::vector<std::string> ClapProcessingEngine::getDeviceNames()
 void ClapProcessingEngine::processAudio(choc::buffer::ChannelArrayView<float> inputBuffer,
                                         choc::buffer::ChannelArrayView<float> outputBuffer)
 {
+    list_in.clear();
+    list_out.clear();
+    int outcounter = 0;
+    double samplerate = 44100.0;
+    int procblocksize = 64;
+    double pos_seconds = outcounter / samplerate;
+    clap_process cp;
+    memset(&cp, 0, sizeof(clap_process));
+    for (size_t i = 0; i < m_chain.size(); ++i)
+    {
+        auto blockevts = m_chain[i]->m_eviter->readNextEvents(procblocksize);
+        for (auto &e : blockevts)
+        {
+            auto ecopy = e.event;
+            ecopy.header.time = (e.timestamp * samplerate) - outcounter;
+            if (ecopy.header.time >= cp.frames_count)
+            {
+                // this should not happen but in case it does, place the event at the last
+                // buffer sample position
+                ecopy.header.time = cp.frames_count - 1;
+            }
+            if (ecopy.header.type == CLAP_EVENT_PARAM_VALUE)
+            {
+                auto aev = (clap_event_param_value *)&ecopy;
+                // std::cout << outcounter / samplerate << "\t" << aev->param_id << "\t"
+                //          << aev->value << "\t"
+                //          << (outcounter + aev->header.time) / samplerate << "\n";
+            }
+            if (ecopy.header.type == CLAP_EVENT_TRANSPORT)
+            {
+                auto tev = (clap_event_transport *)&ecopy;
+                if (tev->flags & CLAP_TRANSPORT_HAS_TEMPO)
+                {
+                    std::cout << pos_seconds << " transport event with tempo " << tev->tempo
+                              << "\n";
+                }
+                else
+                {
+                    std::cout << pos_seconds << " transport event with unsupported properties\n";
+                }
+            }
+            list_in.push((const clap_event_header *)&ecopy);
+            // ++eventssent;
+        }
+
+        auto status = m_chain[i]->m_proc->process(&cp);
+        // if (status == CLAP_PROCESS_ERROR)
+        //     throw std::runtime_error("Clap processing failed");
+        list_in.clear();
+        list_out.clear();
+        // choc::buffer::copy(inputbuffer, outputbuffers[0]);
+    }
+    return;
     auto nFrames = outputBuffer.getNumFrames();
     ClapEventSequence::Event msg;
     while (m_to_test_tone_fifo.pop(msg))
@@ -461,7 +514,7 @@ void ClapProcessingEngine::prepareToPlay(double sampleRate, int maxBufferSize)
     }
     // if more than 15 seconds, it's likely infinite
     maxTailSeconds = std::min(maxTailSeconds, 15.0);
-    
+
     for (auto &p : m_chain)
     {
         p->m_eviter.emplace(p->m_seq, sampleRate);
