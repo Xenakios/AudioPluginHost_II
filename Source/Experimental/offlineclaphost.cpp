@@ -16,17 +16,16 @@
 #include <stdexcept>
 #include <vector>
 
-
 using namespace std::chrono_literals;
 
 ClapProcessingEngine::ClapProcessingEngine()
 {
+    m_rtaudio = std::make_unique<RtAudio>();
     outputbuffers.resize(32);
     for (int i = 0; i < 32; ++i)
     {
         memset(&outbufs[i], 0, sizeof(clap_audio_buffer));
     }
-    m_rtaudio = std::make_unique<RtAudio>();
 }
 
 ClapProcessingEngine::~ClapProcessingEngine() {}

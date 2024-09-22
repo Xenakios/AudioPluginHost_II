@@ -5,6 +5,8 @@
 #include <memory>
 #include <algorithm>
 #include "sst/basic-blocks/modulators/ADSREnvelope.h"
+#include "sst/effects/ConcreteConfig.h"
+#include "sst/effects/Reverb2.h"
 
 struct SRProviderB
 {
@@ -18,8 +20,8 @@ struct SRProviderB
         double dsamplerate_os = samplerate * 2;
         for (int i = 0; i < 512; ++i)
         {
-            double k =
-                dsamplerate_os * std::pow(2.0, (((double)i - 256.0) / 16.0)) / (double)BLOCK_SIZE_OS;
+            double k = dsamplerate_os * std::pow(2.0, (((double)i - 256.0) / 16.0)) /
+                       (double)BLOCK_SIZE_OS;
             table_envrate_linear[i] = (float)(1.f / k);
         }
     }
@@ -40,7 +42,13 @@ class TestSineSynth
 {
   public:
     SRProviderB srprovider;
-    TestSineSynth()
+    using FxConfig = sst::effects::core::ConcreteConfig;
+    FxConfig m_fxconfig;
+    FxConfig::GlobalStorage m_fxgs;
+    FxConfig::EffectStorage m_fxes;
+    FxConfig::ValueStorage m_fxvs;
+    sst::effects::reverb2::Reverb2<FxConfig> m_reverb;
+    TestSineSynth() : m_fxgs{44100.0}, m_reverb{&m_fxgs, &m_fxes, &m_fxvs}
     {
         for (int i = 0; i < 16; ++i)
         {
@@ -53,7 +61,7 @@ class TestSineSynth
         m_sr = samplerate;
         srprovider.samplerate = samplerate;
         srprovider.initTables();
-        for(auto& v : m_voices)
+        for (auto &v : m_voices)
         {
             v->volEnv.onSampleRateChanged();
         }
