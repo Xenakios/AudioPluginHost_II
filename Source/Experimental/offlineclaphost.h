@@ -161,8 +161,14 @@ class ClapProcessingEngine
     choc::buffer::ChannelArrayBuffer<float> inputConversionBuffer;
     double m_samplerate = 0.0;
     int64_t m_transportposSamples = 0;
-    std::atomic<bool> m_processorsNeedStarting{false};
-    std::atomic<bool> m_processorsNeedStopping{false};
+    enum class ProcState
+    {
+        Idle,
+        NeedsStarting,
+        Started,
+        NeedsStopping
+    };
+    std::atomic<ProcState> m_processorsState{ProcState::Idle};
     std::atomic<bool> m_isPrepared{false};
     clap_process m_clap_process;
 };

@@ -372,22 +372,28 @@ void ClapProcessingEngine::processAudio(choc::buffer::ChannelArrayView<float> in
 {
     assert(m_isPrepared);
     assert(inputBuffer.getNumFrames() == outputBuffer.getNumFrames());
-    if (m_processorsNeedStopping)
+    if (m_processorsState == ProcState::Idle)
+    {
+        outputBuffer.clear();
+        return;
+    }
+    if (m_processorsState == ProcState::NeedsStopping)
     {
         for (auto& c : m_chain)
         {
             c->m_proc->stopProcessing();
         }
         outputBuffer.clear();
+        m_processorsState = ProcState::Idle;
         return;
     }
-    if (m_processorsNeedStarting)
+    if (m_processorsState == ProcState::NeedsStarting)
     {
         for (auto &c : m_chain)
         {
             c->m_proc->startProcessing();
         }
-        m_processorsNeedStarting = false;
+        m_processorsState = ProcState::Started;
     }
     list_in.clear();
     list_out.clear();
@@ -542,7 +548,7 @@ void ClapProcessingEngine::prepareToPlay(double sampleRate, int maxBufferSize)
     {
         p->m_eviter.emplace(p->m_seq, sampleRate);
     }
-    m_processorsNeedStarting = true;
+    m_processorsState = ProcState::NeedsStarting;
     m_isPrepared = true;
     m_clap_process.audio_inputs_count = 0;
     m_clap_process.audio_inputs = nullptr;
@@ -590,7 +596,7 @@ void ClapProcessingEngine::startStreaming(unsigned int id, double sampleRate,
 
 void ClapProcessingEngine::stopStreaming()
 {
-    m_processorsNeedStopping = true;
+    m_processorsState = ProcState::NeedsStopping;
     // aaaaarrrrggghhh....
     using namespace std::chrono_literals;
     std::this_thread::sleep_for(100ms);
