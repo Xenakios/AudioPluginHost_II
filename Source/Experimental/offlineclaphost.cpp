@@ -365,31 +365,38 @@ std::vector<std::string> ClapProcessingEngine::getDeviceNames()
     return result;
 }
 
-// we should process the processor chain here but for sanity checks,
-// this is now running just the simple test synth
+// note that this method should always be run in a non-main thread, to keep
+// Clap plugins happy with their thread checks etc
 void ClapProcessingEngine::processAudio(choc::buffer::ChannelArrayView<float> inputBuffer,
                                         choc::buffer::ChannelArrayView<float> outputBuffer)
 {
+    assert(m_isPrepared);
+    assert(inputBuffer.getNumFrames() == outputBuffer.getNumFrames());
+    if (m_processorsNeedStarting)
+    {
+        for (auto &c : m_chain)
+        {
+            c->m_proc->startProcessing();
+        }
+        m_processorsNeedStarting = false;
+    }
     list_in.clear();
     list_out.clear();
-    int outcounter = 0;
-    double samplerate = 44100.0;
-    int procblocksize = 64;
-    double pos_seconds = outcounter / samplerate;
-    clap_process cp;
-    memset(&cp, 0, sizeof(clap_process));
+    int procblocksize = outputBuffer.getNumFrames();
+    double pos_seconds = m_transportposSamples / m_samplerate;
+    m_clap_process.frames_count = procblocksize;
     for (size_t i = 0; i < m_chain.size(); ++i)
     {
         auto blockevts = m_chain[i]->m_eviter->readNextEvents(procblocksize);
         for (auto &e : blockevts)
         {
             auto ecopy = e.event;
-            ecopy.header.time = (e.timestamp * samplerate) - outcounter;
-            if (ecopy.header.time >= cp.frames_count)
+            ecopy.header.time = (e.timestamp * m_samplerate) - m_transportposSamples;
+            if (ecopy.header.time >= m_clap_process.frames_count)
             {
                 // this should not happen but in case it does, place the event at the last
                 // buffer sample position
-                ecopy.header.time = cp.frames_count - 1;
+                ecopy.header.time = m_clap_process.frames_count - 1;
             }
             if (ecopy.header.type == CLAP_EVENT_PARAM_VALUE)
             {
@@ -415,7 +422,7 @@ void ClapProcessingEngine::processAudio(choc::buffer::ChannelArrayView<float> in
             // ++eventssent;
         }
 
-        auto status = m_chain[i]->m_proc->process(&cp);
+        auto status = m_chain[i]->m_proc->process(&m_clap_process);
         // if (status == CLAP_PROCESS_ERROR)
         //     throw std::runtime_error("Clap processing failed");
         list_in.clear();
@@ -476,15 +483,18 @@ int CPECallback(void *outputBuffer, void *inputBuffer, unsigned int nFrames, dou
     }
     return 0;
 }
-// prepare the processing chain here
+
+// prepare the processing chain here, must be called from main thread
 void ClapProcessingEngine::prepareToPlay(double sampleRate, int maxBufferSize)
 {
     if (m_chain.size() == 0)
         throw std::runtime_error("There are no plugins in the chain to process");
     int procblocksize = maxBufferSize;
-
+    m_samplerate = sampleRate;
+    m_transportposSamples = 0;
     double maxTailSeconds = 0.0;
     size_t chainIndex = 0;
+    memset(&m_clap_process, 0, sizeof(clap_process));
     for (auto &c : m_chain)
     {
         c->m_seq.sortEvents();
@@ -519,6 +529,8 @@ void ClapProcessingEngine::prepareToPlay(double sampleRate, int maxBufferSize)
     {
         p->m_eviter.emplace(p->m_seq, sampleRate);
     }
+    m_processorsNeedStarting = true;
+    m_isPrepared = true;
 }
 
 void ClapProcessingEngine::startStreaming(unsigned int id, double sampleRate,
