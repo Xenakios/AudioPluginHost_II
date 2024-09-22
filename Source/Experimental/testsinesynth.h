@@ -46,15 +46,17 @@ class TestSineSynth
     FxConfig m_fxconfig;
     FxConfig::GlobalStorage m_fxgs;
     FxConfig::EffectStorage m_fxes;
-    FxConfig::ValueStorage m_fxvs;
-    sst::effects::reverb2::Reverb2<FxConfig> m_reverb;
-    TestSineSynth() : m_fxgs{44100.0}, m_reverb{&m_fxgs, &m_fxes, &m_fxvs}
+    using ReverbType = sst::effects::reverb2::Reverb2<FxConfig>;
+    ReverbType m_reverb;
+    TestSineSynth() : m_fxgs{44100.0}, m_reverb{&m_fxgs, &m_fxes, nullptr}
     {
         for (int i = 0; i < 16; ++i)
         {
             auto v = std::make_unique<Voice>(&srprovider);
             m_voices.push_back(std::move(v));
         }
+        for (int i = 0; i < ReverbType::numParams; ++i)
+            m_reverb.paramStorage[i] = m_reverb.paramAt(i).defaultVal;
     }
     void prepare(double samplerate, int bufsize)
     {
@@ -66,6 +68,8 @@ class TestSineSynth
             v->volEnv.onSampleRateChanged();
         }
         m_mixbuf.resize(bufsize * 2);
+        m_fxgs.sampleRate = samplerate;
+        // m_reverb.initialize();
     }
     void startNote(int key, float gain)
     {
@@ -123,6 +127,7 @@ class TestSineSynth
         {
             blockCounter = 0;
         }
+        // m_reverb.processBlock(&outLeft, &outRight);
     }
     int blockCounter = 0;
 

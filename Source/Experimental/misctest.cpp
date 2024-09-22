@@ -12,6 +12,7 @@
 #include <random>
 #include "clap/plugin.h"
 #include "clap/stream.h"
+#include "testsinesynth.h"
 #include "xap_utils.h"
 #include "concurrentqueue.h"
 #include <chrono>
@@ -215,7 +216,7 @@ inline void test_mod_matrix()
 
     // rt.updateRoutingAt(5, source4, target5, 1.0);
 
-    m.prepare(rt);
+    m.prepare(rt, 44100, 512);
 
     constexpr size_t blocklen = 64;
     constexpr double sr = 44100;
@@ -1088,15 +1089,15 @@ inline void test_xoroshirorandom()
     for (double z = 0.0; z < 1.1; z += 0.1)
     {
         double z1 = z;
-        //z1 = std::clamp(z1, std::numeric_limits<double>::epsilon(),
-        //                1.0 - std::numeric_limits<double>::epsilon());
+        // z1 = std::clamp(z1, std::numeric_limits<double>::epsilon(),
+        //                 1.0 - std::numeric_limits<double>::epsilon());
         double y = std::tan(M_PI * (0.0 - 0.5));
         // double y = 2.0 / M_PI * std::log(std::tan(M_PI / 2.0 * z1));
         std::cout << z1 << "\t" << y << "\n";
     }
 
     return;
-    
+
     xenakios::DejaVuRandom dj{2};
     dj.setDejaVu(0.4);
     for (int i = 0; i < 20; ++i)
@@ -1112,9 +1113,24 @@ inline void test_xoroshirorandom()
     std::cout << accum / iters << "\n";
 }
 
+inline void test_testsinesyn()
+{
+    auto synth = std::make_unique<TestSineSynth>();
+    synth->prepare(44100, 512);
+    //float L alignas(16)[sfx::core::ConcreteConfig::blockSize],
+    //        R alignas(16)[sfx::core::ConcreteConfig::blockSize];
+    for (int i = 0; i < 1024; ++i)
+    {
+        float L = 0.0f;
+        float R = 0.0f;
+        synth->process(L, R);
+    }
+}
+
 int main()
 {
-    test_xoroshirorandom();
+    test_testsinesyn();
+    // test_xoroshirorandom();
     // test_grain_delay();
     // test_sc();
     // test_binary_clap_state();
