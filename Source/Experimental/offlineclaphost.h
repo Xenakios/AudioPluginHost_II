@@ -100,6 +100,7 @@ class ClapProcessingEngine
     {
         std::unique_ptr<xenakios::XAudioProcessor> m_proc;
         ClapEventSequence m_seq;
+        std::optional<ClapEventSequence::IteratorSampleTime> m_eviter;
         std::string name;
     };
     std::vector<std::unique_ptr<ProcessorEntry>> m_chain;
@@ -143,17 +144,19 @@ class ClapProcessingEngine
     void openPersistentWindow(std::string title);
     std::unique_ptr<RtAudio> m_rtaudio;
     std::vector<std::string> getDeviceNames();
+    void prepareToPlay(double sampleRate, int maxBufferSize);
     void startStreaming(unsigned int id, double sampleRate, int preferredBufferSize);
     void stopStreaming();
     void postNoteMessage(double delay, double duration, int key, double velo);
+    void processAudio(choc::buffer::ChannelArrayView<float> inputBuffer,
+                      choc::buffer::ChannelArrayView<float> outputBuffer);
 
     choc::fifo::SingleReaderSingleWriterFIFO<ClapEventSequence::Event> m_to_test_tone_fifo;
     std::vector<ClapEventSequence::Event> m_delayed_messages;
 
     TestSineSynth m_synth;
     int64_t m_samplePlayPos = 0;
-    void processAudio(choc::buffer::ChannelArrayView<float> inputBuffer,
-                      choc::buffer::ChannelArrayView<float> outputBuffer);
+
     choc::buffer::ChannelArrayBuffer<float> outputConversionBuffer;
     choc::buffer::ChannelArrayBuffer<float> inputConversionBuffer;
 };

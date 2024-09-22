@@ -7,6 +7,7 @@
 #include "clap/ext/note-ports.h"
 #include "clap/plugin.h"
 #include "clap/process.h"
+#include "clap_eventsequence.h"
 #include "gui/choc_MessageLoop.h"
 #include "text/choc_Files.h"
 #include "xap_utils.h"
@@ -363,6 +364,9 @@ std::vector<std::string> ClapProcessingEngine::getDeviceNames()
     }
     return result;
 }
+
+// we should process the processor chain here but for sanity checks,
+// this is now running just the simple test synth
 void ClapProcessingEngine::processAudio(choc::buffer::ChannelArrayView<float> inputBuffer,
                                         choc::buffer::ChannelArrayView<float> outputBuffer)
 {
@@ -419,6 +423,50 @@ int CPECallback(void *outputBuffer, void *inputBuffer, unsigned int nFrames, dou
     }
     return 0;
 }
+// prepare the processing chain here
+void ClapProcessingEngine::prepareToPlay(double sampleRate, int maxBufferSize)
+{
+    if (m_chain.size() == 0)
+        throw std::runtime_error("There are no plugins in the chain to process");
+    int procblocksize = maxBufferSize;
+
+    double maxTailSeconds = 0.0;
+    size_t chainIndex = 0;
+    for (auto &c : m_chain)
+    {
+        c->m_seq.sortEvents();
+        std::cout << std::format("{} has {} audio output ports\n", c->name,
+                                 c->m_proc->audioPortsCount(false));
+        for (int i = 0; i < c->m_proc->audioPortsCount(false); ++i)
+        {
+            clap_audio_port_info_t apinfo;
+            c->m_proc->audioPortsInfo(i, false, &apinfo);
+            std::cout << std::format("\t{} : {} channels\n", i, apinfo.channel_count);
+        }
+        if (!c->m_proc->activate(sampleRate, procblocksize, procblocksize))
+            std::cout << "could not activate " << c->name << "\n";
+        if (deferredStateFiles.count(chainIndex))
+        {
+            loadStateFromBinaryFile(chainIndex, deferredStateFiles[chainIndex]);
+        }
+        ++chainIndex;
+
+        auto tail = c->m_proc->tailGet() / sampleRate;
+        if (tail > 0.0)
+        {
+            std::cout << c->name << " has tail of " << tail << " seconds\n";
+        }
+        maxTailSeconds = std::max(tail, maxTailSeconds);
+        c->m_proc->runMainThreadTasks();
+    }
+    // if more than 15 seconds, it's likely infinite
+    maxTailSeconds = std::min(maxTailSeconds, 15.0);
+    
+    for (auto &p : m_chain)
+    {
+        p->m_eviter.emplace(p->m_seq, sampleRate);
+    }
+}
 
 void ClapProcessingEngine::startStreaming(unsigned int id, double sampleRate,
                                           int preferredBufferSize)
@@ -428,8 +476,6 @@ void ClapProcessingEngine::startStreaming(unsigned int id, double sampleRate,
 
     m_to_test_tone_fifo.reset(512);
 
-    m_synth.prepare(sampleRate, preferredBufferSize);
-
     RtAudio::StreamParameters outpars;
     outpars.deviceId = id;
     outpars.firstChannel = 0;
@@ -437,6 +483,8 @@ void ClapProcessingEngine::startStreaming(unsigned int id, double sampleRate,
     unsigned int bframes = preferredBufferSize;
     auto err = m_rtaudio->openStream(&outpars, nullptr, RTAUDIO_FLOAT32, sampleRate, &bframes,
                                      CPECallback, this, nullptr);
+    m_synth.prepare(sampleRate, bframes);
+    // prepareToPlay(sampleRate, bframes);
     outputConversionBuffer = choc::buffer::ChannelArrayBuffer<float>{2, bframes};
     inputConversionBuffer = choc::buffer::ChannelArrayBuffer<float>{2, bframes};
     if (err != RTAUDIO_NO_ERROR)
