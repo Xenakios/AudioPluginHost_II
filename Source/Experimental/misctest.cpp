@@ -1,3 +1,4 @@
+#include <combaseapi.h>
 #include <fstream>
 #include <iostream>
 #include <memory>
@@ -1129,17 +1130,27 @@ inline void test_testsinesyn()
 
 inline void test_clapengineRT()
 {
+    // CoInitialize(nullptr);
+    choc::messageloop::initialise();
     auto eng = std::make_unique<ClapProcessingEngine>();
     eng->addProcessorToChain(R"(C:\Program Files\Common Files\CLAP\Surge Synth Team\Surge XT.clap)",
-                            0);
+                             0);
     auto &seq = eng->getSequence(0);
     seq.addNote(0.0, 1.0, 0, 0, 60, -1, 0.5, 0.0);
     seq.addNote(0.5, 1.0, 0, 0, 67, -1, 0.5, 0.0);
     seq.addNote(1.0, 1.0, 0, 0, 74, -1, 0.5, 0.0);
     eng->startStreaming(132, 44100.0, 256);
-    using namespace std::chrono_literals;
-    std::this_thread::sleep_for(2500ms);
-    eng->stopStreaming();
+    choc::messageloop::Timer timer{5000, [&eng]() {
+                                       std::cout << "engine stop timer callback\n";
+                                       eng->stopStreaming();
+                                       choc::messageloop::stop();
+                                       return false;
+                                   }};
+    choc::messageloop::run();
+    // CoUninitialize();
+    // using namespace std::chrono_literals;
+    // std::this_thread::sleep_for(2500ms);
+    // eng->stopStreaming();
 }
 
 int main()

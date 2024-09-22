@@ -21,11 +21,14 @@ using namespace std::chrono_literals;
 
 ClapProcessingEngine::ClapProcessingEngine()
 {
+    choc::messageloop::initialise();
     m_rtaudio = std::make_unique<RtAudio>();
     outputbuffers.resize(32);
+    inputbuffers.resize(32);
     for (int i = 0; i < 32; ++i)
     {
         memset(&m_clap_outbufs[i], 0, sizeof(clap_audio_buffer));
+        memset(&m_clap_inbufs[i], 0, sizeof(clap_audio_buffer));
     }
 }
 
@@ -327,7 +330,7 @@ void ClapProcessingEngine::processToFile(std::string filename, double duration, 
 
         renderloopfinished = true;
     });
-    
+
     // fake event loop to flush the on main thread requests from the plugin
     while (!renderloopfinished)
     {
@@ -375,7 +378,7 @@ void ClapProcessingEngine::processAudio(choc::buffer::ChannelArrayView<float> in
     }
     if (m_processorsState == ProcState::NeedsStopping)
     {
-        for (auto& c : m_chain)
+        for (auto &c : m_chain)
         {
             c->m_proc->stopProcessing();
         }
@@ -496,6 +499,12 @@ int CPECallback(void *outputBuffer, void *inputBuffer, unsigned int nFrames, dou
         fobuf[i * 2 + 0] = cpe.outputConversionBuffer.getSample(0, i);
         fobuf[i * 2 + 1] = cpe.outputConversionBuffer.getSample(1, i);
     }
+    cpe.m_timerPosSamples += nFrames;
+    if (cpe.m_timerPosSamples >= 44100)
+    {
+        cpe.m_timerPosSamples = 0;
+        choc::messageloop::postMessage([]() { std::cout << "postmessage callback" << std::endl; });
+    }
     return 0;
 }
 
@@ -523,7 +532,7 @@ void ClapProcessingEngine::prepareToPlay(double sampleRate, int maxBufferSize)
             c->m_proc->audioPortsInfo(i, false, &apinfo);
             std::cout << std::format("\t{} : {} channels\n", i, apinfo.channel_count);
         }
-        
+
         if (deferredStateFiles.count(chainIndex))
         {
             // loadStateFromBinaryFile(chainIndex, deferredStateFiles[chainIndex]);
@@ -547,8 +556,18 @@ void ClapProcessingEngine::prepareToPlay(double sampleRate, int maxBufferSize)
     }
     m_processorsState = ProcState::NeedsStarting;
     m_isPrepared = true;
-    m_clap_process.audio_inputs_count = 0;
-    m_clap_process.audio_inputs = nullptr;
+    m_clap_process.audio_inputs_count = 1;
+    m_clap_inbufs[0].channel_count = 2;
+    m_clap_inbufs[0].constant_mask = 0;
+    m_clap_inbufs[0].latency = 0;
+    m_clap_inbufs[0].data64 = nullptr;
+
+    inputbuffers.clear();
+    inputbuffers.emplace_back((unsigned int)2, (unsigned int)maxBufferSize);
+    inputbuffers.back().clear();
+    m_clap_inbufs[0].data32 = (float **)inputbuffers.back().getView().data.channels;
+    m_clap_process.audio_inputs = m_clap_inbufs;
+
     m_clap_process.audio_outputs_count = 1;
     m_clap_process.audio_outputs = m_clap_outbufs;
     m_clap_outbufs[0].channel_count = 2;
@@ -559,6 +578,11 @@ void ClapProcessingEngine::prepareToPlay(double sampleRate, int maxBufferSize)
     outputbuffers.emplace_back((unsigned int)2, (unsigned int)maxBufferSize);
     outputbuffers.back().clear();
     m_clap_outbufs[0].data32 = (float **)outputbuffers.back().getView().data.channels;
+    m_gui_tasks_timer = choc::messageloop::Timer{1000, []() {
+                                                     std::cout << "choc timer callback"
+                                                               << std::endl;
+                                                     return true;
+                                                 }};
 }
 
 void ClapProcessingEngine::startStreaming(unsigned int id, double sampleRate,
@@ -600,7 +624,7 @@ void ClapProcessingEngine::stopStreaming()
         m_rtaudio->stopStream();
     if (m_delayed_messages.size() > 0)
         std::cout << m_delayed_messages.size() << " delayed messages left\n";
-    
+    m_gui_tasks_timer.clear();
 }
 
 void ClapProcessingEngine::postNoteMessage(double delay, double duration, int key, double velo)

@@ -132,8 +132,11 @@ class ClapProcessingEngine
         deferredStateFiles[chainIndex] = filepath;
     }
     choc::audio::AudioFileProperties outfileprops;
+    clap_audio_buffer m_clap_inbufs[32];
     clap_audio_buffer m_clap_outbufs[32];
+    std::vector<choc::buffer::ChannelArrayBuffer<float>> inputbuffers;
     std::vector<choc::buffer::ChannelArrayBuffer<float>> outputbuffers;
+    
     clap::helpers::EventList list_in;
     clap::helpers::EventList list_out;
     void processToFile(std::string filename, double duration, double samplerate, int numoutchans);
@@ -161,6 +164,7 @@ class ClapProcessingEngine
     choc::buffer::ChannelArrayBuffer<float> inputConversionBuffer;
     double m_samplerate = 0.0;
     int64_t m_transportposSamples = 0;
+    int64_t m_timerPosSamples = 0;
     enum class ProcState
     {
         Idle,
@@ -171,4 +175,5 @@ class ClapProcessingEngine
     std::atomic<ProcState> m_processorsState{ProcState::Idle};
     std::atomic<bool> m_isPrepared{false};
     clap_process m_clap_process;
+    choc::messageloop::Timer m_gui_tasks_timer;
 };
