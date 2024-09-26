@@ -16,6 +16,7 @@
 #include <format>
 #include <stdexcept>
 #include <vector>
+#include "xaps/clap_xaudioprocessor.h"
 
 using namespace std::chrono_literals;
 
@@ -32,7 +33,24 @@ ClapProcessingEngine::ClapProcessingEngine()
     }
 }
 
-ClapProcessingEngine::~ClapProcessingEngine() {}
+ClapProcessingEngine::~ClapProcessingEngine()
+{
+    size_t numUnhandled = 0;
+    for (auto &ce : m_chain)
+    {
+        if (auto cp = dynamic_cast<ClapPluginFormatProcessor *>(ce->m_proc.get()))
+        {
+            if (cp->on_main_thread_fifo.getUsedSlots() > 0)
+            {
+                ++numUnhandled;
+            }
+        }
+    }
+    if (numUnhandled > 0)
+    {
+        std::cout << numUnhandled << " unhandled main thread call requests from Clap plugins\n";
+    }
+}
 
 void ClapProcessingEngine::addProcessorToChain(std::string plugfilename, int pluginindex)
 {
