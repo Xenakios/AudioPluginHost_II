@@ -1206,7 +1206,7 @@ inline void test_osc_receive()
                     // pw.init().addMessage(repl);
                     // sock.sendPacketTo(pw.packetData(), pw.packetSize(), sock.packetOrigin());
                 }
-                else if (msg->match("/start_note")
+                else if (msg->match("/play_note")
                              .popFloat(darg0)
                              .popFloat(darg1)
                              .popInt32(iarg)
@@ -1235,6 +1235,7 @@ inline void test_osc_receive()
     choc::messageloop::run();
     std::cout << "stopped listening to OSC messages\n";
     eng->stopStreaming();
+    std::cout << "stopped streaming audio\n";
 }
 
 int main()
