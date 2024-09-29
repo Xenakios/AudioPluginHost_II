@@ -1,3 +1,6 @@
+#include <ostream>
+#define WIN32_LEAN_AND_MEAN
+#define _WINSOCK_DEPRECATED_NO_WARNINGS
 #include <combaseapi.h>
 #include <fstream>
 #include <iostream>
@@ -37,6 +40,8 @@
 #include "dejavurandom.h"
 #include "bluenoise.h"
 #include <variant>
+#include "oscpkt.hh"
+#include "udp.hh"
 
 inline void test_alt_event_list()
 {
@@ -1139,7 +1144,7 @@ inline void test_clapengineRT()
     seq.addNote(0.0, 1.0, 0, 0, 60, -1, 0.5, 0.0);
     seq.addNote(0.5, 1.0, 0, 0, 67, -1, 0.5, 0.0);
     seq.addNote(1.0, 1.0, 0, 0, 74, -1, 0.5, 0.0);
-    eng->startStreaming(132, 44100.0, 256);
+    eng->startStreaming(132, 44100.0, 256, false);
     choc::messageloop::Timer timer{5000, [&eng]() {
                                        std::cout << "engine stop timer callback\n";
                                        eng->stopStreaming();
@@ -1153,9 +1158,61 @@ inline void test_clapengineRT()
     // eng->stopStreaming();
 }
 
+inline void test_osc_receive()
+{
+    using namespace oscpkt;
+    UdpSocket sock;
+    size_t PORT_NUM = 7001;
+    sock.bindTo(PORT_NUM);
+    if (!sock.isOk())
+    {
+        std::cerr << "Error opening port " << PORT_NUM << ": " << sock.errorMessage() << "\n";
+        return;
+    }
+
+    std::cout << "Server started, will listen to packets on port " << PORT_NUM << std::endl;
+    PacketReader pr;
+    PacketWriter pw;
+    bool shouldQuit = false;
+    while (sock.isOk())
+    {
+        if (sock.receiveNextPacket(30 /* timeout, in ms */))
+        {
+            pr.init(sock.packetData(), sock.packetSize());
+            oscpkt::Message *msg = nullptr;
+            while (pr.isOk() && (msg = pr.popMessage()) != nullptr)
+            {
+                int iarg;
+                if (msg->match("/ping").popInt32(iarg).isOkNoMoreArgs())
+                {
+                    std::cout << "Server: received /ping " << iarg << " from "
+                              << sock.packetOrigin() << std::endl;
+                    // Message repl;
+                    // repl.init("/pong").pushInt32(iarg + 1);
+                    // pw.init().addMessage(repl);
+                    // sock.sendPacketTo(pw.packetData(), pw.packetSize(), sock.packetOrigin());
+                }
+                else if (msg->match("/stop_streaming").isOkNoMoreArgs())
+                {
+                    shouldQuit = true;
+                }
+                else
+                {
+                    std::cout << "Server: unhandled message: " << msg->addressPattern()
+                              << std::endl;
+                }
+            }
+        }
+        if (shouldQuit)
+            break;
+    }
+    std::cout << "stopped listening to OSC messages\n";
+}
+
 int main()
 {
-    test_clapengineRT();
+    test_osc_receive();
+    // test_clapengineRT();
     // test_testsinesyn();
     // test_xoroshirorandom();
     // test_grain_delay();

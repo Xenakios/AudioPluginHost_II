@@ -521,7 +521,7 @@ int CPECallback(void *outputBuffer, void *inputBuffer, unsigned int nFrames, dou
     if (cpe.m_timerPosSamples >= 44100)
     {
         cpe.m_timerPosSamples = 0;
-        choc::messageloop::postMessage([]() { std::cout << "postmessage callback" << std::endl; });
+        // choc::messageloop::postMessage([]() { std::cout << "postmessage callback" << std::endl; });
     }
     return 0;
 }
@@ -596,15 +596,17 @@ void ClapProcessingEngine::prepareToPlay(double sampleRate, int maxBufferSize)
     outputbuffers.emplace_back((unsigned int)2, (unsigned int)maxBufferSize);
     outputbuffers.back().clear();
     m_clap_outbufs[0].data32 = (float **)outputbuffers.back().getView().data.channels;
+    /*
     m_gui_tasks_timer = choc::messageloop::Timer{1000, []() {
                                                      std::cout << "choc timer callback"
                                                                << std::endl;
                                                      return true;
                                                  }};
+    */
 }
 
 void ClapProcessingEngine::startStreaming(unsigned int id, double sampleRate,
-                                          int preferredBufferSize)
+                                          int preferredBufferSize, bool blockExecution)
 {
     m_delayed_messages.reserve(512);
     m_delayed_messages.clear();
@@ -631,6 +633,13 @@ void ClapProcessingEngine::startStreaming(unsigned int id, double sampleRate,
     {
         throw std::runtime_error("Error starting RTAudio stream");
     }
+    if (blockExecution)
+    {
+        choc::messageloop::initialise();
+        choc::messageloop::run();
+        
+    }
+    
 }
 
 void ClapProcessingEngine::wait(double seconds)

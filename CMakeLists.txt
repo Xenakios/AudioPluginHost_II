@@ -26,6 +26,7 @@ include_directories(
     libs/tuning-library/include
     libs/sst-filters/include
     libs/sst-effects/include
+    libs/oscpkt
 )
 
 # for "reasons", this is still a console app even though a GUI app is built from it

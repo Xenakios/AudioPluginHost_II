@@ -148,7 +148,7 @@ class ClapProcessingEngine
     std::unique_ptr<RtAudio> m_rtaudio;
     std::vector<std::string> getDeviceNames();
     void prepareToPlay(double sampleRate, int maxBufferSize);
-    void startStreaming(unsigned int id, double sampleRate, int preferredBufferSize);
+    void startStreaming(unsigned int deviceId, double sampleRate, int preferredBufferSize, bool blockExecution);
     void wait(double seconds);
     void stopStreaming();
     void postNoteMessage(double delay, double duration, int key, double velo);
