@@ -422,6 +422,27 @@ void ClapProcessingEngine::processAudio(choc::buffer::ChannelArrayView<float> in
     m_clap_process.out_events = list_out.clapOutputEvents();
     for (size_t i = 0; i < m_chain.size(); ++i)
     {
+        if (i == 0)
+        {
+            ClapEventSequence::Event msg;
+            while (m_to_test_tone_fifo.pop(msg))
+            {
+                ClapEventSequence::Event msgcopy{msg};
+                msgcopy.timestamp = msg.timestamp + m_samplePlayPos;
+                m_delayed_messages.push_back(msgcopy);
+            }
+            for (auto &dm : m_delayed_messages)
+            {
+                if (dm.timestamp >= m_samplePlayPos &&
+                    dm.timestamp < m_samplePlayPos + procblocksize)
+                {
+                    dm.timestamp = -1.0;
+                    // std::cout << "delayed message at " << m_samplePlayPos << "\n";
+                    list_in.push((clap_event_header_t *)&dm.event);
+                }
+            }
+        }
+
         auto blockevts = m_chain[i]->m_eviter->readNextEvents(procblocksize);
         for (auto &e : blockevts)
         {
@@ -465,44 +486,8 @@ void ClapProcessingEngine::processAudio(choc::buffer::ChannelArrayView<float> in
         // choc::buffer::copy(inputbuffer, outputbuffers[0]);
     }
     choc::buffer::copy(outputBuffer, outputbuffers[0]);
-    return;
-    auto nFrames = outputBuffer.getNumFrames();
-    ClapEventSequence::Event msg;
-    while (m_to_test_tone_fifo.pop(msg))
-    {
-        ClapEventSequence::Event msgcopy{msg};
-        msgcopy.timestamp = msg.timestamp + m_samplePlayPos;
-        m_delayed_messages.push_back(msgcopy);
-    }
-    for (auto &dm : m_delayed_messages)
-    {
-        if (dm.timestamp >= m_samplePlayPos && dm.timestamp < m_samplePlayPos + nFrames)
-        {
-            dm.timestamp = -1.0;
-            // std::cout << "delayed message at " << m_samplePlayPos << "\n";
-            if (dm.event.header.type == CLAP_EVENT_NOTE_ON)
-            {
-                auto nev = (clap_event_note *)&dm.event;
-                m_synth.startNote(nev->key, nev->velocity);
-            }
-            if (dm.event.header.type == CLAP_EVENT_NOTE_OFF)
-            {
-                auto nev = (clap_event_note *)&dm.event;
-                m_synth.stopNote(nev->key);
-            }
-        }
-    }
-
-    for (unsigned int i = 0; i < nFrames; ++i)
-    {
-        float outLeft = 0.0f;
-        float outRight = 0.0f;
-        m_synth.process(outLeft, outRight);
-        outputBuffer.getSample(0, i) = outLeft;
-        outputBuffer.getSample(1, i) = outRight;
-    }
+    m_samplePlayPos += procblocksize;
     std::erase_if(m_delayed_messages, [](auto &&dm) { return dm.timestamp < 0.0; });
-    m_samplePlayPos += nFrames;
 }
 
 int CPECallback(void *outputBuffer, void *inputBuffer, unsigned int nFrames, double streamTime,
@@ -521,9 +506,18 @@ int CPECallback(void *outputBuffer, void *inputBuffer, unsigned int nFrames, dou
     if (cpe.m_timerPosSamples >= 44100)
     {
         cpe.m_timerPosSamples = 0;
-        // choc::messageloop::postMessage([]() { std::cout << "postmessage callback" << std::endl; });
+        // choc::messageloop::postMessage([]() { std::cout << "postmessage callback" << std::endl;
+        // });
     }
     return 0;
+}
+
+void ClapProcessingEngine::runMainThreadTasks()
+{
+    for (auto &cp : m_chain)
+    {
+        cp->m_proc->runMainThreadTasks();
+    }
 }
 
 // prepare the processing chain here, must be called from main thread
@@ -620,7 +614,6 @@ void ClapProcessingEngine::startStreaming(unsigned int id, double sampleRate,
     unsigned int bframes = preferredBufferSize;
     auto err = m_rtaudio->openStream(&outpars, nullptr, RTAUDIO_FLOAT32, sampleRate, &bframes,
                                      CPECallback, this, nullptr);
-    m_synth.prepare(sampleRate, bframes);
     prepareToPlay(sampleRate, bframes);
     outputConversionBuffer = choc::buffer::ChannelArrayBuffer<float>{2, bframes};
     inputConversionBuffer = choc::buffer::ChannelArrayBuffer<float>{2, bframes};
@@ -637,9 +630,7 @@ void ClapProcessingEngine::startStreaming(unsigned int id, double sampleRate,
     {
         choc::messageloop::initialise();
         choc::messageloop::run();
-        
     }
-    
 }
 
 void ClapProcessingEngine::wait(double seconds)

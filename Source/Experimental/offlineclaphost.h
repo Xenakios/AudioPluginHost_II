@@ -154,11 +154,10 @@ class ClapProcessingEngine
     void postNoteMessage(double delay, double duration, int key, double velo);
     void processAudio(choc::buffer::ChannelArrayView<float> inputBuffer,
                       choc::buffer::ChannelArrayView<float> outputBuffer);
-
+    void runMainThreadTasks();
     choc::fifo::SingleReaderSingleWriterFIFO<ClapEventSequence::Event> m_to_test_tone_fifo;
     std::vector<ClapEventSequence::Event> m_delayed_messages;
 
-    TestSineSynth m_synth;
     int64_t m_samplePlayPos = 0;
 
     choc::buffer::ChannelArrayBuffer<float> outputConversionBuffer;
