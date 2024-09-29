@@ -149,6 +149,7 @@ class ClapProcessingEngine
     std::vector<std::string> getDeviceNames();
     void prepareToPlay(double sampleRate, int maxBufferSize);
     void startStreaming(unsigned int id, double sampleRate, int preferredBufferSize);
+    void wait(double seconds);
     void stopStreaming();
     void postNoteMessage(double delay, double duration, int key, double velo);
     void processAudio(choc::buffer::ChannelArrayView<float> inputBuffer,

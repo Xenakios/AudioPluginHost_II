@@ -1681,8 +1681,8 @@ class MyHost
 
 int main()
 {
-    juce::ScopedJuceInitialiser_GUI gi;
-    MyHost host;
+    // juce::ScopedJuceInitialiser_GUI gi;
+    // MyHost host;
     // test_filter();
     // test_polym();
     // test_keyvaluemap<KeyValueTable<clap_id, clap_param_info>>(1000000, "custom kvmap");

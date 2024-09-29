@@ -633,6 +633,26 @@ void ClapProcessingEngine::startStreaming(unsigned int id, double sampleRate,
     }
 }
 
+void ClapProcessingEngine::wait(double seconds)
+{
+    using clock = std::chrono::system_clock;
+    using ms = std::chrono::duration<double, std::milli>;
+    const auto start_time = clock::now();
+    while (true)
+    {
+        for (auto &ce : m_chain)
+        {
+            ce->m_proc->runMainThreadTasks();
+        }
+        const auto now_time = clock::now();
+        const auto timediff = now_time - start_time;
+        // std::cout << timediff.count() << "\n";
+        if (timediff.count() / 10000.0 >= (seconds * 1000.0))
+            break;
+        std::this_thread::sleep_for(10ms);
+    }
+}
+
 void ClapProcessingEngine::stopStreaming()
 {
     m_processorsState = ProcState::NeedsStopping;
