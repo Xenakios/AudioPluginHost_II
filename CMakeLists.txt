@@ -128,14 +128,17 @@ add_executable(TestingProgram
     Source/Experimental/xaudiograph.cpp
     libs/rtaudio/RtAudio.cpp  
     )
-# target_link_libraries(TestingProgram PRIVATE rtaudio)
-
-
-target_sources(TestingProgram
-    PRIVATE
-    
-)
 target_compile_definitions(TestingProgram PRIVATE NOJUCE=1 _USE_MATH_DEFINES=1 __WINDOWS_WASAPI__)
+
+# mini host that can be controlled with OSC messages etc
+add_executable(ClapMiniHost 
+    Source/Experimental/claphost.cpp 
+    Source/Experimental/xaps/clap_xaudioprocessor.cpp
+    Source/Experimental/offlineclaphost.cpp
+    libs/rtaudio/RtAudio.cpp  
+    )
+target_compile_definitions(ClapMiniHost PRIVATE NOJUCE=1 _USE_MATH_DEFINES=1 __WINDOWS_WASAPI__)
+
 
 # juce::juce_recommended_lto_flags
 # juce_add_bundle_resources_directory(AudioPluginHost2 Assets)

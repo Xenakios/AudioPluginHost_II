@@ -1,6 +1,4 @@
 #include <ostream>
-#define WIN32_LEAN_AND_MEAN
-#define _WINSOCK_DEPRECATED_NO_WARNINGS
 #include <combaseapi.h>
 #include <fstream>
 #include <iostream>
@@ -40,8 +38,6 @@
 #include "dejavurandom.h"
 #include "bluenoise.h"
 #include <variant>
-#include "oscpkt.hh"
-#include "udp.hh"
 
 inline void test_alt_event_list()
 {
@@ -1158,89 +1154,9 @@ inline void test_clapengineRT()
     // eng->stopStreaming();
 }
 
-inline void test_osc_receive()
-{
-    using namespace oscpkt;
-    UdpSocket sock;
-    size_t PORT_NUM = 7001;
-    sock.bindTo(PORT_NUM);
-    if (!sock.isOk())
-    {
-        std::cerr << "Error opening port " << PORT_NUM << ": " << sock.errorMessage() << "\n";
-        return;
-    }
-    auto eng = std::make_unique<ClapProcessingEngine>();
-    eng->addProcessorToChain(R"(C:\Program Files\Common Files\CLAP\Surge Synth Team\Surge XT.clap)",
-                             0);
-    eng->startStreaming(132, 44100, 512, false);
-    std::cout << "Server started, will listen to packets on port " << PORT_NUM << std::endl;
-    PacketReader pr;
-    PacketWriter pw;
-    bool shouldQuit = false;
-    // while (sock.isOk())
-    auto oscProcessFunc = [&pr, &pw, &sock, &eng]() {
-        eng->runMainThreadTasks();
-        if (!sock.isOk())
-        {
-            choc::messageloop::stop();
-            return false;
-        }
-
-        if (sock.receiveNextPacket(30 /* timeout, in ms */))
-        {
-            pr.init(sock.packetData(), sock.packetSize());
-            oscpkt::Message *msg = nullptr;
-            while (pr.isOk() && (msg = pr.popMessage()) != nullptr)
-            {
-                int iarg;
-                float darg0;
-                float darg1;
-                float darg2;
-                float darg3;
-                if (msg->match("/ping").popInt32(iarg).isOkNoMoreArgs())
-                {
-                    std::cout << "Server: received /ping " << iarg << " from "
-                              << sock.packetOrigin() << std::endl;
-                    // Message repl;
-                    // repl.init("/pong").pushInt32(iarg + 1);
-                    // pw.init().addMessage(repl);
-                    // sock.sendPacketTo(pw.packetData(), pw.packetSize(), sock.packetOrigin());
-                }
-                else if (msg->match("/play_note")
-                             .popFloat(darg0)
-                             .popFloat(darg1)
-                             .popInt32(iarg)
-                             .popFloat(darg2)
-                             .isOkNoMoreArgs())
-                {
-                    std::cout << std::format("{} {} {} {}", darg0, darg1, iarg, darg2) << std::endl;
-                    eng->postNoteMessage(darg0, darg1, iarg, darg2);
-                }
-                else if (msg->match("/stop_streaming").isOkNoMoreArgs())
-                {
-                    choc::messageloop::stop();
-                    return false;
-                }
-                else
-                {
-                    std::cout << "Server: unhandled message: " << msg->addressPattern() << " "
-                              << msg->typeTags() << std::endl;
-                }
-            }
-        }
-        return true;
-    };
-    choc::messageloop::initialise();
-    choc::messageloop::Timer timer(10, oscProcessFunc);
-    choc::messageloop::run();
-    std::cout << "stopped listening to OSC messages\n";
-    eng->stopStreaming();
-    std::cout << "stopped streaming audio\n";
-}
-
 int main()
 {
-    test_osc_receive();
+    // test_osc_receive();
     // test_clapengineRT();
     // test_testsinesyn();
     // test_xoroshirorandom();
