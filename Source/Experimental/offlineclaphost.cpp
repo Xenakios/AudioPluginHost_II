@@ -12,6 +12,7 @@
 #include "text/choc_Files.h"
 #include "xap_utils.h"
 #include "xaps/xap_memorybufferplayer.h"
+#include <algorithm>
 #include <cstring>
 #include <format>
 #include <mutex>
@@ -492,7 +493,7 @@ void ClapProcessingEngine::processAudio(choc::buffer::ChannelArrayView<float> in
         //     throw std::runtime_error("Clap processing failed");
         list_in.clear();
         list_out.clear();
-        // choc::buffer::copy(inputbuffer, outputbuffers[0]);
+        choc::buffer::copy(inputbuffers[0], outputbuffers[0]);
     }
     choc::buffer::copy(outputBuffer, outputbuffers[0]);
     m_samplePlayPos += procblocksize;
@@ -510,13 +511,13 @@ int CPECallback(void *outputBuffer, void *inputBuffer, unsigned int nFrames, dou
     {
         fobuf[i * 2 + 0] = cpe.outputConversionBuffer.getSample(0, i);
         fobuf[i * 2 + 1] = cpe.outputConversionBuffer.getSample(1, i);
+        fobuf[i * 2 + 0] = std::clamp(fobuf[i * 2 + 0], -1.0f, 1.0f);
+        fobuf[i * 2 + 1] = std::clamp(fobuf[i * 2 + 1], -1.0f, 1.0f);
     }
     cpe.m_timerPosSamples += nFrames;
     if (cpe.m_timerPosSamples >= 44100)
     {
         cpe.m_timerPosSamples = 0;
-        // choc::messageloop::postMessage([]() { std::cout << "postmessage callback" << std::endl;
-        // });
     }
     return 0;
 }
@@ -582,7 +583,6 @@ void ClapProcessingEngine::prepareToPlay(double sampleRate, int maxBufferSize)
     m_clap_inbufs[0].constant_mask = 0;
     m_clap_inbufs[0].latency = 0;
     m_clap_inbufs[0].data64 = nullptr;
-
     inputbuffers.clear();
     inputbuffers.emplace_back((unsigned int)2, (unsigned int)maxBufferSize);
     inputbuffers.back().clear();
@@ -625,7 +625,9 @@ void ClapProcessingEngine::startStreaming(unsigned int id, double sampleRate,
                                      CPECallback, this, nullptr);
     prepareToPlay(sampleRate, bframes);
     outputConversionBuffer = choc::buffer::ChannelArrayBuffer<float>{2, bframes};
+    outputConversionBuffer.clear();
     inputConversionBuffer = choc::buffer::ChannelArrayBuffer<float>{2, bframes};
+    inputConversionBuffer.clear();
     if (err != RTAUDIO_NO_ERROR)
     {
         throw std::runtime_error("Error opening RTAudio stream");

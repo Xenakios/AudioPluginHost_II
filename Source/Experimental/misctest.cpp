@@ -1131,10 +1131,11 @@ inline void test_testsinesyn()
 
 inline void test_clapengineRT()
 {
-    // CoInitialize(nullptr);
     choc::messageloop::initialise();
     auto eng = std::make_unique<ClapProcessingEngine>();
     eng->addProcessorToChain(R"(C:\Program Files\Common Files\CLAP\Surge Synth Team\Surge XT.clap)",
+                             0);
+    eng->addProcessorToChain(R"(C:\Program Files\Common Files\CLAP\Airwindows Consolidated.clap)",
                              0);
     auto &seq = eng->getSequence(0);
     seq.addNote(0.0, 1.0, 0, 0, 60, -1, 0.5, 0.0);
@@ -1148,16 +1149,12 @@ inline void test_clapengineRT()
                                        return false;
                                    }};
     choc::messageloop::run();
-    // CoUninitialize();
-    // using namespace std::chrono_literals;
-    // std::this_thread::sleep_for(2500ms);
-    // eng->stopStreaming();
 }
 
 int main()
 {
     // test_osc_receive();
-    // test_clapengineRT();
+    test_clapengineRT();
     // test_testsinesyn();
     // test_xoroshirorandom();
     // test_grain_delay();
