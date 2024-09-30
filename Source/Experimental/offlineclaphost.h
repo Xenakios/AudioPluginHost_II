@@ -102,6 +102,7 @@ class ClapProcessingEngine
         ClapEventSequence m_seq;
         std::optional<ClapEventSequence::IteratorSampleTime> m_eviter;
         std::string name;
+        std::unique_ptr<choc::ui::DesktopWindow> guiWindow;
     };
     std::vector<std::unique_ptr<ProcessorEntry>> m_chain;
 
@@ -143,8 +144,9 @@ class ClapProcessingEngine
 
     void openPluginGUIBlocking(size_t chainIndex, bool closeImmediately);
 
-    std::unique_ptr<choc::ui::DesktopWindow> m_desktopwindow;
-    void openPersistentWindow(std::string title);
+    void openPersistentWindow(int chainIndex);
+    void closePersistentWindow(int chainIndex);
+    
     std::unique_ptr<RtAudio> m_rtaudio;
     std::vector<std::string> getDeviceNames();
     void prepareToPlay(double sampleRate, int maxBufferSize);

@@ -46,6 +46,7 @@ inline void run_host()
                 float darg1;
                 float darg2;
                 float darg3;
+                bool barg0;
                 if (msg->match("/ping").popInt32(iarg).isOkNoMoreArgs())
                 {
                     std::cout << "Server: received /ping " << iarg << " from "
@@ -64,6 +65,13 @@ inline void run_host()
                 {
                     std::cout << std::format("{} {} {} {}", darg0, darg1, iarg, darg2) << std::endl;
                     eng->postNoteMessage(darg0, darg1, iarg, darg2);
+                }
+                else if (msg->match("/show_gui").popBool(barg0).isOkNoMoreArgs())
+                {
+                    if (barg0)
+                        eng->openPersistentWindow(0);
+                    else
+                        eng->closePersistentWindow(0);
                 }
                 else if (msg->match("/stop_streaming").isOkNoMoreArgs())
                 {

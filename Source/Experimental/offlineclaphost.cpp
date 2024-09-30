@@ -22,6 +22,7 @@ using namespace std::chrono_literals;
 
 ClapProcessingEngine::ClapProcessingEngine()
 {
+    choc::ui::setWindowsDPIAwareness();
     choc::messageloop::initialise();
     m_rtaudio = std::make_unique<RtAudio>();
     outputbuffers.resize(32);
@@ -993,60 +994,44 @@ std::map<std::string, clap_id> ClapProcessingEngine::getParameters(size_t chainI
     }
     return result;
 }
-void ClapProcessingEngine::openPersistentWindow(std::string title)
+
+void ClapProcessingEngine::closePersistentWindow(int chainIndex)
 {
-#ifdef FOO17373
-    std::thread th([this, title]() {
-        OleInitialize(nullptr);
-        // m_plug->mainthread_id() = std::this_thread::get_id();
-        choc::ui::setWindowsDPIAwareness(); // For Windows, we need to tell the OS we're
-                                            // high-DPI-aware
-        m_plug->guiCreate("win32", false);
-        uint32_t pw = 0;
-        uint32_t ph = 0;
-        m_plug->guiGetSize(&pw, &ph);
-        m_desktopwindow =
-            std::make_unique<choc::ui::DesktopWindow>(choc::ui::Bounds{100, 100, (int)pw, (int)ph});
-
-        m_desktopwindow->setWindowTitle("CHOC Window");
-        m_desktopwindow->setResizable(true);
-        m_desktopwindow->setMinimumSize(300, 300);
-        m_desktopwindow->setMaximumSize(1500, 1200);
-        m_desktopwindow->windowClosed = [this] {
-            m_plug->guiDestroy();
-            choc::messageloop::stop();
-        };
-
-        clap_window clapwin;
-        clapwin.api = "win32";
-        clapwin.win32 = m_desktopwindow->getWindowHandle();
-        m_plug->guiSetParent(&clapwin);
-        m_plug->guiShow();
-        m_desktopwindow->toFront();
-        choc::messageloop::run();
-        m_desktopwindow = nullptr;
-        OleUninitialize();
+    if (chainIndex >= m_chain.size())
         return;
-        // choc::messageloop::initialise();
-        OleInitialize(nullptr);
-        choc::ui::setWindowsDPIAwareness();
-        m_desktopwindow =
-            std::make_unique<choc::ui::DesktopWindow>(choc::ui::Bounds{100, 100, 300, 200});
-        m_desktopwindow->setWindowTitle(title);
-        m_desktopwindow->toFront();
-        m_desktopwindow->windowClosed = [this] {
-            // std::cout << "window closed\n";
-            // using namespace std::chrono_literals;
-            // std::this_thread::sleep_for(1000ms);
+    if (!m_chain[chainIndex]->guiWindow)
+        return; // GUI wasn't open
+    auto m_plug = m_chain[chainIndex]->m_proc.get();
+    m_plug->guiDestroy();
+    m_chain[chainIndex]->guiWindow = nullptr;
+}
 
-            choc::messageloop::stop();
-        };
-        choc::messageloop::run();
-        // std::cout << "finished message loop\n";
-        m_desktopwindow = nullptr;
+void ClapProcessingEngine::openPersistentWindow(int chainindex)
+{
+    if (chainindex >= m_chain.size())
+        return;
+    auto m_plug = m_chain[chainindex]->m_proc.get();
+    auto &procEntry = m_chain[chainindex];
+    if (procEntry->guiWindow)
+        return; // GUI already open
+    m_plug->guiCreate("win32", false);
+    uint32_t pw = 0;
+    uint32_t ph = 0;
+    m_plug->guiGetSize(&pw, &ph);
+    procEntry->guiWindow =
+        std::make_unique<choc::ui::DesktopWindow>(choc::ui::Bounds{100, 100, (int)pw, (int)ph});
+    auto m_desktopwindow = procEntry->guiWindow.get();
+    m_desktopwindow->setWindowTitle(procEntry->name);
+    m_desktopwindow->setResizable(true);
+    m_desktopwindow->setMinimumSize(300, 300);
+    m_desktopwindow->setMaximumSize(1500, 1200);
+    // fails if we later allow rearranging the plugin chain!!
+    m_desktopwindow->windowClosed = [this, chainindex] { closePersistentWindow(chainindex); };
 
-        OleUninitialize();
-    });
-    th.detach();
-#endif
+    clap_window clapwin;
+    clapwin.api = "win32";
+    clapwin.win32 = m_desktopwindow->getWindowHandle();
+    m_plug->guiSetParent(&clapwin);
+    m_plug->guiShow();
+    m_desktopwindow->toFront();
 }
