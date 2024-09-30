@@ -132,7 +132,7 @@ target_compile_definitions(TestingProgram PRIVATE NOJUCE=1 _USE_MATH_DEFINES=1 _
 
 # mini host that can be controlled with OSC messages etc
 add_executable(ClapMiniHost 
-    Source/Experimental/claphost.cpp 
+    Source/Experimental/claphostserver.cpp 
     Source/Experimental/xaps/clap_xaudioprocessor.cpp
     Source/Experimental/offlineclaphost.cpp
     libs/rtaudio/RtAudio.cpp  

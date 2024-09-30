@@ -8,11 +8,11 @@
 #include "oscpkt.hh"
 #include "udp.hh"
 
-inline void run_host()
+inline void run_host(size_t receivePort)
 {
     using namespace oscpkt;
     UdpSocket sock;
-    size_t PORT_NUM = 7001;
+    size_t PORT_NUM = receivePort;
     sock.bindTo(PORT_NUM);
     if (!sock.isOk())
     {
@@ -95,4 +95,17 @@ inline void run_host()
     std::cout << "stopped streaming audio\n";
 }
 
-int main() { run_host(); }
+int main()
+{
+    auto mtx = CreateMutex(NULL, TRUE, "XenakiosClapServer");
+    if (GetLastError() == ERROR_SUCCESS)
+    {
+        run_host(7001);
+    }
+    else
+    {
+        std::cout << "ClapHostServer already running" << std::endl;
+    }
+    ReleaseMutex(mtx);
+    CloseHandle(mtx);
+}
