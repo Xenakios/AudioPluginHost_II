@@ -14,6 +14,7 @@
 #include "xaps/xap_memorybufferplayer.h"
 #include <cstring>
 #include <format>
+#include <mutex>
 #include <stdexcept>
 #include <vector>
 #include "xaps/clap_xaudioprocessor.h"
@@ -383,14 +384,21 @@ std::vector<std::string> ClapProcessingEngine::getDeviceNames()
     return result;
 }
 
+void ClapProcessingEngine::setSuspended(bool b)
+{
+    std::lock_guard<std::mutex> locker(m_mutex);
+    m_isSuspended = b;
+}
+
 // note that this method should always be run in a non-main thread, to keep
 // Clap plugins happy with their thread checks etc
 void ClapProcessingEngine::processAudio(choc::buffer::ChannelArrayView<float> inputBuffer,
                                         choc::buffer::ChannelArrayView<float> outputBuffer)
 {
-    assert(m_isPrepared);
+    // assert(m_isPrepared);
     assert(inputBuffer.getNumFrames() == outputBuffer.getNumFrames());
-    if (m_processorsState == ProcState::Idle)
+    std::lock_guard<std::mutex> locker(m_mutex);
+    if (m_processorsState == ProcState::Idle || m_isSuspended)
     {
         outputBuffer.clear();
         return;

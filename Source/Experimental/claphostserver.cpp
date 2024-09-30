@@ -20,9 +20,10 @@ inline void run_host(size_t receivePort)
         return;
     }
     auto eng = std::make_unique<ClapProcessingEngine>();
-    eng->addProcessorToChain(R"(C:\Program Files\Common Files\CLAP\Surge Synth Team\Surge XT.clap)",
-                             0);
-    eng->startStreaming(132, 44100, 512, false);
+    // eng->addProcessorToChain(R"(C:\Program Files\Common Files\CLAP\Surge Synth Team\Surge
+    // XT.clap)",
+    //                         0);
+    // eng->startStreaming(132, 44100, 512, false);
     std::cout << "Server started, will listen to packets on port " << PORT_NUM << std::endl;
     PacketReader pr;
     PacketWriter pw;
@@ -41,15 +42,18 @@ inline void run_host(size_t receivePort)
             oscpkt::Message *msg = nullptr;
             while (pr.isOk() && (msg = pr.popMessage()) != nullptr)
             {
-                int iarg;
+                int iarg0;
+                int iarg1;
+                int iarg2;
                 float darg0;
                 float darg1;
                 float darg2;
                 float darg3;
                 bool barg0;
-                if (msg->match("/ping").popInt32(iarg).isOkNoMoreArgs())
+                std::string strarg0;
+                if (msg->match("/ping").popInt32(iarg0).isOkNoMoreArgs())
                 {
-                    std::cout << "Server: received /ping " << iarg << " from "
+                    std::cout << "Server: received /ping " << iarg0 << " from "
                               << sock.packetOrigin() << std::endl;
                     // Message repl;
                     // repl.init("/pong").pushInt32(iarg + 1);
@@ -59,12 +63,23 @@ inline void run_host(size_t receivePort)
                 else if (msg->match("/play_note")
                              .popFloat(darg0)
                              .popFloat(darg1)
-                             .popInt32(iarg)
+                             .popInt32(iarg0)
                              .popFloat(darg2)
                              .isOkNoMoreArgs())
                 {
-                    std::cout << std::format("{} {} {} {}", darg0, darg1, iarg, darg2) << std::endl;
-                    eng->postNoteMessage(darg0, darg1, iarg, darg2);
+                    // std::cout << std::format("{} {} {} {}", darg0, darg1, iarg, darg2) <<
+                    // std::endl;
+                    eng->postNoteMessage(darg0, darg1, iarg0, darg2);
+                }
+                else if (msg->match("/suspend_processing").popBool(barg0).isOkNoMoreArgs())
+                {
+                    eng->setSuspended(barg0);
+                }
+                else if (msg->match("/add_plugin").popStr(strarg0).popInt32(iarg0).isOkNoMoreArgs())
+                {
+                    eng->setSuspended(true);
+                    eng->addProcessorToChain(strarg0, iarg0);
+                    eng->setSuspended(false);
                 }
                 else if (msg->match("/show_gui").popBool(barg0).isOkNoMoreArgs())
                 {
@@ -72,6 +87,14 @@ inline void run_host(size_t receivePort)
                         eng->openPersistentWindow(0);
                     else
                         eng->closePersistentWindow(0);
+                }
+                else if (msg->match("/start_streaming")
+                             .popInt32(iarg0)
+                             .popInt32(iarg1)
+                             .popInt32(iarg2)
+                             .isOkNoMoreArgs())
+                {
+                    eng->startStreaming(iarg0, iarg1, iarg2, false);
                 }
                 else if (msg->match("/stop_streaming").isOkNoMoreArgs())
                 {

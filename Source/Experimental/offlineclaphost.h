@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <mutex>
 #include <unordered_map>
 #include <vector>
 #include <filesystem>
@@ -137,7 +138,7 @@ class ClapProcessingEngine
     clap_audio_buffer m_clap_outbufs[32];
     std::vector<choc::buffer::ChannelArrayBuffer<float>> inputbuffers;
     std::vector<choc::buffer::ChannelArrayBuffer<float>> outputbuffers;
-    
+
     clap::helpers::EventList list_in;
     clap::helpers::EventList list_out;
     void processToFile(std::string filename, double duration, double samplerate, int numoutchans);
@@ -146,17 +147,19 @@ class ClapProcessingEngine
 
     void openPersistentWindow(int chainIndex);
     void closePersistentWindow(int chainIndex);
-    
+
     std::unique_ptr<RtAudio> m_rtaudio;
     std::vector<std::string> getDeviceNames();
     void prepareToPlay(double sampleRate, int maxBufferSize);
-    void startStreaming(unsigned int deviceId, double sampleRate, int preferredBufferSize, bool blockExecution);
+    void startStreaming(unsigned int deviceId, double sampleRate, int preferredBufferSize,
+                        bool blockExecution);
     void wait(double seconds);
     void stopStreaming();
     void postNoteMessage(double delay, double duration, int key, double velo);
     void processAudio(choc::buffer::ChannelArrayView<float> inputBuffer,
                       choc::buffer::ChannelArrayView<float> outputBuffer);
     void runMainThreadTasks();
+    void setSuspended(bool b);
     choc::fifo::SingleReaderSingleWriterFIFO<ClapEventSequence::Event> m_to_test_tone_fifo;
     std::vector<ClapEventSequence::Event> m_delayed_messages;
 
@@ -175,6 +178,9 @@ class ClapProcessingEngine
         NeedsStopping
     };
     std::atomic<ProcState> m_processorsState{ProcState::Idle};
+    std::atomic<bool> m_isSuspended{false};
+    // lock this only when *absolutely* necessary
+    std::mutex m_mutex;
     std::atomic<bool> m_isPrepared{false};
     clap_process m_clap_process;
     choc::messageloop::Timer m_gui_tasks_timer;
