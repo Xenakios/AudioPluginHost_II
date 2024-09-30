@@ -668,9 +668,9 @@ void ClapProcessingEngine::stopStreaming()
 void ClapProcessingEngine::postNoteMessage(double delay, double duration, int key, double velo)
 {
     double sr = m_rtaudio->getStreamSampleRate();
-    auto ev = xenakios::make_event_note(0, CLAP_EVENT_NOTE_ON, -1, -1, key, -1, velo);
+    auto ev = xenakios::make_event_note(0, CLAP_EVENT_NOTE_ON, -1, 0, key, -1, velo);
     m_to_test_tone_fifo.push(ClapEventSequence::Event(delay * sr, &ev));
-    ev = xenakios::make_event_note(0, CLAP_EVENT_NOTE_OFF, -1, -1, key, -1, velo);
+    ev = xenakios::make_event_note(0, CLAP_EVENT_NOTE_OFF, -1, 0, key, -1, velo);
     m_to_test_tone_fifo.push(ClapEventSequence::Event((delay + duration) * sr, &ev));
 }
 
