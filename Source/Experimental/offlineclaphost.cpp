@@ -13,6 +13,7 @@
 #include "xap_utils.h"
 #include "xaps/xap_memorybufferplayer.h"
 #include <algorithm>
+#include <cmath>
 #include <cstring>
 #include <format>
 #include <mutex>
@@ -152,6 +153,23 @@ std::string ClapProcessingEngine::scanPluginFile(std::filesystem::path plugfilep
     return "No info (should not happen)";
 }
 
+template <typename BufType> inline void sanityCheckBuffer(BufType &buf)
+{
+    for (int j = 0; j < buf.getNumFrames(); ++j)
+    {
+        for (int k = 0; k < buf.getNumChannels(); ++k)
+        {
+            float tempsample = buf.getSample(k, j);
+            if (std::isnan(tempsample) || std::isinf(tempsample))
+            {
+                assert(false);
+                // tempsample = 0.0f;
+                // buf.getSample(k, j) = tempsample;
+            }
+        }
+    }
+}
+
 void ClapProcessingEngine::processToFile(std::string filename, double duration, double samplerate,
                                          int numoutchans)
 {
@@ -192,7 +210,7 @@ void ClapProcessingEngine::processToFile(std::string filename, double duration, 
     }
     // if more than 15 seconds, it's likely infinite
     maxTailSeconds = std::min(maxTailSeconds, 15.0);
-    
+
     //  even offline, do the processing in another another thread because things
     //  can get complicated with plugins like Surge XT because of the thread checks
     std::thread th([&] {
@@ -321,12 +339,15 @@ void ClapProcessingEngine::processToFile(std::string filename, double duration, 
                     list_in.push((const clap_event_header *)&ecopy);
                     ++eventssent;
                 }
-
+                auto proc = m_chain[i]->m_proc.get();
+                sanityCheckBuffer(inputbuffer);
                 auto status = m_chain[i]->m_proc->process(&cp);
                 if (status == CLAP_PROCESS_ERROR)
                     throw std::runtime_error("Clap processing failed");
+                sanityCheckBuffer(outputbuffers[0]);
                 list_in.clear();
                 list_out.clear();
+
                 choc::buffer::copy(inputbuffer, outputbuffers[0]);
             }
             uint32_t framesToWrite = std::min(int(outlensamples - outcounter), procblocksize);
@@ -352,7 +373,7 @@ void ClapProcessingEngine::processToFile(std::string filename, double duration, 
 
         renderloopfinished = true;
     });
-    
+
     choc::messageloop::Timer timer{10, [&]() {
                                        for (auto &p : m_chain)
                                        {

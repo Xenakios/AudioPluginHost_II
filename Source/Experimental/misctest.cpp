@@ -1,3 +1,4 @@
+#include <cstdint>
 #include <ostream>
 #include <combaseapi.h>
 #include <fstream>
@@ -1129,17 +1130,19 @@ inline void test_testsinesyn()
     }
 }
 
-inline void test_clapengineRT()
+inline void test_clapengineRT(int iter)
 {
     choc::messageloop::initialise();
     auto eng = std::make_unique<ClapProcessingEngine>();
     eng->addProcessorToChain(R"(C:\Program Files\Common Files\CLAP\Surge Synth Team\Surge XT.clap)",
                              0);
-    eng->addProcessorToChain(
-         R"(C:\Program Files\Common Files\CLAP\Airwindows Consolidated.clap)", 0);
+    std::string plugname = R"(C:\Program Files\Common Files\CLAP\Airwindows Consolidated.clap)";
+    // std::string plugname = R"(C:\Program Files\Common Files\CLAP\Surge Synth Team\Surge XT
+    // Effects.clap)";
+    eng->addProcessorToChain(plugname, 0);
     // std::this_thread::sleep_for(1000ms);
     auto info = eng->getParameters(1);
-    
+
     /*0
     for (auto &e : info)
     {
@@ -1147,15 +1150,15 @@ inline void test_clapengineRT()
     }
     */
     auto &seq = eng->getSequence(0);
-    seq.addNote(0.0, 1.0, 0, 0, 60, -1, 0.5, 0.0);
+    seq.addNote(0.1, 1.0, 0, 0, 60, -1, 0.5, 0.0);
     seq.addNote(0.5, 1.0, 0, 0, 67, -1, 0.5, 0.0);
-    seq.addNote(1.0, 1.0, 0, 0, 74, -1, 0.5, 0.0);
+    seq.addNote(1.0, 0.2, 0, 0, 74, -1, 0.5, 0.0);
 
     // auto &seq2 = eng->getSequence(1);
     // seq2.addParameterEvent(false, 0.1, 0, 0, 0, 0, 3034571532, 0.02);
-    eng->processToFile(R"(C:\MusicAudio\clap_out\out01.wav)", 10.0, 44100.0, 2);
+    eng->processToFile(std::format(R"(C:\MusicAudio\clap_out\out{}.wav)", iter), 5, 44100.0, 2);
     return;
-    
+
     eng->startStreaming(132, 44100.0, 256, false);
     choc::messageloop::Timer timer{5000, [&eng]() {
                                        std::cout << "engine stop timer callback\n";
@@ -1166,10 +1169,33 @@ inline void test_clapengineRT()
     choc::messageloop::run();
 }
 
+struct TestStruct
+{
+    float *ptr;
+    int x;
+    double y;
+};
+
+inline void inplace_test()
+{
+    std::vector<char> buf;
+    buf.resize(32);
+    // memset(buf, 0, 32);
+    TestStruct *a = new (buf.data()) TestStruct;
+    // TestStruct a;
+    std::cout << std::format("{} {} {}\n", (uint64_t)a->ptr, a->x, a->y);
+}
+
 int main()
 {
-    // test_osc_receive();
-    test_clapengineRT();
+    // inplace_test();
+    // return 0;
+    //  test_osc_receive();
+    for (int i = 0; i < 10; ++i)
+    {
+        test_clapengineRT(i);
+    }
+
     // test_testsinesyn();
     // test_xoroshirorandom();
     // test_grain_delay();
