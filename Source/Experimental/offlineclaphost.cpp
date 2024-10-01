@@ -192,6 +192,7 @@ void ClapProcessingEngine::processToFile(std::string filename, double duration, 
     }
     // if more than 15 seconds, it's likely infinite
     maxTailSeconds = std::min(maxTailSeconds, 15.0);
+    
     //  even offline, do the processing in another another thread because things
     //  can get complicated with plugins like Surge XT because of the thread checks
     std::thread th([&] {
@@ -252,7 +253,7 @@ void ClapProcessingEngine::processToFile(std::string filename, double duration, 
         transport.header.time = 0;
         transport.header.type = CLAP_EVENT_TRANSPORT;
         transport.flags = CLAP_TRANSPORT_IS_PLAYING;
-        cp.transport = nullptr;
+        cp.transport = &transport;
 
         cp.in_events = list_in.clapInputEvents();
         cp.out_events = list_out.clapOutputEvents();
@@ -346,26 +347,29 @@ void ClapProcessingEngine::processToFile(std::string filename, double duration, 
         writer->flush();
         // std::cout << events_in_seqs << " events in sequecnes, sent " << eventssent
         //          << " events to plugin\n";
-        std::cout << std::format("finished in {} seconds, {}x realtime",
+        std::cout << std::format("finished in {} seconds, {}x realtime\n",
                                  render_duration.count() / 1000.0, rtfactor);
 
         renderloopfinished = true;
     });
-
-    // fake event loop to flush the on main thread requests from the plugin
-    while (!renderloopfinished)
-    {
-        for (auto &p : m_chain)
-        {
-            p->m_proc->runMainThreadTasks();
-        }
-        std::this_thread::sleep_for(5ms);
-    }
+    
+    choc::messageloop::Timer timer{10, [&]() {
+                                       for (auto &p : m_chain)
+                                       {
+                                           p->m_proc->runMainThreadTasks();
+                                       }
+                                       if (!renderloopfinished)
+                                           return true;
+                                       choc::messageloop::stop();
+                                       return false;
+                                   }};
+    choc::messageloop::run();
     th.join();
     for (auto &p : m_chain)
     {
         p->m_proc->deactivate();
     }
+    std::cout << "cleaned up after rendering\n";
 }
 
 std::vector<std::string> ClapProcessingEngine::getDeviceNames()
