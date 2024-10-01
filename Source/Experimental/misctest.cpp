@@ -1135,20 +1135,24 @@ inline void test_clapengineRT()
     auto eng = std::make_unique<ClapProcessingEngine>();
     eng->addProcessorToChain(R"(C:\Program Files\Common Files\CLAP\Surge Synth Team\Surge XT.clap)",
                              0);
-    eng->addProcessorToChain(
-        R"(C:\Program Files\Common Files\CLAP\Surge Synth Team\Surge XT Effects.clap)", 0);
+    //eng->addProcessorToChain(
+    //     R"(C:\Program Files\Common Files\CLAP\Airwindows Consolidated.clap)", 0);
+    /*
     auto info = eng->getParameters(1);
     for (auto &e : info)
     {
         // std::cout << e.first << " " << e.second << "\n";
     }
+    */
     auto &seq = eng->getSequence(0);
     seq.addNote(0.0, 1.0, 0, 0, 60, -1, 0.5, 0.0);
     seq.addNote(0.5, 1.0, 0, 0, 67, -1, 0.5, 0.0);
     seq.addNote(1.0, 1.0, 0, 0, 74, -1, 0.5, 0.0);
 
-    auto &seq2 = eng->getSequence(1);
-    seq2.addParameterEvent(false, 0.1, 0, 0, 0, 0, 3034571532, 0.02);
+    // auto &seq2 = eng->getSequence(1);
+    // seq2.addParameterEvent(false, 0.1, 0, 0, 0, 0, 3034571532, 0.02);
+    eng->processToFile(R"(C:\MusicAudio\clap_out\out01.wav)", 10.0, 44100.0, 2);
+    return;
     std::this_thread::sleep_for(2000ms);
     eng->startStreaming(132, 44100.0, 256, false);
     choc::messageloop::Timer timer{5000, [&eng]() {

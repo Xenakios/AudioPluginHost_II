@@ -426,8 +426,11 @@ void ClapProcessingEngine::processAudio(choc::buffer::ChannelArrayView<float> in
     list_out.clear();
     int procblocksize = outputBuffer.getNumFrames();
     double pos_seconds = m_transportposSamples / m_samplerate;
+    assert(procblocksize <= outputbuffers[0].getNumFrames());
     m_clap_process.frames_count = procblocksize;
-    m_clap_process.transport = nullptr;
+    clap_event_transport tp;
+    memset(&tp, 0, sizeof(clap_event_transport));
+    m_clap_process.transport = &tp;
     m_clap_process.in_events = list_in.clapInputEvents();
     m_clap_process.out_events = list_out.clapOutputEvents();
     for (size_t i = 0; i < m_chain.size(); ++i)
@@ -564,7 +567,7 @@ void ClapProcessingEngine::prepareToPlay(double sampleRate, int maxBufferSize)
         auto tail = c->m_proc->tailGet() / sampleRate;
         if (tail > 0.0)
         {
-            std::cout << c->name << " has tail of " << tail << " seconds\n";
+            // std::cout << c->name << " has tail of " << tail << " seconds\n";
         }
         maxTailSeconds = std::max(tail, maxTailSeconds);
         c->m_proc->runMainThreadTasks();
@@ -599,13 +602,6 @@ void ClapProcessingEngine::prepareToPlay(double sampleRate, int maxBufferSize)
     outputbuffers.emplace_back((unsigned int)2, (unsigned int)maxBufferSize);
     outputbuffers.back().clear();
     m_clap_outbufs[0].data32 = (float **)outputbuffers.back().getView().data.channels;
-    /*
-    m_gui_tasks_timer = choc::messageloop::Timer{1000, []() {
-                                                     std::cout << "choc timer callback"
-                                                               << std::endl;
-                                                     return true;
-                                                 }};
-    */
 }
 
 void ClapProcessingEngine::startStreaming(unsigned int id, double sampleRate,
