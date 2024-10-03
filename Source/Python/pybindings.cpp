@@ -243,8 +243,7 @@ PYBIND11_MODULE(xenakios, m)
 
     py::class_<MultiModulator>(m, "MultiModulator")
         .def(py::init<double>())
-        .def("applyToSequence", [](MultiModulator &m, ClapEventSequence &s, double start,
-                                   double dur) { m.applyToSequence(s, start, dur); })
+        .def("applyToSequence", &MultiModulator::applyToSequence)
         .def("setOutputAsParameter", &MultiModulator::setOutputAsParameter)
         .def("setOutputAsParameterModulation", &MultiModulator::setOutputAsParameterModulation)
         .def("setConnection", &MultiModulator::setConnection)

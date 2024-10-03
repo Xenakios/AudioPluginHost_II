@@ -3,6 +3,7 @@
 #include "sst/basic-blocks/modulators/SimpleLFO.h"
 #include "sst/basic-blocks/mod-matrix/ModMatrix.h"
 #include "xap_utils.h"
+#include "clap_eventsequence.h"
 
 template <size_t BLOCK_SIZE> class SimpleLFO
 {
@@ -175,9 +176,8 @@ class MultiModulator
         for (auto &e : outputprops)
             e = OutputProps();
     }
-    // use a template here because the ClapEventSequence is in the offlinehost header for now
-    template <typename SeqType>
-    void applyToSequence(SeqType &destSeq, double startTime, double duration)
+
+    void applyToSequence(ClapEventSequence &destSeq, double startTime, double duration)
     {
         m.prepare(rt, sr, blocklen);
         double tpos = startTime;

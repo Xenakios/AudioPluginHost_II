@@ -340,11 +340,11 @@ void ClapProcessingEngine::processToFile(std::string filename, double duration, 
                     ++eventssent;
                 }
                 auto proc = m_chain[i]->m_proc.get();
-                sanityCheckBuffer(inputbuffer);
+                // sanityCheckBuffer(inputbuffer);
                 auto status = m_chain[i]->m_proc->process(&cp);
                 if (status == CLAP_PROCESS_ERROR)
                     throw std::runtime_error("Clap processing failed");
-                sanityCheckBuffer(outputbuffers[0]);
+                // sanityCheckBuffer(outputbuffers[0]);
                 list_in.clear();
                 list_out.clear();
 
