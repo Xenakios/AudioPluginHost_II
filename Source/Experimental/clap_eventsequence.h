@@ -3,6 +3,8 @@
 #include "clap/clap.h"
 #include "xap_utils.h"
 #include "containers/choc_Span.h"
+#include <limits>
+#include <stdexcept>
 
 class ClapEventSequence
 {
@@ -187,7 +189,18 @@ class ClapEventSequence
         ev.data[2] = b2;
         m_evlist.push_back(Event(time, &ev));
     }
-
+    // doesn't require events to be pre-sorted, so needs to scan all events
+    double getMaximumEventTime() const
+    {
+        if (m_evlist.empty())
+            throw std::runtime_error("No events in sequence");
+        double maxt = std::numeric_limits<double>::min();
+        for (auto &e : m_evlist)
+        {
+            maxt = std::max(maxt, e.timestamp);
+        }
+        return maxt;
+    }
     struct Iterator
     {
         /// Creates an iterator positioned at the start of the sequence.

@@ -73,9 +73,13 @@ void ClapProcessingEngine::addProcessorToChain(std::string plugfilename, int plu
         clap_plugin_descriptor desc;
         if (plug->getDescriptor(&desc))
         {
-            std::cout << "created : " << desc.name << "\n";
+            // std::cout << "created : " << desc.name << "\n";
             chainEntry->name = desc.name;
         }
+        else
+            std::cout << plugfilename
+                      << " does not provide Clap description, likely a bug in the plugin"
+                      << std::endl;
         plug->runMainThreadTasks();
         chainEntry->m_proc = std::move(plug);
         m_chain.push_back(std::move(chainEntry));
@@ -179,9 +183,12 @@ void ClapProcessingEngine::processToFile(std::string filename, double duration, 
     std::atomic<bool> renderloopfinished{false};
     double maxTailSeconds = 0.0;
     size_t chainIndex = 0;
+    
     for (auto &c : m_chain)
     {
         c->m_seq.sortEvents();
+        if (!c->m_proc->activate(samplerate, procblocksize, procblocksize))
+            std::cout << "could not activate " << c->name << "\n";
         std::cout << std::format("{} has {} audio output ports\n", c->name,
                                  c->m_proc->audioPortsCount(false));
         for (int i = 0; i < c->m_proc->audioPortsCount(false); ++i)
@@ -190,8 +197,7 @@ void ClapProcessingEngine::processToFile(std::string filename, double duration, 
             c->m_proc->audioPortsInfo(i, false, &apinfo);
             std::cout << std::format("\t{} : {} channels\n", i, apinfo.channel_count);
         }
-        if (!c->m_proc->activate(samplerate, procblocksize, procblocksize))
-            std::cout << "could not activate " << c->name << "\n";
+        
         if (deferredStateFiles.count(chainIndex))
         {
             loadStateFromBinaryFile(chainIndex, deferredStateFiles[chainIndex]);
@@ -201,10 +207,6 @@ void ClapProcessingEngine::processToFile(std::string filename, double duration, 
         // if (!c->m_proc->renderSetMode(CLAP_RENDER_OFFLINE))
         //     std::cout << "was not able to set offline render mode for " << c->name << "\n";
         auto tail = c->m_proc->tailGet() / samplerate;
-        if (tail > 0.0)
-        {
-            std::cout << c->name << " has tail of " << tail << " seconds\n";
-        }
         maxTailSeconds = std::max(tail, maxTailSeconds);
         c->m_proc->runMainThreadTasks();
     }
@@ -390,7 +392,7 @@ void ClapProcessingEngine::processToFile(std::string filename, double duration, 
     {
         p->m_proc->deactivate();
     }
-    std::cout << "cleaned up after rendering\n";
+    // std::cout << "cleaned up after rendering\n";
 }
 
 std::vector<std::string> ClapProcessingEngine::getDeviceNames()

@@ -151,6 +151,7 @@ PYBIND11_MODULE(xenakios, m)
         .def(py::init<>())
         .def("getNumEvents", &ClapEventSequence::getNumEvents)
         .def("getSizeInBytes", &ClapEventSequence::getApproxSizeInBytes)
+        .def("getMaximumEventTime", &ClapEventSequence::getMaximumEventTime)
         .def("addString", &ClapEventSequence::addString)
         .def("addStringEvent", &ClapEventSequence::addStringEvent)
         .def("addAudioBufferEvent", addAudioBufferEvent)
@@ -250,7 +251,7 @@ PYBIND11_MODULE(xenakios, m)
         .def("setLFOProps", &MultiModulator::setLFOProps);
 
     m.def("writeArrayToFile", &writeArrayToFile);
-    // m.def("juceTest", &juceTest);
+    //  m.def("juceTest", &juceTest);
 
     m.def("generateNoteExpressionsFromEnvelope", &generateNoteExpressionsFromEnvelope, "",
           py::arg("targetSequence"), py::arg("sourceEnvelope"), py::arg("eventsStartTime"),
