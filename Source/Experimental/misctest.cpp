@@ -1186,15 +1186,22 @@ inline void inplace_test()
     std::cout << std::format("{} {} {}\n", (uint64_t)a->ptr, a->x, a->y);
 }
 
+inline void test_numrange()
+{
+    NumericRange<int> range;
+    assert(range.isEmpty());
+    assert(range.getLength() == 0);
+    range = NumericRange<int>(8, 13);
+}
+
 int main()
 {
+    test_numrange();
     // inplace_test();
     // return 0;
     //  test_osc_receive();
-    for (int i = 0; i < 10; ++i)
-    {
-        test_clapengineRT(i);
-    }
+
+    // test_clapengineRT(1);
 
     // test_testsinesyn();
     // test_xoroshirorandom();

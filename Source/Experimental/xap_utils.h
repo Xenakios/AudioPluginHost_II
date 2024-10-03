@@ -41,7 +41,7 @@ Type mapvalue(Type sourceValue, Type sourceRangeMin, Type sourceRangeMax, Type t
  and some simple methods for getting values out as floats etc...
 
 (*) See for example the Microsoft implementation of std::uniform_int_distribution...
-Or the Cauchy distribution, which won't allow a scale factor of 0 to be used, while 
+Or the Cauchy distribution, which won't allow a scale factor of 0 to be used, while
 useful for our audio/music applications as a special case.
 */
 
@@ -854,4 +854,16 @@ struct clap_event_xen_audiorouting
     int32_t opcode;
     int32_t src;
     int32_t dest;
+};
+
+template <typename T> class NumericRange
+{
+  public:
+    NumericRange() = default;
+    NumericRange(T start, T end) : m_start{start}, m_end{end} {}
+    T m_start = T{};
+    T m_end = T{};
+    constexpr bool isEmpty() const noexcept { return m_start == m_end; }
+    constexpr bool contains(T x) const noexcept { return x >= m_start && x < m_end; }
+    constexpr T getLength() const noexcept { return m_end - m_start; }
 };
