@@ -1169,23 +1169,6 @@ inline void test_clapengineRT(int iter)
     choc::messageloop::run();
 }
 
-struct TestStruct
-{
-    float *ptr;
-    int x;
-    double y;
-};
-
-inline void inplace_test()
-{
-    std::vector<char> buf;
-    buf.resize(32);
-    // memset(buf, 0, 32);
-    TestStruct *a = new (buf.data()) TestStruct;
-    // TestStruct a;
-    std::cout << std::format("{} {} {}\n", (uint64_t)a->ptr, a->x, a->y);
-}
-
 inline void test_numrange()
 {
     NumericRange<int> range;
@@ -1194,9 +1177,16 @@ inline void test_numrange()
     range = NumericRange<int>(8, 13);
 }
 
+inline void test_choc_aif()
+{
+    choc::audio::AudioFileFormatList flist;
+    flist.addFormat(std::make_unique<choc::audio::WAVAudioFileFormat<false>>());
+}
+
 int main()
 {
-    test_numrange();
+    test_choc_aif();
+    // test_numrange();
     // inplace_test();
     // return 0;
     //  test_osc_receive();

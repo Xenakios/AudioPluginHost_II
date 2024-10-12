@@ -856,14 +856,30 @@ struct clap_event_xen_audiorouting
     int32_t dest;
 };
 
-template <typename T> class NumericRange
+template <typename ValueType, bool EndExclusive = true> class NumericRange
 {
   public:
+    ValueType start = ValueType{};
+    ValueType end = ValueType{};
     NumericRange() = default;
-    NumericRange(T start, T end) : m_start{start}, m_end{end} {}
-    T m_start = T{};
-    T m_end = T{};
-    constexpr bool isEmpty() const noexcept { return m_start == m_end; }
-    constexpr bool contains(T x) const noexcept { return x >= m_start && x < m_end; }
-    constexpr T getLength() const noexcept { return m_end - m_start; }
+    NumericRange(ValueType startValue) : start{startValue}, end{start} {}
+    NumericRange(ValueType startValue, ValueType endValue) : start{startValue}, end{endValue}
+    {
+        assert(endValue > startValue);
+    }
+
+    constexpr bool isEmpty() const noexcept { return start == end; }
+    constexpr bool lessThanEnd(ValueType x) const
+    {
+        if constexpr (EndExclusive)
+            return x < end;
+        else
+            return x <= end;
+    }
+    constexpr bool contains(ValueType x) const noexcept { return x >= start && lessThanEnd(x); }
+    constexpr ValueType getLength() const noexcept { return end - start; }
+    constexpr NumericRange<ValueType> withLength(ValueType length)
+    {
+        return NumericRange<ValueType>(start, start + length);
+    }
 };

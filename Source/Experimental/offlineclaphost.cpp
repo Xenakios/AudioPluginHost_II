@@ -14,6 +14,7 @@
 #include "xaps/xap_memorybufferplayer.h"
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <cstring>
 #include <format>
 #include <mutex>
@@ -183,7 +184,7 @@ void ClapProcessingEngine::processToFile(std::string filename, double duration, 
     std::atomic<bool> renderloopfinished{false};
     double maxTailSeconds = 0.0;
     size_t chainIndex = 0;
-    
+
     for (auto &c : m_chain)
     {
         c->m_seq.sortEvents();
@@ -197,7 +198,7 @@ void ClapProcessingEngine::processToFile(std::string filename, double duration, 
             c->m_proc->audioPortsInfo(i, false, &apinfo);
             std::cout << std::format("\t{} : {} channels\n", i, apinfo.channel_count);
         }
-        
+
         if (deferredStateFiles.count(chainIndex))
         {
             loadStateFromBinaryFile(chainIndex, deferredStateFiles[chainIndex]);
@@ -473,8 +474,11 @@ void ClapProcessingEngine::processAudio(choc::buffer::ChannelArrayView<float> in
             }
             for (auto &dm : m_delayed_messages)
             {
-                if (dm.timestamp >= m_samplePlayPos &&
-                    dm.timestamp < m_samplePlayPos + procblocksize)
+                if (NumericRange<int64_t>(m_samplePlayPos)
+                        .withLength(procblocksize)
+                        .contains(dm.timestamp))
+                // if (dm.timestamp >= m_samplePlayPos &&
+                //     dm.timestamp < m_samplePlayPos + procblocksize)
                 {
                     dm.timestamp = -1.0;
                     // std::cout << "delayed message at " << m_samplePlayPos << "\n";
@@ -986,15 +990,16 @@ std::string ClapProcessingEngine::getParameterInfoString(size_t chainIndex, size
 
 void ClapEventSequence::addTransportEvent(double time, double tempo)
 {
-    clap_event_transport ev{.header{.flags = 0,
-                                    .time = 0,
-                                    .size = sizeof(clap_event_transport),
-                                    .space_id = CLAP_CORE_EVENT_SPACE_ID,
-                                    .type = CLAP_EVENT_TRANSPORT},
-                            .tempo = tempo,
-                            .tsig_denom = 4,
-                            .tsig_num = 4,
-                            .flags = CLAP_TRANSPORT_HAS_TEMPO};
+    clap_event_transport ev;
+    ev.header.flags = 0;
+    ev.header.time = 0;
+    ev.header.size = sizeof(clap_event_transport);
+    ev.header.space_id = CLAP_CORE_EVENT_SPACE_ID;
+    ev.header.type = CLAP_EVENT_TRANSPORT;
+    ev.tempo = tempo;
+    ev.tsig_denom = 4;
+    ev.tsig_num = 4;
+    ev.flags = CLAP_TRANSPORT_HAS_TEMPO;
     m_evlist.push_back(Event(time, &ev));
 }
 void ClapProcessingEngine::setSequence(int targetProcessorIndex, ClapEventSequence seq)
