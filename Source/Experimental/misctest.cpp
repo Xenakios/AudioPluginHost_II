@@ -1177,15 +1177,9 @@ inline void test_numrange()
     range = NumericRange<int>(8, 13);
 }
 
-inline void test_choc_aif()
-{
-    choc::audio::AudioFileFormatList flist;
-    flist.addFormat(std::make_unique<choc::audio::WAVAudioFileFormat<false>>());
-}
-
 int main()
 {
-    test_choc_aif();
+    
     // test_numrange();
     // inplace_test();
     // return 0;
