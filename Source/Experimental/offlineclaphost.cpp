@@ -5,11 +5,14 @@
 #include "clap/events.h"
 #include "clap/ext/audio-ports.h"
 #include "clap/ext/note-ports.h"
+#include "clap/ext/params.h"
 #include "clap/plugin.h"
 #include "clap/process.h"
 #include "clap_eventsequence.h"
+#include "containers/choc_Value.h"
 #include "gui/choc_MessageLoop.h"
 #include "text/choc_Files.h"
+#include "text/choc_JSON.h"
 #include "xap_utils.h"
 #include "xaps/xap_memorybufferplayer.h"
 #include <algorithm>
@@ -1010,6 +1013,7 @@ void ClapProcessingEngine::setSequence(int targetProcessorIndex, ClapEventSequen
         m_chain[targetProcessorIndex]->m_seq = seq;
     }
 }
+
 ClapEventSequence &ClapProcessingEngine::getSequence(size_t chainIndex)
 {
     if (chainIndex >= 0 && chainIndex < m_chain.size())
@@ -1018,6 +1022,36 @@ ClapEventSequence &ClapProcessingEngine::getSequence(size_t chainIndex)
     }
     throw std::runtime_error("Sequence chain index of out bounds");
 }
+
+std::string ClapProcessingEngine::getParametersAsJSON(size_t chainIndex)
+{
+    if (chainIndex >= m_chain.size())
+        throw std::runtime_error("Chain index out of bounds");
+    auto paramsarray = choc::value::createEmptyArray();
+    auto plug = m_chain[chainIndex]->m_proc.get();
+    // should not activate if already activated...but we don't have a consistent way to track that
+    // yet
+    plug->activate(44100.0, 512, 512);
+    for (int i = 0; i < plug->paramsCount(); ++i)
+    {
+        clap_param_info info;
+        if (plug->paramsInfo(i, &info))
+        {
+            auto infoobject = choc::value::createObject("info");
+            infoobject.setMember("name", std::string(info.name));
+            infoobject.setMember("id", (int64_t)info.id);
+            infoobject.setMember("defaultval", info.default_value);
+            infoobject.setMember("minval", info.min_value);
+            infoobject.setMember("maxval", info.max_value);
+            infoobject.setMember("module", std::string(info.module));
+            paramsarray.addArrayElement(infoobject);
+        }
+    }
+    // should not deactivate if already deactivated...
+    plug->deactivate();
+    return choc::json::toString(paramsarray, true);
+}
+
 std::map<std::string, clap_id> ClapProcessingEngine::getParameters(size_t chainIndex)
 {
     auto m_plug = m_chain[chainIndex]->m_proc.get();

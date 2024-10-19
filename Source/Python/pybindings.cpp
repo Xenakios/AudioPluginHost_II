@@ -165,7 +165,8 @@ PYBIND11_MODULE(xenakios, m)
         .def("addParameterEvent", &ClapEventSequence::addParameterEvent, "ismod"_a = false,
              "time"_a = 0.0, "port"_a = -1, "ch"_a = -1, "key"_a = -1, "nid"_a = -1, "parid"_a,
              "val"_a)
-        .def("addProgramChange", &ClapEventSequence::addProgramChange)
+        .def("addProgramChange", &ClapEventSequence::addProgramChange, "time"_a = 0.0,
+             "port"_a = -1, "ch"_a = -1, "program"_a)
         .def("addTransportEvent", &ClapEventSequence::addTransportEvent)
         .def("addNoteExpression", &ClapEventSequence::addNoteExpression);
 
@@ -202,9 +203,7 @@ PYBIND11_MODULE(xenakios, m)
         .def_static("scanPluginFile", &ClapProcessingEngine::scanPluginFile)
         .def_static("scanPluginDirs", &ClapProcessingEngine::scanPluginDirectories)
         .def("setSequence", &ClapProcessingEngine::setSequence)
-        .def("getParameters", &ClapProcessingEngine::getParameters)
-        .def("getNumParameters", &ClapProcessingEngine::getNumParameters)
-        .def("getParameterInfoString", &ClapProcessingEngine::getParameterInfoString)
+        .def("getParametersJSON", &ClapProcessingEngine::getParametersAsJSON)
         .def("showGUIBlocking", &ClapProcessingEngine::openPluginGUIBlocking)
         .def("openWindow", &ClapProcessingEngine::openPersistentWindow)
         .def("getDeviceNames", &ClapProcessingEngine::getDeviceNames)

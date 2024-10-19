@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <mutex>
+#include <string>
 #include <unordered_map>
 #include <vector>
 #include <filesystem>
@@ -118,6 +119,7 @@ class ClapProcessingEngine
 
     ClapEventSequence &getSequence(size_t chainIndex);
     std::map<std::string, clap_id> getParameters(size_t chainIndex);
+    std::string getParametersAsJSON(size_t chainIndex);
     size_t getNumParameters(size_t chainIndex)
     {
         return m_chain[chainIndex]->m_proc->paramsCount();
