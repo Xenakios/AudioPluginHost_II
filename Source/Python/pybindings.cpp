@@ -12,6 +12,7 @@
 #include "../Experimental/offlineclaphost.h"
 #include "../Experimental/dejavurandom.h"
 #include "../Experimental/xen_modulators.h"
+#include "clap/ext/params.h"
 
 #if !NOJUCE
 #include "juce_audio_processors/juce_audio_processors.h"
@@ -180,6 +181,18 @@ PYBIND11_MODULE(xenakios, m)
     C(CLAP_NOTE_EXPRESSION_BRIGHTNESS);
     C(CLAP_NOTE_EXPRESSION_PRESSURE);
     C(CLAP_NOTE_EXPRESSION_EXPRESSION);
+
+    C(CLAP_PARAM_IS_AUTOMATABLE);
+    C(CLAP_PARAM_IS_AUTOMATABLE_PER_CHANNEL);
+    C(CLAP_PARAM_IS_AUTOMATABLE_PER_PORT);
+    C(CLAP_PARAM_IS_AUTOMATABLE_PER_KEY);
+    C(CLAP_PARAM_IS_AUTOMATABLE_PER_NOTE_ID);
+    C(CLAP_PARAM_IS_MODULATABLE);
+    C(CLAP_PARAM_IS_MODULATABLE_PER_NOTE_ID);
+    C(CLAP_PARAM_IS_MODULATABLE_PER_KEY);
+    C(CLAP_PARAM_IS_MODULATABLE_PER_PORT);
+    C(CLAP_PARAM_IS_MODULATABLE_PER_CHANNEL);
+    C(CLAP_PARAM_IS_STEPPED);
 
     m_const.attr("MIDI_0_FREQ") = Tunings::MIDI_0_FREQ;
 

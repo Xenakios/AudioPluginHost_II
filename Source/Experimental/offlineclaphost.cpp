@@ -22,6 +22,7 @@
 #include <format>
 #include <mutex>
 #include <stdexcept>
+#include <unordered_map>
 #include <vector>
 #include "xaps/clap_xaudioprocessor.h"
 
@@ -1044,6 +1045,9 @@ std::string ClapProcessingEngine::getParametersAsJSON(size_t chainIndex)
             infoobject.setMember("minval", info.min_value);
             infoobject.setMember("maxval", info.max_value);
             infoobject.setMember("module", std::string(info.module));
+            // can do the needed bit checks in Python, but i suppose would be nice
+            // to have some kind of string from the flags too
+            infoobject.setMember("flags", (int64_t)info.flags);
             paramsarray.addArrayElement(infoobject);
         }
     }
