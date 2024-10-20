@@ -120,6 +120,7 @@ class ClapProcessingEngine
     ClapEventSequence &getSequence(size_t chainIndex);
     std::map<std::string, clap_id> getParameters(size_t chainIndex);
     std::string getParametersAsJSON(size_t chainIndex);
+    std::string getParameterValueAsText(size_t chainIndex, clap_id parId, double value);
     size_t getNumParameters(size_t chainIndex)
     {
         return m_chain[chainIndex]->m_proc->paramsCount();

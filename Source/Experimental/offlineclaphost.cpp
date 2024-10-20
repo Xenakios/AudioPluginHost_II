@@ -122,6 +122,22 @@ std::vector<std::filesystem::path> ClapProcessingEngine::scanPluginDirectories()
     return result;
 }
 
+std::string ClapProcessingEngine::getParameterValueAsText(size_t chainIndex, clap_id parId,
+                                                          double val)
+{
+    if (chainIndex >= m_chain.size())
+        throw std::runtime_error("Plugin Index out of range");
+    auto plug = m_chain[chainIndex]->m_proc.get();
+    constexpr size_t bufSize = 256;
+    char buf[bufSize];
+    memset(buf, 0, bufSize);
+    if (plug->paramsValueToText(parId, val, buf, bufSize))
+    {
+        return std::string(buf);
+    }
+    return std::format("{} *", val);
+}
+
 std::string ClapProcessingEngine::scanPluginFile(std::filesystem::path plugfilepath)
 {
     auto plugfilename = plugfilepath.generic_string();
