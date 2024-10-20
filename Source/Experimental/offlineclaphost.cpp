@@ -149,6 +149,15 @@ std::string ClapProcessingEngine::scanPluginFile(std::filesystem::path plugfilep
                 {
                     result += std::to_string(i) + " : " + std::string(desc->name) + " [" +
                               desc->id + "]\n";
+                    auto ptr = desc->features;
+                    while (ptr)
+                    {
+                        if (*ptr == nullptr)
+                            break;
+                        result += std::string(*ptr) + " , ";
+                        // std::cout << *ptr << "\n";
+                        ++ptr;
+                    }
                 }
             }
             entry->deinit();
@@ -1030,8 +1039,9 @@ std::string ClapProcessingEngine::getParametersAsJSON(size_t chainIndex)
         throw std::runtime_error("Chain index out of bounds");
     auto paramsarray = choc::value::createEmptyArray();
     auto plug = m_chain[chainIndex]->m_proc.get();
-    // should not activate if already activated...but we don't have a consistent way to track that
-    // yet
+    // Should not activate if already activated...but we don't have a consistent way to track that
+    // yet. But we do need to activate for plugins that fill in the up to date parameter info
+    // only after activation.
     plug->activate(44100.0, 512, 512);
     for (int i = 0; i < plug->paramsCount(); ++i)
     {
@@ -1045,13 +1055,13 @@ std::string ClapProcessingEngine::getParametersAsJSON(size_t chainIndex)
             infoobject.setMember("minval", info.min_value);
             infoobject.setMember("maxval", info.max_value);
             infoobject.setMember("module", std::string(info.module));
-            // can do the needed bit checks in Python, but i suppose would be nice
+            // Can do the needed bit checks in Python, but I suppose would be nice
             // to have some kind of string from the flags too
             infoobject.setMember("flags", (int64_t)info.flags);
             paramsarray.addArrayElement(infoobject);
         }
     }
-    // should not deactivate if already deactivated...
+    // Should not deactivate if already deactivated...
     plug->deactivate();
     return choc::json::toString(paramsarray, true);
 }
