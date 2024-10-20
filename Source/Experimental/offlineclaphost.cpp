@@ -150,6 +150,11 @@ std::string ClapProcessingEngine::scanPluginFile(std::filesystem::path plugfilep
                     auto ob = choc::value::createObject("clap_plugin");
                     ob.setMember("name", std::string(desc->name));
                     ob.setMember("id", std::string(desc->id));
+                    ob.setMember("description", std::string(desc->description));
+                    ob.setMember("version", std::string(desc->version));
+                    ob.setMember("vendor", std::string(desc->vendor));
+                    ob.setMember("url", std::string(desc->url));
+                    ob.setMember("manual_url", std::string(desc->manual_url));
                     auto featarray = choc::value::createEmptyArray();
                     auto ptr = desc->features;
                     while (ptr)
@@ -157,7 +162,6 @@ std::string ClapProcessingEngine::scanPluginFile(std::filesystem::path plugfilep
                         if (*ptr == nullptr)
                             break;
                         featarray.addArrayElement(std::string(*ptr));
-                        // std::cout << *ptr << "\n";
                         ++ptr;
                     }
                     ob.setMember("features", featarray);
