@@ -126,8 +126,8 @@ std::string ClapProcessingEngine::scanPluginFile(std::filesystem::path plugfilep
 {
     auto plugfilename = plugfilepath.generic_string();
     if (!std::filesystem::exists(plugfilepath))
-        return "Plugin file does not exist " + plugfilename;
-
+        throw std::runtime_error("Plugin file does not exist " + plugfilename);
+    auto pluginfoarray = choc::value::createEmptyArray();
     choc::file::DynamicLibrary dll(plugfilename);
     if (dll.handle)
     {
@@ -139,36 +139,39 @@ std::string ClapProcessingEngine::scanPluginFile(std::filesystem::path plugfilep
             auto plugin_count = fac->get_plugin_count(fac);
             if (plugin_count <= 0)
             {
-                return "No plugins to manufacture in " + plugfilename;
+                throw std::runtime_error("No plugins to manufacture in " + plugfilename);
             }
-            std::string result;
+
             for (uint32_t i = 0; i < plugin_count; ++i)
             {
                 auto desc = fac->get_plugin_descriptor(fac, i);
                 if (desc)
                 {
-                    result += std::to_string(i) + " : " + std::string(desc->name) + " [" +
-                              desc->id + "]\n";
+                    auto ob = choc::value::createObject("clap_plugin");
+                    ob.setMember("name", std::string(desc->name));
+                    ob.setMember("id", std::string(desc->id));
+                    auto featarray = choc::value::createEmptyArray();
                     auto ptr = desc->features;
                     while (ptr)
                     {
                         if (*ptr == nullptr)
                             break;
-                        result += std::string(*ptr) + " , ";
+                        featarray.addArrayElement(std::string(*ptr));
                         // std::cout << *ptr << "\n";
                         ++ptr;
                     }
+                    ob.setMember("features", featarray);
+                    pluginfoarray.addArrayElement(ob);
                 }
             }
             entry->deinit();
-            return result;
         }
         else
-            return "No plugin entry point";
+            throw std::runtime_error("No plugin entry point");
     }
     else
-        return "could not open dll for " + plugfilename;
-    return "No info (should not happen)";
+        throw std::runtime_error("could not open dll for " + plugfilename);
+    return choc::json::toString(pluginfoarray, true);
 }
 
 template <typename BufType> inline void sanityCheckBuffer(BufType &buf)
