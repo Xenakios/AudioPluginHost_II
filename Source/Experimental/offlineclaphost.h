@@ -144,6 +144,9 @@ class ClapProcessingEngine
 
     clap::helpers::EventList list_in;
     clap::helpers::EventList list_out;
+
+    void checkPluginIndex(size_t index);
+
     void processToFile(std::string filename, double duration, double samplerate, int numoutchans);
 
     void openPluginGUIBlocking(size_t chainIndex, bool closeImmediately);

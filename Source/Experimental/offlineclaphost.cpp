@@ -125,8 +125,7 @@ std::vector<std::filesystem::path> ClapProcessingEngine::scanPluginDirectories()
 std::string ClapProcessingEngine::getParameterValueAsText(size_t chainIndex, clap_id parId,
                                                           double val)
 {
-    if (chainIndex >= m_chain.size())
-        throw std::runtime_error("Plugin Index out of range");
+    checkPluginIndex(chainIndex);
     auto plug = m_chain[chainIndex]->m_proc.get();
     constexpr size_t bufSize = 256;
     char buf[bufSize];
@@ -136,6 +135,13 @@ std::string ClapProcessingEngine::getParameterValueAsText(size_t chainIndex, cla
         return std::string(buf);
     }
     return std::format("{} *", val);
+}
+
+void ClapProcessingEngine::checkPluginIndex(size_t index)
+{
+    if (index >= m_chain.size())
+        throw std::runtime_error(
+            std::format("Plugin index {} out of allowed range 0..{}", index, m_chain.size() - 1));
 }
 
 std::string ClapProcessingEngine::scanPluginFile(std::filesystem::path plugfilepath)
@@ -840,8 +846,7 @@ void ClapProcessingEngine::loadStateFromJSONFile(size_t chainIndex,
 void ClapProcessingEngine::saveStateToBinaryFile(size_t chainIndex,
                                                  const std::filesystem::path &filepath)
 {
-    if (chainIndex >= m_chain.size())
-        throw std::runtime_error("Processor index out of bounds");
+    checkPluginIndex(chainIndex);
     auto plug = m_chain[chainIndex]->m_proc.get();
     clap_plugin_descriptor desc;
     if (!plug->getDescriptor(&desc))
@@ -878,8 +883,7 @@ void ClapProcessingEngine::saveStateToBinaryFile(size_t chainIndex,
 void ClapProcessingEngine::loadStateFromBinaryFile(size_t chainIndex,
                                                    const std::filesystem::path &filepath)
 {
-    if (chainIndex >= m_chain.size())
-        throw std::runtime_error("Processor index out of bounds");
+    checkPluginIndex(chainIndex);
     auto plug = m_chain[chainIndex]->m_proc.get();
     clap_plugin_descriptor desc;
     if (!plug->getDescriptor(&desc))
@@ -927,8 +931,7 @@ void ClapProcessingEngine::loadStateFromBinaryFile(size_t chainIndex,
 
 void ClapProcessingEngine::openPluginGUIBlocking(size_t chainIndex, bool closeImmediately)
 {
-    if (chainIndex >= m_chain.size())
-        throw std::runtime_error("Chain index out of bounds");
+    checkPluginIndex(chainIndex);
     choc::messageloop::initialise();
     choc::ui::setWindowsDPIAwareness(); // For Windows, we need to tell the OS we're
                                         // high-DPI-aware
