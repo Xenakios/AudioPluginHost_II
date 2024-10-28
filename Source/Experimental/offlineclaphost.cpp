@@ -47,6 +47,9 @@ ClapProcessingEngine::ClapProcessingEngine()
 
 ClapProcessingEngine::~ClapProcessingEngine()
 {
+    std::cout << "ClapProcessingengine dtor\n";
+    stopStreaming();
+
     g_engineinstances.erase(this);
     size_t numUnhandled = 0;
     for (auto &ce : m_chain)

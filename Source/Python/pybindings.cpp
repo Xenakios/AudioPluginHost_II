@@ -153,20 +153,36 @@ static int XInputHook()
     return 0;
 }
 
-static void runChocLoop()
+static void startStreaming(ClapProcessingEngine &eng, unsigned int deviceId, double sampleRate,
+                           int preferredBufferSize, int blockExecution)
 {
-    choc::messageloop::initialise();
-    choc::messageloop::Timer timer(50, []() {
-        if (PyErr_CheckSignals() != 0)
+    eng.startStreaming(deviceId, sampleRate, preferredBufferSize, false);
+    if (blockExecution > 0)
+    {
+        choc::messageloop::initialise();
+        bool errSet = false;
+        choc::messageloop::Timer timer(50, [&errSet, &eng, blockExecution]() {
+            eng.runMainThreadTasks();
+            if (PyErr_CheckSignals() != 0)
+            {
+                std::cout << "got python signal, stopping event loop!\n";
+                choc::messageloop::stop();
+                errSet = true;
+                if (blockExecution == 2)
+                {
+                    eng.stopStreaming();
+                }
+                return false;
+            }
+            return true;
+        });
+        choc::messageloop::run();
+        std::cout << "finished choc loop\n";
+        if (errSet)
         {
-            std::cout << "got python signal, stopping event loop!\n";
-            choc::messageloop::stop();
             throw py::error_already_set();
         }
-        return true;
-    });
-    choc::messageloop::run();
-    std::cout << "finished choc loop\n";
+    }
 }
 
 PYBIND11_MODULE(xenakios, m)
@@ -176,7 +192,7 @@ PYBIND11_MODULE(xenakios, m)
     PyOS_InputHook = XInputHook;
 
     m.def("writeArrayToFile", &writeArrayToFile);
-    m.def("chocLoop", &runChocLoop);
+    // m.def("chocLoop", &runChocLoop);
     m.def("numInputHookCallbacks", []() { return g_inputHookCount; });
 
     py::class_<MTSESPSource>(m, "MTS_Source")
@@ -264,7 +280,7 @@ PYBIND11_MODULE(xenakios, m)
         .def("showGUIBlocking", &ClapProcessingEngine::openPluginGUIBlocking)
         .def("openWindow", &ClapProcessingEngine::openPersistentWindow)
         .def("getDeviceNames", &ClapProcessingEngine::getDeviceNames)
-        .def("startStreaming", &ClapProcessingEngine::startStreaming)
+        .def("startStreaming", &startStreaming)
         .def("wait", &ClapProcessingEngine::wait)
         .def("postNoteMessage", &ClapProcessingEngine::postNoteMessage)
         .def("stopStreaming", &ClapProcessingEngine::stopStreaming)
