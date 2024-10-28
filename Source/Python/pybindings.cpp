@@ -13,6 +13,7 @@
 #include "../Experimental/dejavurandom.h"
 #include "../Experimental/xen_modulators.h"
 #include "clap/ext/params.h"
+#include "gui/choc_MessageLoop.h"
 
 #if !NOJUCE
 #include "juce_audio_processors/juce_audio_processors.h"
@@ -138,10 +139,45 @@ inline void addAudioBufferEvent(ClapEventSequence &seq, double time, int32_t tar
     seq.addAudioBufferEvent(time, target, ptr1, numChans, numframes, samplerate);
 }
 
+int g_inputHookCount = 0;
+
+// When Python is run in interactive interpreter mode and idle waiting for input, this callback
+// is called ~10 times a second, letting us handle the Clap plugin on main thread requests
+static int XInputHook()
+{
+    ++g_inputHookCount;
+    for (auto &e : ClapProcessingEngine::getEngines())
+    {
+        e->runMainThreadTasks();
+    }
+    return 0;
+}
+
+static void runChocLoop()
+{
+    choc::messageloop::initialise();
+    choc::messageloop::Timer timer(50, []() {
+        if (PyErr_CheckSignals() != 0)
+        {
+            std::cout << "got python signal, stopping event loop!\n";
+            choc::messageloop::stop();
+            throw py::error_already_set();
+        }
+        return true;
+    });
+    choc::messageloop::run();
+    std::cout << "finished choc loop\n";
+}
+
 PYBIND11_MODULE(xenakios, m)
 {
     using namespace pybind11::literals;
     m.doc() = "pybind11 xenakios plugin"; // optional module docstring
+    PyOS_InputHook = XInputHook;
+
+    m.def("writeArrayToFile", &writeArrayToFile);
+    m.def("chocLoop", &runChocLoop);
+    m.def("numInputHookCallbacks", []() { return g_inputHookCount; });
 
     py::class_<MTSESPSource>(m, "MTS_Source")
         .def(py::init<>())
@@ -151,6 +187,7 @@ PYBIND11_MODULE(xenakios, m)
     py::class_<ClapEventSequence>(m, "ClapSequence")
         .def(py::init<>())
         .def("getNumEvents", &ClapEventSequence::getNumEvents)
+        .def("clearEvents", &ClapEventSequence::clearEvents)
         .def("getSizeInBytes", &ClapEventSequence::getApproxSizeInBytes)
         .def("getMaximumEventTime", &ClapEventSequence::getMaximumEventTime)
         .def("addString", &ClapEventSequence::addString)
@@ -268,9 +305,6 @@ PYBIND11_MODULE(xenakios, m)
         .def("setOutputAsParameterModulation", &MultiModulator::setOutputAsParameterModulation)
         .def("setConnection", &MultiModulator::setConnection)
         .def("setLFOProps", &MultiModulator::setLFOProps);
-
-    m.def("writeArrayToFile", &writeArrayToFile);
-    //  m.def("juceTest", &juceTest);
 
     m.def("generateNoteExpressionsFromEnvelope", &generateNoteExpressionsFromEnvelope, "",
           py::arg("targetSequence"), py::arg("sourceEnvelope"), py::arg("eventsStartTime"),

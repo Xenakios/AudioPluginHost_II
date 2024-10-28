@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <mutex>
+#include <set>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -113,6 +114,7 @@ class ClapProcessingEngine
     static std::string scanPluginFile(std::filesystem::path plugfilename);
     ClapProcessingEngine();
     ~ClapProcessingEngine();
+    static std::set<ClapProcessingEngine *> &getEngines();
 
     void addProcessorToChain(std::string plugfilename, int pluginindex);
     void removeProcessorFromChain(int index);

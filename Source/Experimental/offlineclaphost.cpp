@@ -28,8 +28,11 @@
 
 using namespace std::chrono_literals;
 
+std::set<ClapProcessingEngine *> g_engineinstances;
+
 ClapProcessingEngine::ClapProcessingEngine()
 {
+    g_engineinstances.insert(this);
     choc::ui::setWindowsDPIAwareness();
     choc::messageloop::initialise();
     m_rtaudio = std::make_unique<RtAudio>();
@@ -44,6 +47,7 @@ ClapProcessingEngine::ClapProcessingEngine()
 
 ClapProcessingEngine::~ClapProcessingEngine()
 {
+    g_engineinstances.erase(this);
     size_t numUnhandled = 0;
     for (auto &ce : m_chain)
     {
@@ -60,6 +64,8 @@ ClapProcessingEngine::~ClapProcessingEngine()
         std::cout << numUnhandled << " unhandled main thread call requests from Clap plugins\n";
     }
 }
+
+std::set<ClapProcessingEngine *> &ClapProcessingEngine::getEngines() { return g_engineinstances; }
 
 void ClapProcessingEngine::addProcessorToChain(std::string plugfilename, int pluginindex)
 {

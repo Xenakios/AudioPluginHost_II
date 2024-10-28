@@ -39,6 +39,7 @@ class ClapEventSequence
     std::vector<Event> m_evlist;
     ClapEventSequence() { m_evlist.reserve(4096); }
     void sortEvents() { choc::sorting::stable_sort(m_evlist.begin(), m_evlist.end()); }
+    void clearEvents() { m_evlist.clear(); }
     size_t getNumEvents() const { return m_evlist.size(); }
     // should be fairly accurate, despite the name of the method
     size_t getApproxSizeInBytes() const { return m_evlist.capacity() * sizeof(Event); }
