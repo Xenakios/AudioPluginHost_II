@@ -788,9 +788,23 @@ void ClapProcessingEngine::stopStreaming()
     m_gui_tasks_timer.clear();
 }
 
+void ClapProcessingEngine::postParameterMessage(int destination, double delay, clap_id parid,
+                                                double value)
+{
+    if (destination < 0 || destination >= m_chain.size())
+        throw std::runtime_error(std::format("Destination index {} outside allowed range 0..{}",
+                                             destination, m_chain.size() - 1));
+    auto ev = xenakios::make_event_param_value(0, parid, value, nullptr);
+    m_realtime_messages_to_plugins.push(
+        ClapEventSequence::Event(delay * m_samplerate, &ev, destination));
+}
+
 void ClapProcessingEngine::postNoteMessage(int destination, double delay, double duration, int key,
                                            double velo)
 {
+    if (destination < 0 || destination >= m_chain.size())
+        throw std::runtime_error(std::format("Destination index {} outside allowed range 0..{}",
+                                             destination, m_chain.size() - 1));
     double sr = m_samplerate;
     auto ev = xenakios::make_event_note(0, CLAP_EVENT_NOTE_ON, -1, 0, key, -1, velo);
     m_realtime_messages_to_plugins.push(ClapEventSequence::Event(delay * sr, &ev, destination));

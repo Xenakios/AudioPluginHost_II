@@ -193,6 +193,7 @@ PYBIND11_MODULE(xenakios, m)
              "sampleRate"_a = 44100, "bufferSize"_a = 512, "blockExecution"_a = 0)
         .def("wait", &ClapProcessingEngine::wait)
         .def("postNoteMessage", &ClapProcessingEngine::postNoteMessage)
+        .def("postParameterMessage", &ClapProcessingEngine::postParameterMessage)
         .def("panic", &ClapProcessingEngine::allNotesOff,
              "Send all note offs to all plugins in chain")
         .def("setMainVolume", &ClapProcessingEngine::setMainVolume,

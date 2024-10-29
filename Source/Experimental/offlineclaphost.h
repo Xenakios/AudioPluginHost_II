@@ -166,6 +166,7 @@ class ClapProcessingEngine
     void allNotesOff();
     void setMainVolume(double decibels);
     void postNoteMessage(int destination, double delay, double duration, int key, double velo);
+    void postParameterMessage(int destination, double delay, clap_id parid, double value);
     void processAudio(choc::buffer::ChannelArrayView<float> inputBuffer,
                       choc::buffer::ChannelArrayView<float> outputBuffer);
     void runMainThreadTasks();
