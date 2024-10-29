@@ -686,16 +686,18 @@ void ClapProcessingEngine::prepareToPlay(double sampleRate, int maxBufferSize)
     m_clap_outbufs[0].data32 = (float **)outputbuffers.back().getView().data.channels;
 }
 
-void ClapProcessingEngine::startStreaming(unsigned int id, double sampleRate,
+void ClapProcessingEngine::startStreaming(std::optional<unsigned int> id, double sampleRate,
                                           int preferredBufferSize, bool blockExecution)
 {
     m_delayed_messages.reserve(512);
     m_delayed_messages.clear();
 
     m_to_test_tone_fifo.reset(512);
-
     RtAudio::StreamParameters outpars;
-    outpars.deviceId = id;
+    if (id)
+        outpars.deviceId = *id;
+    else
+        outpars.deviceId = m_rtaudio->getDefaultOutputDevice();
     outpars.firstChannel = 0;
     outpars.nChannels = 2;
     unsigned int bframes = preferredBufferSize;
@@ -715,6 +717,7 @@ void ClapProcessingEngine::startStreaming(unsigned int id, double sampleRate,
     {
         throw std::runtime_error("Error starting RTAudio stream");
     }
+    std::cout << "opened " << m_rtaudio->getDeviceInfo(outpars.deviceId).name << "\n";
     if (blockExecution)
     {
         choc::messageloop::initialise();
@@ -747,8 +750,10 @@ void ClapProcessingEngine::stopStreaming()
     m_processorsState = ProcState::NeedsStopping;
     // aaaaarrrrggghhh....
     std::this_thread::sleep_for(100ms);
-    if (m_rtaudio->isStreamOpen())
+    if (m_rtaudio->isStreamRunning())
         m_rtaudio->stopStream();
+    if (m_rtaudio->isStreamOpen())
+        m_rtaudio->closeStream();
     if (m_delayed_messages.size() > 0)
         std::cout << m_delayed_messages.size() << " delayed messages left\n";
     m_gui_tasks_timer.clear();

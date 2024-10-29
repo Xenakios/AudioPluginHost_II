@@ -153,8 +153,8 @@ static int XInputHook()
     return 0;
 }
 
-static void startStreaming(ClapProcessingEngine &eng, unsigned int deviceId, double sampleRate,
-                           int preferredBufferSize, int blockExecution)
+static void startStreaming(ClapProcessingEngine &eng, std::optional<unsigned int> deviceId,
+                           double sampleRate, int preferredBufferSize, int blockExecution)
 {
     eng.startStreaming(deviceId, sampleRate, preferredBufferSize, false);
     if (blockExecution > 0)
@@ -280,7 +280,8 @@ PYBIND11_MODULE(xenakios, m)
         .def("showGUIBlocking", &ClapProcessingEngine::openPluginGUIBlocking)
         .def("openWindow", &ClapProcessingEngine::openPersistentWindow)
         .def("getDeviceNames", &ClapProcessingEngine::getDeviceNames)
-        .def("startStreaming", &startStreaming)
+        .def("startStreaming", &startStreaming, "deviceID"_a = std::optional<unsigned int>(),
+             "sampleRate"_a = 44100, "bufferSize"_a = 512, "blockExecution"_a = 0)
         .def("wait", &ClapProcessingEngine::wait)
         .def("postNoteMessage", &ClapProcessingEngine::postNoteMessage)
         .def("stopStreaming", &ClapProcessingEngine::stopStreaming)
