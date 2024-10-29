@@ -164,6 +164,7 @@ class ClapProcessingEngine
     void wait(double seconds);
     void stopStreaming();
     void allNotesOff();
+    void setMainVolume(double decibels);
     void postNoteMessage(double delay, double duration, int key, double velo);
     void processAudio(choc::buffer::ChannelArrayView<float> inputBuffer,
                       choc::buffer::ChannelArrayView<float> outputBuffer);
@@ -186,7 +187,7 @@ class ClapProcessingEngine
     std::vector<ClapEventSequence::Event> m_delayed_messages;
 
     int64_t m_samplePlayPos = 0;
-
+    double m_mainGain = 1.0;
     choc::buffer::ChannelArrayBuffer<float> outputConversionBuffer;
     choc::buffer::ChannelArrayBuffer<float> inputConversionBuffer;
     double m_samplerate = 0.0;

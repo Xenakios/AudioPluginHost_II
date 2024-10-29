@@ -519,6 +519,8 @@ void ClapProcessingEngine::processAudio(choc::buffer::ChannelArrayView<float> in
     {
         if (engMsg.opcode == EngineMessage::Opcode::AllNotesOff)
             sendAllNotesOff = true;
+        else if (engMsg.opcode == EngineMessage::Opcode::MainVolume)
+            m_mainGain = xenakios::decibelsToGain(engMsg.farg0);
     }
     for (size_t i = 0; i < m_chain.size(); ++i)
     {
@@ -601,6 +603,7 @@ void ClapProcessingEngine::processAudio(choc::buffer::ChannelArrayView<float> in
         choc::buffer::copy(inputbuffers[0], outputbuffers[0]);
     }
     choc::buffer::copy(outputBuffer, outputbuffers[0]);
+    choc::buffer::applyGain(outputBuffer, m_mainGain);
     m_samplePlayPos += procblocksize;
     std::erase_if(m_delayed_messages, [](auto &&dm) { return dm.timestamp < 0.0; });
 }
@@ -745,9 +748,15 @@ void ClapProcessingEngine::startStreaming(std::optional<unsigned int> id, double
     }
 }
 
-void ClapProcessingEngine::allNotesOff() 
-{ 
-    m_engineCommandFifo.push({EngineMessage::Opcode::AllNotesOff}); 
+void ClapProcessingEngine::setMainVolume(double decibels)
+{
+    decibels = std::clamp(decibels, -100.0, 12.0);
+    m_engineCommandFifo.push({EngineMessage::Opcode::MainVolume, 0, decibels});
+}
+
+void ClapProcessingEngine::allNotesOff()
+{
+    m_engineCommandFifo.push({EngineMessage::Opcode::AllNotesOff});
 }
 
 void ClapProcessingEngine::wait(double seconds)
