@@ -33,6 +33,7 @@ std::set<ClapProcessingEngine *> g_engineinstances;
 ClapProcessingEngine::ClapProcessingEngine()
 {
     g_engineinstances.insert(this);
+    m_engineCommandFifo.reset(64);
     choc::ui::setWindowsDPIAwareness();
     choc::messageloop::initialise();
     m_rtaudio = std::make_unique<RtAudio>();
@@ -512,8 +513,27 @@ void ClapProcessingEngine::processAudio(choc::buffer::ChannelArrayView<float> in
     m_clap_process.transport = &tp;
     m_clap_process.in_events = list_in.clapInputEvents();
     m_clap_process.out_events = list_out.clapOutputEvents();
+    EngineMessage engMsg;
+    bool sendAllNotesOff = false;
+    while (m_engineCommandFifo.pop(engMsg))
+    {
+        if (engMsg.opcode == EngineMessage::Opcode::AllNotesOff)
+            sendAllNotesOff = true;
+    }
     for (size_t i = 0; i < m_chain.size(); ++i)
     {
+        if (sendAllNotesOff)
+        {
+            for (int chan = 0; chan < 16; ++chan)
+            {
+                for (int key = 0; key < 128; ++key)
+                {
+                    auto nev =
+                        xenakios::make_event_note(0, CLAP_EVENT_NOTE_OFF, -1, chan, key, -1, 0.0);
+                    list_in.push((const clap_event_header *)&nev);
+                }
+            }
+        }
         if (i == 0)
         {
             ClapEventSequence::Event msg;
@@ -723,6 +743,11 @@ void ClapProcessingEngine::startStreaming(std::optional<unsigned int> id, double
         choc::messageloop::initialise();
         choc::messageloop::run();
     }
+}
+
+void ClapProcessingEngine::allNotesOff() 
+{ 
+    m_engineCommandFifo.push({EngineMessage::Opcode::AllNotesOff}); 
 }
 
 void ClapProcessingEngine::wait(double seconds)
