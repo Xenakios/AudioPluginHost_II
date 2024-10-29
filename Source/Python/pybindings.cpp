@@ -15,13 +15,15 @@
 #include "clap/ext/params.h"
 #include "gui/choc_MessageLoop.h"
 #include "Tunings.h"
+#include "../Experimental/bluenoise.h"
+
 #if !NOJUCE
 #include "juce_audio_processors/juce_audio_processors.h"
 #include "juce_core/juce_core.h"
 #include "juce_events/juce_events.h"
 #include "juce_audio_utils/juce_audio_utils.h"
 #endif
-#include "../Experimental/bluenoise.h"
+
 
 namespace py = pybind11;
 
@@ -171,8 +173,8 @@ PYBIND11_MODULE(xenakios, m)
         .def("nextInt", &xenakios::DejaVuRandom::nextIntInRange);
 
     py::class_<xenakios::BlueNoise>(m, "BlueNoise")
-        .def(py::init<unsigned int>())
-        .def("setDepth", &xenakios::BlueNoise::setDepth)
+        .def(py::init<unsigned int>(),"seed"_a = 0)
+        .def("setDepth", &xenakios::BlueNoise::setDepth, "depth"_a = 4)
         .def("getDepth", &xenakios::BlueNoise::getDepth)
         .def("nextFloat", &xenakios::BlueNoise::operator());
 

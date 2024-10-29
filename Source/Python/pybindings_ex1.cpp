@@ -79,6 +79,7 @@ void init_py1(py::module_ &m)
         .def(py::init<>())
         .def("setNoteTuningMap", &MTSESPSource::setNoteTuningMap)
         .def("setNoteTuning", &MTSESPSource::setNoteTuning);
+    
     py::class_<ClapEventSequence>(m, "ClapSequence")
         .def(py::init<>())
         .def("getNumEvents", &ClapEventSequence::getNumEvents)

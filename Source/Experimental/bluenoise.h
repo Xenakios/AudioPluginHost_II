@@ -11,7 +11,7 @@ class BlueNoise
 {
   public:
     BlueNoise(unsigned int seed = 0) : m_rng{seed, 1} { m_previous = m_rng.nextFloat(); }
-    float operator()()
+    float operator()() noexcept
     {
         float maxdist = 0.0f;
         float z0 = 0.0f;
@@ -29,8 +29,8 @@ class BlueNoise
         return m_previous;
     }
 
-    void setDepth(int d) { m_depth = std::clamp(d, 1, 32); }
-    int getDepth() const { return m_depth; }
+    void setDepth(int d) noexcept { m_depth = std::clamp(d, 1, 32); }
+    int getDepth() const noexcept { return m_depth; }
 
   private:
     xenakios::Xoroshiro128Plus m_rng;

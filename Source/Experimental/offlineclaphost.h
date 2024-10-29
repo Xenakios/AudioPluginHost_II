@@ -129,8 +129,6 @@ class ClapProcessingEngine
     }
     std::string getParameterInfoString(size_t chainIndex, size_t index);
 
-    void saveStateToJSONFile(size_t chainIndex, const std::filesystem::path &filepath);
-    void loadStateFromJSONFile(size_t chainIndex, const std::filesystem::path &filepath);
     void saveStateToBinaryFile(size_t chainIndex, const std::filesystem::path &filepath);
     void loadStateFromBinaryFile(size_t chainIndex, const std::filesystem::path &filepath);
     std::unordered_map<size_t, std::filesystem::path> deferredStateFiles;

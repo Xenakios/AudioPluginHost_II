@@ -91,10 +91,11 @@ pybind11_add_module(xenakios
     Source/Python/pybindings_ex1.cpp
     Source/Experimental/xaps/clap_xaudioprocessor.cpp
     Source/Experimental/offlineclaphost.cpp
-    Source/Experimental/xaudiograph.cpp
+    
     libs/MTS-ESP/Master/libMTSMaster.cpp
     libs/rtaudio/RtAudio.cpp 
 )
+# Source/Experimental/xaudiograph.cpp
 # target_link_libraries(xenakios PRIVATE juce::juce_core juce::juce_audio_utils)
 
 # PYBIND11_FINDPYTHON=ON
@@ -126,9 +127,10 @@ add_executable(TestingProgram
     Source/Experimental/misctest.cpp 
     Source/Experimental/xaps/clap_xaudioprocessor.cpp
     Source/Experimental/offlineclaphost.cpp
-    Source/Experimental/xaudiograph.cpp
+    
     libs/rtaudio/RtAudio.cpp  
     )
+# Source/Experimental/xaudiograph.cpp
 target_compile_definitions(TestingProgram PRIVATE NOJUCE=1 _USE_MATH_DEFINES=1 __WINDOWS_WASAPI__)
 
 # mini host that can be controlled with OSC messages etc

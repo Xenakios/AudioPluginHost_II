@@ -813,95 +813,6 @@ void ClapProcessingEngine::postNoteMessage(int destination, double delay, double
         ClapEventSequence::Event((delay + duration) * sr, &ev, destination));
 }
 
-void ClapProcessingEngine::saveStateToJSONFile(size_t chainIndex,
-                                               const std::filesystem::path &filepath)
-{
-    if (chainIndex >= m_chain.size())
-        throw std::runtime_error("Chain index out of bounds");
-    auto m_plug = m_chain[chainIndex]->m_proc.get();
-    clap_plugin_descriptor desc;
-    if (m_plug->getDescriptor(&desc))
-    {
-        auto ob = choc::value::createObject("pluginstate");
-        ob.setMember("plugin_id", desc.id);
-        std::vector<char> ovec;
-        ovec.reserve(4096);
-
-        clap_ostream clapostream;
-        clapostream.ctx = &ovec;
-        clapostream.write = [](const clap_ostream *stream, const void *buffer, uint64_t size) {
-            auto ov = (std::vector<char> *)stream->ctx;
-            const char *chars = (const char *)buffer;
-            for (int i = 0; i < size; ++i)
-                ov->push_back(chars[i]);
-            return (int64_t)size;
-        };
-
-        if (m_plug->stateSave(&clapostream))
-        {
-            auto str = choc::base64::encodeToString(ovec.data(), ovec.size());
-            ob.setMember("plugin_data", str);
-            std::ofstream ofs(filepath);
-            choc::json::writeAsJSON(ofs, ob, true);
-        }
-        else
-            throw std::runtime_error("Clap plugin could not save state");
-    }
-    else
-        throw std::runtime_error(
-            "Can not store state of plugin that doesn't implement plugin descriptor");
-}
-
-void ClapProcessingEngine::loadStateFromJSONFile(size_t chainIndex,
-                                                 const std::filesystem::path &filepath)
-{
-    if (chainIndex >= m_chain.size())
-        throw std::runtime_error("Chain index out of bounds");
-    auto m_plug = m_chain[chainIndex]->m_proc.get();
-    auto str = choc::file::loadFileAsString(filepath.string());
-    auto json = choc::json::parse(str);
-    if (json.hasObjectMember("plugin_id"))
-    {
-        auto id = json["plugin_id"].getString();
-        clap_plugin_descriptor desc;
-        if (m_plug->getDescriptor(&desc))
-        {
-            std::string myid(desc.id);
-            if (myid != id)
-                throw std::runtime_error("Plugin ID in state does not match current plugin ID");
-        }
-        auto datastr = json["plugin_data"].getString();
-        using VecWithPos = std::pair<std::vector<uint8_t>, int>;
-        VecWithPos datavec;
-        datavec.second = 0;
-        datavec.first.reserve(65536);
-
-        choc::base64::decode(datastr, [&datavec](uint8_t byte) { datavec.first.push_back(byte); });
-        std::cout << "decoded datavec has " << datavec.first.size() << " bytes\n";
-
-        clap_istream clapisteam;
-        clapisteam.ctx = &datavec;
-        clapisteam.read = [](const clap_istream *stream, void *buffer, uint64_t size) {
-            auto vpos = (VecWithPos *)stream->ctx;
-            if (vpos->second >= vpos->first.size())
-                return (int64_t)0;
-            char *bufi = (char *)buffer;
-            for (int i = 0; i < size; ++i)
-            {
-                bufi[i] = vpos->first[vpos->second];
-                (*vpos).second++;
-                if (vpos->second >= vpos->first.size())
-                    return (int64_t)(i + 1);
-            }
-            return (int64_t)size;
-        };
-        if (!m_plug->stateLoad(&clapisteam))
-            throw std::runtime_error("Plugin could not load state data");
-    }
-    else
-        throw std::runtime_error("File is not json with a plugin_id");
-}
-
 void ClapProcessingEngine::saveStateToBinaryFile(size_t chainIndex,
                                                  const std::filesystem::path &filepath)
 {
@@ -938,6 +849,7 @@ void ClapProcessingEngine::saveStateToBinaryFile(size_t chainIndex,
         }
     }
 }
+
 
 void ClapProcessingEngine::loadStateFromBinaryFile(size_t chainIndex,
                                                    const std::filesystem::path &filepath)
