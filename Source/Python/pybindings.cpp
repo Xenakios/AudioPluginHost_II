@@ -75,23 +75,6 @@ inline void writeArrayToFile(const py::array_t<double> &arr, double samplerate,
 
 constexpr size_t ENVBLOCKSIZE = 64;
 
-inline void addAudioBufferEvent(ClapEventSequence &seq, double time, int32_t target,
-                                const py::array_t<double> &arr, int32_t samplerate)
-{
-    uint32_t numChans = arr.shape(0);
-    if (arr.ndim() == 1)
-        numChans = 1;
-    if (numChans > 256)
-        throw std::runtime_error("Numpy array has an unreasonable number of channels " +
-                                 std::to_string(numChans) + ", max supported is 256 channels");
-    py::buffer_info buf1 = arr.request();
-    double *ptr1 = static_cast<double *>(buf1.ptr);
-    uint32_t numframes = buf1.size / numChans;
-    if (arr.ndim() == 1)
-        numframes = arr.shape(0);
-    seq.addAudioBufferEvent(time, target, ptr1, numChans, numframes, samplerate);
-}
-
 int g_inputHookCount = 0;
 
 // When Python is run in interactive interpreter mode and idle waiting for input, this callback
@@ -148,29 +131,7 @@ PYBIND11_MODULE(xenakios, m)
     // m.def("chocLoop", &runChocLoop);
     m.def("numInputHookCallbacks", []() { return g_inputHookCount; });
 
-    py::class_<ClapEventSequence>(m, "ClapSequence")
-        .def(py::init<>())
-        .def("getNumEvents", &ClapEventSequence::getNumEvents)
-        .def("clearEvents", &ClapEventSequence::clearEvents)
-        .def("getSizeInBytes", &ClapEventSequence::getApproxSizeInBytes)
-        .def("getMaximumEventTime", &ClapEventSequence::getMaximumEventTime)
-        .def("addString", &ClapEventSequence::addString)
-        .def("addStringEvent", &ClapEventSequence::addStringEvent)
-        .def("addAudioBufferEvent", addAudioBufferEvent)
-        .def("addAudioRoutingEvent", &ClapEventSequence::addAudioRoutingEvent)
-        .def("addNoteOn", &ClapEventSequence::addNoteOn)
-        .def("addNoteOff", &ClapEventSequence::addNoteOff)
-        .def("addNote", &ClapEventSequence::addNote, "time"_a = 0.0, "dur"_a = 0.05, "port"_a = 0,
-             "ch"_a = 0, "key"_a, "nid"_a = -1, "velo"_a = 1.0, "retune"_a = 0.0)
-        .def("addNoteFloatPitch", &ClapEventSequence::addNoteF, "time"_a = 0.0, "dur"_a = 0.05,
-             "port"_a = 0, "ch"_a = 0, "pitch"_a, "nid"_a = -1, "velo"_a = 1.0)
-        .def("addParameterEvent", &ClapEventSequence::addParameterEvent, "ismod"_a = false,
-             "time"_a = 0.0, "port"_a = -1, "ch"_a = -1, "key"_a = -1, "nid"_a = -1, "parid"_a,
-             "val"_a)
-        .def("addProgramChange", &ClapEventSequence::addProgramChange, "time"_a = 0.0,
-             "port"_a = -1, "ch"_a = -1, "program"_a)
-        .def("addTransportEvent", &ClapEventSequence::addTransportEvent)
-        .def("addNoteExpression", &ClapEventSequence::addNoteExpression);
+    init_py1(m);
 
     py::module m_const = m.def_submodule("constants", "Constants");
 
