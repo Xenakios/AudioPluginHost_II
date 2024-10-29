@@ -14,18 +14,18 @@
 #include "../Experimental/xen_modulators.h"
 #include "clap/ext/params.h"
 #include "gui/choc_MessageLoop.h"
-
+#include "Tunings.h"
 #if !NOJUCE
 #include "juce_audio_processors/juce_audio_processors.h"
 #include "juce_core/juce_core.h"
 #include "juce_events/juce_events.h"
 #include "juce_audio_utils/juce_audio_utils.h"
 #endif
-#include "libMTSMaster.h"
-#include "Tunings.h"
 #include "../Experimental/bluenoise.h"
 
 namespace py = pybind11;
+
+void init_py1(py::module_ &);
 
 #if !NOJUCE
 inline void juceTest(std::string plugfilename)
@@ -72,53 +72,6 @@ inline void writeArrayToFile(const py::array_t<double> &arr, double samplerate,
     else
         throw std::runtime_error("Could not create audio file writer");
 }
-
-class MTSESPSource
-{
-  public:
-    MTSESPSource()
-    {
-        if (MTS_CanRegisterMaster())
-        {
-            MTS_RegisterMaster();
-            std::cout << "registered MTS Source\n";
-            double freqs[128];
-            for (int i = 0; i < 128; ++i)
-            {
-                freqs[i] = 440.0 * std::pow(2.0, (69 - i) / 12.0);
-            }
-            MTS_SetNoteTunings(freqs);
-            MTS_SetScaleName("12tet 440Hz");
-        }
-    }
-    ~MTSESPSource()
-    {
-        MTS_DeregisterMaster();
-        std::cout << "deregistered MTS Source\n";
-    }
-    void setNoteTuning(int midikey, double hz)
-    {
-        if (midikey >= 0 && midikey < 128)
-        {
-            MTS_SetNoteTuning(hz, midikey);
-        }
-    }
-    void setNoteTuningMap(std::unordered_map<int, double> tunmap)
-    {
-        for (const auto &e : tunmap)
-        {
-            if (e.first >= 0 && e.first < 128)
-            {
-                if (e.second >= 0.0 && e.second < 20000.0)
-                {
-                    MTS_SetNoteTuning(e.second, e.first);
-                }
-            }
-        }
-    }
-
-  private:
-};
 
 constexpr size_t ENVBLOCKSIZE = 64;
 
@@ -194,11 +147,6 @@ PYBIND11_MODULE(xenakios, m)
     m.def("writeArrayToFile", &writeArrayToFile);
     // m.def("chocLoop", &runChocLoop);
     m.def("numInputHookCallbacks", []() { return g_inputHookCount; });
-
-    py::class_<MTSESPSource>(m, "MTS_Source")
-        .def(py::init<>())
-        .def("setNoteTuningMap", &MTSESPSource::setNoteTuningMap)
-        .def("setNoteTuning", &MTSESPSource::setNoteTuning);
 
     py::class_<ClapEventSequence>(m, "ClapSequence")
         .def(py::init<>())

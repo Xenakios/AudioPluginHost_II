@@ -88,6 +88,7 @@ add_subdirectory(libs/pybind11)
 # set (PYBIND11_PYTHON_VERSION "3.13")
 pybind11_add_module(xenakios 
     Source/Python/pybindings.cpp
+    Source/Python/pybindings_ex1.cpp
     Source/Experimental/xaps/clap_xaudioprocessor.cpp
     Source/Experimental/offlineclaphost.cpp
     Source/Experimental/xaudiograph.cpp
