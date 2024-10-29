@@ -165,12 +165,12 @@ class ClapProcessingEngine
     void stopStreaming();
     void allNotesOff();
     void setMainVolume(double decibels);
-    void postNoteMessage(double delay, double duration, int key, double velo);
+    void postNoteMessage(int destination, double delay, double duration, int key, double velo);
     void processAudio(choc::buffer::ChannelArrayView<float> inputBuffer,
                       choc::buffer::ChannelArrayView<float> outputBuffer);
     void runMainThreadTasks();
     void setSuspended(bool b);
-    choc::fifo::SingleReaderSingleWriterFIFO<ClapEventSequence::Event> m_to_test_tone_fifo;
+    choc::fifo::SingleReaderSingleWriterFIFO<ClapEventSequence::Event> m_realtime_messages_to_plugins;
     struct EngineMessage
     {
         enum class Opcode
@@ -185,7 +185,6 @@ class ClapProcessingEngine
     };
     choc::fifo::SingleReaderSingleWriterFIFO<EngineMessage> m_engineCommandFifo;
     std::vector<ClapEventSequence::Event> m_delayed_messages;
-
     int64_t m_samplePlayPos = 0;
     double m_mainGain = 1.0;
     choc::buffer::ChannelArrayBuffer<float> outputConversionBuffer;

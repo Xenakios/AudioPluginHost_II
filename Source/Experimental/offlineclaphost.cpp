@@ -522,6 +522,13 @@ void ClapProcessingEngine::processAudio(choc::buffer::ChannelArrayView<float> in
         else if (engMsg.opcode == EngineMessage::Opcode::MainVolume)
             m_mainGain = xenakios::decibelsToGain(engMsg.farg0);
     }
+    ClapEventSequence::Event msg;
+    while (m_realtime_messages_to_plugins.pop(msg))
+    {
+        ClapEventSequence::Event msgcopy{msg};
+        msgcopy.timestamp = msg.timestamp + m_samplePlayPos;
+        m_delayed_messages.push_back(msgcopy);
+    }
     for (size_t i = 0; i < m_chain.size(); ++i)
     {
         if (sendAllNotesOff)
@@ -536,27 +543,15 @@ void ClapProcessingEngine::processAudio(choc::buffer::ChannelArrayView<float> in
                 }
             }
         }
-        if (i == 0)
+        // need to optimize this
+        for (auto &dm : m_delayed_messages)
         {
-            ClapEventSequence::Event msg;
-            while (m_to_test_tone_fifo.pop(msg))
+            if (dm.extdata0 == i && NumericRange<int64_t>(m_samplePlayPos)
+                                        .withLength(procblocksize)
+                                        .contains(dm.timestamp))
             {
-                ClapEventSequence::Event msgcopy{msg};
-                msgcopy.timestamp = msg.timestamp + m_samplePlayPos;
-                m_delayed_messages.push_back(msgcopy);
-            }
-            for (auto &dm : m_delayed_messages)
-            {
-                if (NumericRange<int64_t>(m_samplePlayPos)
-                        .withLength(procblocksize)
-                        .contains(dm.timestamp))
-                // if (dm.timestamp >= m_samplePlayPos &&
-                //     dm.timestamp < m_samplePlayPos + procblocksize)
-                {
-                    dm.timestamp = -1.0;
-                    // std::cout << "delayed message at " << m_samplePlayPos << "\n";
-                    list_in.push((clap_event_header_t *)&dm.event);
-                }
+                dm.timestamp = -1.0;
+                list_in.push((clap_event_header_t *)&dm.event);
             }
         }
 
@@ -715,7 +710,7 @@ void ClapProcessingEngine::startStreaming(std::optional<unsigned int> id, double
     m_delayed_messages.reserve(512);
     m_delayed_messages.clear();
 
-    m_to_test_tone_fifo.reset(512);
+    m_realtime_messages_to_plugins.reset(512);
     RtAudio::StreamParameters outpars;
     if (id)
         outpars.deviceId = *id;
@@ -793,13 +788,15 @@ void ClapProcessingEngine::stopStreaming()
     m_gui_tasks_timer.clear();
 }
 
-void ClapProcessingEngine::postNoteMessage(double delay, double duration, int key, double velo)
+void ClapProcessingEngine::postNoteMessage(int destination, double delay, double duration, int key,
+                                           double velo)
 {
-    double sr = m_rtaudio->getStreamSampleRate();
+    double sr = m_samplerate;
     auto ev = xenakios::make_event_note(0, CLAP_EVENT_NOTE_ON, -1, 0, key, -1, velo);
-    m_to_test_tone_fifo.push(ClapEventSequence::Event(delay * sr, &ev));
+    m_realtime_messages_to_plugins.push(ClapEventSequence::Event(delay * sr, &ev, destination));
     ev = xenakios::make_event_note(0, CLAP_EVENT_NOTE_OFF, -1, 0, key, -1, velo);
-    m_to_test_tone_fifo.push(ClapEventSequence::Event((delay + duration) * sr, &ev));
+    m_realtime_messages_to_plugins.push(
+        ClapEventSequence::Event((delay + duration) * sr, &ev, destination));
 }
 
 void ClapProcessingEngine::saveStateToJSONFile(size_t chainIndex,

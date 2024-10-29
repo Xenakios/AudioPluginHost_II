@@ -29,10 +29,13 @@ class ClapEventSequence
     {
         Event() {}
         template <typename EType>
-        Event(double time, EType *e) : timestamp(time), event(*(clap_multi_event *)e)
+        Event(double time, EType *e, int d0 = 0, int d1 = 0)
+            : timestamp(time), event(*(clap_multi_event *)e), extdata0(d0), extdata1(d1)
         {
         }
         double timestamp = 0.0;
+        int extdata0 = 0;
+        int extdata1 = 0;
         clap_multi_event event;
         bool operator<(const Event &other) { return timestamp < other.timestamp; }
     };
