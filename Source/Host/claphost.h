@@ -24,6 +24,7 @@
 #include "gui/choc_MessageLoop.h"
 #include "RtAudio.h"
 #include "../Common/clap_eventsequence.h"
+#include "../Common/xap_breakpoint_envelope.h"
 
 inline void generateNoteExpressionsFromEnvelope(ClapEventSequence &targetSeq,
                                                 xenakios::Envelope<64> &sourceEnvelope,
