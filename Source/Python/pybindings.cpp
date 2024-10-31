@@ -24,7 +24,6 @@
 #include "juce_audio_utils/juce_audio_utils.h"
 #endif
 
-
 namespace py = pybind11;
 
 void init_py1(py::module_ &);
@@ -166,14 +165,15 @@ PYBIND11_MODULE(xenakios, m)
     m_const.attr("MIDI_0_FREQ") = Tunings::MIDI_0_FREQ;
 
     py::class_<xenakios::DejaVuRandom>(m, "DejaVuRandom")
-        .def(py::init<unsigned int>())
-        .def("setLoopLength", &xenakios::DejaVuRandom::setLoopLength)
-        .def("setDejaVu", &xenakios::DejaVuRandom::setDejaVu)
+        .def(py::init<unsigned int>(), "seed"_a = 0)
+        .def("setLoopLength", &xenakios::DejaVuRandom::setLoopLength, "count"_a)
+        .def("setDejaVu", &xenakios::DejaVuRandom::setDejaVu, "amount"_a,
+             "0.0 fully random, 0.5 freeze loop, >0.5 pick randomly from loop")
         .def("nextFloat", &xenakios::DejaVuRandom::nextFloatInRange)
         .def("nextInt", &xenakios::DejaVuRandom::nextIntInRange);
 
     py::class_<xenakios::BlueNoise>(m, "BlueNoise")
-        .def(py::init<unsigned int>(),"seed"_a = 0)
+        .def(py::init<unsigned int>(), "seed"_a = 0)
         .def("setDepth", &xenakios::BlueNoise::setDepth, "depth"_a = 4)
         .def("getDepth", &xenakios::BlueNoise::getDepth)
         .def("nextFloat", &xenakios::BlueNoise::operator());

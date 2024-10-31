@@ -2,7 +2,7 @@
 #include "xaps/testprocessors.h"
 #include <memory>
 #include <vector>
-
+#include <juce_core/juce_core.h>
 #include <clap/helpers/event-list.hh>
 #include "xaps/clap_xaudioprocessor.h"
 #include "xaps/juce_xaudioprocessor.h"
@@ -1681,7 +1681,7 @@ class MyHost
 
 int main()
 {
-    // juce::ScopedJuceInitialiser_GUI gi;
+    juce::ScopedJuceInitialiser_GUI gi;
     // MyHost host;
     // test_filter();
     // test_polym();
