@@ -85,8 +85,8 @@ project(cmaketest)
 add_subdirectory(libs/pybind11)
 # set (PYBIND11_PYTHON_VERSION "3.13")
 pybind11_add_module(xenakios 
-    Source/Python/pybindings.cpp
-    Source/Python/pybindings_ex1.cpp
+    Source/PythonBindings/pybindings.cpp
+    Source/PythonBindings/pybindings_ex1.cpp
     Source/Xaps/clap_xaudioprocessor.cpp
     Source/Host/claphost.cpp
     
