@@ -1,4 +1,5 @@
 #include <cstdint>
+#include <exception>
 #include <ostream>
 #include <combaseapi.h>
 #include <fstream>
@@ -23,7 +24,7 @@
 #include "audio/choc_AudioFileFormat_WAV.h"
 #include "containers/choc_NonAllocatingStableSort.h"
 #include "../Common/xap_breakpoint_envelope.h"
-#include "xen_modulators.h"
+#include "../Common/xen_modulators.h"
 #include "sst/basic-blocks/modulators/SimpleLFO.h"
 #include "sst/basic-blocks/dsp/LanczosResampler.h"
 #include "sst/basic-blocks/dsp/FollowSlewAndSmooth.h"
@@ -1178,9 +1179,41 @@ inline void test_numrange()
     range = NumericRange<int>(8, 13);
 }
 
+inline void test_clap_engine()
+{
+    try
+    {
+        auto eng = std::make_unique<ClapProcessingEngine>();
+        eng->addChain();
+        auto &chain0 = eng->getChain(0);
+        chain0.addProcessor(R"(C:\Program Files\Common Files\CLAP\Surge Synth Team\Surge XT.clap)",
+                            0);
+        chain0.activate(44100.0, 512);
+        eng->addChain();
+        auto &chain1 = eng->getChain(1);
+        chain1.addProcessor(
+            R"(C:\Program Files\Common Files\CLAP\Surge Synth Team\Shortcircuit XT.clap)", 0);
+        chain1.activate(44100.0, 512);
+        auto &seq1 = chain1.getSequence(0);
+        seq1.addNote(0.0, 1.0, 0, 0, 60, -1, 1.0, 0.0);
+
+        std::thread th([&]() {
+            choc::buffer::ChannelArrayBuffer<float> inbuf{2, 512};
+            choc::buffer::ChannelArrayBuffer<float> outbuf{2, 512};
+            chain1.processAudio(inbuf.getView(), outbuf.getView());
+            chain1.stopProcessing();
+        });
+        th.join();
+    }
+    catch (std::exception &ex)
+    {
+        std::cout << ex.what() << "\n";
+    }
+}
+
 int main()
 {
-
+    test_clap_engine();
     // test_numrange();
     // inplace_test();
     // return 0;

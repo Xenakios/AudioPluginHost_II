@@ -20,6 +20,7 @@
 #include <cstdint>
 #include <cstring>
 #include <format>
+#include <memory>
 #include <mutex>
 #include <stdexcept>
 #include <unordered_map>
@@ -788,6 +789,13 @@ void ClapProcessingEngine::stopStreaming()
     m_gui_tasks_timer.clear();
 }
 
+void ClapProcessingEngine::addChain()
+{
+    m_chains.push_back(std::make_unique<ProcessorChain>(m_chains.size()));
+}
+
+ProcessorChain &ClapProcessingEngine::getChain(size_t index) { return *m_chains[index]; }
+
 void ClapProcessingEngine::postParameterMessage(int destination, double delay, clap_id parid,
                                                 double value)
 {
@@ -849,7 +857,6 @@ void ClapProcessingEngine::saveStateToBinaryFile(size_t chainIndex,
         }
     }
 }
-
 
 void ClapProcessingEngine::loadStateFromBinaryFile(size_t chainIndex,
                                                    const std::filesystem::path &filepath)
@@ -1117,4 +1124,145 @@ void ClapProcessingEngine::openPersistentWindow(int chainindex)
     m_plug->guiSetParent(&clapwin);
     m_plug->guiShow();
     m_desktopwindow->toFront();
+}
+
+void ProcessorChain::addProcessor(std::string plugfilename, int pluginindex)
+{
+    std::unique_ptr<xenakios::XAudioProcessor> plug;
+    if (plugfilename == "XenakiosMemoryBufferPlayer")
+    {
+        plug = std::make_unique<XapMemoryBufferPlayer>();
+    }
+    else
+    {
+        plug = std::make_unique<ClapPluginFormatProcessor>(plugfilename, pluginindex);
+    }
+    if (plug)
+    {
+        auto chainEntry = std::make_unique<ProcessorEntry>();
+        clap_plugin_descriptor desc;
+        if (plug->getDescriptor(&desc))
+        {
+            // std::cout << "created : " << desc.name << "\n";
+            chainEntry->name = desc.name;
+        }
+        else
+            std::cout << plugfilename
+                      << " does not provide Clap description, likely a bug in the plugin"
+                      << std::endl;
+        plug->runMainThreadTasks();
+        chainEntry->m_proc = std::move(plug);
+        m_processors.push_back(std::move(chainEntry));
+    }
+    else
+    {
+        throw std::runtime_error("Could not create CLAP plugin");
+    }
+}
+
+void ProcessorChain::activate(double sampleRate, int maxBlockSize)
+{
+    inputBuffers.resize(32);
+    outputBuffers.resize(32);
+    inChannelPointers.resize(64);
+    outChannelPointers.resize(64);
+    int maxInBuffersNeeded = 0;
+    int maxOutBuffersNeeded = 0;
+    int maxInPortsNeeded = 0;
+    int maxOutPortsNeeded = 0;
+    for (auto &e : m_processors)
+    {
+        e->m_eviter.emplace(e->m_seq, sampleRate);
+        e->m_proc->activate(sampleRate, maxBlockSize, maxBlockSize);
+        int inChans = 0;
+        int numInports = e->m_proc->audioPortsCount(true);
+        // if (numInports > inputBuffers.size())
+        //    inputBuffers.resize(numInports);
+        maxInPortsNeeded = std::max<int>(maxInPortsNeeded, numInports);
+        for (int i = 0; i < numInports; ++i)
+        {
+            clap_audio_port_info pinfo;
+            e->m_proc->audioPortsInfo(i, true, &pinfo);
+            inChans += pinfo.channel_count;
+        }
+        maxInBuffersNeeded = std::max<int>(inChans, maxInBuffersNeeded);
+        int outChans = 0;
+        int numOutports = e->m_proc->audioPortsCount(false);
+        // if (numOutports > outputBuffers.size())
+        //     outputBuffers.resize(numOutports);
+        maxOutPortsNeeded = std::max<int>(maxOutPortsNeeded, numOutports);
+        for (int i = 0; i < numOutports; ++i)
+        {
+            clap_audio_port_info pinfo;
+            e->m_proc->audioPortsInfo(i, false, &pinfo);
+            outChans += pinfo.channel_count;
+        }
+        maxOutBuffersNeeded = std::max<int>(outChans, maxOutBuffersNeeded);
+    }
+    std::cout << "chain " << id << " needs " << maxInBuffersNeeded << " input buffers" << "\n";
+    audioInputData.resize(maxInBuffersNeeded * maxBlockSize);
+
+    for (auto &e : inputBuffers)
+    {
+        e.channel_count = 0;
+        e.constant_mask = 0;
+        e.data32 = inChannelPointers.data();
+        e.data64 = nullptr;
+        e.latency = 0;
+    }
+    for (auto &e : outputBuffers)
+    {
+        e.channel_count = 0;
+        e.constant_mask = 0;
+        e.data32 = outChannelPointers.data();
+        e.data64 = nullptr;
+        e.latency = 0;
+    }
+    std::cout << "chain " << id << " needs " << maxOutBuffersNeeded << " output buffers" << "\n";
+    audioOutputData.resize(maxOutBuffersNeeded * maxBlockSize);
+    blockSize = maxBlockSize;
+}
+
+void ProcessorChain::processAudio(choc::buffer::ChannelArrayView<float> inputBuffer,
+                                  choc::buffer::ChannelArrayView<float> outputBuffer)
+{
+    if (!isProcessing)
+    {
+        for (auto &e : m_processors)
+        {
+            e->m_proc->startProcessing();
+        }
+    }
+    clap_process cp;
+    memset(&cp, 0, sizeof(clap_process));
+    cp.frames_count = inputBuffer.getNumFrames();
+    cp.in_events = inEventList.clapInputEvents();
+    cp.out_events = outEventList.clapOutputEvents();
+    cp.audio_inputs_count = 1;
+    inputBuffers[0].channel_count = 2;
+    inputBuffers[0].data32[0] = getInputBuffer(0);
+    inputBuffers[0].data32[1] = getInputBuffer(1);
+    cp.audio_inputs = inputBuffers.data();
+
+    cp.audio_outputs_count = 1;
+    outputBuffers[0].channel_count = 2;
+    outputBuffers[0].data32[0] = getOutputBuffer(0);
+    outputBuffers[0].data32[1] = getOutputBuffer(1);
+    cp.audio_outputs = outputBuffers.data();
+    inEventList.clear();
+    outEventList.clear();
+    for (size_t i = 0; i < m_processors.size(); ++i)
+    {
+        auto procEntry = m_processors[i].get();
+        auto proc = procEntry->m_proc.get();
+        auto eventSpan = procEntry->m_eviter->readNextEvents(cp.frames_count);
+        for (auto &cev : eventSpan)
+        {
+            auto evcopy = cev.event;
+            evcopy.header.time = (cev.timestamp * currentSampleRate) - samplePosition;
+            inEventList.push((clap_event_header *)&evcopy);
+        }
+        proc->process(&cp);
+    }
+    samplePosition += cp.frames_count;
 }

@@ -11,6 +11,8 @@
 #include <iostream>
 
 #include "audio/choc_AudioFileFormat.h"
+#include "clap/audio-buffer.h"
+#include "clap/helpers/event-list.hh"
 #include "containers/choc_SingleReaderSingleWriterFIFO.h"
 #include "memory/choc_Base64.h"
 #include "audio/choc_SampleBuffers.h"
@@ -95,20 +97,71 @@ class TempoMap
     std::vector<double> m_beat_to_secs_map;
 };
 
+struct ProcessorEntry
+{
+    std::unique_ptr<xenakios::XAudioProcessor> m_proc;
+    ClapEventSequence m_seq;
+    std::optional<ClapEventSequence::IteratorSampleTime> m_eviter;
+    std::string name;
+    std::unique_ptr<choc::ui::DesktopWindow> guiWindow;
+};
+
+class ProcessorChain
+{
+  public:
+    ProcessorChain(int64_t _id) : id(_id) {}
+    int64_t id;
+    std::vector<std::unique_ptr<ProcessorEntry>> m_processors;
+    // this should really take in a Clap plugin id instead
+    void addProcessor(std::string plugfilename, int pluginindex);
+
+    ClapEventSequence &getSequence(size_t pluginIndex) { return m_processors[pluginIndex]->m_seq; }
+
+    void activate(double sampleRate, int maxBlockSize);
+    void processAudio(choc::buffer::ChannelArrayView<float> inputBuffer,
+                      choc::buffer::ChannelArrayView<float> outputBuffer);
+
+    void stopProcessing()
+    {
+        for (auto &e : m_processors)
+        {
+            e->m_proc->stopProcessing();
+        }
+    }
+    std::vector<float> audioInputData;
+    float *getInputBuffer(size_t index)
+    {
+        if (audioInputData.empty())
+            return nullptr;
+        return &audioInputData[index * blockSize];
+    }
+    std::vector<clap_audio_buffer> inputBuffers;
+    std::vector<float> audioOutputData;
+    float *getOutputBuffer(size_t index)
+    {
+        if (audioOutputData.empty())
+            return nullptr;
+        return &audioOutputData[index * blockSize];
+    }
+    std::vector<clap_audio_buffer> outputBuffers;
+    std::vector<float *> inChannelPointers;
+    std::vector<float *> outChannelPointers;
+    clap::helpers::EventList inEventList;
+    clap::helpers::EventList outEventList;
+    size_t blockSize = 0;
+    int64_t samplePosition = 0;
+    double currentSampleRate = 0.0;
+    std::atomic<bool> isProcessing{false};
+};
+
 class ClapProcessingEngine
 {
 
   public:
-    struct ProcessorEntry
-    {
-        std::unique_ptr<xenakios::XAudioProcessor> m_proc;
-        ClapEventSequence m_seq;
-        std::optional<ClapEventSequence::IteratorSampleTime> m_eviter;
-        std::string name;
-        std::unique_ptr<choc::ui::DesktopWindow> guiWindow;
-    };
     std::vector<std::unique_ptr<ProcessorEntry>> m_chain;
-
+    std::vector<std::unique_ptr<ProcessorChain>> m_chains;
+    void addChain();
+    ProcessorChain &getChain(size_t index);
     void setSequence(int targetProcessorIndex, ClapEventSequence seq);
     static std::vector<std::filesystem::path> scanPluginDirectories();
     static std::string scanPluginFile(std::filesystem::path plugfilename);
@@ -169,7 +222,8 @@ class ClapProcessingEngine
                       choc::buffer::ChannelArrayView<float> outputBuffer);
     void runMainThreadTasks();
     void setSuspended(bool b);
-    choc::fifo::SingleReaderSingleWriterFIFO<ClapEventSequence::Event> m_realtime_messages_to_plugins;
+    choc::fifo::SingleReaderSingleWriterFIFO<ClapEventSequence::Event>
+        m_realtime_messages_to_plugins;
     struct EngineMessage
     {
         enum class Opcode
