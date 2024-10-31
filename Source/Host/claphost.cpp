@@ -14,7 +14,7 @@
 #include "text/choc_Files.h"
 #include "text/choc_JSON.h"
 
-#include "../Experimental/xaps/xap_memorybufferplayer.h"
+#include "../Xaps/xap_memorybufferplayer.h"
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
