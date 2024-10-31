@@ -1280,15 +1280,17 @@ void ProcessorChain::processAudio(choc::buffer::ChannelArrayView<float> inputBuf
         {
             auto pev = (clap_event_param_value *)&cev.event;
             if (pev->param_id == (clap_id)ChainParameters::Volume)
-            {
                 chainGain = xenakios::decibelsToGain(pev->value);
-            }
+            if (pev->param_id == (clap_id)ChainParameters::Mute)
+                muted = pev->value >= 0.5;
         }
     }
-    
+    float actualGain = chainGain;
+    if (muted)
+        actualGain = 0.0f;
     for (int i = 0; i < cp.frames_count; ++i)
     {
-        auto smoothedGain = chainGainSmoother.step(chainGain);
+        auto smoothedGain = chainGainSmoother.step(actualGain);
         outputBuffer.getSample(0, i) = cp.audio_outputs[0].data32[0][i] * smoothedGain;
         outputBuffer.getSample(1, i) = cp.audio_outputs[0].data32[1][i] * smoothedGain;
     }

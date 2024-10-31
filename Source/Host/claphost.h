@@ -158,9 +158,11 @@ class ProcessorChain
     std::optional<ClapEventSequence::IteratorSampleTime> eventIterator;
     double chainGain = 1.0;
     sst::basic_blocks::dsp::SlewLimiter chainGainSmoother;
+    bool muted = false;
     enum class ChainParameters
     {
-        Volume
+        Volume,
+        Mute
     };
 };
 
