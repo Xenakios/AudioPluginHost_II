@@ -24,7 +24,7 @@
 #include <stdexcept>
 #include <unordered_map>
 #include <vector>
-#include "../Experimental/xaps/clap_xaudioprocessor.h"
+#include "../Xaps/clap_xaudioprocessor.h"
 
 using namespace std::chrono_literals;
 

@@ -42,13 +42,11 @@ target_sources(MainHostApp
         Source/Experimental/main.cpp
         Source/Experimental/xapfactory.cpp
         Source/Experimental/xaudiograph.cpp
-        Source/Experimental/xap_utils.cpp
+        Source/Common/xap_utils.cpp
         Source/Experimental/xaps/xap_notegenerator.cpp
         Source/Experimental/xaps/fileplayer_xaudioprocessor.cpp
-        Source/Experimental/xaps/clap_xaudioprocessor.cpp
-        Source/Experimental/xaudioprocessor.cpp
-        
-        
+        Source/Xaps/clap_xaudioprocessor.cpp
+        Source/Common/xaudioprocessor.cpp
         libs/sst-jucegui/src/sst/jucegui/components/Knob.cpp
         libs/sst-jucegui/src/sst/jucegui/components/HSlider.cpp
         libs/sst-jucegui/src/sst/jucegui/components/ContinuousParamEditor.cpp
@@ -89,7 +87,7 @@ add_subdirectory(libs/pybind11)
 pybind11_add_module(xenakios 
     Source/Python/pybindings.cpp
     Source/Python/pybindings_ex1.cpp
-    Source/Experimental/xaps/clap_xaudioprocessor.cpp
+    Source/Xaps/clap_xaudioprocessor.cpp
     Source/Host/claphost.cpp
     
     libs/MTS-ESP/Master/libMTSMaster.cpp
@@ -125,7 +123,7 @@ add_custom_command(TARGET xenakios POST_BUILD
 # this is used for simple C++ testing/experimenting stuff without Juce
 add_executable(TestingProgram 
     Source/Experimental/misctest.cpp 
-    Source/Experimental/xaps/clap_xaudioprocessor.cpp
+    Source/Xaps/clap_xaudioprocessor.cpp
     Source/Host/claphost.cpp
     
     libs/rtaudio/RtAudio.cpp  
@@ -135,8 +133,8 @@ target_compile_definitions(TestingProgram PRIVATE NOJUCE=1 _USE_MATH_DEFINES=1 _
 
 # mini host that can be controlled with OSC messages etc
 add_executable(ClapMiniHost 
-    Source/Experimental/claphostserver.cpp 
-    Source/Experimental/xaps/clap_xaudioprocessor.cpp
+    Source/Host/claphostserver.cpp 
+    Source/Xaps/clap_xaudioprocessor.cpp
     Source/Host/claphost.cpp
     libs/rtaudio/RtAudio.cpp  
     )

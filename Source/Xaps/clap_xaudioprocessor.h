@@ -1,13 +1,13 @@
 #pragma once
 
-#include "../../Common/xaudioprocessor.h"
+#include "../Common/xaudioprocessor.h"
 #include "platform/choc_DynamicLibrary.h"
 #ifdef JUCE_CORE_H_INCLUDED
 #include "../xap_generic_editor.h"
 #endif
 #include "containers/choc_SingleReaderSingleWriterFIFO.h"
-#include "../../Common/xap_utils.h"
-#include "../xap_extensions.h"
+#include "../Common/xap_utils.h"
+#include "../Experimental/xap_extensions.h"
 #include <thread>
 #include <iostream>
 #ifndef JUCE_CORE_H_INCLUDED

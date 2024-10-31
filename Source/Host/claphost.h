@@ -17,7 +17,7 @@
 #include "audio/choc_AudioFileFormat_WAV.h"
 #include "../Common/xapdsp.h"
 #include "../Common/xap_utils.h"
-#include "../Experimental/xaps/clap_xaudioprocessor.h"
+#include "../Xaps/clap_xaudioprocessor.h"
 #include "containers/choc_Span.h"
 
 #include "gui/choc_DesktopWindow.h"
