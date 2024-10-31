@@ -1,4 +1,4 @@
-#include "offlineclaphost.h"
+#include "claphost.h"
 #include "RtAudio.h"
 #include "audio/choc_SampleBuffers.h"
 #include "clap/audio-buffer.h"
@@ -8,13 +8,13 @@
 #include "clap/ext/params.h"
 #include "clap/plugin.h"
 #include "clap/process.h"
-#include "clap_eventsequence.h"
+
 #include "containers/choc_Value.h"
 #include "gui/choc_MessageLoop.h"
 #include "text/choc_Files.h"
 #include "text/choc_JSON.h"
-#include "xap_utils.h"
-#include "xaps/xap_memorybufferplayer.h"
+
+#include "../Experimental/xaps/xap_memorybufferplayer.h"
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
@@ -24,7 +24,7 @@
 #include <stdexcept>
 #include <unordered_map>
 #include <vector>
-#include "xaps/clap_xaudioprocessor.h"
+#include "../Experimental/xaps/clap_xaudioprocessor.h"
 
 using namespace std::chrono_literals;
 

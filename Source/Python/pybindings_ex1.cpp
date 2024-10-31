@@ -3,7 +3,7 @@
 #include <pybind11/numpy.h>
 #include "libMTSMaster.h"
 #include <iostream>
-#include "../Experimental/clap_eventsequence.h"
+#include "../Common/clap_eventsequence.h"
 
 namespace py = pybind11;
 

@@ -90,7 +90,7 @@ pybind11_add_module(xenakios
     Source/Python/pybindings.cpp
     Source/Python/pybindings_ex1.cpp
     Source/Experimental/xaps/clap_xaudioprocessor.cpp
-    Source/Experimental/offlineclaphost.cpp
+    Source/Host/claphost.cpp
     
     libs/MTS-ESP/Master/libMTSMaster.cpp
     libs/rtaudio/RtAudio.cpp 
@@ -126,7 +126,7 @@ add_custom_command(TARGET xenakios POST_BUILD
 add_executable(TestingProgram 
     Source/Experimental/misctest.cpp 
     Source/Experimental/xaps/clap_xaudioprocessor.cpp
-    Source/Experimental/offlineclaphost.cpp
+    Source/Host/claphost.cpp
     
     libs/rtaudio/RtAudio.cpp  
     )
@@ -137,7 +137,7 @@ target_compile_definitions(TestingProgram PRIVATE NOJUCE=1 _USE_MATH_DEFINES=1 _
 add_executable(ClapMiniHost 
     Source/Experimental/claphostserver.cpp 
     Source/Experimental/xaps/clap_xaudioprocessor.cpp
-    Source/Experimental/offlineclaphost.cpp
+    Source/Host/claphost.cpp
     libs/rtaudio/RtAudio.cpp  
     )
 target_compile_definitions(ClapMiniHost PRIVATE NOJUCE=1 _USE_MATH_DEFINES=1 __WINDOWS_WASAPI__)

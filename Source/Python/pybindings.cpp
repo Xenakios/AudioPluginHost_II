@@ -7,15 +7,15 @@
 #include <pybind11/functional.h>
 #include <iostream>
 #include "audio/choc_AudioFileFormat_WAV.h"
-#include "../Experimental/xapdsp.h"
-#include "../Experimental/xap_utils.h"
-#include "../Experimental/offlineclaphost.h"
-#include "../Experimental/dejavurandom.h"
+#include "../Common/xapdsp.h"
+#include "../Common/xap_utils.h"
+#include "../Host/claphost.h"
+#include "../Common/dejavurandom.h"
 #include "../Experimental/xen_modulators.h"
 #include "clap/ext/params.h"
 #include "gui/choc_MessageLoop.h"
 #include "Tunings.h"
-#include "../Experimental/bluenoise.h"
+#include "../Common/bluenoise.h"
 
 #if !NOJUCE
 #include "juce_audio_processors/juce_audio_processors.h"

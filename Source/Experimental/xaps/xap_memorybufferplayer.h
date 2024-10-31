@@ -1,8 +1,9 @@
 #pragma once
 
 #include "audio/choc_SampleBuffers.h"
-#include "../xaudioprocessor.h"
+#include "../Common/xaudioprocessor.h"
 #include <vector>
+#include <iostream>
 
 class XapMemoryBufferPlayer : public xenakios::XAudioProcessor
 {

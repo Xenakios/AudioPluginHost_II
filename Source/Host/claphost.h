@@ -15,16 +15,15 @@
 #include "memory/choc_Base64.h"
 #include "audio/choc_SampleBuffers.h"
 #include "audio/choc_AudioFileFormat_WAV.h"
-#include "xapdsp.h"
-#include "xap_utils.h"
-#include "xaps/clap_xaudioprocessor.h"
+#include "../Common/xapdsp.h"
+#include "../Common/xap_utils.h"
+#include "../Experimental/xaps/clap_xaudioprocessor.h"
 #include "containers/choc_Span.h"
 
 #include "gui/choc_DesktopWindow.h"
 #include "gui/choc_MessageLoop.h"
 #include "RtAudio.h"
-#include "testsinesynth.h"
-#include "clap_eventsequence.h"
+#include "../Common/clap_eventsequence.h"
 
 inline void generateNoteExpressionsFromEnvelope(ClapEventSequence &targetSeq,
                                                 xenakios::Envelope<64> &sourceEnvelope,
