@@ -1221,6 +1221,8 @@ void ProcessorChain::activate(double sampleRate, int maxBlockSize)
     std::cout << "chain " << id << " needs " << maxOutBuffersNeeded << " output buffers" << "\n";
     audioOutputData.resize(maxOutBuffersNeeded * maxBlockSize);
     blockSize = maxBlockSize;
+    eventIterator.emplace(chainSequence, sampleRate);
+    chainGainSmoother.setParams(1.0f, 1.0f, sampleRate);
 }
 
 void ProcessorChain::processAudio(choc::buffer::ChannelArrayView<float> inputBuffer,
@@ -1232,6 +1234,7 @@ void ProcessorChain::processAudio(choc::buffer::ChannelArrayView<float> inputBuf
         {
             e->m_proc->startProcessing();
         }
+        isProcessing = true;
     }
     clap_process cp;
     memset(&cp, 0, sizeof(clap_process));
@@ -1263,6 +1266,31 @@ void ProcessorChain::processAudio(choc::buffer::ChannelArrayView<float> inputBuf
             inEventList.push((clap_event_header *)&evcopy);
         }
         proc->process(&cp);
+        for (int j = 0; j < cp.frames_count; ++j)
+        {
+            cp.audio_inputs[0].data32[0][j] = cp.audio_outputs[0].data32[0][j];
+            cp.audio_inputs[0].data32[1][j] = cp.audio_outputs[0].data32[1][j];
+        }
+    }
+
+    auto eventSpan = eventIterator->readNextEvents(cp.frames_count);
+    for (auto &cev : eventSpan)
+    {
+        if (cev.event.header.type == CLAP_EVENT_PARAM_VALUE)
+        {
+            auto pev = (clap_event_param_value *)&cev.event;
+            if (pev->param_id == (clap_id)ChainParameters::Volume)
+            {
+                chainGain = xenakios::decibelsToGain(pev->value);
+            }
+        }
+    }
+    
+    for (int i = 0; i < cp.frames_count; ++i)
+    {
+        auto smoothedGain = chainGainSmoother.step(chainGain);
+        outputBuffer.getSample(0, i) = cp.audio_outputs[0].data32[0][i] * smoothedGain;
+        outputBuffer.getSample(1, i) = cp.audio_outputs[0].data32[1][i] * smoothedGain;
     }
     samplePosition += cp.frames_count;
 }

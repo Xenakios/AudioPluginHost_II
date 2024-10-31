@@ -1183,25 +1183,51 @@ inline void test_clap_engine()
 {
     try
     {
+        size_t bufferSize = 512;
         auto eng = std::make_unique<ClapProcessingEngine>();
         eng->addChain();
         auto &chain0 = eng->getChain(0);
         chain0.addProcessor(R"(C:\Program Files\Common Files\CLAP\Surge Synth Team\Surge XT.clap)",
                             0);
-        chain0.activate(44100.0, 512);
+        chain0.addProcessor(
+            R"(C:\Program Files\Common Files\CLAP\Airwindows (with BaconPaul and members of the Surge Synth Team)\Airwindows Consolidated.clap)",
+            0);
+        chain0.chainSequence.addParameterEvent(false, 0.0, 0, 0, 0, 0, 0, 12.0);
+        chain0.chainSequence.addParameterEvent(false, 2.5, 0, 0, 0, 0, 0, 0.0);
+        chain0.chainSequence.addParameterEvent(false, 3.5, 0, 0, 0, 0, 0, 36);
+        chain0.chainSequence.addParameterEvent(false, 3.6, 0, 0, 0, 0, 0, 0);
+        chain0.activate(44100.0, bufferSize);
         eng->addChain();
         auto &chain1 = eng->getChain(1);
         chain1.addProcessor(
             R"(C:\Program Files\Common Files\CLAP\Surge Synth Team\Shortcircuit XT.clap)", 0);
-        chain1.activate(44100.0, 512);
-        auto &seq1 = chain1.getSequence(0);
+        chain1.activate(44100.0, bufferSize);
+        auto &seq1 = chain0.getSequence(0);
         seq1.addNote(0.0, 1.0, 0, 0, 60, -1, 1.0, 0.0);
+        seq1.addNote(1.0, 1.0, 0, 0, 67, -1, 1.0, 0.0);
+        seq1.addNote(2.0, 1.0, 0, 0, 53, -1, 1.0, 0.0);
 
         std::thread th([&]() {
-            choc::buffer::ChannelArrayBuffer<float> inbuf{2, 512};
-            choc::buffer::ChannelArrayBuffer<float> outbuf{2, 512};
-            chain1.processAudio(inbuf.getView(), outbuf.getView());
-            chain1.stopProcessing();
+            choc::buffer::ChannelArrayBuffer<float> inbuf{2, (unsigned int)bufferSize};
+            inbuf.clear();
+            choc::buffer::ChannelArrayBuffer<float> outbuf{2, (unsigned int)bufferSize};
+            outbuf.clear();
+            choc::audio::WAVAudioFileFormat<true> format;
+            choc::audio::AudioFileProperties props;
+            props.bitDepth = choc::audio::BitDepth::float32;
+            props.numChannels = 2;
+            props.sampleRate = 44100;
+            auto writer = format.createWriter(R"(C:\MusicAudio\clap_out\chain_out1.wav)", props);
+            int outlen = 44100 * 5;
+            int outcounter = 0;
+            while (outcounter < outlen)
+            {
+                chain0.processAudio(inbuf.getView(), outbuf.getView());
+                writer->appendFrames(outbuf.getView());
+                outcounter += bufferSize;
+            }
+
+            chain0.stopProcessing();
         });
         th.join();
     }

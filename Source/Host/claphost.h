@@ -27,6 +27,7 @@
 #include "RtAudio.h"
 #include "../Common/clap_eventsequence.h"
 #include "../Common/xap_breakpoint_envelope.h"
+#include "sst/basic-blocks/dsp/FollowSlewAndSmooth.h"
 
 inline void generateNoteExpressionsFromEnvelope(ClapEventSequence &targetSeq,
                                                 xenakios::Envelope<64> &sourceEnvelope,
@@ -152,6 +153,15 @@ class ProcessorChain
     int64_t samplePosition = 0;
     double currentSampleRate = 0.0;
     std::atomic<bool> isProcessing{false};
+    // events specific to the chain like output volume
+    ClapEventSequence chainSequence;
+    std::optional<ClapEventSequence::IteratorSampleTime> eventIterator;
+    double chainGain = 1.0;
+    sst::basic_blocks::dsp::SlewLimiter chainGainSmoother;
+    enum class ChainParameters
+    {
+        Volume
+    };
 };
 
 class ClapProcessingEngine
