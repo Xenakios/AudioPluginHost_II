@@ -16,10 +16,10 @@
 #include "clap/plugin.h"
 #include "clap/stream.h"
 #include "testsinesynth.h"
-#include "xap_utils.h"
+#include "../Common/xap_utils.h"
 #include "concurrentqueue.h"
 #include <chrono>
-#include "xapdsp.h"
+#include "../Common/xapdsp.h"
 #include "audio/choc_AudioFileFormat_WAV.h"
 #include "containers/choc_NonAllocatingStableSort.h"
 #include "xen_modulators.h"
@@ -28,16 +28,16 @@
 #include "sst/basic-blocks/dsp/FollowSlewAndSmooth.h"
 #include "sst/basic-blocks/mod-matrix/ModMatrix.h"
 #include "sst/basic-blocks/dsp/PanLaws.h"
-#include "offlineclaphost.h"
+#include "../Host/claphost.h"
 #include "gui/choc_DesktopWindow.h"
 #include "gui/choc_MessageLoop.h"
 #include "gui/choc_WebView.h"
 #include "text/choc_Files.h"
 #include "RtAudio.h"
-#include "xaps/clap_xaudioprocessor.h"
+#include "../Xaps/clap_xaudioprocessor.h"
 #include "xaudiograph.h"
-#include "dejavurandom.h"
-#include "bluenoise.h"
+#include "../Common/dejavurandom.h"
+#include "../Common/bluenoise.h"
 #include <variant>
 
 inline void test_alt_event_list()
@@ -1179,7 +1179,7 @@ inline void test_numrange()
 
 int main()
 {
-    
+
     // test_numrange();
     // inplace_test();
     // return 0;

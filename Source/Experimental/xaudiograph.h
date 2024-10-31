@@ -1,6 +1,6 @@
 #pragma once
-#include "xaudioprocessor.h"
-#include "xap_utils.h"
+#include "../Common/xaudioprocessor.h"
+#include "../Common/xap_utils.h"
 #include "containers/choc_NonAllocatingStableSort.h"
 #if !NOJUCE
 #include "xapfactory.h"
