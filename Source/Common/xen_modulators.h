@@ -2,9 +2,9 @@
 
 #include "sst/basic-blocks/modulators/SimpleLFO.h"
 #include "sst/basic-blocks/mod-matrix/ModMatrix.h"
-#include "../Common/xap_utils.h"
-#include "../Common/clap_eventsequence.h"
-#include "../Common/xap_breakpoint_envelope.h"
+#include "xap_utils.h"
+#include "clap_eventsequence.h"
+#include "xap_breakpoint_envelope.h"
 
 template <size_t BLOCK_SIZE> class SimpleLFO
 {

@@ -11,7 +11,7 @@
 #include "../Common/xap_utils.h"
 #include "../Host/claphost.h"
 #include "../Common/dejavurandom.h"
-#include "../Experimental/xen_modulators.h"
+#include "../Common/xen_modulators.h"
 #include "clap/ext/params.h"
 #include "gui/choc_MessageLoop.h"
 #include "Tunings.h"
