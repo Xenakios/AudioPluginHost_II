@@ -4,6 +4,8 @@
 #include <optional>
 #include <functional>
 #include "xap_utils.h"
+#include "containers/choc_SmallVector.h"
+
 namespace xenakios
 {
 class EnvelopePoint
@@ -40,14 +42,16 @@ class EnvelopePoint
 template <size_t BLOCK_SIZE = 64> class Envelope
 {
   public:
-    float outputBlock[BLOCK_SIZE];
+    // float outputBlock[BLOCK_SIZE];
+    choc::SmallVector<float, 64> outputBlock;
     void clearOutputBlock()
     {
-        for (int i = 0; i < BLOCK_SIZE; ++i)
+        for (size_t i = 0; i < outputBlock.size(); ++i)
             outputBlock[i] = 0.0f;
     }
     Envelope(std::optional<double> defaultPointValue = {})
     {
+        outputBlock.resize(BLOCK_SIZE);
         m_points.reserve(16);
         if (defaultPointValue)
             addPoint({0.0, *defaultPointValue});
