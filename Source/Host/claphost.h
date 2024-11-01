@@ -213,6 +213,7 @@ class ClapProcessingEngine
     void checkPluginIndex(size_t index);
 
     void processToFile(std::string filename, double duration, double samplerate, int numoutchans);
+    void processToFile2(std::string filename, double duration, double samplerate, int numoutchans);
 
     void openPluginGUIBlocking(size_t chainIndex, bool closeImmediately);
 

@@ -228,9 +228,58 @@ template <typename BufType> inline void sanityCheckBuffer(BufType &buf)
     }
 }
 
+void ClapProcessingEngine::processToFile2(std::string filename, double duration, double samplerate,
+                                          int numoutchans)
+{
+    size_t blockSize = 64;
+    for (auto &e : m_chains)
+    {
+        e->activate(samplerate, blockSize);
+    }
+    std::thread th([&]() {
+        choc::buffer::ChannelArrayBuffer<float> inbuf{2, (unsigned int)blockSize};
+        inbuf.clear();
+        choc::buffer::ChannelArrayBuffer<float> outbuf{2, (unsigned int)blockSize};
+        outbuf.clear();
+        choc::buffer::ChannelArrayBuffer<float> mixbuf{2, (unsigned int)blockSize};
+        mixbuf.clear();
+        choc::audio::WAVAudioFileFormat<true> format;
+        choc::audio::AudioFileProperties props;
+        props.bitDepth = choc::audio::BitDepth::float32;
+        props.numChannels = 2;
+        props.sampleRate = samplerate;
+        auto writer = format.createWriter(filename, props);
+        int outlen = duration * samplerate;
+        int outcounter = 0;
+        while (outcounter < outlen)
+        {
+            mixbuf.clear();
+            for (auto &e : m_chains)
+            {
+                e->processAudio(inbuf.getView(), outbuf.getView());
+                for (int i = 0; i < blockSize; ++i)
+                {
+                    for (int j = 0; j < 2; ++j)
+                    {
+                        mixbuf.getSample(j, i) += outbuf.getSample(j, i);
+                    }
+                }
+            }
+            writer->appendFrames(mixbuf.getView());
+            outcounter += blockSize;
+        }
+        for (auto &e : m_chains)
+        {
+            e->stopProcessing();
+        }
+    });
+    th.join();
+}
+
 void ClapProcessingEngine::processToFile(std::string filename, double duration, double samplerate,
                                          int numoutchans)
 {
+
     if (m_chain.size() == 0)
         throw std::runtime_error("There are no plugins in the chain to process");
     int procblocksize = 64;
@@ -1200,7 +1249,7 @@ void ProcessorChain::activate(double sampleRate, int maxBlockSize)
         maxOutBuffersNeeded = std::max<int>(outChans, maxOutBuffersNeeded);
     }
     std::cout << "chain " << id << " needs " << maxInBuffersNeeded << " input buffers" << "\n";
-    audioInputData.resize(maxInBuffersNeeded * maxBlockSize);
+    audioInputData.resize(64 * maxBlockSize);
 
     for (auto &e : inputBuffers)
     {
@@ -1219,7 +1268,7 @@ void ProcessorChain::activate(double sampleRate, int maxBlockSize)
         e.latency = 0;
     }
     std::cout << "chain " << id << " needs " << maxOutBuffersNeeded << " output buffers" << "\n";
-    audioOutputData.resize(maxOutBuffersNeeded * maxBlockSize);
+    audioOutputData.resize(64 * maxBlockSize);
     blockSize = maxBlockSize;
     eventIterator.emplace(chainSequence, sampleRate);
     chainGainSmoother.setParams(1.0f, 1.0f, sampleRate);
