@@ -69,6 +69,7 @@ class XAudioProcessor
     {
         return false;
     }
+    virtual bool paramsOrigin(clap_id paramId, double *value) noexcept { return false; }
     std::vector<ParamDesc> paramDescriptions;
     // paramsFlush is intended to be used to set parameters even when the processing isn't
     // actively called. We might want to somehow abstract this, if possible...

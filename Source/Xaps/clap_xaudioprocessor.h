@@ -13,6 +13,8 @@
 #ifndef JUCE_CORE_H_INCLUDED
 #include "gui/choc_WebView.h"
 #include "gui/choc_DesktopWindow.h"
+#include "clap/ext/draft/param-origin.h"
+
 class WebViewGenericEditor
 {
   public:
@@ -34,6 +36,7 @@ class ClapPluginFormatProcessor : public xenakios::XAudioProcessor
     clap_plugin_params_t *m_ext_params = nullptr;
     clap_plugin_remote_controls *m_ext_remote_controls = nullptr;
     clap_plugin_render *m_ext_render_mode = nullptr;
+    clap_plugin_param_origin *m_ext_param_origin = nullptr;
     std::atomic<bool> m_processingStarted{false};
     std::atomic<bool> m_activated{false};
     choc::fifo::SingleReaderSingleWriterFIFO<xenakios::CrossThreadMessage> m_from_generic_editor;
@@ -80,6 +83,12 @@ class ClapPluginFormatProcessor : public xenakios::XAudioProcessor
     bool paramsValue(clap_id paramId, double *value) noexcept override;
     bool paramsValueToText(clap_id paramId, double value, char *display,
                            uint32_t size) noexcept override;
+    bool paramsOrigin(clap_id paramId, double *value) noexcept override
+    {
+        if (!m_ext_param_origin)
+            return false;
+        return m_ext_param_origin->get(m_plug, paramId, value);
+    }
 
     uint32_t audioPortsCount(bool isInput) const noexcept override;
 

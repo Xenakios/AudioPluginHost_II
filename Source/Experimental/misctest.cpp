@@ -14,6 +14,7 @@
 #include <algorithm>
 #include <cassert>
 #include <random>
+#include "clap/ext/params.h"
 #include "clap/plugin.h"
 #include "clap/stream.h"
 #include "testsinesynth.h"
@@ -1221,9 +1222,28 @@ inline void test_clap_engine()
     }
 }
 
+inline void test_param_origin()
+{
+    auto plug = std::make_unique<ClapPluginFormatProcessor>(
+        R"(C:\Program Files\Common Files\CLAP\FilePlayerPlugin.clap)", 0);
+    for (int i = 0; i < plug->paramsCount(); ++i)
+    {
+        clap_param_info pinfo;
+        if (plug->paramsInfo(i, &pinfo))
+        {
+            double origin = 0.0;
+            if (plug->paramsOrigin(pinfo.id, &origin))
+                std::cout << pinfo.name << " has origin value " << origin << "\n";
+            else 
+                std::cout << pinfo.name << " has no origin value\n";
+        }
+    }
+}
+
 int main()
 {
-    test_clap_engine();
+    test_param_origin();
+    // test_clap_engine();
     // test_numrange();
     // inplace_test();
     // return 0;
