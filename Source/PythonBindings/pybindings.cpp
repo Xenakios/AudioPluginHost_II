@@ -91,6 +91,16 @@ static int XInputHook()
     return 0;
 }
 
+static void addChainWithPlugins(ClapProcessingEngine &eng,
+                                std::vector<std::pair<std::string, int>> plugins)
+{
+    for (auto &e : plugins)
+    {
+        auto &chain = eng.addChain();
+        chain.addProcessor(e.first, e.second);
+    }
+}
+
 static void startStreaming(ClapProcessingEngine &eng, std::optional<unsigned int> deviceId,
                            double sampleRate, int preferredBufferSize, int blockExecution)
 {
@@ -179,9 +189,13 @@ PYBIND11_MODULE(xenakios, m)
         .def("getDepth", &xenakios::BlueNoise::getDepth)
         .def("nextFloat", &xenakios::BlueNoise::operator());
 
+    py::class_<ProcessorChain>(m, "ClapChain").def("getSequence", &ProcessorChain::getSequence);
+
     py::class_<ClapProcessingEngine>(m, "ClapEngine")
         .def(py::init<>())
         .def("addPlugin", &ClapProcessingEngine::addProcessorToChain)
+        .def("addChain", &addChainWithPlugins)
+        .def("getChain",&ClapProcessingEngine::getChain, py::return_value_policy::reference)
         .def("getSequence", &ClapProcessingEngine::getSequence, py::return_value_policy::reference)
         .def_static("scanPluginFile", &ClapProcessingEngine::scanPluginFile,
                     "Returns plugin info as JSON formatted string")

@@ -838,9 +838,10 @@ void ClapProcessingEngine::stopStreaming()
     m_gui_tasks_timer.clear();
 }
 
-void ClapProcessingEngine::addChain()
+ProcessorChain &ClapProcessingEngine::addChain()
 {
     m_chains.push_back(std::make_unique<ProcessorChain>(m_chains.size()));
+    return *m_chains.back();
 }
 
 ProcessorChain &ClapProcessingEngine::getChain(size_t index) { return *m_chains[index]; }
@@ -1248,7 +1249,7 @@ void ProcessorChain::activate(double sampleRate, int maxBlockSize)
         }
         maxOutBuffersNeeded = std::max<int>(outChans, maxOutBuffersNeeded);
     }
-    std::cout << "chain " << id << " needs " << maxInBuffersNeeded << " input buffers" << "\n";
+    // std::cout << "chain " << id << " needs " << maxInBuffersNeeded << " input buffers" << "\n";
     audioInputData.resize(64 * maxBlockSize);
 
     for (auto &e : inputBuffers)
@@ -1267,7 +1268,7 @@ void ProcessorChain::activate(double sampleRate, int maxBlockSize)
         e.data64 = nullptr;
         e.latency = 0;
     }
-    std::cout << "chain " << id << " needs " << maxOutBuffersNeeded << " output buffers" << "\n";
+    // std::cout << "chain " << id << " needs " << maxOutBuffersNeeded << " output buffers" << "\n";
     audioOutputData.resize(64 * maxBlockSize);
     blockSize = maxBlockSize;
     eventIterator.emplace(chainSequence, sampleRate);

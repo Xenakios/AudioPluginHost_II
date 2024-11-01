@@ -153,13 +153,14 @@ ClapPluginFormatProcessor::ClapPluginFormatProcessor(std::string plugfilename, i
                     std::format("Plugin index {} is out of bounds, allowed range is 0 - {}",
                                 plugindex, plugin_count - 1));
             auto desc = fac->get_plugin_descriptor(fac, plugindex);
-            if (desc)
-            {
-                std::cout << desc->name << "\n";
-            }
+
             auto plug = fac->create_plugin(fac, &xen_host_info, desc->id);
             if (plug)
             {
+                if (desc)
+                {
+                    std::cout << "created : " << desc->name << "\n";
+                }
                 m_plug = plug;
                 m_plug->init(m_plug);
                 m_inited = true;

@@ -172,7 +172,7 @@ class ClapProcessingEngine
   public:
     std::vector<std::unique_ptr<ProcessorEntry>> m_chain;
     std::vector<std::unique_ptr<ProcessorChain>> m_chains;
-    void addChain();
+    ProcessorChain & addChain();
     ProcessorChain &getChain(size_t index);
     void setSequence(int targetProcessorIndex, ClapEventSequence seq);
     static std::vector<std::filesystem::path> scanPluginDirectories();
