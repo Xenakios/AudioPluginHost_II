@@ -27,6 +27,7 @@ include_directories(
     libs/sst-filters/include
     libs/sst-effects/include
     libs/oscpkt
+    libs/simde
 )
 
 # for "reasons", this is still a console app even though a GUI app is built from it

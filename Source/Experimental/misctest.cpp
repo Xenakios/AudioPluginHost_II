@@ -1226,6 +1226,18 @@ inline void test_param_origin()
 {
     auto plug = std::make_unique<ClapPluginFormatProcessor>(
         R"(C:\Program Files\Common Files\CLAP\FilePlayerPlugin.clap)", 0);
+    char display[256];
+    for (float x = -12.0f; x <= 12.0; x += 1.0f)
+    {
+        if (plug->paramsValueToText(44,x, display, 256))
+        {
+            std::cout << x << "\t" << display << "\n";
+        }
+        else
+            std::cout << x << " was not formatted\n";
+    }
+
+    return;
     for (int i = 0; i < plug->paramsCount(); ++i)
     {
         clap_param_info pinfo;
@@ -1234,7 +1246,7 @@ inline void test_param_origin()
             double origin = 0.0;
             if (plug->paramsOrigin(pinfo.id, &origin))
                 std::cout << pinfo.name << " has origin value " << origin << "\n";
-            else 
+            else
                 std::cout << pinfo.name << " has no origin value\n";
         }
     }
