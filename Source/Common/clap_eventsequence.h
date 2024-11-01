@@ -2,7 +2,10 @@
 
 #include "clap/clap.h"
 #include "../Common/xap_utils.h"
+#include "clap/events.h"
 #include "containers/choc_Span.h"
+#include "containers/choc_Value.h"
+#include "text/choc_JSON.h"
 #include <limits>
 #include <stdexcept>
 
@@ -204,6 +207,45 @@ class ClapEventSequence
             maxt = std::max(maxt, e.timestamp);
         }
         return maxt;
+    }
+    choc::value::Value toValueTree(std::string rootName)
+    {
+        sortEvents();
+        auto root = choc::value::createObject(rootName);
+        auto evarr = choc::value::createEmptyArray();
+        for (size_t i = 0; i < m_evlist.size(); ++i)
+        {
+            const Event &e = m_evlist[i];
+            auto evob = choc::value::createObject("e");
+            evob.setMember("time", e.timestamp);
+            evob.setMember("type", (int64_t)e.event.header.type);
+
+            if (e.extdata0 != 0)
+                evob.setMember("ext0", e.extdata0);
+            if (e.extdata1 != 0)
+                evob.setMember("ext1", e.extdata1);
+            if (e.event.header.space_id != CLAP_CORE_EVENT_SPACE_ID)
+                evob.setMember("spid", (int64_t)e.event.header.space_id);
+            if (e.event.header.type == CLAP_EVENT_NOTE_ON ||
+                e.event.header.type == CLAP_EVENT_NOTE_OFF ||
+                e.event.header.type == CLAP_EVENT_NOTE_CHOKE)
+            {
+                auto nev = (clap_event_note *)&e.event;
+                evob.setMember("port", (int64_t)nev->port_index);
+                evob.setMember("chan", (int64_t)nev->channel);
+                evob.setMember("key", (int64_t)nev->key);
+                if (nev->note_id != -1)
+                    evob.setMember("nid", (int64_t)nev->note_id);
+            }
+            evarr.addArrayElement(evob);
+        }
+        root.setMember("events", evarr);
+        return root;
+    }
+    std::string toJSON()
+    {
+        auto root = toValueTree("e");
+        return choc::json::toString(root, true);
     }
     struct Iterator
     {

@@ -1236,7 +1236,6 @@ inline void test_param_origin()
         else
             std::cout << x << " was not formatted\n";
     }
-
     return;
     for (int i = 0; i < plug->paramsCount(); ++i)
     {
@@ -1252,9 +1251,21 @@ inline void test_param_origin()
     }
 }
 
+inline void test_seq_to_json()
+{
+    ClapEventSequence seq;
+    seq.addNote(0.0, 1.0, 0, 0, 60, -1, 0.67, 0.0);
+    seq.addNote(0.0, 1.0, 0, 0, 67, -1, 0.67, 0.0);
+    std::ofstream ofs(R"(C:\develop\AudioPluginHost_mk2\sequence_test.json)");
+    auto json = seq.toJSON();
+    ofs << json;
+    
+}
+
 int main()
 {
-    test_param_origin();
+    test_seq_to_json();
+    //test_param_origin();
     // test_clap_engine();
     // test_numrange();
     // inplace_test();
