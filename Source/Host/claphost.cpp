@@ -1108,6 +1108,11 @@ std::string ClapProcessingEngine::getParametersAsJSON(size_t chainIndex)
             infoobject.setMember("defaultval", info.default_value);
             infoobject.setMember("minval", info.min_value);
             infoobject.setMember("maxval", info.max_value);
+            double origin = 0.0;
+            if (plug->paramsOrigin(info.id, &origin))
+            {
+                infoobject.setMember("origin", origin);
+            }
             infoobject.setMember("module", std::string(info.module));
             // Can do the needed bit checks in Python, but I suppose would be nice
             // to have some kind of string from the flags too
