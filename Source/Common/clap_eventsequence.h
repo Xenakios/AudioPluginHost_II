@@ -270,7 +270,24 @@ class ClapEventSequence
                     evob.setMember("nid", (int64_t)pev->note_id);
                 evob.setMember("pid", (int64_t)pev->param_id);
                 evob.setMember("val", (int64_t)pev->amount);
-            }            
+            }
+            if (e.event.header.type == CLAP_EVENT_MIDI)
+            {
+                auto miev = (clap_event_midi *)&e.event;
+                evob.setMember("port", (int64_t)miev->port_index);
+                evob.setMember("b0", (int64_t)miev->data[0]);
+                evob.setMember("b1", (int64_t)miev->data[1]);
+                evob.setMember("b2", (int64_t)miev->data[2]);
+            }
+            if (e.event.header.type == CLAP_EVENT_MIDI2)
+            {
+                auto mi2ev = (clap_event_midi2 *)&e.event;
+                evob.setMember("port", (int64_t)mi2ev->port_index);
+                evob.setMember("i0", (int64_t)mi2ev->data[0]);
+                evob.setMember("i1", (int64_t)mi2ev->data[1]);
+                evob.setMember("i2", (int64_t)mi2ev->data[2]);
+                evob.setMember("i3", (int64_t)mi2ev->data[3]);
+            }
             evarr.addArrayElement(evob);
         }
         root.setMember("events", evarr);
