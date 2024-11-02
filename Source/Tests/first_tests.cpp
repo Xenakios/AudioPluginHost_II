@@ -22,7 +22,6 @@ inline void compareSequences(choc::test::TestProgress &progress, const ClapEvent
 
 void test_clap_sequence(choc::test::TestProgress &progress)
 {
-
     CHOC_CATEGORY(ClapEventSequence)
     {
         CHOC_TEST(Basic)
@@ -59,11 +58,13 @@ void test_clap_sequence(choc::test::TestProgress &progress)
             auto tree = seq.toValueTree("Test");
             CHOC_EXPECT_TRUE(tree.isObject());
             auto deserialized = ClapEventSequence::fromValueTree(tree);
+
             compareSequences(progress, seq, deserialized);
         }
         {
             auto json = seq.toJSON();
             auto deserialized = ClapEventSequence::fromJSON(json);
+            
             compareSequences(progress, seq, deserialized);
         }
     }

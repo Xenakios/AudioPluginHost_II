@@ -5,6 +5,7 @@
 #include "clap/events.h"
 #include "containers/choc_Span.h"
 #include "containers/choc_Value.h"
+#include "memory/choc_xxHash.h"
 #include "text/choc_JSON.h"
 #include <limits>
 #include <stdexcept>
@@ -362,6 +363,21 @@ class ClapEventSequence
     {
         auto root = toValueTree("e");
         return choc::json::toString(root, true);
+    }
+    uint64_t getHash() const
+    {
+        choc::hash::xxHash64 h;
+        size_t sz = m_evlist.size();
+        h.addInput(&sz, sizeof(size_t));
+        for (auto &e : m_evlist)
+        {
+            h.addInput(&e.timestamp, sizeof(double));
+            // Can't do it this way, the events may contain spurious undefined data
+            // because of padding. I am afraid that if hashing is needed, it needs
+            // to be done quite tediously taking all event types manually into account...
+            h.addInput(&e.event,e.event.header.size);
+        }
+        return h.getHash();
     }
     struct Iterator
     {
