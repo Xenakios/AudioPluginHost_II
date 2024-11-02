@@ -1,5 +1,4 @@
 #include "clap_xaudioprocessor.h"
-#include "clap/ext/draft/param-origin.h"
 #include <iostream>
 #include <stdexcept>
 
@@ -168,8 +167,10 @@ ClapPluginFormatProcessor::ClapPluginFormatProcessor(std::string plugfilename, i
                 initParamsExtension();
                 initGUIExtension();
                 m_ext_state = (clap_plugin_state *)plug->get_extension(plug, CLAP_EXT_STATE);
+#ifdef CLAP_PARAM_ORIGIN_AVAILABLE
                 m_ext_param_origin =
                     (clap_plugin_param_origin *)plug->get_extension(plug, CLAP_EXT_PARAM_ORIGIN);
+#endif
                 if (!m_ext_gui && m_ext_params)
                 {
                     // create parameter infos for generic GUI
