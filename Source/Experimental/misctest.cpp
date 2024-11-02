@@ -1255,7 +1255,8 @@ inline void test_seq_to_json()
 {
     ClapEventSequence seq;
     seq.addNote(0.0, 1.0, 0, 0, 60, -1, 0.67, 0.0);
-    seq.addNote(0.0, 1.0, 0, 0, 67, -1, 0.67, 0.0);
+    seq.addNote(0.0, 1.0, 0, 0, 67, -1, 0.67, 0.5);
+    seq.addParameterEvent(false, 0.1, -1, -1, -1, -1, 666, 0.42);
     std::ofstream ofs(R"(C:\develop\AudioPluginHost_mk2\sequence_test.json)");
     auto json = seq.toJSON();
     ofs << json;

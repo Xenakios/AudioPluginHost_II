@@ -212,6 +212,7 @@ class ClapEventSequence
     {
         sortEvents();
         auto root = choc::value::createObject(rootName);
+        root.setMember("version", 0);
         auto evarr = choc::value::createEmptyArray();
         for (size_t i = 0; i < m_evlist.size(); ++i)
         {
@@ -237,6 +238,39 @@ class ClapEventSequence
                 if (nev->note_id != -1)
                     evob.setMember("nid", (int64_t)nev->note_id);
             }
+            if (e.event.header.type == CLAP_EVENT_NOTE_EXPRESSION)
+            {
+                auto xev = (clap_event_note_expression *)&e.event;
+                evob.setMember("port", (int64_t)xev->port_index);
+                evob.setMember("chan", (int64_t)xev->channel);
+                evob.setMember("key", (int64_t)xev->key);
+                if (xev->note_id != -1)
+                    evob.setMember("nid", (int64_t)xev->note_id);
+                evob.setMember("exid", xev->expression_id);
+                evob.setMember("val", xev->value);
+            }
+            if (e.event.header.type == CLAP_EVENT_PARAM_VALUE)
+            {
+                auto pev = (clap_event_param_value *)&e.event;
+                evob.setMember("port", (int64_t)pev->port_index);
+                evob.setMember("chan", (int64_t)pev->channel);
+                evob.setMember("key", (int64_t)pev->key);
+                if (pev->note_id != -1)
+                    evob.setMember("nid", (int64_t)pev->note_id);
+                evob.setMember("pid", (int64_t)pev->param_id);
+                evob.setMember("val", (int64_t)pev->value);
+            }
+            if (e.event.header.type == CLAP_EVENT_PARAM_MOD)
+            {
+                auto pev = (clap_event_param_mod *)&e.event;
+                evob.setMember("port", (int64_t)pev->port_index);
+                evob.setMember("chan", (int64_t)pev->channel);
+                evob.setMember("key", (int64_t)pev->key);
+                if (pev->note_id != -1)
+                    evob.setMember("nid", (int64_t)pev->note_id);
+                evob.setMember("pid", (int64_t)pev->param_id);
+                evob.setMember("val", (int64_t)pev->amount);
+            }            
             evarr.addArrayElement(evob);
         }
         root.setMember("events", evarr);
