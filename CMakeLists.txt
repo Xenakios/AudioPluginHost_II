@@ -126,7 +126,7 @@ add_executable(TestingProgram
     Source/Experimental/misctest.cpp 
     Source/Xaps/clap_xaudioprocessor.cpp
     Source/Host/claphost.cpp
-    
+    Source/Tests/first_tests.cpp
     libs/rtaudio/RtAudio.cpp  
     )
 # Source/Experimental/xaudiograph.cpp

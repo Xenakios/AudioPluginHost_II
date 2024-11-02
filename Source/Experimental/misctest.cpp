@@ -10,6 +10,8 @@
 #include <array>
 #include "audio/choc_AudioFileFormat.h"
 #include "audio/choc_SampleBuffers.h"
+#include "clap/events.h"
+
 #include "clap/clap.h"
 #include <algorithm>
 #include <cassert>
@@ -38,6 +40,7 @@
 #include "text/choc_Files.h"
 #include "RtAudio.h"
 #include "../Xaps/clap_xaudioprocessor.h"
+#include "text/choc_JSON.h"
 #include "xaudiograph.h"
 #include "../Common/dejavurandom.h"
 #include "../Common/bluenoise.h"
@@ -1229,7 +1232,7 @@ inline void test_param_origin()
     char display[256];
     for (float x = -12.0f; x <= 12.0; x += 1.0f)
     {
-        if (plug->paramsValueToText(44,x, display, 256))
+        if (plug->paramsValueToText(44, x, display, 256))
         {
             std::cout << x << "\t" << display << "\n";
         }
@@ -1253,25 +1256,37 @@ inline void test_param_origin()
 
 inline void test_seq_to_json()
 {
-    ClapEventSequence seq;
-    seq.addNote(0.0, 1.0, 0, 0, 60, -1, 0.67, 0.0);
-    seq.addNote(0.0, 1.0, 0, 0, 67, -1, 0.67, 0.5);
-    seq.addParameterEvent(false, 0.1, -1, -1, -1, -1, 666, 0.42);
-    std::ofstream ofs(R"(C:\develop\AudioPluginHost_mk2\sequence_test.json)");
-    auto json = seq.toJSON();
-    ofs << json;
-    
+    {
+        ClapEventSequence seq;
+        seq.addNote(0.0, 1.0, 0, 0, 60, -1, 0.67, 0.0);
+        seq.addNote(0.0, 1.0, 0, 0, 67, -1, 0.67, 0.5);
+        seq.addParameterEvent(false, 0.1, -1, -1, -1, -1, 666, 0.42);
+        seq.addMIDI1Message(15.0, 0, 176, 21, 63);
+        seq.addProgramChange(16.1, 0, 0, 99);
+        std::ofstream ofs(R"(C:\develop\AudioPluginHost_mk2\sequence_test.json)");
+        auto json = seq.toJSON();
+        ofs << json;
+    }
+    {
+        auto json =
+            choc::file::loadFileAsString(R"(C:\develop\AudioPluginHost_mk2\sequence_test.json)");
+        auto root = choc::json::parse(json);
+        auto seq = ClapEventSequence::fromValueTree(root);
+    }
 }
+
+void run_tests();
 
 int main()
 {
-    test_seq_to_json();
-    //test_param_origin();
-    // test_clap_engine();
-    // test_numrange();
-    // inplace_test();
-    // return 0;
-    //  test_osc_receive();
+    run_tests();
+    // test_seq_to_json();
+    // test_param_origin();
+    //  test_clap_engine();
+    //  test_numrange();
+    //  inplace_test();
+    //  return 0;
+    //   test_osc_receive();
 
     // test_clapengineRT(1);
 

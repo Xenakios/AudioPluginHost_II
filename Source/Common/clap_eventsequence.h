@@ -8,6 +8,7 @@
 #include "text/choc_JSON.h"
 #include <limits>
 #include <stdexcept>
+#include <string>
 
 class ClapEventSequence
 {
@@ -59,6 +60,12 @@ class ClapEventSequence
     {
         auto ev =
             xenakios::make_event_note(0, CLAP_EVENT_NOTE_OFF, port, channel, key, note_id, velo);
+        m_evlist.push_back(Event(time, &ev));
+    }
+    void addNoteChoke(double time, int port, int channel, int key, double velo, int note_id)
+    {
+        auto ev =
+            xenakios::make_event_note(0, CLAP_EVENT_NOTE_CHOKE, port, channel, key, note_id, velo);
         m_evlist.push_back(Event(time, &ev));
     }
     void addNote(double time, double duration, int port, int channel, int key, int note_id,
@@ -208,10 +215,67 @@ class ClapEventSequence
         }
         return maxt;
     }
+    static ClapEventSequence fromValueTree(choc::value::Value root)
+    {
+        ClapEventSequence result;
+        if (root.hasObjectMember("magic") && root["magic"].getString() == "ClapEventSequence")
+        {
+            auto evarr = root["events"];
+            for (int i = 0; i < evarr.size(); ++i)
+            {
+                auto evob = evarr[i];
+                double timepos = evob["time"].get<double>();
+                int64_t etype = evob["type"].get<int64_t>();
+                if (etype == CLAP_EVENT_NOTE_ON || etype == CLAP_EVENT_NOTE_OFF ||
+                    etype == CLAP_EVENT_NOTE_CHOKE)
+                {
+                    int64_t port = evob["port"].get<int64_t>();
+                    int64_t chan = evob["chan"].get<int64_t>();
+                    int64_t key = evob["key"].get<int64_t>();
+                    int64_t nid = evob["nid"].getWithDefault((int64_t)-1);
+                    double velo = evob["velo"].get<double>();
+                    if (etype == CLAP_EVENT_NOTE_ON)
+                        result.addNoteOn(timepos, port, chan, key, velo, nid);
+                    if (etype == CLAP_EVENT_NOTE_OFF)
+                        result.addNoteOff(timepos, port, chan, key, velo, nid);
+                    if (etype == CLAP_EVENT_NOTE_CHOKE)
+                        result.addNoteChoke(timepos, port, chan, key, velo, nid);
+                }
+                if (etype == CLAP_EVENT_NOTE_EXPRESSION)
+                {
+                    int64_t port = evob["port"].get<int64_t>();
+                    int64_t chan = evob["chan"].get<int64_t>();
+                    int64_t key = evob["key"].get<int64_t>();
+                    int64_t nid = evob["nid"].getWithDefault((int64_t)-1);
+                    int64_t exid = evob["exid"].get<int64_t>();
+                    double val = evob["val"].get<double>();
+                    result.addNoteExpression(timepos, port, chan, key, nid, exid, val);
+                }
+                if (etype == CLAP_EVENT_MIDI)
+                {
+                    int64_t port = evob["port"].get<int64_t>();
+                    int64_t b0 = evob["b0"].get<int64_t>();
+                    int64_t b1 = evob["b1"].get<int64_t>();
+                    int64_t b2 = evob["b2"].get<int64_t>();
+                    result.addMIDI1Message(timepos, port, static_cast<uint8_t>(b0),
+                                           static_cast<uint8_t>(b1), static_cast<uint8_t>(b2));
+                }
+            }
+        }
+        else
+            throw std::runtime_error("Not a valid ClapEventSequence Choc Value");
+        return result;
+    }
+    static ClapEventSequence fromJSON(std::string json)
+    {
+        auto root = choc::json::parse(json);
+        return fromValueTree(root);
+    }
     choc::value::Value toValueTree(std::string rootName)
     {
         sortEvents();
         auto root = choc::value::createObject(rootName);
+        root.setMember("magic", "ClapEventSequence");
         root.setMember("version", 0);
         auto evarr = choc::value::createEmptyArray();
         for (size_t i = 0; i < m_evlist.size(); ++i)
@@ -237,6 +301,7 @@ class ClapEventSequence
                 evob.setMember("key", (int64_t)nev->key);
                 if (nev->note_id != -1)
                     evob.setMember("nid", (int64_t)nev->note_id);
+                evob.setMember("velo", nev->velocity);
             }
             if (e.event.header.type == CLAP_EVENT_NOTE_EXPRESSION)
             {
