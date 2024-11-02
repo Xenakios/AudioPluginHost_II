@@ -1267,6 +1267,7 @@ inline void test_seq_to_json()
         auto json = seq.toJSON();
         ofs << json;
     }
+    return;
     {
         auto json =
             choc::file::loadFileAsString(R"(C:\develop\AudioPluginHost_mk2\sequence_test.json)");
@@ -1279,8 +1280,8 @@ void run_tests();
 
 int main()
 {
-    run_tests();
-    // test_seq_to_json();
+    // run_tests();
+    test_seq_to_json();
     // test_param_origin();
     //  test_clap_engine();
     //  test_numrange();

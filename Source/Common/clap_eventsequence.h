@@ -252,6 +252,16 @@ class ClapEventSequence
                     double val = evob["val"].get<double>();
                     result.addNoteExpression(timepos, port, chan, key, nid, exid, val);
                 }
+                if (etype == CLAP_EVENT_PARAM_VALUE)
+                {
+                    int64_t port = evob["port"].getWithDefault((int64_t)-1);
+                    int64_t chan = evob["chan"].getWithDefault((int64_t)-1);
+                    int64_t key = evob["key"].getWithDefault((int64_t)-1);
+                    int64_t nid = evob["nid"].getWithDefault((int64_t)-1);
+                    int64_t pid = evob["pid"].get<int64_t>();
+                    double val = evob["val"].get<double>();
+                    result.addParameterEvent(false, timepos, port, chan, key, nid, pid, val);
+                }
                 if (etype == CLAP_EVENT_MIDI)
                 {
                     int64_t port = evob["port"].get<int64_t>();
@@ -274,6 +284,7 @@ class ClapEventSequence
     }
     choc::value::Value toValueTree(std::string rootName)
     {
+        bool addTypesAsStrings = true;
         sortEvents();
         auto root = choc::value::createObject(rootName);
         root.setMember("magic", "ClapEventSequence");
@@ -303,6 +314,8 @@ class ClapEventSequence
                 if (nev->note_id != -1)
                     evob.setMember("nid", (int64_t)nev->note_id);
                 evob.setMember("velo", nev->velocity);
+                if (addTypesAsStrings)
+                    evob.setMember("typestring", "NoteOn/Off/Choke");
             }
             if (e.event.header.type == CLAP_EVENT_NOTE_EXPRESSION)
             {
@@ -314,17 +327,24 @@ class ClapEventSequence
                     evob.setMember("nid", (int64_t)xev->note_id);
                 evob.setMember("exid", xev->expression_id);
                 evob.setMember("val", xev->value);
+                if (addTypesAsStrings)
+                    evob.setMember("typestring", "NoteExpression");
             }
             if (e.event.header.type == CLAP_EVENT_PARAM_VALUE)
             {
                 auto pev = (clap_event_param_value *)&e.event;
-                evob.setMember("port", (int64_t)pev->port_index);
-                evob.setMember("chan", (int64_t)pev->channel);
-                evob.setMember("key", (int64_t)pev->key);
+                if (pev->port_index != -1)
+                    evob.setMember("port", (int64_t)pev->port_index);
+                if (pev->channel != -1)
+                    evob.setMember("chan", (int64_t)pev->channel);
+                if (pev->key != -1)
+                    evob.setMember("key", (int64_t)pev->key);
                 if (pev->note_id != -1)
                     evob.setMember("nid", (int64_t)pev->note_id);
                 evob.setMember("pid", (int64_t)pev->param_id);
                 evob.setMember("val", (int64_t)pev->value);
+                if (addTypesAsStrings)
+                    evob.setMember("typestring", "ParamValue");
             }
             if (e.event.header.type == CLAP_EVENT_PARAM_MOD)
             {
@@ -336,6 +356,8 @@ class ClapEventSequence
                     evob.setMember("nid", (int64_t)pev->note_id);
                 evob.setMember("pid", (int64_t)pev->param_id);
                 evob.setMember("val", (int64_t)pev->amount);
+                if (addTypesAsStrings)
+                    evob.setMember("typestring", "ParamMod");
             }
             if (e.event.header.type == CLAP_EVENT_MIDI)
             {
@@ -344,6 +366,8 @@ class ClapEventSequence
                 evob.setMember("b0", (int64_t)miev->data[0]);
                 evob.setMember("b1", (int64_t)miev->data[1]);
                 evob.setMember("b2", (int64_t)miev->data[2]);
+                if (addTypesAsStrings)
+                    evob.setMember("typestring", "MIDI1");
             }
             if (e.event.header.type == CLAP_EVENT_MIDI2)
             {
@@ -353,6 +377,8 @@ class ClapEventSequence
                 evob.setMember("i1", (int64_t)mi2ev->data[1]);
                 evob.setMember("i2", (int64_t)mi2ev->data[2]);
                 evob.setMember("i3", (int64_t)mi2ev->data[3]);
+                if (addTypesAsStrings)
+                    evob.setMember("typestring", "MIDI2");
             }
             evarr.addArrayElement(evob);
         }
@@ -375,7 +401,7 @@ class ClapEventSequence
             // Can't do it this way, the events may contain spurious undefined data
             // because of padding. I am afraid that if hashing is needed, it needs
             // to be done quite tediously taking all event types manually into account...
-            h.addInput(&e.event,e.event.header.size);
+            h.addInput(&e.event, e.event.header.size);
         }
         return h.getHash();
     }
