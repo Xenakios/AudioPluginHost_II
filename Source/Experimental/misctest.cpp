@@ -19,6 +19,7 @@
 #include "clap/ext/params.h"
 #include "clap/plugin.h"
 #include "clap/stream.h"
+#include "libMTSClient.h"
 #include "testsinesynth.h"
 #include "../Common/xap_utils.h"
 #include "concurrentqueue.h"
@@ -45,6 +46,7 @@
 #include "../Common/dejavurandom.h"
 #include "../Common/bluenoise.h"
 #include <variant>
+#include "mts_esp_wrapper.h"
 
 inline void test_alt_event_list()
 {
@@ -919,9 +921,9 @@ class GrainDelay
                     ph.outputbufferpos = 0;
                 float gain = 1.0f;
                 if (ph.playpos < ph.lensamples / 2)
-                    gain = xenakios::mapvalue<float>(ph.playpos, 0, ph.lensamples / 2, 0.0f, 1.0f);
+                    gain = xenakios::mapvalue<float>(ph.playpos, 0, ph.lensamples / 2.0, 0.0f, 1.0f);
                 if (ph.playpos >= ph.lensamples / 2)
-                    gain = xenakios::mapvalue<float>(ph.playpos, ph.lensamples / 2, ph.lensamples,
+                    gain = xenakios::mapvalue<float>(ph.playpos, ph.lensamples / 2.0, ph.lensamples,
                                                      1.0f, 0.0f);
                 resampledLeft *= gain * 0.5f;
                 resampledRight *= gain * 0.5f;
@@ -1183,7 +1185,7 @@ inline void test_numrange()
     range = NumericRange<int>(8, 13);
 }
 
-inline void test_clap_engine()
+inline void test_clap_engine_multichain()
 {
     try
     {
@@ -1278,12 +1280,35 @@ inline void test_seq_to_json()
 
 void run_tests();
 
+inline void test_mts_esp_wrapper()
+{
+    mtsesp_wrapper::MIDIKeyTuner tuner;
+
+    if (tuner.MTS_ESP_available())
+    {
+        std::cout << "MTS ESP available\n";
+        std::cout << "Scale name " << MTS_GetScaleName(tuner.getClient()) << "\n";
+    }
+    else
+        std::cout << "MTS ESP not available\n";
+    std::cout << "With MTS ESP enabled\n";
+    std::cout << tuner.noteToFrequency(69) << "\n";
+    std::cout << tuner.noteToFrequency(60) << "\n";
+    std::cout << "With MTS ESP disabled\n";
+    tuner.setMTSESP_Enabled(false);
+    std::cout << tuner.noteToFrequency(69) << "\n";
+    std::cout << tuner.noteToFrequency(60) << "\n";
+}
+
 int main()
 {
+    test_clap_engine_multichain();
+    // test_vec();
+    // test_mts_esp_wrapper();
     // run_tests();
-    test_seq_to_json();
+    // test_seq_to_json();
     // test_param_origin();
-    //  test_clap_engine();
+    
     //  test_numrange();
     //  inplace_test();
     //  return 0;

@@ -23,6 +23,8 @@ include_directories(
     libs/sst-voicemanager/include
     libs/rtaudio
     libs/MTS-ESP/Master
+    libs/MTS-ESP/Client
+    libs/mts_esp_wrapper
     libs/tuning-library/include
     libs/sst-filters/include
     libs/sst-effects/include
@@ -128,6 +130,7 @@ add_executable(TestingProgram
     Source/Host/claphost.cpp
     Source/Tests/first_tests.cpp
     libs/rtaudio/RtAudio.cpp  
+    libs/MTS-ESP/Client/libMTSClient.cpp
     )
 # Source/Experimental/xaudiograph.cpp
 target_compile_definitions(TestingProgram PRIVATE NOJUCE=1 _USE_MATH_DEFINES=1 __WINDOWS_WASAPI__)
