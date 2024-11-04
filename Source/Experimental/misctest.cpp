@@ -42,6 +42,7 @@
 #include "RtAudio.h"
 #include "../Xaps/clap_xaudioprocessor.h"
 #include "text/choc_JSON.h"
+#include "text/choc_StringUtilities.h"
 #include "xaudiograph.h"
 #include "../Common/dejavurandom.h"
 #include "../Common/bluenoise.h"
@@ -1381,6 +1382,54 @@ class CV_Sequencer
         }
         highestPortNumber = highestPort;
     }
+    void seek(double timepos)
+    {
+        int foundIndex = -1;
+        for (size_t i = 0; i < events.size(); ++i)
+        {
+            if (events[i].time >= timepos)
+            {
+                foundIndex = i;
+                break;
+            }
+        }
+        if (foundIndex >= 0)
+        {
+            curEventIndex = foundIndex;
+        }
+    }
+    void writeToTextFile(std::string filename)
+    {
+        std::ofstream os(filename);
+        sortAndScanEvents();
+        for (auto &e : events)
+        {
+            os << e.time << " " << e.outport << " " << e.outchan << " " << e.voltage << "\n";
+        }
+    }
+    void loadFromTextFile(std::string filename)
+    {
+        auto txt = choc::file::loadFileAsString(filename);
+        auto lines = choc::text::splitIntoLines(txt, false);
+        if (lines.size() > 0)
+        {
+            events.clear();
+            for (auto &line : lines)
+            {
+                auto tokens = choc::text::splitString(txt, ' ', false);
+                if (tokens.size() >= 4)
+                {
+                    Event ev;
+                    ev.time = std::stod(tokens[0]);
+                    ev.outport = std::stoi(tokens[1]);
+                    ev.outchan = std::stoi(tokens[2]);
+                    ev.voltage = std::stod(tokens[3]);
+                    events.push_back(ev);
+                }
+            }
+            sortAndScanEvents();
+        }
+    }
     static constexpr size_t numOutports = 16;
     static constexpr size_t maxOutChannels = 16;
     float outportvalues[numOutports][maxOutChannels];
@@ -1432,10 +1481,17 @@ inline void test_cv_seq()
         seq->events.emplace_back(t, 15, 0, 6.0 * std::sin(2 * 3.141592 * t * 9.7));
         t += 0.01;
     }
+    seq->sortAndScanEvents();
+    seq->seek(0.0);
+    std::cout << seq->curEventIndex << "\n";
+    seq->seek(1.5);
+    std::cout << seq->curEventIndex << "\n";
+    return;
+    seq->writeToTextFile(R"(C:\develop\AudioPluginHost_mk2\cvsequence.txt)");
     seq->playRate = 2.0;
     choc::audio::WAVAudioFileFormat<true> format;
     choc::audio::AudioFileProperties props;
-    seq->sortAndScanEvents();
+    
     props.bitDepth = choc::audio::BitDepth::float32;
     props.numChannels = seq->highestPortNumber + 1;
     props.sampleRate = 44100;
