@@ -1318,7 +1318,7 @@ class CV_Sequencer
         events.reserve(4096);
         for (int i = 0; i < numOutports; ++i)
         {
-            // slews[i] = sst::basic_blocks::dsp::SlewLimiter();
+            // might want to do some other kind of smoothing...
             slews[i].setParams(5.0f, 1.0f, sampleRate);
             for (int j = 0; j < maxOutChannels; ++j)
             {
@@ -1333,12 +1333,13 @@ class CV_Sequencer
         {
             int eventIndex = curEventIndex;
             Event *ptr = &events[curEventIndex];
-            while ((int)(ptr->time * sampleRate) == (int)samplePos)
+            float invRate = 1.0 / playRate;
+            while ((int)(ptr->time * sampleRate) == (int)(samplePos * invRate))
             {
                 std::cout << std::format("{}\t{}\t{}\t{}\t{}\n", outputSamplesProduced, samplePos,
                                          ptr->outport, ptr->outchan, ptr->voltage);
-                assert(ptr->outport >= 0 && ptr->outport < numOutports);
-                assert(ptr->outchan >= 0 && ptr->outchan < maxOutChannels);
+                // assert(ptr->outport >= 0 && ptr->outport < numOutports);
+                // assert(ptr->outchan >= 0 && ptr->outchan < maxOutChannels);
                 outportvalues[ptr->outport][ptr->outchan] = ptr->voltage;
                 ++curEventIndex;
                 if (curEventIndex == events.size())
@@ -1368,11 +1369,23 @@ class CV_Sequencer
         }
         ++outputSamplesProduced;
     }
-    void sortEvents() { choc::sorting::stable_sort(events.begin(), events.end()); }
+    void sortAndScanEvents()
+    {
+        choc::sorting::stable_sort(events.begin(), events.end());
+        int highestPort = 0;
+        for (auto &e : events)
+        {
+            e.outport = std::clamp(e.outport, 0, 15);
+            e.outchan = std::clamp(e.outchan, 0, 15);
+            highestPort = std::max(highestPort, e.outport);
+        }
+        highestPortNumber = highestPort;
+    }
     static constexpr size_t numOutports = 16;
     static constexpr size_t maxOutChannels = 16;
     float outportvalues[numOutports][maxOutChannels];
     float smoothedValues[numOutports][maxOutChannels];
+    int highestPortNumber = 0;
     sst::basic_blocks::dsp::SlewLimiter slews[numOutports];
     int curEventIndex = 0;
     double samplePos = 0.0;
@@ -1389,9 +1402,9 @@ inline void test_cv_seq()
     seq->events.emplace_back(0.0, 0, 0, 0.5);
     seq->events.emplace_back(2.3, 0, 0, -0.5);
     seq->events.emplace_back(0.0, 1, 0, -9.99);
-    seq->events.emplace_back(1.0, 15, 0, 8.888);
-    seq->events.emplace_back(1.2, 15, 0, -8.888);
-    seq->events.emplace_back(2.1, 15, 0, 8.888);
+    seq->events.emplace_back(1.0, 14, 0, 8.888);
+    seq->events.emplace_back(1.2, 14, 0, -8.888);
+    seq->events.emplace_back(2.1, 14, 0, 8.888);
     std::mt19937 gen;
     std::uniform_real_distribution<double> dist{-5.0, 5.0};
     std::uniform_real_distribution<double> dist2{-10.0, 10.0};
@@ -1413,24 +1426,34 @@ inline void test_cv_seq()
         seq->events.emplace_back(t, 13, 0, 6.0 * std::sin(2 * 3.141592 * t));
         t += 0.01;
     }
-    // seq->playRate = 0.51;
+    t = 1.5;
+    while (t < 5.0)
+    {
+        seq->events.emplace_back(t, 15, 0, 6.0 * std::sin(2 * 3.141592 * t * 9.7));
+        t += 0.01;
+    }
+    seq->playRate = 2.0;
     choc::audio::WAVAudioFileFormat<true> format;
     choc::audio::AudioFileProperties props;
+    seq->sortAndScanEvents();
     props.bitDepth = choc::audio::BitDepth::float32;
-    props.numChannels = 16;
+    props.numChannels = seq->highestPortNumber + 1;
     props.sampleRate = 44100;
     auto writer = format.createWriter(R"(C:\MusicAudio\clap_out\cvseq\seqout.wav)", props);
+
     int outlen = 10 * 44100;
     int bufsize = 512;
     int outcounter = 0;
-    choc::buffer::ChannelArrayBuffer<float> buffer{16, (unsigned int)bufsize};
-    seq->sortEvents();
+
+    choc::buffer::ChannelArrayBuffer<float> buffer{(unsigned int)(seq->highestPortNumber + 1),
+                                                   (unsigned int)bufsize};
+
     while (outcounter < outlen)
     {
         for (int i = 0; i < bufsize; ++i)
         {
             seq->process();
-            for (int j = 0; j < 16; ++j)
+            for (int j = 0; j < buffer.getNumChannels(); ++j)
             {
                 buffer.getSample(j, i) = 0.1 * seq->smoothedValues[j][0];
             }
