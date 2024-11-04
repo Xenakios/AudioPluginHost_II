@@ -921,7 +921,8 @@ class GrainDelay
                     ph.outputbufferpos = 0;
                 float gain = 1.0f;
                 if (ph.playpos < ph.lensamples / 2)
-                    gain = xenakios::mapvalue<float>(ph.playpos, 0, ph.lensamples / 2.0, 0.0f, 1.0f);
+                    gain =
+                        xenakios::mapvalue<float>(ph.playpos, 0, ph.lensamples / 2.0, 0.0f, 1.0f);
                 if (ph.playpos >= ph.lensamples / 2)
                     gain = xenakios::mapvalue<float>(ph.playpos, ph.lensamples / 2.0, ph.lensamples,
                                                      1.0f, 0.0f);
@@ -1300,15 +1301,128 @@ inline void test_mts_esp_wrapper()
     std::cout << tuner.noteToFrequency(60) << "\n";
 }
 
+class CV_Sequencer
+{
+  public:
+    struct Event
+    {
+        double time = 0.0;
+        int outport = 0;
+        int outchan = 0;
+        double voltage = 0.0;
+        bool operator<(const Event &other) { return time < other.time; }
+    };
+    std::vector<Event> events;
+    CV_Sequencer()
+    {
+        events.reserve(4096);
+        for (int i = 0; i < numOutports; ++i)
+        {
+            // slews[i] = sst::basic_blocks::dsp::SlewLimiter();
+            slews[i].setParams(5.0f, 1.0f, sampleRate);
+            for (int j = 0; j < maxOutChannels; ++j)
+            {
+                outportvalues[i][j] = 0.0f;
+                smoothedValues[i][j] = 0.0f;
+            }
+        }
+    }
+    void process()
+    {
+        if (events.size() > 0 && curEventIndex < events.size())
+        {
+            int eventIndex = curEventIndex;
+            Event *ptr = &events[curEventIndex];
+            while ((int)(ptr->time * sampleRate) == (int)samplePos)
+            {
+                std::cout << std::format("{}\t{}\t{}\t{}\t{}\n", outputSamplesProduced, samplePos,
+                                         ptr->outport, ptr->outchan, ptr->voltage);
+                assert(ptr->outport >= 0 && ptr->outport < numOutports);
+                assert(ptr->outchan >= 0 && ptr->outchan < maxOutChannels);
+                outportvalues[ptr->outport][ptr->outchan] = ptr->voltage;
+                ++curEventIndex;
+                if (curEventIndex == events.size())
+                    break;
+                ptr = &events[curEventIndex];
+            }
+        }
+        for (int i = 0; i < numOutports; ++i)
+        {
+            smoothedValues[i][0] = slews[i].step(outportvalues[i][0]);
+        }
+        samplePos += playRate;
+        if (samplePos >= loopLen)
+        {
+            samplePos = 0;
+            curEventIndex = 0;
+        }
+        ++outputSamplesProduced;
+    }
+    void sortEvents() { choc::sorting::stable_sort(events.begin(), events.end()); }
+    static constexpr size_t numOutports = 16;
+    static constexpr size_t maxOutChannels = 16;
+    float outportvalues[numOutports][maxOutChannels];
+    float smoothedValues[numOutports][maxOutChannels];
+    sst::basic_blocks::dsp::SlewLimiter slews[numOutports];
+    int curEventIndex = 0;
+    double samplePos = 0.0;
+    double playRate = 1.0;
+    int loopLen = 5 * 44100;
+    double sampleRate = 44100.0;
+    int outputSamplesProduced = 0;
+};
+
+inline void test_cv_seq()
+{
+    auto seq = std::make_unique<CV_Sequencer>();
+    seq->events.emplace_back(0.0, 0, 0, 0.5);
+    seq->events.emplace_back(2.3, 0, 0, -0.5);
+    seq->events.emplace_back(0.0, 1, 0, -9.99);
+    seq->events.emplace_back(1.0, 15, 0, 8.888);
+    seq->events.emplace_back(1.2, 15, 0, -8.888);
+    seq->events.emplace_back(2.1, 15, 0, 8.888);
+    std::mt19937 gen;
+    std::uniform_real_distribution<double> dist{-5.0, 5.0};
+    std::uniform_real_distribution<double> dist2{-10.0, 10.0};
+    for (int i = 0; i < 10; ++i)
+    {
+        seq->events.emplace_back(0.5 + i * 0.1, 8, 0, dist(gen));
+    }
+    for (int i = 0; i < 40; ++i)
+    {
+        seq->events.emplace_back(1.4 + i * 0.05, 5, 0, dist2(gen));
+    }
+    // seq->playRate = 0.51;
+    choc::audio::WAVAudioFileFormat<true> format;
+    choc::audio::AudioFileProperties props;
+    props.bitDepth = choc::audio::BitDepth::float32;
+    props.numChannels = 16;
+    props.sampleRate = 44100;
+    auto writer = format.createWriter(R"(C:\MusicAudio\clap_out\cvseq\seqout.wav)", props);
+    int outlen = 10 * 44100;
+    choc::buffer::ChannelArrayBuffer<float> buffer{16, (unsigned int)outlen};
+    seq->sortEvents();
+    for (int i = 0; i < outlen; ++i)
+    {
+        seq->process();
+        for (int j = 0; j < 16; ++j)
+        {
+            buffer.getSample(j, i) = 0.1 * seq->smoothedValues[j][0];
+        }
+    }
+    writer->appendFrames(buffer.getView());
+}
+
 int main()
 {
-    test_clap_engine_multichain();
+    test_cv_seq();
+    // test_clap_engine_multichain();
     // test_vec();
     // test_mts_esp_wrapper();
     // run_tests();
     // test_seq_to_json();
     // test_param_origin();
-    
+
     //  test_numrange();
     //  inplace_test();
     //  return 0;
