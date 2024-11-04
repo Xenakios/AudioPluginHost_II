@@ -1348,13 +1348,23 @@ class CV_Sequencer
         }
         for (int i = 0; i < numOutports; ++i)
         {
-            smoothedValues[i][0] = slews[i].step(outportvalues[i][0]);
+            smoothedValues[i][0] = std::clamp(slews[i].step(outportvalues[i][0]), -10.0f, 10.0f);
         }
         samplePos += playRate;
         if (samplePos >= loopLen)
         {
             samplePos = 0;
             curEventIndex = 0;
+            if (zeroVoltagesAtLoop)
+            {
+                for (int i = 0; i < numOutports; ++i)
+                {
+                    for (int j = 0; j < maxOutChannels; ++j)
+                    {
+                        outportvalues[i][j] = 0.0f;
+                    }
+                }
+            }
         }
         ++outputSamplesProduced;
     }
@@ -1368,6 +1378,7 @@ class CV_Sequencer
     double samplePos = 0.0;
     double playRate = 1.0;
     int loopLen = 5 * 44100;
+    bool zeroVoltagesAtLoop = true;
     double sampleRate = 44100.0;
     int outputSamplesProduced = 0;
 };
@@ -1392,6 +1403,16 @@ inline void test_cv_seq()
     {
         seq->events.emplace_back(1.4 + i * 0.05, 5, 0, dist2(gen));
     }
+    for (int i = 0; i < 400; ++i)
+    {
+        seq->events.emplace_back(1.4 + i * 0.005, 11, 0, dist(gen));
+    }
+    double t = 0.0;
+    while (t < 5.0)
+    {
+        seq->events.emplace_back(t, 13, 0, 6.0 * std::sin(2 * 3.141592 * t));
+        t += 0.01;
+    }
     // seq->playRate = 0.51;
     choc::audio::WAVAudioFileFormat<true> format;
     choc::audio::AudioFileProperties props;
@@ -1400,17 +1421,23 @@ inline void test_cv_seq()
     props.sampleRate = 44100;
     auto writer = format.createWriter(R"(C:\MusicAudio\clap_out\cvseq\seqout.wav)", props);
     int outlen = 10 * 44100;
-    choc::buffer::ChannelArrayBuffer<float> buffer{16, (unsigned int)outlen};
+    int bufsize = 512;
+    int outcounter = 0;
+    choc::buffer::ChannelArrayBuffer<float> buffer{16, (unsigned int)bufsize};
     seq->sortEvents();
-    for (int i = 0; i < outlen; ++i)
+    while (outcounter < outlen)
     {
-        seq->process();
-        for (int j = 0; j < 16; ++j)
+        for (int i = 0; i < bufsize; ++i)
         {
-            buffer.getSample(j, i) = 0.1 * seq->smoothedValues[j][0];
+            seq->process();
+            for (int j = 0; j < 16; ++j)
+            {
+                buffer.getSample(j, i) = 0.1 * seq->smoothedValues[j][0];
+            }
         }
+        writer->appendFrames(buffer.getView());
+        outcounter += bufsize;
     }
-    writer->appendFrames(buffer.getView());
 }
 
 int main()
