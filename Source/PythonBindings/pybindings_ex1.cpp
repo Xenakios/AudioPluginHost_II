@@ -15,17 +15,16 @@ class TimeStretch
     TimeStretch() {}
     void set_stretch(float st) { m_stretchfactor = st; }
     void set_pitch(float semitones) { m_pitchfactor = std::pow(2.0, semitones / 12.0); }
-    bool inited = false;
     std::vector<float> outdata;
-    py::array_t<float> process(const py::array_t<float> &input_audio)
+    py::array_t<float> process(const py::array_t<float> &input_audio, float insamplerate)
     {
         int num_inchans = input_audio.shape(0);
-        if (!inited)
+        if (samplerate != insamplerate)
         {
-            m_stretcher.presetDefault(num_inchans, 44100.0);
-            m_stretcher.setTransposeFactor(m_pitchfactor);
-            inited = true;
+            m_stretcher.presetDefault(num_inchans, insamplerate);
+            samplerate = insamplerate;
         }
+        m_stretcher.setTransposeFactor(m_pitchfactor);
         int numinsamples = input_audio.shape(1);
         int numoutsamples = numinsamples * m_stretchfactor;
         // std::cout << input_audio.shape(0) << " " << input_audio.shape(1) << "\n";
@@ -53,6 +52,7 @@ class TimeStretch
     signalsmith::stretch::SignalsmithStretch<float> m_stretcher;
     double m_stretchfactor = 2.0;
     double m_pitchfactor = 1.0;
+    float samplerate = -1.0;
 };
 
 class MTSESPSource
