@@ -41,12 +41,10 @@ class TimeStretch
         m_stretcher.setTransposeFactor(m_pitchfactor);
         int numinsamples = input_audio.shape(1);
         int numoutsamples = numinsamples * m_stretchfactor;
-        if (numoutsamples < 16)
-            throw std::runtime_error(
-                std::format("Resulting output buffer is too small ({} samples)", numoutsamples));
-        if (numoutsamples * num_inchans * sizeof(float) > 1024 * 1024 * 1024)
-            throw std::runtime_error(
-                std::format("Resulting output buffer is too large ({} samples)", numoutsamples));
+        if (numoutsamples < 16 ||
+            (numoutsamples * num_inchans * sizeof(float)) > (1024 * 1024 * 1024))
+            throw std::runtime_error(std::format(
+                "Resulting output buffer size {} samples outside limits", numoutsamples));
         outdata.resize(numoutsamples * num_inchans);
         float const *buftostretch[64];
         float *buf_from_stretch[64];
@@ -63,7 +61,6 @@ class TimeStretch
                 buf_from_stretch[i] = nullptr;
             }
         }
-
         m_stretcher.process(buftostretch, numinsamples, buf_from_stretch, numoutsamples);
         py::buffer_info binfo(
             outdata.data(),                         /* Pointer to buffer */
