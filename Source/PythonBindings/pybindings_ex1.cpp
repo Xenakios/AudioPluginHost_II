@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <pybind11/buffer_info.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
@@ -13,8 +14,16 @@ class TimeStretch
 {
   public:
     TimeStretch() {}
-    void set_stretch(float st) { m_stretchfactor = st; }
-    void set_pitch(float semitones) { m_pitchfactor = std::pow(2.0, semitones / 12.0); }
+    void set_stretch(float st)
+    {
+        st = std::clamp(st, 0.1f, 64.0f);
+        m_stretchfactor = st;
+    }
+    void set_pitch(float semitones)
+    {
+        semitones = std::clamp(semitones, -48.0f, 48.0f);
+        m_pitchfactor = std::pow(2.0, semitones / 12.0);
+    }
     std::vector<float> outdata;
     py::array_t<float> process(const py::array_t<float> &input_audio, float insamplerate)
     {
@@ -29,11 +38,22 @@ class TimeStretch
         int numoutsamples = numinsamples * m_stretchfactor;
         // std::cout << input_audio.shape(0) << " " << input_audio.shape(1) << "\n";
         outdata.resize(numoutsamples * num_inchans);
+        float const *buftostretch[64];
+        float *buf_from_stretch[64];
+        for (int i = 0; i < 64; ++i)
+        {
+            if (i < num_inchans)
+            {
+                buftostretch[i] = input_audio.data(i);
+                buf_from_stretch[i] = &outdata[numoutsamples * i];
+            }
+            else
+            {
+                buftostretch[i] = nullptr;
+                buf_from_stretch[i] = nullptr;
+            }
+        }
 
-        // output_audio.reshape({1,numoutsamples});
-        // output_audio.
-        float const *buftostretch[2] = {input_audio.data(0), input_audio.data(1)};
-        float *buf_from_stretch[2] = {&outdata[0], &outdata[numoutsamples * 1]};
         m_stretcher.process(buftostretch, numinsamples, buf_from_stretch, numoutsamples);
         py::buffer_info binfo(
             outdata.data(),                         /* Pointer to buffer */
