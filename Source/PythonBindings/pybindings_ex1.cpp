@@ -14,7 +14,12 @@ namespace py = pybind11;
 class TimeStretch
 {
   public:
-    TimeStretch() {}
+    TimeStretch(int preset)
+    {
+        m_stretcher = std::make_unique<signalsmith::stretch::SignalsmithStretch<float>>();
+        outdata.reserve(65536);
+        stretchPreset = std::clamp(preset, 0, 2);
+    }
     void set_stretch(float st)
     {
         st = std::clamp(st, 0.1f, 64.0f);
@@ -25,6 +30,7 @@ class TimeStretch
         semitones = std::clamp(semitones, -48.0f, 48.0f);
         m_pitchfactor = std::pow(2.0, semitones / 12.0);
     }
+    int get_latency() { return m_stretcher->outputLatency(); }
     std::vector<float> outdata;
     py::array_t<float> process(const py::array_t<float> &input_audio, float insamplerate)
     {
@@ -35,10 +41,17 @@ class TimeStretch
 
         if (samplerate != insamplerate)
         {
-            m_stretcher.presetDefault(num_inchans, insamplerate);
+            if (stretchPreset == 0)
+                m_stretcher->presetCheaper(num_inchans, insamplerate);
+            if (stretchPreset == 1)
+                m_stretcher->presetDefault(num_inchans, insamplerate);
+            if (stretchPreset == 2)
+                m_stretcher->configure(num_inchans, insamplerate * 0.2, insamplerate * 0.02);
             samplerate = insamplerate;
         }
-        m_stretcher.setTransposeFactor(m_pitchfactor);
+        m_stretcher->setTransposeFactor(m_pitchfactor);
+        // std::cout << "input latency " << m_stretcher->inputLatency() << "\n";
+        // std::cout << "output latency " << m_stretcher->outputLatency() << "\n";
         int numinsamples = input_audio.shape(1);
         int numoutsamples = numinsamples * m_stretchfactor;
         if (numoutsamples < 16 ||
@@ -61,7 +74,7 @@ class TimeStretch
                 buf_from_stretch[i] = nullptr;
             }
         }
-        m_stretcher.process(buftostretch, numinsamples, buf_from_stretch, numoutsamples);
+        m_stretcher->process(buftostretch, numinsamples, buf_from_stretch, numoutsamples);
         py::buffer_info binfo(
             outdata.data(),                         /* Pointer to buffer */
             sizeof(float),                          /* Size of one scalar */
@@ -76,10 +89,11 @@ class TimeStretch
     }
 
   private:
-    signalsmith::stretch::SignalsmithStretch<float> m_stretcher;
+    std::unique_ptr<signalsmith::stretch::SignalsmithStretch<float>> m_stretcher;
     double m_stretchfactor = 2.0;
     double m_pitchfactor = 1.0;
     float samplerate = -1.0;
+    int stretchPreset = 0;
 };
 
 class MTSESPSource
@@ -156,9 +170,10 @@ void init_py1(py::module_ &m)
         .def("setNoteTuning", &MTSESPSource::setNoteTuning);
 
     py::class_<TimeStretch>(m, "TimeStretch")
-        .def(py::init<>())
+        .def(py::init<int>(), "stretch_preset"_a)
         .def("set_stretch", &TimeStretch::set_stretch)
         .def("set_pitch", &TimeStretch::set_pitch)
+        .def("get_latency", &TimeStretch::get_latency)
         .def("process", &TimeStretch::process);
 
     py::class_<ClapEventSequence>(m, "ClapSequence")
