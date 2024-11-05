@@ -1,11 +1,59 @@
+#include <pybind11/buffer_info.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 #include <pybind11/numpy.h>
 #include "libMTSMaster.h"
 #include <iostream>
 #include "../Common/clap_eventsequence.h"
+#include "signalsmith-stretch.h"
 
 namespace py = pybind11;
+
+class TimeStretch
+{
+  public:
+    TimeStretch() {}
+    void set_stretch(float st) { m_stretchfactor = st; }
+    void set_pitch(float semitones) { m_pitchfactor = std::pow(2.0, semitones / 12.0); }
+    bool inited = false;
+    std::vector<float> outdata;
+    py::array_t<float> process(const py::array_t<float> &input_audio)
+    {
+        int num_inchans = input_audio.shape(0);
+        if (!inited)
+        {
+            m_stretcher.presetDefault(num_inchans, 44100.0);
+            m_stretcher.setTransposeFactor(m_pitchfactor);
+            inited = true;
+        }
+        int numinsamples = input_audio.shape(1);
+        int numoutsamples = numinsamples * m_stretchfactor;
+        // std::cout << input_audio.shape(0) << " " << input_audio.shape(1) << "\n";
+        outdata.resize(numoutsamples * num_inchans);
+
+        // output_audio.reshape({1,numoutsamples});
+        // output_audio.
+        float const *buftostretch[2] = {input_audio.data(0), input_audio.data(1)};
+        float *buf_from_stretch[2] = {&outdata[0], &outdata[numoutsamples * 1]};
+        m_stretcher.process(buftostretch, numinsamples, buf_from_stretch, numoutsamples);
+        py::buffer_info binfo(
+            outdata.data(),                         /* Pointer to buffer */
+            sizeof(float),                          /* Size of one scalar */
+            py::format_descriptor<float>::format(), /* Python struct-style format descriptor */
+            2,                                      /* Number of dimensions */
+            {2, numoutsamples},                     /* Buffer dimensions */
+            {sizeof(float) * numoutsamples,         /* Strides (in bytes) for each index */
+             sizeof(float)});
+        py::array_t<float> output_audio{binfo};
+        // std::cout << output_audio.shape(0) << " " << output_audio.shape(1) << "\n";
+        return output_audio;
+    }
+
+  private:
+    signalsmith::stretch::SignalsmithStretch<float> m_stretcher;
+    double m_stretchfactor = 2.0;
+    double m_pitchfactor = 1.0;
+};
 
 class MTSESPSource
 {
@@ -79,7 +127,13 @@ void init_py1(py::module_ &m)
         .def(py::init<>())
         .def("setNoteTuningMap", &MTSESPSource::setNoteTuningMap)
         .def("setNoteTuning", &MTSESPSource::setNoteTuning);
-    
+
+    py::class_<TimeStretch>(m, "TimeStretch")
+        .def(py::init<>())
+        .def("set_stretch", &TimeStretch::set_stretch)
+        .def("set_pitch", &TimeStretch::set_pitch)
+        .def("process", &TimeStretch::process);
+
     py::class_<ClapEventSequence>(m, "ClapSequence")
         .def(py::init<>())
         .def("getNumEvents", &ClapEventSequence::getNumEvents)

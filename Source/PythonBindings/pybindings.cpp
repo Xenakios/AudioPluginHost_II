@@ -17,6 +17,7 @@
 #include "Tunings.h"
 #include "../Common/bluenoise.h"
 
+
 #if !NOJUCE
 #include "juce_audio_processors/juce_audio_processors.h"
 #include "juce_core/juce_core.h"
@@ -133,6 +134,7 @@ static void startStreaming(ClapProcessingEngine &eng, std::optional<unsigned int
     }
 }
 
+
 PYBIND11_MODULE(xenakios, m)
 {
     using namespace pybind11::literals;
@@ -195,7 +197,7 @@ PYBIND11_MODULE(xenakios, m)
         .def(py::init<>())
         .def("addPlugin", &ClapProcessingEngine::addProcessorToChain)
         .def("addChain", &addChainWithPlugins)
-        .def("getChain",&ClapProcessingEngine::getChain, py::return_value_policy::reference)
+        .def("getChain", &ClapProcessingEngine::getChain, py::return_value_policy::reference)
         .def("getSequence", &ClapProcessingEngine::getSequence, py::return_value_policy::reference)
         .def_static("scanPluginFile", &ClapProcessingEngine::scanPluginFile,
                     "Returns plugin info as JSON formatted string")
