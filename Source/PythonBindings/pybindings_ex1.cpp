@@ -5,6 +5,7 @@
 #include <pybind11/numpy.h>
 #include "libMTSMaster.h"
 #include <iostream>
+#include <stdexcept>
 #include "../Common/clap_eventsequence.h"
 #include "signalsmith-stretch.h"
 
@@ -28,6 +29,10 @@ class TimeStretch
     py::array_t<float> process(const py::array_t<float> &input_audio, float insamplerate)
     {
         int num_inchans = input_audio.shape(0);
+        if (num_inchans > 64)
+            throw std::runtime_error(
+                std::format("Channel count {} too high, max allowed is 64", num_inchans));
+
         if (samplerate != insamplerate)
         {
             m_stretcher.presetDefault(num_inchans, insamplerate);
@@ -36,7 +41,12 @@ class TimeStretch
         m_stretcher.setTransposeFactor(m_pitchfactor);
         int numinsamples = input_audio.shape(1);
         int numoutsamples = numinsamples * m_stretchfactor;
-        // std::cout << input_audio.shape(0) << " " << input_audio.shape(1) << "\n";
+        if (numoutsamples < 16)
+            throw std::runtime_error(
+                std::format("Resulting output buffer is too small ({} samples)", numoutsamples));
+        if (numoutsamples * num_inchans * sizeof(float) > 1024 * 1024 * 1024)
+            throw std::runtime_error(
+                std::format("Resulting output buffer is too large ({} samples)", numoutsamples));
         outdata.resize(numoutsamples * num_inchans);
         float const *buftostretch[64];
         float *buf_from_stretch[64];
