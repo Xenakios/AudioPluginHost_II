@@ -3,14 +3,87 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 #include <pybind11/numpy.h>
+#include "audio/choc_AudioFileFormat.h"
+#include "audio/choc_AudioFileFormat_WAV.h"
+#include "audio/choc_SampleBuffers.h"
 #include "libMTSMaster.h"
 #include <iostream>
 #include <stdexcept>
+#include <type_traits>
 #include <unordered_map>
 #include "../Common/clap_eventsequence.h"
 #include "signalsmith-stretch.h"
 
 namespace py = pybind11;
+
+class XAudioFileReader
+{
+  public:
+    XAudioFileReader(std::string path)
+    {
+        choc::audio::AudioFileFormatList flist;
+        flist.addFormat(std::make_unique<choc::audio::WAVAudioFileFormat<false>>());
+        m_reader = flist.createReader(path);
+        if (!m_reader)
+            throw std::runtime_error("Can't open " + path);
+    }
+    void seek(int64_t pos) { m_currentPos = pos; }
+    py::array_t<float> read(int num_samples, int force_output_channels)
+    {
+        auto filechans = m_reader->getProperties().numChannels;
+        int outchans_to_use = filechans;
+
+        if (filechans == 1 && force_output_channels > 1)
+            outchans_to_use = force_output_channels;
+        if (m_readVec.size() < num_samples * outchans_to_use)
+        {
+            m_readVec.resize(outchans_to_use * num_samples);
+        }
+        float *chanpointers[64];
+        for (int i = 0; i < 64; ++i)
+        {
+            if (i < outchans_to_use)
+                chanpointers[i] = &m_readVec[i * num_samples];
+            else
+                chanpointers[i] = nullptr;
+        }
+        choc::buffer::SeparateChannelLayout<float> layout{chanpointers};
+        choc::buffer::ChannelArrayView<float> view{layout, {filechans, (unsigned int)num_samples}};
+        if (!m_reader->readFrames(m_currentPos, view))
+            throw std::runtime_error("could not read from file");
+        if (filechans == 1 && force_output_channels > 1)
+        {
+            for (int i = 0; i < num_samples; ++i)
+            {
+                chanpointers[1][i] = chanpointers[0][i];
+            }
+        }
+        py::buffer_info binfo(
+            m_readVec.data(),                       /* Pointer to buffer */
+            sizeof(float),                          /* Size of one scalar */
+            py::format_descriptor<float>::format(), /* Python struct-style format descriptor */
+            2,                                      /* Number of dimensions */
+            {outchans_to_use, num_samples},         /* Buffer dimensions */
+            {sizeof(float) * num_samples,           /* Strides (in bytes) for each index */
+             sizeof(float)});
+        py::array_t<float> output_audio{binfo};
+        m_currentPos += num_samples;
+        return output_audio;
+    }
+    int sample_rate()
+    {
+        return m_reader->getProperties().sampleRate;
+    }
+    int64_t tell()
+    {
+        return m_currentPos;
+    }
+  private:
+    choc::audio::AudioFileProperties m_props;
+    std::unique_ptr<choc::audio::AudioFileReader> m_reader;
+    int64_t m_currentPos = 0;
+    std::vector<float> m_readVec;
+};
 
 class TimeStretch
 {
@@ -229,6 +302,13 @@ void init_py1(py::module_ &m)
         .def("samples_required", &TimeStretch::samples_required)
         .def("process", &TimeStretch::process, "input_audio"_a, "samplerate"_a,
              "outputwanted"_a = 0);
+
+    py::class_<XAudioFileReader>(m, "AudioFile")
+        .def(py::init<std::string>(), "filename"_a)
+        .def("seek", &XAudioFileReader::seek)
+        .def("tell", &XAudioFileReader::tell)
+        .def("sample_rate", &XAudioFileReader::sample_rate)
+        .def("read", &XAudioFileReader::read);
 
     py::class_<ClapEventSequence>(m, "ClapSequence")
         .def(py::init<>())
