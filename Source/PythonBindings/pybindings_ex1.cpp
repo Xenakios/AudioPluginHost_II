@@ -5,6 +5,9 @@
 #include <pybind11/numpy.h>
 #include "audio/choc_AudioFileFormat.h"
 #include "audio/choc_AudioFileFormat_WAV.h"
+//#include "audio/choc_AudioFileFormat_FLAC.h"
+//#include "audio/choc_AudioFileFormat_Ogg.h"
+//#include "audio/choc_AudioFileFormat_MP3.h"
 #include "audio/choc_SampleBuffers.h"
 #include "libMTSMaster.h"
 #include <iostream>
@@ -23,11 +26,21 @@ class XAudioFileReader
     {
         choc::audio::AudioFileFormatList flist;
         flist.addFormat(std::make_unique<choc::audio::WAVAudioFileFormat<false>>());
+        // flist.addFormat(std::make_unique<choc::audio::FLACAudioFileFormat<false>>());
+        // flist.addFormat(std::make_unique<choc::audio::OggAudioFileFormat<false>>());
+        // flist.addFormat(std::make_unique<choc::audio::MP3AudioFileFormat>());
+
         m_reader = flist.createReader(path);
         if (!m_reader)
             throw std::runtime_error("Can't open " + path);
+        m_loopEnd = m_reader->getProperties().numFrames;
     }
     void seek(int64_t pos) { m_currentPos = pos; }
+    void set_loop_points(int64_t start, int64_t end)
+    {
+        m_loopStart = start;
+        m_loopEnd = end;
+    }
     py::array_t<float> read(int num_samples, int force_output_channels)
     {
         auto filechans = m_reader->getProperties().numChannels;
@@ -49,8 +62,11 @@ class XAudioFileReader
         }
         choc::buffer::SeparateChannelLayout<float> layout{chanpointers};
         choc::buffer::ChannelArrayView<float> view{layout, {filechans, (unsigned int)num_samples}};
-        if (!m_reader->readFrames(m_currentPos, view))
-            throw std::runtime_error("could not read from file");
+        // if (m_currentPos + num_samples < m_loopEnd)
+        {
+            m_reader->readFrames(m_currentPos, view);
+        }
+
         if (filechans == 1 && force_output_channels > 1)
         {
             for (int i = 0; i < num_samples; ++i)
@@ -70,18 +86,15 @@ class XAudioFileReader
         m_currentPos += num_samples;
         return output_audio;
     }
-    int sample_rate()
-    {
-        return m_reader->getProperties().sampleRate;
-    }
-    int64_t tell()
-    {
-        return m_currentPos;
-    }
+    int sample_rate() { return m_reader->getProperties().sampleRate; }
+    int64_t tell() { return m_currentPos; }
+
   private:
     choc::audio::AudioFileProperties m_props;
     std::unique_ptr<choc::audio::AudioFileReader> m_reader;
     int64_t m_currentPos = 0;
+    int64_t m_loopStart = 0;
+    int64_t m_loopEnd = 0;
     std::vector<float> m_readVec;
 };
 
