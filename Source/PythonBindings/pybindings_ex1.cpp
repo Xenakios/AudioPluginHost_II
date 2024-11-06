@@ -15,13 +15,14 @@ namespace py = pybind11;
 class TimeStretch
 {
   public:
-    TimeStretch(int preset)
+    TimeStretch(int preset, int iomode)
     {
+        m_iomode = iomode;
         m_stretcher = std::make_unique<signalsmith::stretch::SignalsmithStretch<float>>();
         outdata.reserve(65536);
         stretchPreset = std::clamp(preset, 0, 4);
         presetConfigs[0] = {0.04f, 0.02f};
-        presetConfigs[1] = {0.1f, 0.04f}; // signalsmith cheap 
+        presetConfigs[1] = {0.1f, 0.04f};  // signalsmith cheap
         presetConfigs[2] = {0.12f, 0.03f}; // signalsmith default
         presetConfigs[3] = {0.2f, 0.02f};
         presetConfigs[4] = {0.4f, 0.02f};
@@ -37,8 +38,9 @@ class TimeStretch
         m_pitchfactor = std::pow(2.0, semitones / 12.0);
     }
     int get_latency() { return m_stretcher->outputLatency(); }
-
-    py::array_t<float> process(const py::array_t<float> &input_audio, float insamplerate)
+    int samples_required(int numoutsamples) { return numoutsamples / m_stretchfactor; }
+    py::array_t<float> process(const py::array_t<float> &input_audio, float insamplerate,
+                               int numoutsampleswanted)
     {
         int num_inchans = input_audio.shape(0);
         if (num_inchans > 64)
@@ -53,45 +55,89 @@ class TimeStretch
             samplerate = insamplerate;
         }
         m_stretcher->setTransposeFactor(m_pitchfactor);
-        int numinsamples = input_audio.shape(1);
-        int numoutsamples = numinsamples * m_stretchfactor;
-        if (numoutsamples < 16 ||
-            (numoutsamples * num_inchans * sizeof(float)) > (1024 * 1024 * 1024))
-            throw std::runtime_error(std::format(
-                "Resulting output buffer size {} samples outside limits", numoutsamples));
-        outdata.resize(numoutsamples * num_inchans);
-        float const *buftostretch[64];
-        float *buf_from_stretch[64];
-        for (int i = 0; i < 64; ++i)
+        if (m_iomode == 0)
         {
-            if (i < num_inchans)
+            int numinsamples = input_audio.shape(1);
+            int numoutsamples = numinsamples * m_stretchfactor;
+            if (numoutsamples < 16 ||
+                (numoutsamples * num_inchans * sizeof(float)) > (1024 * 1024 * 1024))
+                throw std::runtime_error(std::format(
+                    "Resulting output buffer size {} samples outside limits", numoutsamples));
+            outdata.resize(numoutsamples * num_inchans);
+            float const *buftostretch[64];
+            float *buf_from_stretch[64];
+            for (int i = 0; i < 64; ++i)
             {
-                buftostretch[i] = input_audio.data(i);
-                buf_from_stretch[i] = &outdata[numoutsamples * i];
+                if (i < num_inchans)
+                {
+                    buftostretch[i] = input_audio.data(i);
+                    buf_from_stretch[i] = &outdata[numoutsamples * i];
+                }
+                else
+                {
+                    buftostretch[i] = nullptr;
+                    buf_from_stretch[i] = nullptr;
+                }
             }
-            else
-            {
-                buftostretch[i] = nullptr;
-                buf_from_stretch[i] = nullptr;
-            }
+            m_stretcher->process(buftostretch, numinsamples, buf_from_stretch, numoutsamples);
+            py::buffer_info binfo(
+                outdata.data(),                         /* Pointer to buffer */
+                sizeof(float),                          /* Size of one scalar */
+                py::format_descriptor<float>::format(), /* Python struct-style format descriptor */
+                2,                                      /* Number of dimensions */
+                {2, numoutsamples},                     /* Buffer dimensions */
+                {sizeof(float) * numoutsamples,         /* Strides (in bytes) for each index */
+                 sizeof(float)});
+            py::array_t<float> output_audio{binfo};
+            return output_audio;
         }
-        m_stretcher->process(buftostretch, numinsamples, buf_from_stretch, numoutsamples);
-        py::buffer_info binfo(
-            outdata.data(),                         /* Pointer to buffer */
-            sizeof(float),                          /* Size of one scalar */
-            py::format_descriptor<float>::format(), /* Python struct-style format descriptor */
-            2,                                      /* Number of dimensions */
-            {2, numoutsamples},                     /* Buffer dimensions */
-            {sizeof(float) * numoutsamples,         /* Strides (in bytes) for each index */
-             sizeof(float)});
-        py::array_t<float> output_audio{binfo};
-        // std::cout << output_audio.shape(0) << " " << output_audio.shape(1) << "\n";
-        return output_audio;
+        else
+        {
+            if (numoutsampleswanted < 16)
+                throw std::runtime_error("Too small output buffer wanted");
+            int numinsamples = input_audio.shape(1);
+            if (numinsamples != samples_required(numoutsampleswanted))
+                throw std::runtime_error(std::format("Expected {} input samples, got {}",
+                                                     samples_required(numoutsampleswanted),
+                                                     numinsamples));
+            int numoutsamples = numoutsampleswanted;
+            outdata.resize(numoutsamples * num_inchans);
+            float const *buftostretch[64];
+            float *buf_from_stretch[64];
+            for (int i = 0; i < 64; ++i)
+            {
+                if (i < num_inchans)
+                {
+                    buftostretch[i] = input_audio.data(i);
+                    buf_from_stretch[i] = &outdata[numoutsamples * i];
+                }
+                else
+                {
+                    buftostretch[i] = nullptr;
+                    buf_from_stretch[i] = nullptr;
+                }
+            }
+            m_stretcher->process(buftostretch, numinsamples, buf_from_stretch, numoutsamples);
+            py::buffer_info binfo(
+                outdata.data(),                         /* Pointer to buffer */
+                sizeof(float),                          /* Size of one scalar */
+                py::format_descriptor<float>::format(), /* Python struct-style format descriptor */
+                2,                                      /* Number of dimensions */
+                {2, numoutsamples},                     /* Buffer dimensions */
+                {sizeof(float) * numoutsamples,         /* Strides (in bytes) for each index */
+                 sizeof(float)});
+            py::array_t<float> output_audio{binfo};
+            // std::cout << output_audio.shape(0) << " " << output_audio.shape(1) << "\n";
+            return output_audio;
+        }
     }
 
   private:
     std::unique_ptr<signalsmith::stretch::SignalsmithStretch<float>> m_stretcher;
     std::vector<float> outdata;
+    // 0 : stretcher decides output buffer size
+    // 1 : client decides stretch output buffer size, needs to change input buffer size as needed
+    int m_iomode = 0;
     double m_stretchfactor = 2.0;
     double m_pitchfactor = 1.0;
     float samplerate = -1.0;
@@ -173,11 +219,13 @@ void init_py1(py::module_ &m)
         .def("setNoteTuning", &MTSESPSource::setNoteTuning);
 
     py::class_<TimeStretch>(m, "TimeStretch")
-        .def(py::init<int>(), "stretch_preset"_a = 2)
+        .def(py::init<int, int>(), "stretch_preset"_a = 2, "io_mode"_a = 0)
         .def("set_stretch", &TimeStretch::set_stretch)
         .def("set_pitch", &TimeStretch::set_pitch)
         .def("get_latency", &TimeStretch::get_latency)
-        .def("process", &TimeStretch::process);
+        .def("samples_required", &TimeStretch::samples_required)
+        .def("process", &TimeStretch::process, "input_audio"_a, "samplerate"_a = 44100.0f,
+             "outputwanted"_a = 0);
 
     py::class_<ClapEventSequence>(m, "ClapSequence")
         .def(py::init<>())
