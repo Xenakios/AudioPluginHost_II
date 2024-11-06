@@ -6,6 +6,7 @@
 #include "libMTSMaster.h"
 #include <iostream>
 #include <stdexcept>
+#include <unordered_map>
 #include "../Common/clap_eventsequence.h"
 #include "signalsmith-stretch.h"
 
@@ -18,7 +19,12 @@ class TimeStretch
     {
         m_stretcher = std::make_unique<signalsmith::stretch::SignalsmithStretch<float>>();
         outdata.reserve(65536);
-        stretchPreset = std::clamp(preset, 0, 2);
+        stretchPreset = std::clamp(preset, 0, 4);
+        presetConfigs[0] = {0.07f, 0.04f};
+        presetConfigs[1] = {0.1f, 0.04f};
+        presetConfigs[2] = {0.12f, 0.03f};
+        presetConfigs[3] = {0.2f, 0.02f};
+        presetConfigs[4] = {0.4f, 0.01f};
     }
     void set_stretch(float st)
     {
@@ -41,17 +47,12 @@ class TimeStretch
 
         if (samplerate != insamplerate)
         {
-            if (stretchPreset == 0)
-                m_stretcher->presetCheaper(num_inchans, insamplerate);
-            if (stretchPreset == 1)
-                m_stretcher->presetDefault(num_inchans, insamplerate);
-            if (stretchPreset == 2)
-                m_stretcher->configure(num_inchans, insamplerate * 0.2, insamplerate * 0.02);
+            auto conf = presetConfigs[stretchPreset];
+            m_stretcher->configure(num_inchans, insamplerate * conf.first,
+                                   insamplerate * conf.second);
             samplerate = insamplerate;
         }
         m_stretcher->setTransposeFactor(m_pitchfactor);
-        // std::cout << "input latency " << m_stretcher->inputLatency() << "\n";
-        // std::cout << "output latency " << m_stretcher->outputLatency() << "\n";
         int numinsamples = input_audio.shape(1);
         int numoutsamples = numinsamples * m_stretchfactor;
         if (numoutsamples < 16 ||
@@ -94,6 +95,7 @@ class TimeStretch
     double m_pitchfactor = 1.0;
     float samplerate = -1.0;
     int stretchPreset = 0;
+    std::unordered_map<int, std::pair<float, float>> presetConfigs;
 };
 
 class MTSESPSource
