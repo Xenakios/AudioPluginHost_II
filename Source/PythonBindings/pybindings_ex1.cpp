@@ -96,10 +96,13 @@ class TimeStretch
             if (numoutsampleswanted < 16)
                 throw std::runtime_error("Too small output buffer wanted");
             int numinsamples = input_audio.shape(1);
+            /*
+            // Satisfying this check is tricky when using PedalBoard AudioFile
             if (numinsamples != samples_required(numoutsampleswanted))
                 throw std::runtime_error(std::format("Expected {} input samples, got {}",
                                                      samples_required(numoutsampleswanted),
-                                                     numinsamples));
+                                                   numinsamples));
+            */
             int numoutsamples = numoutsampleswanted;
             outdata.resize(numoutsamples * num_inchans);
             float const *buftostretch[64];
@@ -224,7 +227,7 @@ void init_py1(py::module_ &m)
         .def("set_pitch", &TimeStretch::set_pitch)
         .def("get_latency", &TimeStretch::get_latency)
         .def("samples_required", &TimeStretch::samples_required)
-        .def("process", &TimeStretch::process, "input_audio"_a, "samplerate"_a = 44100.0f,
+        .def("process", &TimeStretch::process, "input_audio"_a, "samplerate"_a,
              "outputwanted"_a = 0);
 
     py::class_<ClapEventSequence>(m, "ClapSequence")
