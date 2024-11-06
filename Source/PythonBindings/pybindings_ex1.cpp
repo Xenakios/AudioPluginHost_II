@@ -20,11 +20,11 @@ class TimeStretch
         m_stretcher = std::make_unique<signalsmith::stretch::SignalsmithStretch<float>>();
         outdata.reserve(65536);
         stretchPreset = std::clamp(preset, 0, 4);
-        presetConfigs[0] = {0.07f, 0.04f};
-        presetConfigs[1] = {0.1f, 0.04f};
-        presetConfigs[2] = {0.12f, 0.03f};
+        presetConfigs[0] = {0.04f, 0.02f};
+        presetConfigs[1] = {0.1f, 0.04f}; // signalsmith cheap 
+        presetConfigs[2] = {0.12f, 0.03f}; // signalsmith default
         presetConfigs[3] = {0.2f, 0.02f};
-        presetConfigs[4] = {0.4f, 0.01f};
+        presetConfigs[4] = {0.4f, 0.02f};
     }
     void set_stretch(float st)
     {
@@ -37,7 +37,7 @@ class TimeStretch
         m_pitchfactor = std::pow(2.0, semitones / 12.0);
     }
     int get_latency() { return m_stretcher->outputLatency(); }
-    std::vector<float> outdata;
+
     py::array_t<float> process(const py::array_t<float> &input_audio, float insamplerate)
     {
         int num_inchans = input_audio.shape(0);
@@ -91,6 +91,7 @@ class TimeStretch
 
   private:
     std::unique_ptr<signalsmith::stretch::SignalsmithStretch<float>> m_stretcher;
+    std::vector<float> outdata;
     double m_stretchfactor = 2.0;
     double m_pitchfactor = 1.0;
     float samplerate = -1.0;
@@ -172,7 +173,7 @@ void init_py1(py::module_ &m)
         .def("setNoteTuning", &MTSESPSource::setNoteTuning);
 
     py::class_<TimeStretch>(m, "TimeStretch")
-        .def(py::init<int>(), "stretch_preset"_a)
+        .def(py::init<int>(), "stretch_preset"_a = 2)
         .def("set_stretch", &TimeStretch::set_stretch)
         .def("set_pitch", &TimeStretch::set_pitch)
         .def("get_latency", &TimeStretch::get_latency)
