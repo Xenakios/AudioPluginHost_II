@@ -5,9 +5,9 @@
 #include <pybind11/numpy.h>
 #include "audio/choc_AudioFileFormat.h"
 #include "audio/choc_AudioFileFormat_WAV.h"
-//#include "audio/choc_AudioFileFormat_FLAC.h"
-//#include "audio/choc_AudioFileFormat_Ogg.h"
-//#include "audio/choc_AudioFileFormat_MP3.h"
+// #include "audio/choc_AudioFileFormat_FLAC.h"
+// #include "audio/choc_AudioFileFormat_Ogg.h"
+// #include "audio/choc_AudioFileFormat_MP3.h"
 #include "audio/choc_SampleBuffers.h"
 #include "libMTSMaster.h"
 #include <iostream>
@@ -35,14 +35,17 @@ class XAudioFileReader
             throw std::runtime_error("Can't open " + path);
         m_loopEnd = m_reader->getProperties().numFrames;
     }
-    void seek(int64_t pos) { m_currentPos = pos; }
-    void set_loop_points(int64_t start, int64_t end)
+    void seek(uint64_t pos) { m_currentPos = pos; }
+    void set_loop_points(uint64_t start, uint64_t end)
     {
         m_loopStart = start;
         m_loopEnd = end;
     }
+    void set_looping(bool b) { m_looping = b; }
     py::array_t<float> read(int num_samples, int force_output_channels)
     {
+        if (force_output_channels == 666)
+            throw std::runtime_error("exception test");
         auto filechans = m_reader->getProperties().numChannels;
         int outchans_to_use = filechans;
 
@@ -62,7 +65,12 @@ class XAudioFileReader
         }
         choc::buffer::SeparateChannelLayout<float> layout{chanpointers};
         choc::buffer::ChannelArrayView<float> view{layout, {filechans, (unsigned int)num_samples}};
-        // if (m_currentPos + num_samples < m_loopEnd)
+        if (m_looping && m_currentPos + num_samples >= m_loopEnd)
+        {
+            m_currentPos = m_loopStart;
+            m_reader->readFrames(m_currentPos, view);
+        }
+        else
         {
             m_reader->readFrames(m_currentPos, view);
         }
@@ -87,14 +95,15 @@ class XAudioFileReader
         return output_audio;
     }
     int sample_rate() { return m_reader->getProperties().sampleRate; }
-    int64_t tell() { return m_currentPos; }
+    uint64_t tell() { return m_currentPos; }
 
   private:
     choc::audio::AudioFileProperties m_props;
     std::unique_ptr<choc::audio::AudioFileReader> m_reader;
-    int64_t m_currentPos = 0;
-    int64_t m_loopStart = 0;
-    int64_t m_loopEnd = 0;
+    uint64_t m_currentPos = 0;
+    uint64_t m_loopStart = 0;
+    uint64_t m_loopEnd = 0;
+    bool m_looping = false;
     std::vector<float> m_readVec;
 };
 
@@ -321,6 +330,8 @@ void init_py1(py::module_ &m)
         .def("seek", &XAudioFileReader::seek)
         .def("tell", &XAudioFileReader::tell)
         .def("sample_rate", &XAudioFileReader::sample_rate)
+        .def("set_looping", &XAudioFileReader::set_looping)
+        .def("set_loop_points", &XAudioFileReader::set_loop_points)
         .def("read", &XAudioFileReader::read);
 
     py::class_<ClapEventSequence>(m, "ClapSequence")
