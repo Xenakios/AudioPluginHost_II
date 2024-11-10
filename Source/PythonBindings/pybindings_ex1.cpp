@@ -96,6 +96,7 @@ class XAudioFileReader
     }
     int sample_rate() { return m_reader->getProperties().sampleRate; }
     uint64_t tell() { return m_currentPos; }
+    uint64_t get_num_frames() { return m_reader->getProperties().numFrames; }
 
   private:
     choc::audio::AudioFileProperties m_props;
@@ -329,7 +330,8 @@ void init_py1(py::module_ &m)
         .def(py::init<std::string>(), "filename"_a)
         .def("seek", &XAudioFileReader::seek)
         .def("tell", &XAudioFileReader::tell)
-        .def("sample_rate", &XAudioFileReader::sample_rate)
+        .def_property_readonly("sample_rate", &XAudioFileReader::sample_rate)
+        .def_property_readonly("frames", &XAudioFileReader::get_num_frames)
         .def("set_looping", &XAudioFileReader::set_looping)
         .def("set_loop_points", &XAudioFileReader::set_loop_points)
         .def("read", &XAudioFileReader::read);
