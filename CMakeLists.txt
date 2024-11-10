@@ -30,6 +30,7 @@ include_directories(
     libs/sst-effects/include
     libs/oscpkt
     libs/simde
+    libs/thread-pool/include
 )
 
 # for "reasons", this is still a console app even though a GUI app is built from it

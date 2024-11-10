@@ -1181,6 +1181,14 @@ void ClapProcessingEngine::openPersistentWindow(int chainindex)
     m_desktopwindow->toFront();
 }
 
+ProcessorChain::ProcessorChain(std::vector<std::pair<std::string, int>> plugins)
+{
+    for (auto &e : plugins)
+    {
+        addProcessor(e.first, e.second);
+    }
+}
+
 void ProcessorChain::addProcessor(std::string plugfilename, int pluginindex)
 {
     std::unique_ptr<xenakios::XAudioProcessor> plug;
@@ -1293,7 +1301,7 @@ void ProcessorChain::processAudio(choc::buffer::ChannelArrayView<float> inputBuf
     }
     clap_process cp;
     memset(&cp, 0, sizeof(clap_process));
-    cp.frames_count = inputBuffer.getNumFrames();
+    cp.frames_count = outputBuffer.getNumFrames();
     cp.in_events = inEventList.clapInputEvents();
     cp.out_events = outEventList.clapOutputEvents();
     cp.audio_inputs_count = 1;
@@ -1309,6 +1317,11 @@ void ProcessorChain::processAudio(choc::buffer::ChannelArrayView<float> inputBuf
     cp.audio_outputs = outputBuffers.data();
     inEventList.clear();
     outEventList.clear();
+    for (int j = 0; j < cp.frames_count; ++j)
+    {
+        cp.audio_inputs[0].data32[0][j] = inputBuffer.getSample(0, j);
+        cp.audio_inputs[0].data32[1][j] = inputBuffer.getSample(0, j);
+    }
     for (size_t i = 0; i < m_processors.size(); ++i)
     {
         auto procEntry = m_processors[i].get();

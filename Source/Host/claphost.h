@@ -28,6 +28,7 @@
 #include "../Common/clap_eventsequence.h"
 #include "../Common/xap_breakpoint_envelope.h"
 #include "sst/basic-blocks/dsp/FollowSlewAndSmooth.h"
+#include "BS_thread_pool.hpp"
 
 inline void generateNoteExpressionsFromEnvelope(ClapEventSequence &targetSeq,
                                                 xenakios::Envelope<64> &sourceEnvelope,
@@ -111,6 +112,7 @@ class ProcessorChain
 {
   public:
     ProcessorChain(int64_t _id) : id(_id) {}
+    ProcessorChain(std::vector<std::pair<std::string, int>> plugins);
     int64_t id;
     std::vector<std::unique_ptr<ProcessorEntry>> m_processors;
     // this should really take in a Clap plugin id instead
@@ -164,6 +166,7 @@ class ProcessorChain
         Volume,
         Mute
     };
+    BS::thread_pool thpool{1};
 };
 
 class ClapProcessingEngine
@@ -172,7 +175,7 @@ class ClapProcessingEngine
   public:
     std::vector<std::unique_ptr<ProcessorEntry>> m_chain;
     std::vector<std::unique_ptr<ProcessorChain>> m_chains;
-    ProcessorChain & addChain();
+    ProcessorChain &addChain();
     ProcessorChain &getChain(size_t index);
     void setSequence(int targetProcessorIndex, ClapEventSequence seq);
     static std::vector<std::filesystem::path> scanPluginDirectories();

@@ -17,7 +17,6 @@
 #include "Tunings.h"
 #include "../Common/bluenoise.h"
 
-
 #if !NOJUCE
 #include "juce_audio_processors/juce_audio_processors.h"
 #include "juce_core/juce_core.h"
@@ -134,6 +133,43 @@ static void startStreaming(ClapProcessingEngine &eng, std::optional<unsigned int
     }
 }
 
+inline py::array_t<float> processChain(ProcessorChain &chain, const py::array_t<float> &input_audio)
+{
+    int num_inchans = input_audio.shape(0);
+    if (num_inchans > 64)
+        throw std::runtime_error(
+            std::format("Channel count {} too high, max allowed is 64", num_inchans));
+    int numinsamples = input_audio.shape(1);
+    float *chanpointers[64];
+    for (int i = 0; i < 64; ++i)
+    {
+        if (i < num_inchans)
+        {
+            chanpointers[i] = (float *)input_audio.data(i);
+            // buf_from_stretch[i] = &outdata[numoutsamples * i];
+        }
+        else
+        {
+            chanpointers[i] = nullptr;
+            // buf_from_stretch[i] = nullptr;
+        }
+    }
+    choc::buffer::SeparateChannelLayout<float> layout{chanpointers};
+    choc::buffer::ChannelArrayView<float> view{
+        layout, {(unsigned int)num_inchans, (unsigned int)numinsamples}};
+    auto fut = chain.thpool.submit_task([&]() { chain.processAudio(view, view); });
+    fut.wait();
+    py::buffer_info binfo(
+        chain.audioOutputData.data(),           /* Pointer to buffer */
+        sizeof(float),                          /* Size of one scalar */
+        py::format_descriptor<float>::format(), /* Python struct-style format descriptor */
+        2,                                      /* Number of dimensions */
+        {num_inchans, numinsamples},            /* Buffer dimensions */
+        {sizeof(float) * numinsamples,          /* Strides (in bytes) for each index */
+         sizeof(float)});
+    py::array_t<float> output_audio{binfo};
+    return output_audio;
+}
 
 PYBIND11_MODULE(xenakios, m)
 {
@@ -191,7 +227,12 @@ PYBIND11_MODULE(xenakios, m)
         .def("getDepth", &xenakios::BlueNoise::getDepth)
         .def("nextFloat", &xenakios::BlueNoise::operator());
 
-    py::class_<ProcessorChain>(m, "ClapChain").def("getSequence", &ProcessorChain::getSequence);
+    py::class_<ProcessorChain>(m, "ClapChain")
+        .def(py::init<std::vector<std::pair<std::string, int>>>())
+        .def("getSequence", &ProcessorChain::getSequence)
+        .def("activate", &ProcessorChain::activate)
+        .def("stop_processing", &ProcessorChain::stopProcessing)
+        .def("process", &processChain);
 
     py::class_<ClapProcessingEngine>(m, "ClapEngine")
         .def(py::init<>())
