@@ -23,6 +23,7 @@
 #include <memory>
 #include <mutex>
 #include <stdexcept>
+#include <thread>
 #include <unordered_map>
 #include <vector>
 #include "../Xaps/clap_xaudioprocessor.h"
@@ -1183,6 +1184,7 @@ void ClapProcessingEngine::openPersistentWindow(int chainindex)
 
 ProcessorChain::ProcessorChain(std::vector<std::pair<std::string, int>> plugins)
 {
+    main_thread_id = std::this_thread::get_id();
     for (auto &e : plugins)
     {
         addProcessor(e.first, e.second);
@@ -1286,6 +1288,25 @@ void ProcessorChain::activate(double sampleRate, int maxBlockSize)
     blockSize = maxBlockSize;
     eventIterator.emplace(chainSequence, sampleRate);
     chainGainSmoother.setParams(1.0f, 1.0f, sampleRate);
+}
+
+void ProcessorChain::stopProcessing()
+{
+    auto task = [this]() {
+        for (auto &e : m_processors)
+        {
+            e->m_proc->stopProcessing();
+        }
+    };
+    if (std::this_thread::get_id() == main_thread_id)
+    {
+        auto fut = thpool.submit_task(task);
+        fut.wait();
+    }
+    else
+    {
+        task();
+    }
 }
 
 void ProcessorChain::processAudio(choc::buffer::ChannelArrayView<float> inputBuffer,

@@ -124,13 +124,8 @@ class ProcessorChain
     void processAudio(choc::buffer::ChannelArrayView<float> inputBuffer,
                       choc::buffer::ChannelArrayView<float> outputBuffer);
 
-    void stopProcessing()
-    {
-        for (auto &e : m_processors)
-        {
-            e->m_proc->stopProcessing();
-        }
-    }
+    void stopProcessing();
+    std::thread::id main_thread_id;
     std::vector<float> audioInputData;
     float *getInputBuffer(size_t index)
     {
