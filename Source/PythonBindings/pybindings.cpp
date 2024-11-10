@@ -1,4 +1,5 @@
 #include <pybind11/pybind11.h>
+#include <stdexcept>
 #include <vector>
 // #include <optional>
 #include <pybind11/stl.h>
@@ -157,8 +158,10 @@ inline py::array_t<float> processChain(ProcessorChain &chain, const py::array_t<
     choc::buffer::SeparateChannelLayout<float> layout{chanpointers};
     choc::buffer::ChannelArrayView<float> view{
         layout, {(unsigned int)num_inchans, (unsigned int)numinsamples}};
-    auto fut = chain.thpool.submit_task([&]() { chain.processAudio(view, view); });
-    fut.wait();
+    auto fut = chain.thpool.submit_task([&]() { return chain.processAudio(view, view); });
+    auto err = fut.get();
+    if (err == -1)
+        throw std::runtime_error("Chain was not activated when processing called");
     py::buffer_info binfo(
         chain.audioOutputData.data(),           /* Pointer to buffer */
         sizeof(float),                          /* Size of one scalar */

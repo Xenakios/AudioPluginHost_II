@@ -121,11 +121,11 @@ class ProcessorChain
     ClapEventSequence &getSequence(size_t pluginIndex) { return m_processors[pluginIndex]->m_seq; }
 
     void activate(double sampleRate, int maxBlockSize);
-    void processAudio(choc::buffer::ChannelArrayView<float> inputBuffer,
+    int processAudio(choc::buffer::ChannelArrayView<float> inputBuffer,
                       choc::buffer::ChannelArrayView<float> outputBuffer);
 
     void stopProcessing();
-    std::thread::id main_thread_id;
+
     std::vector<float> audioInputData;
     float *getInputBuffer(size_t index)
     {
@@ -150,6 +150,8 @@ class ProcessorChain
     int64_t samplePosition = 0;
     double currentSampleRate = 0.0;
     std::atomic<bool> isProcessing{false};
+    std::atomic<bool> isActivated{false};
+    std::thread::id main_thread_id;
     // events specific to the chain like output volume
     ClapEventSequence chainSequence;
     std::optional<ClapEventSequence::IteratorSampleTime> eventIterator;

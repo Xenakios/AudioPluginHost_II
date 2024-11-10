@@ -1227,6 +1227,20 @@ void ProcessorChain::addProcessor(std::string plugfilename, int pluginindex)
 
 void ProcessorChain::activate(double sampleRate, int maxBlockSize)
 {
+    if (isActivated && sampleRate == currentSampleRate && maxBlockSize == blockSize)
+    {
+        std::cout << "ClapChain is already activated!\n";
+        return;
+    }
+    if (isActivated && (sampleRate != currentSampleRate || maxBlockSize != blockSize))
+    {
+        std::cout << "ClapChain was already activated but activation requested with different "
+                     "parameters}n";
+        for (auto &e : m_processors)
+        {
+            e->m_proc->deactivate();
+        }
+    }
     inputBuffers.resize(32);
     outputBuffers.resize(32);
     inChannelPointers.resize(64);
@@ -1288,6 +1302,7 @@ void ProcessorChain::activate(double sampleRate, int maxBlockSize)
     blockSize = maxBlockSize;
     eventIterator.emplace(chainSequence, sampleRate);
     chainGainSmoother.setParams(1.0f, 1.0f, sampleRate);
+    isActivated = true;
 }
 
 void ProcessorChain::stopProcessing()
@@ -1307,11 +1322,14 @@ void ProcessorChain::stopProcessing()
     {
         task();
     }
+    isProcessing = false;
 }
 
-void ProcessorChain::processAudio(choc::buffer::ChannelArrayView<float> inputBuffer,
-                                  choc::buffer::ChannelArrayView<float> outputBuffer)
+int ProcessorChain::processAudio(choc::buffer::ChannelArrayView<float> inputBuffer,
+                                 choc::buffer::ChannelArrayView<float> outputBuffer)
 {
+    if (!isActivated)
+        return -1;
     if (!isProcessing)
     {
         for (auto &e : m_processors)
@@ -1384,4 +1402,5 @@ void ProcessorChain::processAudio(choc::buffer::ChannelArrayView<float> inputBuf
         outputBuffer.getSample(1, i) = cp.audio_outputs[0].data32[1][i] * smoothedGain;
     }
     samplePosition += cp.frames_count;
+    return 0;
 }
