@@ -136,10 +136,13 @@ static void startStreaming(ClapProcessingEngine &eng, std::optional<unsigned int
 
 inline py::array_t<float> processChain(ProcessorChain &chain, const py::array_t<float> &input_audio)
 {
+    if (input_audio.ndim() != 2)
+        throw std::runtime_error(std::format(
+            "Input audio ndim {} not compatible, only ndim 2 allowed", input_audio.ndim()));
     int num_inchans = input_audio.shape(0);
     if (num_inchans > 64)
         throw std::runtime_error(
-            std::format("Channel count {} too high, max allowed is 64", num_inchans));
+            std::format("Input audio channel count {} too high, max allowed is 64", num_inchans));
     int numinsamples = input_audio.shape(1);
     float *chanpointers[64];
     for (int i = 0; i < 64; ++i)
@@ -147,12 +150,10 @@ inline py::array_t<float> processChain(ProcessorChain &chain, const py::array_t<
         if (i < num_inchans)
         {
             chanpointers[i] = (float *)input_audio.data(i);
-            // buf_from_stretch[i] = &outdata[numoutsamples * i];
         }
         else
         {
             chanpointers[i] = nullptr;
-            // buf_from_stretch[i] = nullptr;
         }
     }
     choc::buffer::SeparateChannelLayout<float> layout{chanpointers};
