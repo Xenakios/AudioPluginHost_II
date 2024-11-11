@@ -12,6 +12,7 @@
 
 #include "audio/choc_AudioFileFormat.h"
 #include "clap/audio-buffer.h"
+#include "clap/ext/audio-ports.h"
 #include "clap/helpers/event-list.hh"
 #include "containers/choc_SingleReaderSingleWriterFIFO.h"
 #include "memory/choc_Base64.h"
@@ -106,6 +107,8 @@ struct ProcessorEntry
     std::optional<ClapEventSequence::IteratorSampleTime> m_eviter;
     std::string name;
     std::unique_ptr<choc::ui::DesktopWindow> guiWindow;
+    std::unordered_map<clap_id, std::string> idToStringMap;
+    std::unordered_map<std::string, clap_id> stringToIdMap;
 };
 
 class ProcessorChain
@@ -119,13 +122,15 @@ class ProcessorChain
     void addProcessor(std::string plugfilename, int pluginindex);
 
     ClapEventSequence &getSequence(size_t pluginIndex) { return m_processors[pluginIndex]->m_seq; }
-
+    ProcessorEntry &getProcessor(size_t pluginIndex) { return *m_processors[pluginIndex]; }
     void activate(double sampleRate, int maxBlockSize);
     int processAudio(choc::buffer::ChannelArrayView<float> inputBuffer,
-                      choc::buffer::ChannelArrayView<float> outputBuffer);
+                     choc::buffer::ChannelArrayView<float> outputBuffer);
 
     void stopProcessing();
-
+    int getNumAudioPorts(size_t pluginIndex, bool isInput);
+    clap_audio_port_info getAudioPortInfo(size_t pluginIndex, size_t portIndex, bool isInput);
+    std::string getParametersAsJSON(size_t chainIndex);
     std::vector<float> audioInputData;
     float *getInputBuffer(size_t index)
     {
@@ -164,6 +169,20 @@ class ProcessorChain
         Mute
     };
     BS::thread_pool thpool{1};
+    struct ThreadMessage
+    {
+        enum class Opcode
+        {
+            None,
+            SetParam
+        };
+        Opcode opcode = Opcode::None;
+        int64_t i0 = 0;
+        int64_t i1 = 1;
+        double d0 = 0.0f;
+        double d1 = 0.0f;
+    };
+    choc::fifo::SingleReaderSingleWriterFIFO<ThreadMessage> from_ui_fifo;
 };
 
 class ClapProcessingEngine

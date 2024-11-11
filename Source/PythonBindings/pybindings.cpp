@@ -13,6 +13,7 @@
 #include "../Host/claphost.h"
 #include "../Common/dejavurandom.h"
 #include "../Common/xen_modulators.h"
+#include "clap/ext/audio-ports.h"
 #include "clap/ext/params.h"
 #include "gui/choc_MessageLoop.h"
 #include "Tunings.h"
@@ -136,7 +137,7 @@ static void startStreaming(ClapProcessingEngine &eng, std::optional<unsigned int
 
 inline py::array_t<float> processChain(ProcessorChain &chain, const py::array_t<float> &input_audio)
 {
-    // for convenience we should probably allow ndim 1, and ndim 3 could work for 
+    // for convenience we should probably allow ndim 1, and ndim 3 could work for
     // passing in sidechain audio?
     if (input_audio.ndim() != 2)
         throw std::runtime_error(std::format(
@@ -161,7 +162,7 @@ inline py::array_t<float> processChain(ProcessorChain &chain, const py::array_t<
     choc::buffer::SeparateChannelLayout<float> layout{chanpointers};
     choc::buffer::ChannelArrayView<float> view{
         layout, {(unsigned int)num_inchans, (unsigned int)numinsamples}};
-    auto fut = chain.thpool.submit_task([&]() { return chain.processAudio(view, view); });
+    auto fut = chain.thpool.submit_task([&]() { return chain.processAudio(view, {}); });
     auto err = fut.get();
     if (err == -1)
         throw std::runtime_error("Chain was not activated when processing called");
@@ -233,13 +234,23 @@ PYBIND11_MODULE(xenakios, m)
         .def("getDepth", &xenakios::BlueNoise::getDepth)
         .def("nextFloat", &xenakios::BlueNoise::operator());
 
+    py::class_<clap_audio_port_info>(m, "clap_audio_port_info")
+        .def_property_readonly("channel_count",
+                               [](const clap_audio_port_info &info) { return info.channel_count; })
+        .def_property_readonly("name",
+                               [](const clap_audio_port_info &info) { return info.name; });
+    
     py::class_<ProcessorChain>(m, "ClapChain")
         .def(py::init<std::vector<std::pair<std::string, int>>>())
         .def("getSequence", &ProcessorChain::getSequence)
+        .def("audio_port_count", &ProcessorChain::getNumAudioPorts)
+        .def("audio_port_info", &ProcessorChain::getAudioPortInfo)
+        .def("get_params_json", &ProcessorChain::getParametersAsJSON)
         .def("activate", &ProcessorChain::activate)
         .def("stop_processing", &ProcessorChain::stopProcessing)
         .def("process", &processChain);
 
+    
     py::class_<ClapProcessingEngine>(m, "ClapEngine")
         .def(py::init<>())
         .def("addPlugin", &ClapProcessingEngine::addProcessorToChain)

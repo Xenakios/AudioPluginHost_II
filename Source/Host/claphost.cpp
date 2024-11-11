@@ -16,6 +16,7 @@
 
 #include "../Xaps/xap_memorybufferplayer.h"
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <cstdint>
 #include <cstring>
@@ -27,6 +28,7 @@
 #include <unordered_map>
 #include <vector>
 #include "../Xaps/clap_xaudioprocessor.h"
+#include "text/choc_StringUtilities.h"
 
 using namespace std::chrono_literals;
 
@@ -182,6 +184,7 @@ std::string ClapProcessingEngine::scanPluginFile(std::filesystem::path plugfilep
                 if (desc)
                 {
                     auto ob = choc::value::createObject("clap_plugin");
+                    ob.setMember("numeric_index", (int64_t)i);
                     ob.setMember("name", std::string(desc->name));
                     ob.setMember("id", std::string(desc->id));
                     ob.setMember("description", std::string(desc->description));
@@ -1189,6 +1192,7 @@ ProcessorChain::ProcessorChain(std::vector<std::pair<std::string, int>> plugins)
     {
         addProcessor(e.first, e.second);
     }
+    from_ui_fifo.reset(1024);
 }
 
 void ProcessorChain::addProcessor(std::string plugfilename, int pluginindex)
@@ -1216,6 +1220,30 @@ void ProcessorChain::addProcessor(std::string plugfilename, int pluginindex)
                       << " does not provide Clap description, likely a bug in the plugin"
                       << std::endl;
         plug->runMainThreadTasks();
+        for (int i = 0; i < plug->paramsCount(); ++i)
+        {
+            clap_param_info info;
+            if (plug->paramsInfo(i, &info))
+            {
+                if (info.flags & CLAP_PARAM_IS_AUTOMATABLE)
+                {
+                    std::string parname = info.name;
+                    parname = choc::text::toLowerCase(parname);
+                    parname = choc::text::removeOuterCharacter(parname, ' ');
+                    for (auto &c : parname)
+                    {
+                        if (choc::text::isWhitespace(c) || !std::isalnum(c))
+                            c = '_';
+                    }
+                    chainEntry->idToStringMap[info.id] = parname;
+                    chainEntry->stringToIdMap[parname] = info.id;
+                }
+            }
+        }
+        for (auto &pyentry : chainEntry->idToStringMap)
+        {
+            std::cout << pyentry.first << "\t\t" << pyentry.second << "\n";
+        }
         chainEntry->m_proc = std::move(plug);
         m_processors.push_back(std::move(chainEntry));
     }
@@ -1340,7 +1368,7 @@ int ProcessorChain::processAudio(choc::buffer::ChannelArrayView<float> inputBuff
     }
     clap_process cp;
     memset(&cp, 0, sizeof(clap_process));
-    cp.frames_count = outputBuffer.getNumFrames();
+    cp.frames_count = inputBuffer.getNumFrames();
     cp.in_events = inEventList.clapInputEvents();
     cp.out_events = outEventList.clapOutputEvents();
     cp.audio_inputs_count = 1;
@@ -1395,12 +1423,79 @@ int ProcessorChain::processAudio(choc::buffer::ChannelArrayView<float> inputBuff
     float actualGain = chainGain;
     if (muted)
         actualGain = 0.0f;
-    for (int i = 0; i < cp.frames_count; ++i)
+    if (outputBuffer.getNumChannels() > 0)
     {
-        auto smoothedGain = chainGainSmoother.step(actualGain);
-        outputBuffer.getSample(0, i) = cp.audio_outputs[0].data32[0][i] * smoothedGain;
-        outputBuffer.getSample(1, i) = cp.audio_outputs[0].data32[1][i] * smoothedGain;
+        for (int i = 0; i < cp.frames_count; ++i)
+        {
+            auto smoothedGain = chainGainSmoother.step(actualGain);
+            outputBuffer.getSample(0, i) = cp.audio_outputs[0].data32[0][i] * smoothedGain;
+            outputBuffer.getSample(1, i) = cp.audio_outputs[0].data32[1][i] * smoothedGain;
+        }
     }
+    else
+    {
+        for (int i = 0; i < cp.frames_count; ++i)
+        {
+            auto smoothedGain = chainGainSmoother.step(actualGain);
+            cp.audio_outputs[0].data32[0][i] *= smoothedGain;
+            cp.audio_outputs[0].data32[1][i] *= smoothedGain;
+        }
+    }
+
     samplePosition += cp.frames_count;
     return 0;
+}
+int ProcessorChain::getNumAudioPorts(size_t pluginIndex, bool isInput)
+{
+    return m_processors[pluginIndex]->m_proc->audioPortsCount(isInput);
+}
+
+clap_audio_port_info ProcessorChain::getAudioPortInfo(size_t pluginIndex, size_t portIndex,
+                                                      bool isInput)
+{
+    clap_audio_port_info info;
+    if (m_processors[pluginIndex]->m_proc->audioPortsInfo(portIndex, isInput, &info))
+    {
+        return info;
+    }
+    info.channel_count = 0;
+    return info;
+}
+
+std::string ProcessorChain::getParametersAsJSON(size_t chainIndex)
+{
+    if (chainIndex >= m_processors.size())
+        throw std::runtime_error("Chain index out of bounds");
+    auto paramsarray = choc::value::createEmptyArray();
+    auto plug = m_processors[chainIndex]->m_proc.get();
+    // Should not activate if already activated...but we don't have a consistent way to track that
+    // yet. But we do need to activate for plugins that fill in the up to date parameter info
+    // only after activation.
+    plug->activate(44100.0, 512, 512);
+    for (int i = 0; i < plug->paramsCount(); ++i)
+    {
+        clap_param_info info;
+        if (plug->paramsInfo(i, &info))
+        {
+            auto infoobject = choc::value::createObject("info");
+            infoobject.setMember("name", std::string(info.name));
+            infoobject.setMember("id", (int64_t)info.id);
+            infoobject.setMember("defaultval", info.default_value);
+            infoobject.setMember("minval", info.min_value);
+            infoobject.setMember("maxval", info.max_value);
+            double origin = 0.0;
+            if (plug->paramsOrigin(info.id, &origin))
+            {
+                infoobject.setMember("origin", origin);
+            }
+            infoobject.setMember("module", std::string(info.module));
+            // Can do the needed bit checks in Python, but I suppose would be nice
+            // to have some kind of string from the flags too
+            infoobject.setMember("flags", (int64_t)info.flags);
+            paramsarray.addArrayElement(infoobject);
+        }
+    }
+    // Should not deactivate if already deactivated...
+    plug->deactivate();
+    return choc::json::toString(paramsarray, true);
 }
