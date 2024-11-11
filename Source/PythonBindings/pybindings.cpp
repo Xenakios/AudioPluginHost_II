@@ -29,6 +29,7 @@
 namespace py = pybind11;
 
 void init_py1(py::module_ &);
+void init_py2(py::module_ &);
 
 #if !NOJUCE
 inline void juceTest(std::string plugfilename)
@@ -217,6 +218,7 @@ PYBIND11_MODULE(xenakios, m)
     m.def("numInputHookCallbacks", []() { return g_inputHookCount; });
 
     init_py1(m);
+    init_py2(m);
 
     py::module m_const = m.def_submodule("constants", "Constants");
 

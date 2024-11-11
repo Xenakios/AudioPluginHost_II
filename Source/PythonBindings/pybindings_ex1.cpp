@@ -1,6 +1,6 @@
 #include <algorithm>
-#include <pybind11/buffer_info.h>
 #include <pybind11/pybind11.h>
+#include <pybind11/buffer_info.h>
 #include <pybind11/stl.h>
 #include <pybind11/numpy.h>
 #include "audio/choc_AudioFileFormat.h"
@@ -9,7 +9,7 @@
 // #include "audio/choc_AudioFileFormat_Ogg.h"
 // #include "audio/choc_AudioFileFormat_MP3.h"
 #include "audio/choc_SampleBuffers.h"
-#include "libMTSMaster.h"
+
 #include <iostream>
 #include <stdexcept>
 #include <type_traits>
@@ -244,53 +244,6 @@ class TimeStretch
     std::unordered_map<int, std::pair<float, float>> presetConfigs;
 };
 
-class MTSESPSource
-{
-  public:
-    MTSESPSource()
-    {
-        if (MTS_CanRegisterMaster())
-        {
-            MTS_RegisterMaster();
-            std::cout << "registered MTS Source\n";
-            double freqs[128];
-            for (int i = 0; i < 128; ++i)
-            {
-                freqs[i] = 440.0 * std::pow(2.0, (69 - i) / 12.0);
-            }
-            MTS_SetNoteTunings(freqs);
-            MTS_SetScaleName("12tet 440Hz");
-        }
-    }
-    ~MTSESPSource()
-    {
-        MTS_DeregisterMaster();
-        std::cout << "deregistered MTS Source\n";
-    }
-    void setNoteTuning(int midikey, double hz)
-    {
-        if (midikey >= 0 && midikey < 128)
-        {
-            MTS_SetNoteTuning(hz, midikey);
-        }
-    }
-    void setNoteTuningMap(std::unordered_map<int, double> tunmap)
-    {
-        for (const auto &e : tunmap)
-        {
-            if (e.first >= 0 && e.first < 128)
-            {
-                if (e.second >= 0.0 && e.second < 20000.0)
-                {
-                    MTS_SetNoteTuning(e.second, e.first);
-                }
-            }
-        }
-    }
-
-  private:
-};
-
 inline void addAudioBufferEvent(ClapEventSequence &seq, double time, int32_t target,
                                 const py::array_t<double> &arr, int32_t samplerate)
 {
@@ -312,11 +265,6 @@ using namespace pybind11::literals;
 
 void init_py1(py::module_ &m)
 {
-    py::class_<MTSESPSource>(m, "MTS_Source")
-        .def(py::init<>())
-        .def("setNoteTuningMap", &MTSESPSource::setNoteTuningMap)
-        .def("setNoteTuning", &MTSESPSource::setNoteTuning);
-
     py::class_<TimeStretch>(m, "TimeStretch")
         .def(py::init<int, int>(), "stretch_preset"_a = 2, "io_mode"_a = 0)
         .def("set_stretch", &TimeStretch::set_stretch)
