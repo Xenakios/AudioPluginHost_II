@@ -136,6 +136,8 @@ static void startStreaming(ClapProcessingEngine &eng, std::optional<unsigned int
 
 inline py::array_t<float> processChain(ProcessorChain &chain, const py::array_t<float> &input_audio)
 {
+    // for convenience we should probably allow ndim 1, and ndim 3 could work for 
+    // passing in sidechain audio?
     if (input_audio.ndim() != 2)
         throw std::runtime_error(std::format(
             "Input audio ndim {} not compatible, only ndim 2 allowed", input_audio.ndim()));
