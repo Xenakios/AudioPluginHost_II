@@ -178,6 +178,33 @@ inline py::array_t<float> processChain(ProcessorChain &chain, const py::array_t<
     return output_audio;
 }
 
+double getParamAttribute(ProcessorEntry &proc, const std::string &name)
+{
+    auto it = proc.stringToIdMap.find(name);
+    if (it != proc.stringToIdMap.end())
+    {
+        double val = 0.0;
+        if (proc.m_proc->paramsValue(it->second, &val))
+        {
+            return val;
+        }
+        throw std::runtime_error("Could not get current value of " + name);
+    }
+    throw std::runtime_error(name + " is not a parameter attribute of " + proc.name);
+}
+
+void setParamAttribute(ProcessorEntry &proc, const std::string &name, double value)
+{
+    auto it = proc.stringToIdMap.find(name);
+    if (it != proc.stringToIdMap.end())
+    {
+        std::cout << "would post param change for " << name << " " << it->second << " to value "
+                  << value << "\n";
+        return;
+    }
+    throw std::runtime_error(name + " is not a parameter attribute of " + proc.name);
+}
+
 PYBIND11_MODULE(xenakios, m)
 {
     using namespace pybind11::literals;
@@ -237,20 +264,23 @@ PYBIND11_MODULE(xenakios, m)
     py::class_<clap_audio_port_info>(m, "clap_audio_port_info")
         .def_property_readonly("channel_count",
                                [](const clap_audio_port_info &info) { return info.channel_count; })
-        .def_property_readonly("name",
-                               [](const clap_audio_port_info &info) { return info.name; });
-    
+        .def_property_readonly("name", [](const clap_audio_port_info &info) { return info.name; });
+
+    py::class_<ProcessorEntry>(m, "Processor")
+        .def("__getattribute__", &getParamAttribute)
+        .def("__setattr__", &setParamAttribute);
+
     py::class_<ProcessorChain>(m, "ClapChain")
         .def(py::init<std::vector<std::pair<std::string, int>>>())
         .def("getSequence", &ProcessorChain::getSequence)
         .def("audio_port_count", &ProcessorChain::getNumAudioPorts)
         .def("audio_port_info", &ProcessorChain::getAudioPortInfo)
         .def("get_params_json", &ProcessorChain::getParametersAsJSON)
+        .def("get_processor", &ProcessorChain::getProcessor, py::return_value_policy::reference)
         .def("activate", &ProcessorChain::activate)
         .def("stop_processing", &ProcessorChain::stopProcessing)
         .def("process", &processChain);
 
-    
     py::class_<ClapProcessingEngine>(m, "ClapEngine")
         .def(py::init<>())
         .def("addPlugin", &ClapProcessingEngine::addProcessorToChain)
