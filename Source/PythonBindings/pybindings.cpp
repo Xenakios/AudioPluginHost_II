@@ -1,3 +1,4 @@
+#include <pybind11/buffer_info.h>
 #include <pybind11/pybind11.h>
 #include <stdexcept>
 #include <vector>
@@ -16,7 +17,6 @@
 #include "clap/ext/audio-ports.h"
 #include "clap/ext/params.h"
 #include "gui/choc_MessageLoop.h"
-#include "Tunings.h"
 #include "../Common/bluenoise.h"
 
 #if !NOJUCE
@@ -29,7 +29,7 @@
 namespace py = pybind11;
 
 void init_py1(py::module_ &);
-void init_py2(py::module_ &);
+void init_py2(py::module_ &, py::module_ &);
 
 #if !NOJUCE
 inline void juceTest(std::string plugfilename)
@@ -207,6 +207,29 @@ void setParamAttribute(ProcessorEntry &proc, const std::string &name, double val
     throw std::runtime_error(name + " is not a parameter attribute of " + proc.name);
 }
 
+inline py::array_t<float> getArrayWithBlueNoise(xenakios::BlueNoise &noise, double gain, int chans,
+                                                int frames)
+{
+    py::buffer_info binfo(
+        nullptr,                                /* Pointer to buffer */
+        sizeof(float),                          /* Size of one scalar */
+        py::format_descriptor<float>::format(), /* Python struct-style format descriptor */
+        2,                                      /* Number of dimensions */
+        {chans, frames},                        /* Buffer dimensions */
+        {sizeof(float) * frames,                /* Strides (in bytes) for each index */
+         sizeof(float)});
+    py::array_t<float> output_audio{binfo};
+    for (int i = 0; i < chans; ++i)
+    {
+        float *writebuf = output_audio.mutable_data(i);
+        for (int j = 0; j < frames; ++j)
+        {
+            writebuf[j] = (-1.0 + 2.0 * noise()) * gain;
+        }
+    }
+    return output_audio;
+}
+
 PYBIND11_MODULE(xenakios, m)
 {
     using namespace pybind11::literals;
@@ -218,9 +241,9 @@ PYBIND11_MODULE(xenakios, m)
     m.def("numInputHookCallbacks", []() { return g_inputHookCount; });
 
     init_py1(m);
-    init_py2(m);
 
     py::module m_const = m.def_submodule("constants", "Constants");
+    init_py2(m, m_const);
 
 #define C(x) m_const.attr(#x) = py::int_((int)(x));
     C(CLAP_NOTE_EXPRESSION_TUNING);
@@ -248,8 +271,6 @@ PYBIND11_MODULE(xenakios, m)
     C(CLAP_PARAM_IS_READONLY);
     C(CLAP_PARAM_IS_STEPPED);
 
-    m_const.attr("MIDI_0_FREQ") = Tunings::MIDI_0_FREQ;
-
     py::class_<xenakios::DejaVuRandom>(m, "DejaVuRandom")
         .def(py::init<unsigned int>(), "seed"_a = 0)
         .def("setLoopLength", &xenakios::DejaVuRandom::setLoopLength, "count"_a)
@@ -257,12 +278,13 @@ PYBIND11_MODULE(xenakios, m)
              "0.0 fully random, 0.5 freeze loop, >0.5 pick randomly from loop")
         .def("nextFloat", &xenakios::DejaVuRandom::nextFloatInRange)
         .def("nextInt", &xenakios::DejaVuRandom::nextIntInRange);
-
+    // .def("setDepth", &xenakios::BlueNoise::setDepth, "depth"_a = 4)
     py::class_<xenakios::BlueNoise>(m, "BlueNoise")
         .def(py::init<unsigned int>(), "seed"_a = 0)
-        .def("setDepth", &xenakios::BlueNoise::setDepth, "depth"_a = 4)
-        .def("getDepth", &xenakios::BlueNoise::getDepth)
-        .def("nextFloat", &xenakios::BlueNoise::operator());
+        
+        .def_property("depth", &xenakios::BlueNoise::getDepth, &xenakios::BlueNoise::setDepth)
+        .def("get_array", &getArrayWithBlueNoise)
+        .def("__call__", &xenakios::BlueNoise::operator());
 
     py::class_<clap_audio_port_info>(m, "clap_audio_port_info")
         .def_property_readonly("channel_count",

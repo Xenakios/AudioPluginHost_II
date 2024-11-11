@@ -4,6 +4,8 @@
 #include <pybind11/numpy.h>
 #include <iostream>
 #include "libMTSMaster.h"
+#include "Tunings.h"
+
 namespace py = pybind11;
 
 class MTSESPSource
@@ -53,10 +55,11 @@ class MTSESPSource
   private:
 };
 
-void init_py2(py::module_ &m)
+void init_py2(py::module_ &m, py::module_ &m_const)
 {
     py::class_<MTSESPSource>(m, "MTS_Source")
         .def(py::init<>())
         .def("setNoteTuningMap", &MTSESPSource::setNoteTuningMap)
         .def("setNoteTuning", &MTSESPSource::setNoteTuning);
+    m_const.attr("MIDI_0_FREQ") = Tunings::MIDI_0_FREQ;
 }
