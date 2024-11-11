@@ -200,6 +200,7 @@ void setParamAttribute(ProcessorEntry &proc, const std::string &name, double val
     {
         std::cout << "would post param change for " << name << " " << it->second << " to value "
                   << value << "\n";
+        proc.from_ui_fifo.push({ProcessorEntry::Msg::Opcode::SetParam, it->second, value});
         return;
     }
     throw std::runtime_error(name + " is not a parameter attribute of " + proc.name);

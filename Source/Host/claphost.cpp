@@ -1244,6 +1244,7 @@ void ProcessorChain::addProcessor(std::string plugfilename, int pluginindex)
         {
             std::cout << pyentry.first << "\t\t" << pyentry.second << "\n";
         }
+        chainEntry->from_ui_fifo.reset(64);
         chainEntry->m_proc = std::move(plug);
         m_processors.push_back(std::move(chainEntry));
     }

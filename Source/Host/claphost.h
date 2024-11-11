@@ -109,6 +109,18 @@ struct ProcessorEntry
     std::unique_ptr<choc::ui::DesktopWindow> guiWindow;
     std::unordered_map<clap_id, std::string> idToStringMap;
     std::unordered_map<std::string, clap_id> stringToIdMap;
+    struct Msg
+    {
+        enum class Opcode
+        {
+            None,
+            SetParam
+        };
+        Opcode opcode = Opcode::None;
+        int64_t i0 = 0;
+        double d0 = 0.0;
+    };
+    choc::fifo::SingleReaderSingleWriterFIFO<Msg> from_ui_fifo;
 };
 
 class ProcessorChain
