@@ -281,9 +281,8 @@ PYBIND11_MODULE(xenakios, m)
     // .def("setDepth", &xenakios::BlueNoise::setDepth, "depth"_a = 4)
     py::class_<xenakios::BlueNoise>(m, "BlueNoise")
         .def(py::init<unsigned int>(), "seed"_a = 0)
-        
-        .def_property("depth", &xenakios::BlueNoise::getDepth, &xenakios::BlueNoise::setDepth)
         .def("get_array", &getArrayWithBlueNoise)
+        .def_property("depth", &xenakios::BlueNoise::getDepth, &xenakios::BlueNoise::setDepth)
         .def("__call__", &xenakios::BlueNoise::operator());
 
     py::class_<clap_audio_port_info>(m, "clap_audio_port_info")
