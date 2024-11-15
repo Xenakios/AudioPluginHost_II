@@ -842,9 +842,7 @@ class GrainDelay
             int maxdelay = 1.0 * m_samplerate;
             int delaysamples = xenakios::mapvalue<float>(m_pos, 0.0f, 1.0f, mindelay, maxdelay);
             std::uniform_int_distribution<int> delaydist{mindelay, maxdelay};
-            std::uniform_real_distribution<float> pitchdist{-0.0f, 0.0f};
             float panrange = xenakios::mapvalue(m_pan_width, 0.0f, 1.0f, 0.0f, 0.5f);
-            std::uniform_real_distribution<float> pandist{0.5f - panrange, 0.5f + panrange};
             const float pitches[4] = {0.0f, 4.0f, 7.0f, 12.0f};
             for (auto &ph : m_playheads)
             {
@@ -855,14 +853,14 @@ class GrainDelay
                     float lenseconds = xenakios::mapvalue(shapedsize, 0.0f, 1.0f, 0.01f, 1.0f);
                     ph.lensamples = lenseconds * m_samplerate;
                     ph.playpos = 0;
-                    float pitch = pitchdist(m_rng);
+                    float pitch = m_rng.nextFloatInRange(0.0, 0.0);
                     // pitch = pitches[m_graincounter % 4];
                     pitch = m_center_pitch;
                     ph.rate = std::pow(2.0f, pitch / 12.0f);
                     ph.m_resampler.sri = m_samplerate;
                     ph.m_resampler.sro = m_samplerate / ph.rate;
                     ph.m_resampler.dPhaseO = ph.m_resampler.sri / ph.m_resampler.sro;
-                    ph.pan = pandist(m_rng);
+                    ph.pan = m_rng.nextFloatInRange(0.5f - panrange, 0.5f + panrange);
                     sst::basic_blocks::dsp::pan_laws::monoEqualPower(ph.pan, ph.panmatrix);
                     ph.outputbufferpos = 0;
                     int actualDelay = delaysamples; // delaydist(m_rng);
@@ -1491,7 +1489,7 @@ inline void test_cv_seq()
     seq->playRate = 2.0;
     choc::audio::WAVAudioFileFormat<true> format;
     choc::audio::AudioFileProperties props;
-    
+
     props.bitDepth = choc::audio::BitDepth::float32;
     props.numChannels = seq->highestPortNumber + 1;
     props.sampleRate = 44100;
