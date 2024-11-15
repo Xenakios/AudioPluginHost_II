@@ -1300,6 +1300,33 @@ inline void test_mts_esp_wrapper()
     std::cout << tuner.noteToFrequency(60) << "\n";
 }
 
+// begin VCV Rack SDK
+template <typename T = float> struct TExponentialFilter
+{
+    T out = 0.f;
+    T lambda = 0.f;
+
+    void reset() { out = 0.f; }
+
+    void setLambda(T lambda) { this->lambda = lambda; }
+
+    /** Sets \f$ \lambda = 1 / \tau \f$. */
+    void setTau(T tau) { this->lambda = 1 / tau; }
+
+    T process(T deltaTime, T in)
+    {
+        T y = out + (in - out) * lambda * deltaTime;
+        // If no change was made between the old and new output, assume T granularity is too small
+        // and snap output to input out =  simd::ifelse(out == y, in, y);
+        if (out == y)
+            out = in;
+        else
+            out = y;
+        return out;
+    }
+};
+// end VCV Rack SDK
+
 class CV_Sequencer
 {
   public:
@@ -1319,9 +1346,10 @@ class CV_Sequencer
         {
             for (int j = 0; j < maxOutChannels; ++j)
             {
-                // might want to do some other kind of smoothing, it's not
-                // completely clear what the SST slew limiter does...
+                // it's not completely clear what the SST slew limiter does...
                 slews[i][j].setParams(5.0f, 1.0f, sampleRate);
+                // so experimenting with an exponential filter too
+                expFilters[i][j].setTau(1.0 / 100.0);
                 outportvalues[i][j] = 0.0f;
                 activatedOutports[i][j] = false;
                 smoothedValues[i][j] = 0.0f;
@@ -1337,14 +1365,16 @@ class CV_Sequencer
             float invRate = 1.0 / playRate;
             while ((int)(ptr->time * sampleRate) == (int)(samplePos * invRate))
             {
-                std::cout << std::format("{}\t{}\t{}\t{}\t{}\n", outputSamplesProduced, samplePos,
-                                         ptr->outport, ptr->outchan, ptr->voltage);
+                int op = ptr->outport;
+                int oc = ptr->outchan;
+                // std::cout << std::format("{}\t{}\t{}\t{}\t{}\n", outputSamplesProduced, samplePos,
+                //                          op, oc, ptr->voltage);
                 // assert(ptr->outport >= 0 && ptr->outport < numOutports);
                 // assert(ptr->outchan >= 0 && ptr->outchan < maxOutChannels);
-                outportvalues[ptr->outport][ptr->outchan] = ptr->voltage;
+                outportvalues[op][oc] = ptr->voltage;
                 // once a port/channel has activated, it stays active but
                 // we can get at least some cpu savings by not running all the smoothers always
-                activatedOutports[ptr->outport][ptr->outchan] = true;
+                activatedOutports[op][oc] = true;
                 ++curEventIndex;
                 if (curEventIndex == events.size())
                     break;
@@ -1357,8 +1387,12 @@ class CV_Sequencer
             {
                 if (activatedOutports[i][j])
                 {
-                    smoothedValues[i][j] =
-                        std::clamp(slews[i][j].step(outportvalues[i][0]), -10.0f, 10.0f);
+                    float o = outportvalues[i][j];
+                    // smoothedValues[i][j] =
+                    //     std::clamp(slews[i][j].step(outportvalues[i][j]), -10.0f, 10.0f);
+                    o = expFilters[i][j].process(1.0 / sampleRate, o);
+                    o = std::clamp(o, -10.0f, 10.0f);
+                    smoothedValues[i][j] = o;
                 }
             }
         }
@@ -1447,6 +1481,7 @@ class CV_Sequencer
     float smoothedValues[numOutports][maxOutChannels];
     int highestPortNumber = 0;
     sst::basic_blocks::dsp::SlewLimiter slews[numOutports][maxOutChannels];
+    TExponentialFilter<float> expFilters[numOutports][maxOutChannels];
     int curEventIndex = 0;
     double samplePos = 0.0;
     double playRate = 1.0;
@@ -1493,13 +1528,16 @@ inline void test_cv_seq()
         t += 0.01;
     }
     seq->sortAndScanEvents();
+    /*
+
     seq->seek(0.0);
     std::cout << seq->curEventIndex << "\n";
     seq->seek(1.5);
     std::cout << seq->curEventIndex << "\n";
     return;
     seq->writeToTextFile(R"(C:\develop\AudioPluginHost_mk2\cvsequence.txt)");
-    seq->playRate = 2.0;
+    */
+    seq->playRate = 1.0;
     choc::audio::WAVAudioFileFormat<true> format;
     choc::audio::AudioFileProperties props;
 
