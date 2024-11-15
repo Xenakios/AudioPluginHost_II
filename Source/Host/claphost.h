@@ -134,7 +134,7 @@ class ProcessorChain
     void addProcessor(std::string plugfilename, int pluginindex);
 
     ClapEventSequence &getSequence(size_t pluginIndex) { return m_processors[pluginIndex]->m_seq; }
-    ProcessorEntry &getProcessor(size_t pluginIndex) { return *m_processors[pluginIndex]; }
+    ProcessorEntry &getProcessor(int pluginIndex);
     void activate(double sampleRate, int maxBlockSize);
     int processAudio(choc::buffer::ChannelArrayView<float> inputBuffer,
                      choc::buffer::ChannelArrayView<float> outputBuffer);

@@ -20,6 +20,7 @@
 #include <cmath>
 #include <cstdint>
 #include <cstring>
+#include <filesystem>
 #include <format>
 #include <memory>
 #include <mutex>
@@ -1204,6 +1205,10 @@ void ProcessorChain::addProcessor(std::string plugfilename, int pluginindex)
     }
     else
     {
+        if (!std::filesystem::exists(plugfilename))
+            plugfilename = R"(C:\Program Files\Common Files\CLAP\)" + plugfilename;
+        if (!std::filesystem::exists(plugfilename))
+            throw std::runtime_error("File does not exist : " + plugfilename);
         plug = std::make_unique<ClapPluginFormatProcessor>(plugfilename, pluginindex);
     }
     if (plug)
@@ -1499,4 +1504,11 @@ std::string ProcessorChain::getParametersAsJSON(size_t chainIndex)
     // Should not deactivate if already deactivated...
     plug->deactivate();
     return choc::json::toString(paramsarray, true);
+}
+ProcessorEntry &ProcessorChain::getProcessor(int pluginIndex)
+{
+    if (pluginIndex >= m_processors.size())
+        throw std::runtime_error(std::format("Processor index {} out of allowed range 0..{}",
+                                             pluginIndex, m_processors.size() - 1));
+    return *m_processors[pluginIndex];
 }
