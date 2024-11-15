@@ -1317,11 +1317,13 @@ class CV_Sequencer
         events.reserve(4096);
         for (int i = 0; i < numOutports; ++i)
         {
-            // might want to do some other kind of smoothing...
-            slews[i].setParams(5.0f, 1.0f, sampleRate);
             for (int j = 0; j < maxOutChannels; ++j)
             {
+                // might want to do some other kind of smoothing, it's not
+                // completely clear what the SST slew limiter does...
+                slews[i][j].setParams(5.0f, 1.0f, sampleRate);
                 outportvalues[i][j] = 0.0f;
+                activatedOutports[i][j] = false;
                 smoothedValues[i][j] = 0.0f;
             }
         }
@@ -1340,6 +1342,9 @@ class CV_Sequencer
                 // assert(ptr->outport >= 0 && ptr->outport < numOutports);
                 // assert(ptr->outchan >= 0 && ptr->outchan < maxOutChannels);
                 outportvalues[ptr->outport][ptr->outchan] = ptr->voltage;
+                // once a port/channel has activated, it stays active but
+                // we can get at least some cpu savings by not running all the smoothers always
+                activatedOutports[ptr->outport][ptr->outchan] = true;
                 ++curEventIndex;
                 if (curEventIndex == events.size())
                     break;
@@ -1348,7 +1353,14 @@ class CV_Sequencer
         }
         for (int i = 0; i < numOutports; ++i)
         {
-            smoothedValues[i][0] = std::clamp(slews[i].step(outportvalues[i][0]), -10.0f, 10.0f);
+            for (int j = 0; j < maxOutChannels; ++j)
+            {
+                if (activatedOutports[i][j])
+                {
+                    smoothedValues[i][j] =
+                        std::clamp(slews[i][j].step(outportvalues[i][0]), -10.0f, 10.0f);
+                }
+            }
         }
         samplePos += playRate;
         if (samplePos >= loopLen)
@@ -1431,9 +1443,10 @@ class CV_Sequencer
     static constexpr size_t numOutports = 16;
     static constexpr size_t maxOutChannels = 16;
     float outportvalues[numOutports][maxOutChannels];
+    bool activatedOutports[numOutports][maxOutChannels];
     float smoothedValues[numOutports][maxOutChannels];
     int highestPortNumber = 0;
-    sst::basic_blocks::dsp::SlewLimiter slews[numOutports];
+    sst::basic_blocks::dsp::SlewLimiter slews[numOutports][maxOutChannels];
     int curEventIndex = 0;
     double samplePos = 0.0;
     double playRate = 1.0;
