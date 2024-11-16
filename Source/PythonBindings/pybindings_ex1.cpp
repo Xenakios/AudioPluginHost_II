@@ -35,6 +35,7 @@ class XAudioFileReader
             throw std::runtime_error("Can't open " + path);
         m_loopEnd = m_reader->getProperties().numFrames;
     }
+    ~XAudioFileReader() { /*std::cout << "XAudioFileReader dtor\n";*/ }
     void seek(uint64_t pos) { m_currentPos = pos; }
     void set_loop_points(uint64_t start, uint64_t end)
     {
