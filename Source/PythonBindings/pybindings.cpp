@@ -297,7 +297,7 @@ PYBIND11_MODULE(xenakios, m)
 
     py::class_<ProcessorChain>(m, "ClapChain")
         .def(py::init<std::vector<std::pair<std::string, int>>>())
-        .def("getSequence", &ProcessorChain::getSequence)
+        .def("getSequence", &ProcessorChain::getSequence, py::return_value_policy::reference)
         .def("audio_port_count", &ProcessorChain::getNumAudioPorts)
         .def("audio_port_info", &ProcessorChain::getAudioPortInfo)
         .def("get_params_json", &ProcessorChain::getParametersAsJSON)
