@@ -181,20 +181,7 @@ class ProcessorChain
         Mute
     };
     BS::thread_pool thpool{1};
-    struct ThreadMessage
-    {
-        enum class Opcode
-        {
-            None,
-            SetParam
-        };
-        Opcode opcode = Opcode::None;
-        int64_t i0 = 0;
-        int64_t i1 = 1;
-        double d0 = 0.0f;
-        double d1 = 0.0f;
-    };
-    choc::fifo::SingleReaderSingleWriterFIFO<ThreadMessage> from_ui_fifo;
+    
 };
 
 class ClapProcessingEngine

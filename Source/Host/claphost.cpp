@@ -1193,7 +1193,6 @@ ProcessorChain::ProcessorChain(std::vector<std::pair<std::string, int>> plugins)
     {
         addProcessor(e.first, e.second);
     }
-    from_ui_fifo.reset(1024);
 }
 
 void ProcessorChain::addProcessor(std::string plugfilename, int pluginindex)
@@ -1247,9 +1246,9 @@ void ProcessorChain::addProcessor(std::string plugfilename, int pluginindex)
         }
         for (auto &pyentry : chainEntry->idToStringMap)
         {
-            std::cout << pyentry.first << "\t\t" << pyentry.second << "\n";
+            // std::cout << pyentry.first << "\t\t" << pyentry.second << "\n";
         }
-        chainEntry->from_ui_fifo.reset(64);
+        chainEntry->from_ui_fifo.reset(128);
         chainEntry->m_proc = std::move(plug);
         m_processors.push_back(std::move(chainEntry));
     }
@@ -1269,7 +1268,7 @@ void ProcessorChain::activate(double sampleRate, int maxBlockSize)
     if (isActivated && (sampleRate != currentSampleRate || maxBlockSize != blockSize))
     {
         std::cout << "ClapChain was already activated but activation requested with different "
-                     "parameters}n";
+                     "parameters\n";
         for (auto &e : m_processors)
         {
             e->m_proc->deactivate();
@@ -1319,7 +1318,7 @@ void ProcessorChain::activate(double sampleRate, int maxBlockSize)
     {
         e.channel_count = 0;
         e.constant_mask = 0;
-        e.data32 = inChannelPointers.data();
+        e.data32 = nullptr;
         e.data64 = nullptr;
         e.latency = 0;
     }
@@ -1327,7 +1326,7 @@ void ProcessorChain::activate(double sampleRate, int maxBlockSize)
     {
         e.channel_count = 0;
         e.constant_mask = 0;
-        e.data32 = outChannelPointers.data();
+        e.data32 = nullptr;
         e.data64 = nullptr;
         e.latency = 0;
     }
@@ -1399,6 +1398,17 @@ int ProcessorChain::processAudio(choc::buffer::ChannelArrayView<float> inputBuff
     {
         auto procEntry = m_processors[i].get();
         auto proc = procEntry->m_proc.get();
+        // handle events from ui/python thread
+        ProcessorEntry::Msg msg;
+        while (procEntry->from_ui_fifo.pop(msg))
+        {
+            if (msg.opcode == ProcessorEntry::Msg::Opcode::SetParam)
+            {
+                auto pev = xenakios::make_event_param_value(0, msg.i0, msg.d0, nullptr);
+                inEventList.push((clap_event_header *)&pev);
+            }
+        }
+        // handle presequenced events
         auto eventSpan = procEntry->m_eviter->readNextEvents(cp.frames_count);
         for (auto &cev : eventSpan)
         {
