@@ -136,6 +136,9 @@ class ProcessorChain
     ClapEventSequence &getSequence(size_t pluginIndex) { return m_processors[pluginIndex]->m_seq; }
     ProcessorEntry &getProcessor(int pluginIndex);
     void activate(double sampleRate, int maxBlockSize);
+    std::vector<std::tuple<int, int, int>> inputRouting;
+    int highestInputPort = 0;
+    void setInputRouting(std::vector<std::tuple<int, int, int>> routing);
     int processAudio(choc::buffer::ChannelArrayView<float> inputBuffer,
                      choc::buffer::ChannelArrayView<float> outputBuffer);
 
@@ -181,7 +184,6 @@ class ProcessorChain
         Mute
     };
     BS::thread_pool thpool{1};
-    
 };
 
 class ClapProcessingEngine

@@ -138,12 +138,12 @@ static void startStreaming(ClapProcessingEngine &eng, std::optional<unsigned int
 
 inline py::array_t<float> processChain(ProcessorChain &chain, const py::array_t<float> &input_audio)
 {
-    // for convenience we should probably allow ndim 1, and ndim 3 could work for
-    // passing in sidechain audio?
+    // for convenience we should probably allow ndim 1
     if (input_audio.ndim() != 2)
         throw std::runtime_error(std::format(
             "Input audio ndim {} not compatible, only ndim 2 allowed", input_audio.ndim()));
     int num_inchans = input_audio.shape(0);
+
     if (num_inchans > 64)
         throw std::runtime_error(
             std::format("Input audio channel count {} too high, max allowed is 64", num_inchans));
@@ -167,12 +167,13 @@ inline py::array_t<float> processChain(ProcessorChain &chain, const py::array_t<
     auto err = fut.get();
     if (err == -1)
         throw std::runtime_error("Chain was not activated when processing called");
+    int numoutchans = 2;
     py::buffer_info binfo(
         chain.audioOutputData.data(),           /* Pointer to buffer */
         sizeof(float),                          /* Size of one scalar */
         py::format_descriptor<float>::format(), /* Python struct-style format descriptor */
         2,                                      /* Number of dimensions */
-        {num_inchans, numinsamples},            /* Buffer dimensions */
+        {numoutchans, numinsamples},            /* Buffer dimensions */
         {sizeof(float) * numinsamples,          /* Strides (in bytes) for each index */
          sizeof(float)});
     py::array_t<float> output_audio{binfo};
@@ -303,6 +304,7 @@ PYBIND11_MODULE(xenakios, m)
         .def("get_processor", &ProcessorChain::getProcessor, py::return_value_policy::reference)
         .def("activate", &ProcessorChain::activate)
         .def("stop_processing", &ProcessorChain::stopProcessing)
+        .def("set_input_routing", &ProcessorChain::setInputRouting)
         .def("process", &processChain);
 
     py::class_<ClapProcessingEngine>(m, "ClapEngine")

@@ -1193,6 +1193,7 @@ ProcessorChain::ProcessorChain(std::vector<std::pair<std::string, int>> plugins)
     {
         addProcessor(e.first, e.second);
     }
+    setInputRouting({{0, 0, 0}, {1, 0, 1}});
 }
 
 void ProcessorChain::addProcessor(std::string plugfilename, int pluginindex)
@@ -1314,6 +1315,7 @@ void ProcessorChain::activate(double sampleRate, int maxBlockSize)
     // std::cout << "chain " << id << " needs " << maxInBuffersNeeded << " input buffers" << "\n";
     audioInputData.resize(64 * maxBlockSize);
 
+    int i = 0;
     for (auto &e : inputBuffers)
     {
         e.channel_count = 0;
@@ -1358,6 +1360,17 @@ void ProcessorChain::stopProcessing()
     isProcessing = false;
 }
 
+void ProcessorChain::setInputRouting(std::vector<std::tuple<int, int, int>> routing)
+{
+    inputRouting = routing;
+    highestInputPort = 0;
+    for (auto &e : inputRouting)
+    {
+        highestInputPort = std::max(std::get<1>(e), highestInputPort);
+    }
+    std::cout << "highest input port " << highestInputPort << "\n";
+}
+
 int ProcessorChain::processAudio(choc::buffer::ChannelArrayView<float> inputBuffer,
                                  choc::buffer::ChannelArrayView<float> outputBuffer)
 {
@@ -1376,24 +1389,50 @@ int ProcessorChain::processAudio(choc::buffer::ChannelArrayView<float> inputBuff
     cp.frames_count = inputBuffer.getNumFrames();
     cp.in_events = inEventList.clapInputEvents();
     cp.out_events = outEventList.clapOutputEvents();
-    cp.audio_inputs_count = 1;
-    inputBuffers[0].channel_count = 2;
-    inputBuffers[0].data32[0] = getInputBuffer(0);
-    inputBuffers[0].data32[1] = getInputBuffer(1);
+
+    cp.audio_inputs_count = highestInputPort + 1;
+    int chancounter = 0;
+    for (int i = 0; i < highestInputPort + 1; ++i)
+    {
+        inputBuffers[i].channel_count = 2;
+        inputBuffers[i].data32 = &inChannelPointers[chancounter];
+        for (int j = 0; j < 2; ++j)
+        {
+            inputBuffers[i].data32[j] = getInputBuffer(chancounter);
+            ++chancounter;
+        }
+    }
     cp.audio_inputs = inputBuffers.data();
 
-    cp.audio_outputs_count = 1;
-    outputBuffers[0].channel_count = 2;
-    outputBuffers[0].data32[0] = getOutputBuffer(0);
-    outputBuffers[0].data32[1] = getOutputBuffer(1);
+    int highestOutputPort = 0;
+    cp.audio_outputs_count = highestOutputPort + 1;
+    chancounter = 0;
+    for (int i = 0; i < highestOutputPort + 1; ++i)
+    {
+        outputBuffers[i].channel_count = 2;
+        outputBuffers[i].data32 = &outChannelPointers[chancounter];
+        for (int j = 0; j < 2; ++j)
+        {
+            outputBuffers[i].data32[j] = getOutputBuffer(chancounter);
+            ++chancounter;
+        }
+    }
+
     cp.audio_outputs = outputBuffers.data();
+
     inEventList.clear();
     outEventList.clear();
-    for (int j = 0; j < cp.frames_count; ++j)
+    for (auto &conn : inputRouting)
     {
-        cp.audio_inputs[0].data32[0][j] = inputBuffer.getSample(0, j);
-        cp.audio_inputs[0].data32[1][j] = inputBuffer.getSample(0, j);
+        int sourchan = std::get<0>(conn);
+        int destport = std::get<1>(conn);
+        int destchan = std::get<2>(conn);
+        for (int j = 0; j < cp.frames_count; ++j)
+        {
+            cp.audio_inputs[destport].data32[destchan][j] = inputBuffer.getSample(sourchan, j);
+        }
     }
+
     for (size_t i = 0; i < m_processors.size(); ++i)
     {
         auto procEntry = m_processors[i].get();
