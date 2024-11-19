@@ -167,9 +167,9 @@ inline py::array_t<float> processChain(ProcessorChain &chain, const py::array_t<
     auto err = fut.get();
     if (err == -1)
         throw std::runtime_error("Chain was not activated when processing called");
-    int numoutchans = 2;
+    int numoutchans = chain.highestOutputChannel + 1;
     py::buffer_info binfo(
-        chain.audioOutputData.data(),           /* Pointer to buffer */
+        chain.chainAudioOutputData.data(),      /* Pointer to buffer */
         sizeof(float),                          /* Size of one scalar */
         py::format_descriptor<float>::format(), /* Python struct-style format descriptor */
         2,                                      /* Number of dimensions */
@@ -297,7 +297,7 @@ PYBIND11_MODULE(xenakios, m)
 
     py::class_<ProcessorChain>(m, "ClapChain")
         .def(py::init<std::vector<std::pair<std::string, int>>>())
-        .def("getSequence", &ProcessorChain::getSequence, py::return_value_policy::reference)
+        .def("get_sequence", &ProcessorChain::getSequence, py::return_value_policy::reference)
         .def("audio_port_count", &ProcessorChain::getNumAudioPorts)
         .def("audio_port_info", &ProcessorChain::getAudioPortInfo)
         .def("get_params_json", &ProcessorChain::getParametersAsJSON)
@@ -305,6 +305,7 @@ PYBIND11_MODULE(xenakios, m)
         .def("activate", &ProcessorChain::activate)
         .def("stop_processing", &ProcessorChain::stopProcessing)
         .def("set_input_routing", &ProcessorChain::setInputRouting)
+        .def("set_output_routing", &ProcessorChain::setOutputRouting)
         .def("process", &processChain);
 
     py::class_<ClapProcessingEngine>(m, "ClapEngine")

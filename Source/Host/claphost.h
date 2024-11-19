@@ -128,6 +128,7 @@ class ProcessorChain
   public:
     ProcessorChain(int64_t _id) : id(_id) {}
     ProcessorChain(std::vector<std::pair<std::string, int>> plugins);
+    ~ProcessorChain();
     int64_t id;
     std::vector<std::unique_ptr<ProcessorEntry>> m_processors;
     // this should really take in a Clap plugin id instead
@@ -137,8 +138,12 @@ class ProcessorChain
     ProcessorEntry &getProcessor(int pluginIndex);
     void activate(double sampleRate, int maxBlockSize);
     std::vector<std::tuple<int, int, int>> inputRouting;
+    std::vector<std::tuple<int, int, int>> outputRouting;
     int highestInputPort = 0;
+    int highestOutputChannel = 0;
+    std::vector<float> chainAudioOutputData;
     void setInputRouting(std::vector<std::tuple<int, int, int>> routing);
+    void setOutputRouting(std::vector<std::tuple<int, int, int>> routing);
     int processAudio(choc::buffer::ChannelArrayView<float> inputBuffer,
                      choc::buffer::ChannelArrayView<float> outputBuffer);
 

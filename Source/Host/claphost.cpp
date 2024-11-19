@@ -1194,7 +1194,11 @@ ProcessorChain::ProcessorChain(std::vector<std::pair<std::string, int>> plugins)
         addProcessor(e.first, e.second);
     }
     setInputRouting({{0, 0, 0}, {1, 0, 1}});
+    setOutputRouting({{0, 0, 0}, {0, 1, 1}});
+    chainAudioOutputData.reserve(1024 * 1024);
 }
+
+ProcessorChain::~ProcessorChain() { stopProcessing(); }
 
 void ProcessorChain::addProcessor(std::string plugfilename, int pluginindex)
 {
@@ -1342,6 +1346,8 @@ void ProcessorChain::activate(double sampleRate, int maxBlockSize)
 
 void ProcessorChain::stopProcessing()
 {
+    if (!isProcessing)
+        return;
     auto task = [this]() {
         for (auto &e : m_processors)
         {
@@ -1364,11 +1370,22 @@ void ProcessorChain::setInputRouting(std::vector<std::tuple<int, int, int>> rout
 {
     inputRouting = routing;
     highestInputPort = 0;
-    for (auto &e : inputRouting)
+    for (const auto &e : inputRouting)
     {
         highestInputPort = std::max(std::get<1>(e), highestInputPort);
     }
     std::cout << "highest input port " << highestInputPort << "\n";
+}
+
+void ProcessorChain::setOutputRouting(std::vector<std::tuple<int, int, int>> routing)
+{
+    outputRouting = routing;
+    highestOutputChannel = 0;
+    for (const auto &conn : outputRouting)
+    {
+        highestOutputChannel = std::max(highestOutputChannel, std::get<2>(conn));
+    }
+    std::cout << "highest output channel " << highestOutputChannel << "\n";
 }
 
 int ProcessorChain::processAudio(choc::buffer::ChannelArrayView<float> inputBuffer,
@@ -1384,11 +1401,16 @@ int ProcessorChain::processAudio(choc::buffer::ChannelArrayView<float> inputBuff
         }
         isProcessing = true;
     }
+
     clap_process cp;
     memset(&cp, 0, sizeof(clap_process));
     cp.frames_count = inputBuffer.getNumFrames();
     cp.in_events = inEventList.clapInputEvents();
     cp.out_events = outEventList.clapOutputEvents();
+    int numChainOutChans = highestOutputChannel + 1;
+    if (chainAudioOutputData.size() < numChainOutChans * cp.frames_count)
+        chainAudioOutputData.resize(numChainOutChans * cp.frames_count);
+    std::fill(chainAudioOutputData.begin(), chainAudioOutputData.end(), 0.0f);
 
     cp.audio_inputs_count = highestInputPort + 1;
     int chancounter = 0;
@@ -1456,6 +1478,7 @@ int ProcessorChain::processAudio(choc::buffer::ChannelArrayView<float> inputBuff
             inEventList.push((clap_event_header *)&evcopy);
         }
         proc->process(&cp);
+        // need to fix this to deal with ports/channels properly
         for (int j = 0; j < cp.frames_count; ++j)
         {
             cp.audio_inputs[0].data32[0][j] = cp.audio_outputs[0].data32[0][j];
@@ -1480,20 +1503,34 @@ int ProcessorChain::processAudio(choc::buffer::ChannelArrayView<float> inputBuff
         actualGain = 0.0f;
     if (outputBuffer.getNumChannels() > 0)
     {
-        for (int i = 0; i < cp.frames_count; ++i)
+        // auto smoothedGain = chainGainSmoother.step(actualGain);
+        for (auto &conn : outputRouting)
         {
-            auto smoothedGain = chainGainSmoother.step(actualGain);
-            outputBuffer.getSample(0, i) = cp.audio_outputs[0].data32[0][i] * smoothedGain;
-            outputBuffer.getSample(1, i) = cp.audio_outputs[0].data32[1][i] * smoothedGain;
+            int from_port = std::get<0>(conn);
+            int from_chan = std::get<1>(conn);
+            int to_chan = std::get<2>(conn);
+            if (to_chan >= 0 && to_chan < outputBuffer.getNumChannels())
+            {
+                for (int i = 0; i < cp.frames_count; ++i)
+                {
+                    outputBuffer.getSample(to_chan, i) =
+                        cp.audio_outputs[from_port].data32[from_chan][i];
+                }
+            }
         }
     }
     else
     {
-        for (int i = 0; i < cp.frames_count; ++i)
+        for (const auto &conn : outputRouting)
         {
-            auto smoothedGain = chainGainSmoother.step(actualGain);
-            cp.audio_outputs[0].data32[0][i] *= smoothedGain;
-            cp.audio_outputs[0].data32[1][i] *= smoothedGain;
+            int srcport = std::get<0>(conn);
+            int srchan = std::get<1>(conn);
+            int outchan = std::get<2>(conn);
+            float *optr = &chainAudioOutputData[cp.frames_count * outchan];
+            for (int i = 0; i < cp.frames_count; ++i)
+            {
+                optr[i] = cp.audio_outputs[srcport].data32[srchan][i];
+            }
         }
     }
 
