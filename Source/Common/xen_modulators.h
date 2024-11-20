@@ -40,12 +40,12 @@ template <size_t BLOCK_SIZE> class SimpleLFO
     SimpleLFO(double sr) : samplerate(sr), m_lfo(this) { initTables(); }
 };
 
-inline xenakios::Envelope<64> generateEnvelopeFromLFO(double rate, double deform, int shape,
+inline xenakios::Envelope generateEnvelopeFromLFO(double rate, double deform, int shape,
                                                       double envlen, double envgranul)
 {
     double sr = 44100.0;
     constexpr size_t blocklen = 64;
-    xenakios::Envelope<blocklen> result;
+    xenakios::Envelope result;
     SimpleLFO<blocklen> lfo{sr};
     int outpos = 0;
     int outlen = sr * envlen;
@@ -196,7 +196,7 @@ class MultiModulator
             {
                 if (env.getNumPoints() > 0)
                 {
-                    env.processBlock(tpos, sr, 2);
+                    env.processBlock(tpos, sr, 2, 1);
                     sourceValues[i] = env.outputBlock[0];
                 }
                 ++i;
@@ -271,7 +271,7 @@ class MultiModulator
     std::array<float, 16> targetValues;
     static constexpr size_t blocklen = 64;
     std::array<SimpleLFO<blocklen>, 4> lfos{44100, 44100, 44100, 44100};
-    std::array<xenakios::Envelope<blocklen>, 4> envs;
+    std::array<xenakios::Envelope, 4> envs;
     struct OutputProps
     {
         int type = -1;

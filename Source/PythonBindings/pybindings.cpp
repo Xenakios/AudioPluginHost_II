@@ -169,13 +169,13 @@ inline py::array_t<float> processChain(ProcessorChain &chain, const py::array_t<
         throw std::runtime_error("Chain was not activated when processing called");
     int numoutchans = chain.highestOutputChannel + 1;
     py::buffer_info binfo(
-        chain.chainAudioOutputData.data(),      /* Pointer to buffer */
-        sizeof(float),                          /* Size of one scalar */
-        py::format_descriptor<float>::format(), /* Python struct-style format descriptor */
-        2,                                      /* Number of dimensions */
-        {numoutchans, numinsamples},            /* Buffer dimensions */
-        {sizeof(float) * numinsamples,          /* Strides (in bytes) for each index */
-         sizeof(float)});
+        /* Pointer to buffer */
+        chain.chainAudioOutputData.data(), sizeof(float), /* Size of one scalar */
+        /* Python struct-style format descriptor */
+        py::format_descriptor<float>::format(), 2, /* Number of dimensions */
+        {numoutchans, numinsamples},               /* Buffer dimensions */
+        /* Strides (in bytes) for each index */
+        {sizeof(float) * numinsamples, sizeof(float)});
     py::array_t<float> output_audio{binfo};
     return output_audio;
 }
@@ -347,21 +347,19 @@ PYBIND11_MODULE(xenakios, m)
         .def("getX", &xenakios::EnvelopePoint::getX)
         .def("getY", &xenakios::EnvelopePoint::getY);
 
-    py::class_<xenakios::Envelope<ENVBLOCKSIZE>>(m, "Envelope")
+    py::class_<xenakios::Envelope>(m, "Envelope")
         .def(py::init<>())
         .def(py::init<std::vector<xenakios::EnvelopePoint>>())
-        .def("numPoints", &xenakios::Envelope<ENVBLOCKSIZE>::getNumPoints)
-        .def("addPoint", &xenakios::Envelope<ENVBLOCKSIZE>::addPoint)
-        .def("removePoint", &xenakios::Envelope<ENVBLOCKSIZE>::removeEnvelopePointAtIndex)
-        .def("removePoints", &xenakios::Envelope<ENVBLOCKSIZE>::removeEnvelopePoints)
+        .def("numPoints", &xenakios::Envelope::getNumPoints)
+        .def("addPoint", &xenakios::Envelope::addPoint)
+        .def("removePoint", &xenakios::Envelope::removeEnvelopePointAtIndex)
+        .def("removePoints", &xenakios::Envelope::removeEnvelopePoints)
         .def("__iter__",
-             [](xenakios::Envelope<ENVBLOCKSIZE> &v) {
-                 return py::make_iterator(v.begin(), v.end());
-             })
+             [](xenakios::Envelope &v) { return py::make_iterator(v.begin(), v.end()); })
 
-        .def("getPoint", &xenakios::Envelope<ENVBLOCKSIZE>::getPointSafe)
-        .def("setPoint", &xenakios::Envelope<ENVBLOCKSIZE>::setPoint)
-        .def("getValueAtPosition", &xenakios::Envelope<ENVBLOCKSIZE>::getValueAtPosition);
+        .def("getPoint", &xenakios::Envelope::getPointSafe)
+        .def("setPoint", &xenakios::Envelope::setPoint)
+        .def("getValueAtPosition", &xenakios::Envelope::getValueAtPosition);
 
     py::class_<MultiModulator>(m, "MultiModulator")
         .def(py::init<double>())

@@ -39,14 +39,14 @@ class EnvelopePoint
 // Output is always calculated into the outputBlock array.
 // This aims to be as simple as possible, to allow composing
 // more complicated things elsewhere.
-template <size_t BLOCK_SIZE = 64> class Envelope
+class Envelope
 {
   public:
-    float outputBlock[BLOCK_SIZE];
-    
+    // float outputBlock[BLOCK_SIZE];
+    choc::SmallVector<float, 128> outputBlock;
     void clearOutputBlock()
     {
-        for (size_t i = 0; i < BLOCK_SIZE; ++i)
+        for (size_t i = 0; i < outputBlock.size(); ++i)
             outputBlock[i] = 0.0f;
     }
     Envelope(std::optional<double> defaultPointValue = {})
@@ -54,6 +54,7 @@ template <size_t BLOCK_SIZE = 64> class Envelope
         m_points.reserve(16);
         if (defaultPointValue)
             addPoint({0.0, *defaultPointValue});
+        outputBlock.resize(1);
         clearOutputBlock();
     }
     Envelope(std::vector<EnvelopePoint> points) : m_points(std::move(points))
@@ -161,7 +162,7 @@ template <size_t BLOCK_SIZE = 64> class Envelope
     {
         if (!m_sorted)
             sortPoints();
-        processBlock(pos, 0.0, 2);
+        processBlock(pos, 0.0, 2, 1);
         return outputBlock[0];
     }
     // interpolate_mode :
@@ -170,8 +171,9 @@ template <size_t BLOCK_SIZE = 64> class Envelope
     // 2 : sets only the first outputBlock element into the sampled value from the envelope at the
     // timepos, useful if you really know you are never going to care about about the other array
     // elements
-    void processBlock(double timepos, double samplerate, int interpolate_mode)
+    void processBlock(double timepos, double samplerate, int interpolate_mode, size_t blockSize)
     {
+        outputBlock.resize(blockSize);
 // behavior would be undefined if the envelope points are not sorted or if no points
 #if XENPYTHONBINDINGS
         if (!m_sorted)
@@ -209,7 +211,7 @@ template <size_t BLOCK_SIZE = 64> class Envelope
             }
             if (interpolate_mode == 1)
             {
-                for (int i = 0; i < BLOCK_SIZE; ++i)
+                for (int i = 0; i < outputBlock.size(); ++i)
                 {
                     outputBlock[i] = outvalue;
                 }
@@ -222,7 +224,7 @@ template <size_t BLOCK_SIZE = 64> class Envelope
         assert(samplerate > 0.0);
         const double invsr = 1.0 / samplerate;
         auto shape = pt0.getShape();
-        for (int i = 0; i < BLOCK_SIZE; ++i)
+        for (int i = 0; i < outputBlock.size(); ++i)
         {
             double outvalue = x0;
             double xdiff = x1 - x0;

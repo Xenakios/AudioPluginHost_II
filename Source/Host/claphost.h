@@ -32,7 +32,7 @@
 #include "BS_thread_pool.hpp"
 
 inline void generateNoteExpressionsFromEnvelope(ClapEventSequence &targetSeq,
-                                                xenakios::Envelope<64> &sourceEnvelope,
+                                                xenakios::Envelope &sourceEnvelope,
                                                 double eventsStartTime, double duration,
                                                 double granularity, int net, int port, int chan,
                                                 int key, int note_id)
@@ -47,7 +47,7 @@ inline void generateNoteExpressionsFromEnvelope(ClapEventSequence &targetSeq,
 }
 
 inline void generateParameterEventsFromEnvelope(bool is_mod, ClapEventSequence &targetSeq,
-                                                xenakios::Envelope<64> &sourceEnvelope,
+                                                xenakios::Envelope &sourceEnvelope,
                                                 double eventsStartTime, double duration,
                                                 double granularity, clap_id parid, int port,
                                                 int chan, int key, int note_id)
@@ -77,7 +77,7 @@ class TempoMap
     }
     bool isEnvelopeActive() { return m_bpm_envelope.getNumPoints() > 0; }
     void setStaticBPM(double bpm) { m_static_bpm = std::clamp(bpm, 5.0, 1000.0); }
-    xenakios::Envelope<64> m_bpm_envelope;
+    xenakios::Envelope m_bpm_envelope;
     void updateMapping()
     {
         double lastbeat = m_bpm_envelope.getPointSafe(m_bpm_envelope.getNumPoints() - 1).getX();

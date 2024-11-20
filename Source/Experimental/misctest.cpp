@@ -234,7 +234,7 @@ inline void test_mod_matrix()
     constexpr double sr = 44100;
     std::array<SimpleLFO<blocklen>, 4> lfos{sr, sr, sr, sr};
 
-    std::array<xenakios::Envelope<blocklen>, 4> envs;
+    std::array<xenakios::Envelope, 4> envs;
     envs[0].addPoint({0.0, 0.0});
     envs[0].addPoint({0.25, 1.0});
     envs[0].addPoint({0.5, 0.0});
@@ -267,8 +267,8 @@ inline void test_mod_matrix()
     while (outcounter < outlen)
     {
         double secs = outcounter / sr;
-        envs[0].processBlock(secs, sr, 2);
-        envs[1].processBlock(secs, sr, 2);
+        envs[0].processBlock(secs, sr, 2, 1);
+        envs[1].processBlock(secs, sr, 2, 1);
         lfos[0].m_lfo.process_block(1.0, 0.0, 0, false);
         lfos[1].m_lfo.process_block(4.75, 0.0, 0, false);
         lfos[2].m_lfo.process_block(2.5, 0.0, 4, false);
@@ -467,7 +467,7 @@ inline void test_bluenoise()
         slew.setParams(250.0, 1.0, outsr);
 
         ClapEventSequence::Iterator seqiter(seq);
-        xenakios::Envelope<64> env;
+        xenakios::Envelope env;
         env.addPoint({0.0, -1.0});
         env.addPoint({5.0, 1.0});
         env.addPoint({10.0, -1.0});
@@ -1015,11 +1015,11 @@ inline void test_grain_delay()
         auto proc = std::make_unique<GrainDelay>();
         proc->prepareToPlay(44100.0, 10.0);
         int inplaypos = 0;
-        xenakios::Envelope<64> panenvelope;
+        xenakios::Envelope panenvelope;
         panenvelope.addPoint({0.0, 0.0});
         panenvelope.addPoint({5.0, 1.0});
         panenvelope.addPoint({10.0, 0.0});
-        xenakios::Envelope<64> freeze_env;
+        xenakios::Envelope freeze_env;
         freeze_env.addPoint({0.0f, 0.0f});
         freeze_env.addPoint({2.0f, 0.0f});
         freeze_env.addPoint({2.1f, 1.0f});
@@ -1029,7 +1029,7 @@ inline void test_grain_delay()
         freeze_env.addPoint({6.7f, 1.0f});
         freeze_env.addPoint({7.7f, 1.0f});
         freeze_env.addPoint({7.8f, 0.0f});
-        xenakios::Envelope<64> pitch_env;
+        xenakios::Envelope pitch_env;
         pitch_env.addPoint({0.0, 0.0});
         pitch_env.addPoint({2.0, 0.0});
         pitch_env.addPoint({2.0, 0.0});
@@ -1038,13 +1038,13 @@ inline void test_grain_delay()
         pitch_env.addPoint({16.0, -12.0});
         pitch_env.addPoint({17.5, -11.0});
         pitch_env.addPoint({19.0, 0.0});
-        xenakios::Envelope<64> rate_env;
+        xenakios::Envelope rate_env;
         rate_env.addPoint({0.0, 3.0});
         rate_env.addPoint({2.0, 3.0});
         rate_env.addPoint({10.0, 7.0});
         rate_env.addPoint({15.0, 8.0});
         rate_env.addPoint({20.0, -1.0});
-        xenakios::Envelope<64> size_env;
+        xenakios::Envelope size_env;
         size_env.addPoint({0.0, 0.0});
         size_env.addPoint({10.0, 0.6});
         size_env.addPoint({20.0, 0.0});
@@ -1568,9 +1568,15 @@ inline void test_cv_seq()
     }
 }
 
+inline void test_smallvectorenv()
+{
+    xenakios::Envelope env;
+}
+
 int main()
 {
-    test_cv_seq();
+    test_smallvectorenv();
+    // test_cv_seq();
     // test_clap_engine_multichain();
     // test_vec();
     // test_mts_esp_wrapper();
