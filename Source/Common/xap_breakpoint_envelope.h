@@ -174,6 +174,7 @@ class Envelope
     void processBlock(double timepos, double samplerate, int interpolate_mode, size_t blockSize)
     {
         outputBlock.resize(blockSize);
+        
 // behavior would be undefined if the envelope points are not sorted or if no points
 #if XENPYTHONBINDINGS
         if (!m_sorted)

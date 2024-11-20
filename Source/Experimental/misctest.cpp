@@ -1367,7 +1367,8 @@ class CV_Sequencer
             {
                 int op = ptr->outport;
                 int oc = ptr->outchan;
-                // std::cout << std::format("{}\t{}\t{}\t{}\t{}\n", outputSamplesProduced, samplePos,
+                // std::cout << std::format("{}\t{}\t{}\t{}\t{}\n", outputSamplesProduced,
+                // samplePos,
                 //                          op, oc, ptr->voltage);
                 // assert(ptr->outport >= 0 && ptr->outport < numOutports);
                 // assert(ptr->outchan >= 0 && ptr->outchan < maxOutChannels);
@@ -1571,6 +1572,24 @@ inline void test_cv_seq()
 inline void test_smallvectorenv()
 {
     xenakios::Envelope env;
+    env.addPoint({0.0, -1.0});
+    env.addPoint({0.5, 1.0});
+    env.addPoint({0.75, -1.0});
+    env.sortPoints();
+    choc::audio::WAVAudioFileFormat<true> format;
+    choc::audio::AudioFileProperties props;
+
+    props.bitDepth = choc::audio::BitDepth::float32;
+    props.numChannels = 1;
+    props.sampleRate = 44100;
+    auto writer = format.createWriter(R"(C:\MusicAudio\clap_out\envelope01.wav)", props);
+    unsigned int outlen = 1 * 44100;
+    choc::buffer::ChannelArrayBuffer<float> buf{1, outlen};
+    env.processBlock(0.0, 44100, 0, outlen);
+    for (int i = 0; i < outlen; ++i)
+        buf.getSample(0, i) = env.outputBlock[i];
+    writer->appendFrames(buf.getView());
+
 }
 
 int main()
