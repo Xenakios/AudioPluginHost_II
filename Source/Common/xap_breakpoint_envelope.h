@@ -42,8 +42,7 @@ class EnvelopePoint
 class Envelope
 {
   public:
-    // float outputBlock[BLOCK_SIZE];
-    choc::SmallVector<float, 128> outputBlock;
+    choc::SmallVector<float, 64> outputBlock;
     void clearOutputBlock()
     {
         for (size_t i = 0; i < outputBlock.size(); ++i)
@@ -54,6 +53,7 @@ class Envelope
         m_points.reserve(16);
         if (defaultPointValue)
             addPoint({0.0, *defaultPointValue});
+        // note that we can later get up to resize(64) without allocation
         outputBlock.resize(1);
         clearOutputBlock();
     }

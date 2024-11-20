@@ -78,8 +78,6 @@ inline void writeArrayToFile(const py::array_t<double> &arr, double samplerate,
         throw std::runtime_error("Could not create audio file writer");
 }
 
-constexpr size_t ENVBLOCKSIZE = 64;
-
 int g_inputHookCount = 0;
 
 // When Python is run in interactive interpreter mode and idle waiting for input, this callback
