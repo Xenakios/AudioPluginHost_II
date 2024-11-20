@@ -1339,6 +1339,7 @@ void ProcessorChain::activate(double sampleRate, int maxBlockSize)
     // std::cout << "chain " << id << " needs " << maxOutBuffersNeeded << " output buffers" << "\n";
     audioOutputData.resize(64 * maxBlockSize);
     blockSize = maxBlockSize;
+    currentSampleRate = sampleRate;
     eventIterator.emplace(chainSequence, sampleRate);
     chainGainSmoother.setParams(1.0f, 1.0f, sampleRate);
     isActivated = true;
@@ -1475,6 +1476,8 @@ int ProcessorChain::processAudio(choc::buffer::ChannelArrayView<float> inputBuff
         {
             auto evcopy = cev.event;
             evcopy.header.time = (cev.timestamp * currentSampleRate) - samplePosition;
+            // std::cout << samplePosition << " " << cev.timestamp << " " << evcopy.header.time
+            //           << "\n";
             inEventList.push((clap_event_header *)&evcopy);
         }
         proc->process(&cp);
