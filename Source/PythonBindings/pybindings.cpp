@@ -347,6 +347,7 @@ PYBIND11_MODULE(xenakios, m)
 
     py::class_<xenakios::Envelope>(m, "Envelope")
         .def(py::init<>())
+        .def(py::init<xenakios::Envelope>())
         .def(py::init<std::vector<xenakios::EnvelopePoint>>())
         .def("num_points", &xenakios::Envelope::getNumPoints)
         .def("add_point", &xenakios::Envelope::addPoint)
@@ -356,7 +357,7 @@ PYBIND11_MODULE(xenakios, m)
              [](xenakios::Envelope &v) { return py::make_iterator(v.begin(), v.end()); })
 
         .def("get_point", &xenakios::Envelope::getPointSafe)
-        .def("set:point", &xenakios::Envelope::setPoint)
+        .def("set_point", &xenakios::Envelope::setPoint)
         .def("get_value", &xenakios::Envelope::getValueAtPosition);
 
     py::class_<MultiModulator>(m, "MultiModulator")

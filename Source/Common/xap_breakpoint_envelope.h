@@ -76,7 +76,7 @@ class Envelope
             throw std::runtime_error(std::format("Index {} out of range", index));
         m_points.erase(m_points.begin() + index);
     }
-    void removeEnvelopePoints(std::function<bool(EnvelopePoint)> func)
+    void removeEnvelopePoints(std::function<bool(const EnvelopePoint &)> func)
     {
         std::erase_if(m_points, func);
     }
@@ -141,6 +141,9 @@ class Envelope
             newIndex = m_points.size() - 1;
         else
         {
+            // could do some optimization trick here, like binary search
+            // or search backwards/forwards depending on current point index etc
+            // but this shall suffice for now
             for (int i = 0; i < m_points.size(); ++i)
             {
                 if (t >= m_points[i].getX())
@@ -158,6 +161,7 @@ class Envelope
             //           << "\n";
         }
     }
+    // potentially slow convenience function, prefer using processBlock if possible
     double getValueAtPosition(double pos)
     {
         if (!m_sorted)
@@ -165,16 +169,16 @@ class Envelope
         processBlock(pos, 0.0, 2, 1);
         return outputBlock[0];
     }
-    // interpolate_mode :
-    // 0 : sample accurately interpolates into the outputBlock
+    // output_mode :
+    // 0 : sample accurately interpolates into the outputBlock, can obviously be slowish
     // 1 : fills the output block with the same sampled value from the envelope at the timepos
     // 2 : sets only the first outputBlock element into the sampled value from the envelope at the
     // timepos, useful if you really know you are never going to care about about the other array
     // elements
-    void processBlock(double timepos, double samplerate, int interpolate_mode, size_t blockSize)
+    void processBlock(double timepos, double samplerate, int output_mode, size_t blockSize)
     {
         outputBlock.resize(blockSize);
-        
+
 // behavior would be undefined if the envelope points are not sorted or if no points
 #if XENPYTHONBINDINGS
         if (!m_sorted)
@@ -198,7 +202,7 @@ class Envelope
         double x1 = pt1.getX();
         double y0 = pt0.getY();
         double y1 = pt1.getY();
-        if (interpolate_mode > 0)
+        if (output_mode > 0)
         {
             double outvalue = x0;
             double xdiff = x1 - x0;
@@ -210,7 +214,7 @@ class Envelope
                 double normpos = ((1.0 / xdiff * (timepos - x0)));
                 outvalue = y0 + ydiff * getShapedValue(normpos, pt0.getShape(), 0.0, 0.0);
             }
-            if (interpolate_mode == 1)
+            if (output_mode == 1)
             {
                 for (int i = 0; i < outputBlock.size(); ++i)
                 {
