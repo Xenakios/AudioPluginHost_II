@@ -1589,7 +1589,7 @@ inline void test_smallvectorenv()
     for (int i = 0; i < outlen; ++i)
         buf.getSample(0, i) = env.outputBlock[i];
     writer->appendFrames(buf.getView());
-
+    
 }
 
 int main()

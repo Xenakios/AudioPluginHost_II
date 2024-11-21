@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.15)
 
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 
 
@@ -135,7 +135,7 @@ add_executable(TestingProgram
     libs/MTS-ESP/Client/libMTSClient.cpp
     )
 # Source/Experimental/xaudiograph.cpp
-target_compile_definitions(TestingProgram PRIVATE NOJUCE=1 _USE_MATH_DEFINES=1 __WINDOWS_WASAPI__)
+target_compile_definitions(TestingProgram PRIVATE XENPYTHONBINDINGS=0 NOJUCE=1 _USE_MATH_DEFINES=1 __WINDOWS_WASAPI__)
 
 # mini host that can be controlled with OSC messages etc
 add_executable(ClapMiniHost 

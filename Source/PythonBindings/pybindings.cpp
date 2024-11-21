@@ -342,22 +342,22 @@ PYBIND11_MODULE(xenakios, m)
              [](const xenakios::EnvelopePoint &a) {
                  return std::format("EnvelopePoint x={} y={}", a.getX(), a.getY());
              })
-        .def("getX", &xenakios::EnvelopePoint::getX)
-        .def("getY", &xenakios::EnvelopePoint::getY);
+        .def("get_x", &xenakios::EnvelopePoint::getX)
+        .def("get_y", &xenakios::EnvelopePoint::getY);
 
     py::class_<xenakios::Envelope>(m, "Envelope")
         .def(py::init<>())
         .def(py::init<std::vector<xenakios::EnvelopePoint>>())
-        .def("numPoints", &xenakios::Envelope::getNumPoints)
-        .def("addPoint", &xenakios::Envelope::addPoint)
-        .def("removePoint", &xenakios::Envelope::removeEnvelopePointAtIndex)
-        .def("removePoints", &xenakios::Envelope::removeEnvelopePoints)
+        .def("num_points", &xenakios::Envelope::getNumPoints)
+        .def("add_point", &xenakios::Envelope::addPoint)
+        .def("remove_point", &xenakios::Envelope::removeEnvelopePointAtIndex)
+        .def("remove_points", &xenakios::Envelope::removeEnvelopePoints)
         .def("__iter__",
              [](xenakios::Envelope &v) { return py::make_iterator(v.begin(), v.end()); })
 
-        .def("getPoint", &xenakios::Envelope::getPointSafe)
-        .def("setPoint", &xenakios::Envelope::setPoint)
-        .def("getValueAtPosition", &xenakios::Envelope::getValueAtPosition);
+        .def("get_point", &xenakios::Envelope::getPointSafe)
+        .def("set:point", &xenakios::Envelope::setPoint)
+        .def("get_value", &xenakios::Envelope::getValueAtPosition);
 
     py::class_<MultiModulator>(m, "MultiModulator")
         .def(py::init<double>())
