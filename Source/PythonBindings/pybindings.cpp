@@ -229,6 +229,13 @@ inline py::array_t<float> getArrayWithBlueNoise(xenakios::BlueNoise &noise, doub
     return output_audio;
 }
 
+void removeEnvelopeXRange(xenakios::Envelope &env, double x0, double x1)
+{
+    std::erase_if(env.getPoints(), [x0, x1](const xenakios::EnvelopePoint &pt) {
+        return pt.getX() >= x0 && pt.getX() < x1;
+    });
+}
+
 PYBIND11_MODULE(xenakios, m)
 {
     using namespace pybind11::literals;
@@ -353,6 +360,7 @@ PYBIND11_MODULE(xenakios, m)
         .def("add_point", &xenakios::Envelope::addPoint)
         .def("remove_point", &xenakios::Envelope::removeEnvelopePointAtIndex)
         .def("remove_points", &xenakios::Envelope::removeEnvelopePoints)
+        .def("remove_point_range", removeEnvelopeXRange)
         .def("__iter__",
              [](xenakios::Envelope &v) { return py::make_iterator(v.begin(), v.end()); })
 

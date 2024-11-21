@@ -259,6 +259,7 @@ class Envelope
             }
         }
     }
+    std::vector<EnvelopePoint> &getPoints() { return m_points; }
 
   private:
     std::vector<EnvelopePoint> m_points;
