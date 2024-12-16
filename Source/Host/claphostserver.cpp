@@ -101,7 +101,7 @@ inline void runInteractiveMode(HANDLE pipe)
         }
         catch (std::exception &excep)
         {
-            std::cout << excep.what() << "\n";
+            std::print("error parsing input : {}\n", excep.what());
         }
     }
 }
@@ -198,6 +198,13 @@ inline void handleClapEvent(clap_event_header *hdr)
     {
         auto *pev = (clap_event_param_value *)hdr;
         std::print("received clap param value event id={} value={}\n", pev->param_id, pev->value);
+    }
+    else if (hdr->type == CLAP_EVENT_NOTE_EXPRESSION &&
+             hdr->size == sizeof(clap_event_note_expression))
+    {
+        auto *pexp = (clap_event_note_expression *)hdr;
+        std::print("received clap note expression event net={} key={} value={}\n",
+                   pexp->expression_id, pexp->key, pexp->value);
     }
     else if (hdr->type == 666 && hdr->size == sizeof(xclap_string_event))
     {
