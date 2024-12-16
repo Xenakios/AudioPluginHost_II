@@ -22,6 +22,8 @@
 
 const char *g_pipename = "\\\\.\\pipe\\my_pipe";
 
+// every new pipe message should start with this byte pattern, 
+// if it doesn't, something has went wrong somewhere and should abort
 const uint64_t messageMagic = 0xFFFFFFFF00EE0000;
 
 inline void run_pipe_sender()
@@ -72,11 +74,11 @@ inline void run_pipe_sender()
         }
         else
         {
-            std::cout << "sent " << numBytesWritten << " bytes\n";
+            // std::cout << "sent " << numBytesWritten << " bytes\n";
         }
     };
     std::cout << "Sending data to pipe...\n";
-    bool interactive = true;
+    bool interactive = false;
     if (!interactive)
     {
 
