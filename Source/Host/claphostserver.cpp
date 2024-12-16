@@ -2,7 +2,7 @@
 
 #define WIN32_LEAN_AND_MEAN
 #define _WINSOCK_DEPRECATED_NO_WARNINGS
-
+#include "clap/events.h"
 #include <random>
 #include <windows.h>
 #include <winbase.h>
@@ -45,8 +45,8 @@ inline void run_pipe_receiver()
         // The read operation will block until there is data to read
         DWORD numBytesRead = 0;
         BOOL result = ReadFile(pipe,
-                               buffer.data(), // the data from the pipe will be put here
-                               buffer.size(), // number of bytes allocated
+                               buffer.data(),             // the data from the pipe will be put here
+                               sizeof(clap_event_header), // number of bytes allocated
                                &numBytesRead, // this will store number of bytes actually read
                                NULL           // not using overlapped IO
         );
@@ -54,11 +54,27 @@ inline void run_pipe_receiver()
         if (result)
         {
             std::cout << "Number of bytes read: " << numBytesRead << "\n";
-            int numInts = numBytesRead / sizeof(int);
-            for (int i = 0; i < numInts; ++i)
+            clap_event_header *h = (clap_event_header *)buffer.data();
+            if (h->space_id == CLAP_CORE_EVENT_SPACE_ID)
             {
-                int *iptr = (int *)&buffer[i * sizeof(int)];
-                resultbuffer.push_back(*iptr);
+                if (h->type == CLAP_EVENT_NOTE_ON && h->size == sizeof(clap_event_note))
+                {
+                    std::cout << "got clap note on event from pipe\n";
+                    int bytestoread = sizeof(clap_event_note) - sizeof(clap_event_header);
+                    result = ReadFile(
+                        pipe,
+                        buffer.data() +
+                            sizeof(clap_event_header), // the data from the pipe will be put here
+                        bytestoread,                   // number of bytes allocated
+                        &numBytesRead, // this will store number of bytes actually read
+                        NULL);         // not using overlapped IO
+                    if (result && bytestoread == numBytesRead)
+                    {
+                        clap_event_note *nev = (clap_event_note *)buffer.data();
+                        std::cout << "received full clap note on event " << nev->key << " "
+                                  << nev->velocity << "\n";
+                    }
+                }
             }
         }
         else
@@ -67,10 +83,12 @@ inline void run_pipe_receiver()
             break;
         }
     }
+    /*
     std::cout << "result buffer size is " << resultbuffer.size() << "\n";
     choc::hash::xxHash32 hash;
     hash.hash(resultbuffer.data(), sizeof(int) * resultbuffer.size());
     std::cout << "test data hash on receiver side is " << hash.getHash() << "\n";
+    */
     // Close our pipe handle
     CloseHandle(pipe);
 }
@@ -125,17 +143,27 @@ inline void test_pipe(int argc, char **argv)
 
         std::cout << "Sending data to pipe...\n";
 
-        int pos = 0;
-        int outsendsize = 1024;
-        while (pos < outputdata.size())
+        int numMessagesToSend = 2;
+        for (int i = 0; i < numMessagesToSend; ++i)
         {
+            clap_event_note enote;
+            enote.header.time = 0;
+            enote.header.flags = 0;
+            enote.header.space_id = CLAP_CORE_EVENT_SPACE_ID;
+            enote.header.type = CLAP_EVENT_NOTE_ON;
+            enote.header.size = sizeof(clap_event_note);
+            enote.port_index = -1;
+            enote.channel = 0;
+            enote.key = 60 + i;
+            enote.note_id = i;
+            enote.velocity = 0.666;
             DWORD numBytesWritten = 0;
             // This call blocks until a client process reads all the data
-            result = WriteFile(pipe,                      // handle to our outbound pipe
-                               outputdata.data() + pos,   // data to send
-                               outsendsize * sizeof(int), // length of data to send (bytes)
-                               &numBytesWritten,          // will store actual amount of data sent
-                               NULL                       // not using overlapped IO
+            result = WriteFile(pipe,              // handle to our outbound pipe
+                               &enote,            // data to send
+                               enote.header.size, // length of data to send (bytes)
+                               &numBytesWritten,  // will store actual amount of data sent
+                               NULL               // not using overlapped IO
             );
 
             if (result)
@@ -147,7 +175,6 @@ inline void test_pipe(int argc, char **argv)
                 std::cout << "Failed to send data.\n";
                 // look up error code here using GetLastError()
             }
-            pos += outsendsize;
         }
 
         // Close the pipe (automatically disconnects client too)
