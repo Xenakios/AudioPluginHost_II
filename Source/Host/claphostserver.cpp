@@ -37,13 +37,12 @@ inline void run_pipe_receiver()
 
     std::cout << "Reading data from pipe...\n";
 
-    // The read operation will block until there is data to read
     std::vector<int> resultbuffer;
     std::vector<char> buffer;
     buffer.resize(1024);
     while (true)
     {
-
+        // The read operation will block until there is data to read
         DWORD numBytesRead = 0;
         BOOL result = ReadFile(pipe,
                                buffer.data(), // the data from the pipe will be put here
@@ -54,7 +53,6 @@ inline void run_pipe_receiver()
 
         if (result)
         {
-            // buffer[numBytesRead / sizeof(wchar_t)] = '\0'; // null terminate the string
             std::cout << "Number of bytes read: " << numBytesRead << "\n";
             int numInts = numBytesRead / sizeof(int);
             for (int i = 0; i < numInts; ++i)
@@ -62,7 +60,6 @@ inline void run_pipe_receiver()
                 int *iptr = (int *)&buffer[i * sizeof(int)];
                 resultbuffer.push_back(*iptr);
             }
-            // std::cout << "Message: " << buffer << "\n";
         }
         else
         {
@@ -128,24 +125,29 @@ inline void test_pipe(int argc, char **argv)
 
         std::cout << "Sending data to pipe...\n";
 
-        // This call blocks until a client process reads all the data
-
-        DWORD numBytesWritten = 0;
-        result = WriteFile(pipe,                            // handle to our outbound pipe
-                           outputdata.data(),               // data to send
-                           outputdata.size() * sizeof(int), // length of data to send (bytes)
-                           &numBytesWritten,                // will store actual amount of data sent
-                           NULL                             // not using overlapped IO
-        );
-
-        if (result)
+        int pos = 0;
+        int outsendsize = 1024;
+        while (pos < outputdata.size())
         {
-            std::cout << "Number of bytes sent: " << numBytesWritten << "\n";
-        }
-        else
-        {
-            std::cout << "Failed to send data.\n";
-            // look up error code here using GetLastError()
+            DWORD numBytesWritten = 0;
+            // This call blocks until a client process reads all the data
+            result = WriteFile(pipe,                      // handle to our outbound pipe
+                               outputdata.data() + pos,   // data to send
+                               outsendsize * sizeof(int), // length of data to send (bytes)
+                               &numBytesWritten,          // will store actual amount of data sent
+                               NULL                       // not using overlapped IO
+            );
+
+            if (result)
+            {
+                std::cout << "Number of bytes sent: " << numBytesWritten << "\n";
+            }
+            else
+            {
+                std::cout << "Failed to send data.\n";
+                // look up error code here using GetLastError()
+            }
+            pos += outsendsize;
         }
 
         // Close the pipe (automatically disconnects client too)
