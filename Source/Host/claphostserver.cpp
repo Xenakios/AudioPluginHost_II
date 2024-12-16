@@ -1,5 +1,8 @@
+
 #define WIN32_LEAN_AND_MEAN
 #define _WINSOCK_DEPRECATED_NO_WARNINGS
+#include <exception>
+#include "text/choc_StringUtilities.h"
 #include "clap/events.h"
 #include <random>
 #include <windows.h>
@@ -38,6 +41,69 @@ template <typename EventType> inline int writeClapEventToPipe(HANDLE pipe, Event
         return 0;
     }
     return numBytesWritten;
+}
+
+inline void runInteractiveMode(HANDLE pipe)
+{
+    while (true)
+    {
+        try
+        {
+            std::string input;
+            std::getline(std::cin, input);
+            auto tokens = choc::text::splitString(input, ' ', false);
+            if (tokens.size() == 0)
+            {
+                std::cout << "no input given!\n";
+                continue;
+            }
+            tokens[0] = choc::text::toUpperCase(tokens[0]);
+            if (tokens[0] == "QUIT")
+            {
+                std::cout << "finishing interactive mode\n";
+                break;
+            }
+
+            if (tokens[0] == "ON" && tokens.size() >= 2)
+            {
+                int key = std::stoi(tokens[1]);
+                if (key >= 0 && key < 128)
+                {
+                    double velo = 1.0;
+                    if (tokens.size() >= 3)
+                        velo = std::stod(tokens[2]);
+                    auto nev =
+                        xenakios::make_event_note(0, CLAP_EVENT_NOTE_ON, 0, 0, key, -1, velo);
+                    writeClapEventToPipe(pipe, &nev);
+                }
+            }
+            if (tokens[0] == "OFF" && tokens.size() >= 2)
+            {
+                int key = std::stoi(tokens[1]);
+                if (key >= 0 && key < 128)
+                {
+                    auto nev =
+                        xenakios::make_event_note(0, CLAP_EVENT_NOTE_OFF, 0, 0, key, -1, 0.0);
+                    writeClapEventToPipe(pipe, &nev);
+                }
+            }
+            if (tokens[0] == "TUNE" && tokens.size() >= 3)
+            {
+                int key = std::stoi(tokens[1]);
+                if (key >= 0 && key < 128)
+                {
+                    double retune = std::stod(tokens[2]);
+                    auto nexp = xenakios::make_event_note_expression(0, CLAP_NOTE_EXPRESSION_TUNING,
+                                                                     0, 0, key, -1, retune);
+                    writeClapEventToPipe(pipe, &nexp);
+                }
+            }
+        }
+        catch (std::exception &excep)
+        {
+            std::cout << excep.what() << "\n";
+        }
+    }
 }
 
 inline void run_pipe_sender()
@@ -115,32 +181,7 @@ inline void run_pipe_sender()
     }
     else
     {
-        while (true)
-        {
-            bool note_on = false;
-            int key = -1;
-            double velo = 0.0;
-            double retun = 0.0;
-            std::cin >> note_on >> key >> velo >> retun;
-            if (key >= 0 && key < 128)
-            {
-                int ety = CLAP_EVENT_NOTE_OFF;
-                if (note_on)
-                    ety = CLAP_EVENT_NOTE_ON;
-                auto nev = xenakios::make_event_note(0, ety, 0, 0, key, -1, velo);
-                writeClapEventToPipe(pipe, &nev);
-                if (std::abs(retun) > 0.0)
-                {
-                    auto nexp = xenakios::make_event_note_expression(0, CLAP_NOTE_EXPRESSION_TUNING,
-                                                                     0, 0, key, -1, retun);
-                    writeClapEventToPipe(pipe, &nexp);
-                }
-            }
-            if (key == -1)
-            {
-                break;
-            }
-        }
+        runInteractiveMode(pipe);
     }
     // Close the pipe (automatically disconnects client too)
     CloseHandle(pipe);
