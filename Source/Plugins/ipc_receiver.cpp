@@ -1,3 +1,10 @@
+
+#define WIN32_LEAN_AND_MEAN
+#define _WINSOCK_DEPRECATED_NO_WARNINGS
+#include <windows.h>
+#undef min
+#undef max
+#include <handleapi.h>
 #include "../Common/xap_ipc.h"
 
 #include "clap/clap.h"
@@ -24,7 +31,7 @@ struct xen_pipereceiver
                                    clap::helpers::CheckingLevel::Maximal>
 {
     std::vector<ParamDesc> paramDescs;
-
+    HANDLE m_pipe = INVALID_HANDLE_VALUE;
     const void *extension(const char *id) noexcept override
     {
         /*
@@ -55,11 +62,103 @@ struct xen_pipereceiver
         };
         */
     }
-    double outSr = 44100.0;
+    std::unique_ptr<std::thread> m_pipe_thread;
+    ~xen_pipereceiver()
+    {
+        m_stop_pipe_thread = true;
+        if (m_pipe_thread)
+        {
+            m_pipe_thread->join();
+        }
+        if (m_pipe != INVALID_HANDLE_VALUE)
+        {
+            CloseHandle(m_pipe);
+        }
+    }
+    void pipeThreadRun()
+    {
+        char buffer[maxPipeMessageLen];
+        while (!m_stop_pipe_thread)
+        {
+            DWORD numBytesRead = 0;
+            BOOL result = ReadFile(m_pipe,
+                                   buffer, // the data from the pipe will be put here
+                                   sizeof(uint64_t) + sizeof(clap_event_header),
+                                   &numBytesRead, // this will store number of bytes actually read
+                                   NULL           // not using overlapped IO
+            );
+
+            if (result)
+            {
+                uint64_t magic = 0;
+                memcpy(&magic, buffer, sizeof(uint64_t));
+                if (magic != messageMagicClap)
+                {
+                    std::cout << "message magic check failed!\n";
+                    // CloseHandle(pipe);
+                    return;
+                }
+
+                clap_event_header *hdr = (clap_event_header *)(buffer + sizeof(uint64_t));
+                if (hdr->space_id == CLAP_CORE_EVENT_SPACE_ID)
+                {
+                    int bytestoread = hdr->size - sizeof(clap_event_header);
+                    result =
+                        ReadFile(m_pipe,
+                                 buffer + sizeof(clap_event_header) +
+                                     sizeof(uint64_t), // the data from the pipe will be put here
+                                 bytestoread,          // number of bytes allocated
+                                 &numBytesRead, // this will store number of bytes actually read
+                                 NULL);         // not using overlapped IO
+                    // std::cout << "bytes to read " << bytestoread << " got " << numBytesRead <<
+                    // "\n";
+                    if (result && bytestoread == numBytesRead)
+                    {
+                        if (hdr->type == CLAP_EVENT_NOTE_ON || hdr->type == CLAP_EVENT_NOTE_OFF)
+                        {
+                            auto nev = (clap_event_note *)hdr;
+                            m_from_pipe_fifo.push(*nev);
+                        }
+                    }
+                    else
+                    {
+                        std::cout << "failed to read concrete clap event from pipe\n";
+                    }
+                }
+            }
+            else
+            {
+                std::cout << "Failed to read clap header from the pipe/end of messages\n";
+                // break;
+            }
+            Sleep(10);
+        }
+    }
+    std::atomic<bool> m_connected{false};
+    std::atomic<bool> m_stop_pipe_thread{false};
+    choc::fifo::SingleReaderSingleWriterFIFO<clap_event_note> m_from_pipe_fifo;
     bool activate(double sampleRate_, uint32_t minFrameCount,
                   uint32_t maxFrameCount) noexcept override
     {
-        outSr = sampleRate_;
+        if (m_pipe == INVALID_HANDLE_VALUE)
+        {
+            HANDLE pipe = CreateFileA(g_pipename,
+                                      GENERIC_READ, // only need read access
+                                      FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING,
+                                      FILE_ATTRIBUTE_NORMAL, NULL);
+
+            m_pipe = pipe;
+            if (pipe == INVALID_HANDLE_VALUE)
+            {
+                std::cout << "Failed to connect to pipe.\n";
+            }
+            else
+            {
+                m_from_pipe_fifo.reset(128);
+                m_connected = true;
+                m_pipe_thread = std::make_unique<std::thread>([this] { pipeThreadRun(); });
+            }
+        }
         return true;
     }
     bool implementsParams() const noexcept override { return false; }
@@ -121,6 +220,12 @@ struct xen_pipereceiver
     }
     clap_process_status process(const clap_process *process) noexcept override
     {
+        clap_event_note msg;
+        while (m_from_pipe_fifo.pop(msg))
+        {
+            process->out_events->try_push(process->out_events, (clap_event_header *)&msg);
+        }
+        return CLAP_PROCESS_CONTINUE;
         int numEvents = process->in_events->size(process->in_events);
         for (int i = 0; i < numEvents; ++i)
         {
@@ -135,7 +240,7 @@ struct xen_pipereceiver
                 process->out_events->try_push(process->out_events, (clap_event_header *)&dupev);
             }
         }
-        
+
         return CLAP_PROCESS_CONTINUE;
     }
 };
