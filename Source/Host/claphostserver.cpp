@@ -1,5 +1,3 @@
-
-
 #define WIN32_LEAN_AND_MEAN
 #define _WINSOCK_DEPRECATED_NO_WARNINGS
 #include "clap/events.h"
@@ -8,8 +6,6 @@
 #include <winbase.h>
 #include <fileapi.h>
 #include <memory>
-// #undef min
-// #undef max
 #include <string>
 #include <iostream>
 #include <format>
@@ -18,30 +14,15 @@
 #include "udp.hh"
 #include "memory/choc_xxHash.h"
 #include <print>
-// #include <namedpipeapi.h>
-
-const char *g_pipename = "\\\\.\\pipe\\my_pipe";
-
-// pipe messages should start with these byte pattern,
-// if they don't, something has went wrong somewhere and should abort
-const uint64_t messageMagicClap = 0xFFFFFFFF00EE0000;
-const uint64_t messageMagicCustom = 0xFFFFFFFF00EF0000;
-
-const uint32_t maxMessageLen = 512;
-
-struct xclap_string_event
-{
-    clap_event_header header;
-    char str[maxMessageLen - sizeof(clap_event_header) - sizeof(uint64_t)];
-};
+#include "../Common/xap_ipc.h"
 
 template <typename EventType> inline int writeClapEventToPipe(HANDLE pipe, EventType *ch)
 {
     // This call blocks until a client process reads all the data
-    char msgbuf[maxMessageLen];
+    char msgbuf[maxPipeMessageLen];
     // if things are working correctly, the memset redundant, but keeping this around
     // for debugging/testing for now
-    memset(msgbuf, 0, maxMessageLen);
+    memset(msgbuf, 0, maxPipeMessageLen);
 
     auto magic = messageMagicClap;
     memcpy(msgbuf, &magic, sizeof(uint64_t));
@@ -90,10 +71,9 @@ inline void run_pipe_sender()
     }
 
     std::cout << "Sending data to pipe...\n";
-    bool interactive = false;
+    bool interactive = true;
     if (!interactive)
     {
-
         int numMessagesToSend = 12;
         for (int i = 0; i < numMessagesToSend; ++i)
         {
@@ -138,10 +118,11 @@ inline void run_pipe_sender()
         while (true)
         {
             int key = -1;
-            std::cin >> key;
+            double velo = 0.0;
+            std::cin >> key >> velo;
             if (key >= 0 && key < 128)
             {
-                auto nev = xenakios::make_event_note(0, CLAP_EVENT_NOTE_ON, 0, 0, key, -1, 0.5);
+                auto nev = xenakios::make_event_note(0, CLAP_EVENT_NOTE_ON, 0, 0, key, -1, velo);
                 writeClapEventToPipe(pipe, &nev);
             }
             if (key == -1)
@@ -194,7 +175,7 @@ inline void run_pipe_receiver()
     std::cout << "Reading data from pipe...\n";
 
     std::vector<char> buffer;
-    buffer.resize(maxMessageLen);
+    buffer.resize(maxPipeMessageLen);
     while (true)
     {
         // The read operation will block until there is data to read
