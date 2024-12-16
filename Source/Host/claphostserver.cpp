@@ -19,7 +19,7 @@
 
 template <typename EventType> inline int writeClapEventToPipe(HANDLE pipe, EventType *ch)
 {
-    // This call blocks until a client process reads all the data
+    
     char msgbuf[maxPipeMessageLen];
     // if things are working correctly, the memset redundant, but keeping this around
     // for debugging/testing for now
@@ -29,6 +29,7 @@ template <typename EventType> inline int writeClapEventToPipe(HANDLE pipe, Event
     memcpy(msgbuf, &magic, sizeof(uint64_t));
     memcpy(msgbuf + sizeof(uint64_t), ch, ch->header.size);
     DWORD numBytesWritten = 0;
+    // This call blocks until a client process reads all the data
     auto r = WriteFile(pipe,                               // handle to our outbound pipe
                        msgbuf,                             // data to send
                        sizeof(uint64_t) + ch->header.size, // length of data to send (bytes)
