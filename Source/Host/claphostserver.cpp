@@ -22,9 +22,42 @@
 
 const char *g_pipename = "\\\\.\\pipe\\my_pipe";
 
-// every new pipe message should start with this byte pattern, 
-// if it doesn't, something has went wrong somewhere and should abort
-const uint64_t messageMagic = 0xFFFFFFFF00EE0000;
+// pipe messages should start with these byte pattern,
+// if they don't, something has went wrong somewhere and should abort
+const uint64_t messageMagicClap = 0xFFFFFFFF00EE0000;
+const uint64_t messageMagicCustom = 0xFFFFFFFF00EF0000;
+
+const uint32_t maxMessageLen = 512;
+
+struct xclap_string_event
+{
+    clap_event_header header;
+    char str[maxMessageLen - sizeof(clap_event_header) - sizeof(uint64_t)];
+};
+
+template <typename EventType> inline int writeClapEventToPipe(HANDLE pipe, EventType *ch)
+{
+    // This call blocks until a client process reads all the data
+    char msgbuf[maxMessageLen];
+    // if things are working correctly, the memset redundant, but keeping this around
+    // for debugging/testing for now
+    memset(msgbuf, 0, maxMessageLen);
+
+    auto magic = messageMagicClap;
+    memcpy(msgbuf, &magic, sizeof(uint64_t));
+    memcpy(msgbuf + sizeof(uint64_t), ch, ch->header.size);
+    DWORD numBytesWritten = 0;
+    auto r = WriteFile(pipe,                               // handle to our outbound pipe
+                       msgbuf,                             // data to send
+                       sizeof(uint64_t) + ch->header.size, // length of data to send (bytes)
+                       &numBytesWritten,                   // will store actual amount of data sent
+                       NULL);                              // not using overlapped IO
+    if (!r)
+    {
+        return 0;
+    }
+    return numBytesWritten;
+}
 
 inline void run_pipe_sender()
 {
@@ -55,28 +88,7 @@ inline void run_pipe_sender()
         CloseHandle(pipe); // close the pipe
         return;
     }
-    auto writeClapEventToPipe = [&pipe](auto *ch) {
-        // This call blocks until a client process reads all the data
-        char msgbuf[512];
-        memset(msgbuf, 0, 512);
-        auto magic = messageMagic;
-        memcpy(msgbuf, &magic, sizeof(uint64_t));
-        memcpy(msgbuf + sizeof(uint64_t), ch, ch->header.size);
-        DWORD numBytesWritten = 0;
-        auto r = WriteFile(pipe,                               // handle to our outbound pipe
-                           msgbuf,                             // data to send
-                           sizeof(uint64_t) + ch->header.size, // length of data to send (bytes)
-                           &numBytesWritten, // will store actual amount of data sent
-                           NULL);            // not using overlapped IO
-        if (!r)
-        {
-            std::cout << "failed to send data\n";
-        }
-        else
-        {
-            // std::cout << "sent " << numBytesWritten << " bytes\n";
-        }
-    };
+
     std::cout << "Sending data to pipe...\n";
     bool interactive = false;
     if (!interactive)
@@ -87,11 +99,22 @@ inline void run_pipe_sender()
         {
             auto enote = xenakios::make_event_note(0, CLAP_EVENT_NOTE_ON, 1, 0, 60 + i, -1, 0.8888);
 
-            writeClapEventToPipe(&enote);
+            writeClapEventToPipe(pipe, &enote);
             if (i == 5)
             {
                 auto automev = xenakios::make_event_param_value(0, 666, 0.42, nullptr);
-                writeClapEventToPipe(&automev);
+                writeClapEventToPipe(pipe, &automev);
+            }
+            if (i == 2)
+            {
+                xclap_string_event sev;
+                sev.header.flags = 0;
+                sev.header.size = sizeof(xclap_string_event);
+                sev.header.type = 666;
+                sev.header.space_id = CLAP_CORE_EVENT_SPACE_ID;
+                sev.header.time = 0;
+                strcpy(sev.str, "this is a text event");
+                writeClapEventToPipe(pipe, &sev);
             }
             if (i == 10)
             {
@@ -105,7 +128,7 @@ inline void run_pipe_sender()
                 mev.data[0] = 0;
                 mev.data[1] = 0;
                 mev.data[2] = 0;
-                writeClapEventToPipe(&mev);
+                writeClapEventToPipe(pipe, &mev);
             }
             Sleep(250);
         }
@@ -119,7 +142,7 @@ inline void run_pipe_sender()
             if (key >= 0 && key < 128)
             {
                 auto nev = xenakios::make_event_note(0, CLAP_EVENT_NOTE_ON, 0, 0, key, -1, 0.5);
-                writeClapEventToPipe(&nev);
+                writeClapEventToPipe(pipe, &nev);
             }
             if (key == -1)
             {
@@ -165,7 +188,7 @@ inline void run_pipe_receiver()
         {
             uint64_t magic = 0;
             memcpy(&magic, buffer.data(), sizeof(uint64_t));
-            if (magic != messageMagic)
+            if (magic != messageMagicClap)
             {
                 std::cout << "message magic check failed!\n";
                 CloseHandle(pipe);
@@ -187,20 +210,26 @@ inline void run_pipe_receiver()
                 {
                     if (hdr->type == CLAP_EVENT_NOTE_ON && hdr->size == sizeof(clap_event_note))
                     {
-                        clap_event_note *nev = (clap_event_note *)hdr;
-                        std::cout << "received clap note on event " << nev->key << " "
-                                  << nev->velocity << "\n";
+                        auto *nev = (clap_event_note *)hdr;
+                        std::print("received clap note on event key={} velo={}\n", nev->key,
+                                   nev->velocity);
                     }
                     else if (hdr->type == CLAP_EVENT_PARAM_VALUE &&
                              hdr->size == sizeof(clap_event_param_value))
                     {
-                        clap_event_param_value *pev = (clap_event_param_value *)hdr;
-                        std::cout << "received clap param value event " << pev->param_id << " "
-                                  << pev->value << "\n";
+                        auto *pev = (clap_event_param_value *)hdr;
+                        std::print("received clap param value event id={} value={}\n",
+                                   pev->param_id, pev->value);
+                    }
+                    else if (hdr->type == 666 && hdr->size == sizeof(xclap_string_event))
+                    {
+                        auto *sev = (xclap_string_event *)hdr;
+                        std::print("received text event : {}\n", sev->str);
                     }
                     else
                     {
-                        std::print("unhandled clap event of type {} size {}\n", hdr->type, hdr->size);
+                        std::print("unhandled clap event of type {} size {}\n", hdr->type,
+                                   hdr->size);
                     }
                 }
                 else
