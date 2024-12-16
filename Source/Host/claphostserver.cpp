@@ -154,6 +154,29 @@ inline void run_pipe_sender()
     CloseHandle(pipe);
 }
 
+inline void handleClapEvent(clap_event_header *hdr)
+{
+    if (hdr->type == CLAP_EVENT_NOTE_ON && hdr->size == sizeof(clap_event_note))
+    {
+        auto *nev = (clap_event_note *)hdr;
+        std::print("received clap note on event key={} velo={}\n", nev->key, nev->velocity);
+    }
+    else if (hdr->type == CLAP_EVENT_PARAM_VALUE && hdr->size == sizeof(clap_event_param_value))
+    {
+        auto *pev = (clap_event_param_value *)hdr;
+        std::print("received clap param value event id={} value={}\n", pev->param_id, pev->value);
+    }
+    else if (hdr->type == 666 && hdr->size == sizeof(xclap_string_event))
+    {
+        auto *sev = (xclap_string_event *)hdr;
+        std::print("received text event : {}\n", sev->str);
+    }
+    else
+    {
+        std::print("unhandled clap event of type {} size {}\n", hdr->type, hdr->size);
+    }
+}
+
 inline void run_pipe_receiver()
 {
     HANDLE pipe = CreateFileA(g_pipename,
@@ -170,9 +193,8 @@ inline void run_pipe_receiver()
 
     std::cout << "Reading data from pipe...\n";
 
-    std::vector<int> resultbuffer;
     std::vector<char> buffer;
-    buffer.resize(1024);
+    buffer.resize(maxMessageLen);
     while (true)
     {
         // The read operation will block until there is data to read
@@ -208,33 +230,11 @@ inline void run_pipe_receiver()
                 // std::cout << "bytes to read " << bytestoread << " got " << numBytesRead << "\n";
                 if (result && bytestoread == numBytesRead)
                 {
-                    if (hdr->type == CLAP_EVENT_NOTE_ON && hdr->size == sizeof(clap_event_note))
-                    {
-                        auto *nev = (clap_event_note *)hdr;
-                        std::print("received clap note on event key={} velo={}\n", nev->key,
-                                   nev->velocity);
-                    }
-                    else if (hdr->type == CLAP_EVENT_PARAM_VALUE &&
-                             hdr->size == sizeof(clap_event_param_value))
-                    {
-                        auto *pev = (clap_event_param_value *)hdr;
-                        std::print("received clap param value event id={} value={}\n",
-                                   pev->param_id, pev->value);
-                    }
-                    else if (hdr->type == 666 && hdr->size == sizeof(xclap_string_event))
-                    {
-                        auto *sev = (xclap_string_event *)hdr;
-                        std::print("received text event : {}\n", sev->str);
-                    }
-                    else
-                    {
-                        std::print("unhandled clap event of type {} size {}\n", hdr->type,
-                                   hdr->size);
-                    }
+                    handleClapEvent(hdr);
                 }
                 else
                 {
-                    std::cout << "failed to read clap concrete event from pipe\n";
+                    std::cout << "failed to read concrete clap event from pipe\n";
                 }
             }
         }
@@ -244,13 +244,6 @@ inline void run_pipe_receiver()
             break;
         }
     }
-    /*
-    std::cout << "result buffer size is " << resultbuffer.size() << "\n";
-    choc::hash::xxHash32 hash;
-    hash.hash(resultbuffer.data(), sizeof(int) * resultbuffer.size());
-    std::cout << "test data hash on receiver side is " << hash.getHash() << "\n";
-    */
-    // Close our pipe handle
     CloseHandle(pipe);
 }
 
