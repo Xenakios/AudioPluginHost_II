@@ -156,3 +156,17 @@ target_link_libraries(CMajorTester PRIVATE c:/develop/cmajlang/cmajor/tools/Cmaj
 
 # juce::juce_recommended_lto_flags
 # juce_add_bundle_resources_directory(AudioPluginHost2 Assets)
+
+add_library(PipeReceiverPlugin MODULE
+Source/Plugins/ipc_receiver.cpp
+)
+set_target_properties(PipeReceiverPlugin PROPERTIES SUFFIX ".clap" PREFIX "")
+target_compile_definitions(PipeReceiverPlugin PRIVATE _USE_MATH_DEFINES=1 IS_WIN=1)
+# target_link_libraries(PipeReceiverPlugin PRIVATE fmt)
+set(products_folder ${CMAKE_BINARY_DIR})
+    set(build_type ${CMAKE_BUILD_TYPE})
+    add_custom_command(
+        TARGET PipeReceiverPlugin POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy "${products_folder}/PipeReceiverPlugin.clap" "C:\\Program Files\\Common Files\\CLAP"
+    )
+
