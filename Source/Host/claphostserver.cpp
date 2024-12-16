@@ -24,6 +24,102 @@ const char *g_pipename = "\\\\.\\pipe\\my_pipe";
 
 const uint64_t messageMagic = 0xFFFFFFFF00EE0000;
 
+inline void run_pipe_sender()
+{
+    HANDLE pipe = CreateNamedPipeA(g_pipename,           // name of the pipe
+                                   PIPE_ACCESS_OUTBOUND, // 1-way pipe -- send only
+                                   PIPE_TYPE_BYTE,       // send data as a byte stream
+                                   1,                    // only allow 1 instance of this pipe
+                                   65536,                // no outbound buffer
+                                   0,                    // no inbound buffer
+                                   0,                    // use default wait time
+                                   NULL                  // use default security attributes
+    );
+
+    if (pipe == NULL || pipe == INVALID_HANDLE_VALUE)
+    {
+        std::cout << "Failed to create outbound pipe instance.\n";
+        return;
+    }
+
+    std::cout << "Waiting for a client to connect to the pipe...\n";
+
+    // This call blocks until a client process connects to the pipe
+    BOOL result = ConnectNamedPipe(pipe, NULL);
+    if (!result)
+    {
+        std::cout << "Failed to make connection on named pipe.\n";
+        // look up error code here using GetLastError()
+        CloseHandle(pipe); // close the pipe
+        return;
+    }
+    auto writeClapEventToPipe = [&pipe](auto *ch) {
+        // This call blocks until a client process reads all the data
+        DWORD numBytesWritten = 0;
+        auto r = WriteFile(pipe,             // handle to our outbound pipe
+                           ch,               // data to send
+                           ch->header.size,  // length of data to send (bytes)
+                           &numBytesWritten, // will store actual amount of data sent
+                           NULL);            // not using overlapped IO
+        if (!r)
+        {
+            std::cout << "failed to send data\n";
+        }
+    };
+    std::cout << "Sending data to pipe...\n";
+    bool interactive = true;
+    if (!interactive)
+    {
+
+        int numMessagesToSend = 12;
+        for (int i = 0; i < numMessagesToSend; ++i)
+        {
+            auto enote = xenakios::make_event_note(0, CLAP_EVENT_NOTE_ON, 1, 0, 60 + i, -1, 0.8888);
+
+            writeClapEventToPipe(&enote);
+            if (i == 5)
+            {
+                auto automev = xenakios::make_event_param_value(0, 666, 0.42, nullptr);
+                writeClapEventToPipe(&automev);
+            }
+            if (i == 10)
+            {
+                clap_event_midi mev;
+                mev.header.flags = 0;
+                mev.header.space_id = CLAP_CORE_EVENT_SPACE_ID;
+                mev.header.type = CLAP_EVENT_MIDI;
+                mev.header.size = sizeof(clap_event_midi);
+                mev.header.time = 0;
+                mev.port_index = 0;
+                mev.data[0] = 0;
+                mev.data[1] = 0;
+                mev.data[2] = 0;
+                writeClapEventToPipe(&mev);
+            }
+            Sleep(250);
+        }
+    }
+    else
+    {
+        while (true)
+        {
+            int key = -1;
+            std::cin >> key;
+            if (key >= 0 && key < 128)
+            {
+                auto nev = xenakios::make_event_note(0, CLAP_EVENT_NOTE_ON, 0, 0, key, -1, 0.5);
+                writeClapEventToPipe(&nev);
+            }
+            if (key == -1)
+            {
+                break;
+            }
+        }
+    }
+    // Close the pipe (automatically disconnects client too)
+    CloseHandle(pipe);
+}
+
 inline void run_pipe_receiver()
 {
     HANDLE pipe = CreateFileA(g_pipename,
@@ -131,135 +227,10 @@ inline void test_pipe(int argc, char **argv)
 
     if (atoi(argv[1]) == 0)
     {
-        // sender
-        std::vector<int> outputdata;
-        std::mt19937 rng;
-        std::uniform_int_distribution<int> dist(0, 10);
-        int outdatalen = 4096;
-        for (int i = 0; i < outdatalen; ++i)
-            outputdata.push_back(dist(rng));
-        choc::hash::xxHash32 hash;
-        hash.hash(outputdata.data(), sizeof(int) * outputdata.size());
-        // std::cout << "test data hash is " << hash.getHash() << "\n";
-        HANDLE pipe = CreateNamedPipeA(g_pipename,           // name of the pipe
-                                       PIPE_ACCESS_OUTBOUND, // 1-way pipe -- send only
-                                       PIPE_TYPE_BYTE,       // send data as a byte stream
-                                       1,                    // only allow 1 instance of this pipe
-                                       65536,                // no outbound buffer
-                                       0,                    // no inbound buffer
-                                       0,                    // use default wait time
-                                       NULL                  // use default security attributes
-        );
-
-        if (pipe == NULL || pipe == INVALID_HANDLE_VALUE)
-        {
-            std::cout << "Failed to create outbound pipe instance.\n";
-            return;
-        }
-
-        std::cout << "Waiting for a client to connect to the pipe...\n";
-
-        // This call blocks until a client process connects to the pipe
-        BOOL result = ConnectNamedPipe(pipe, NULL);
-        if (!result)
-        {
-            std::cout << "Failed to make connection on named pipe.\n";
-            // look up error code here using GetLastError()
-            CloseHandle(pipe); // close the pipe
-            return;
-        }
-
-        std::cout << "Sending data to pipe...\n";
-        bool interactive = true;
-        if (!interactive)
-        {
-
-            int numMessagesToSend = 12;
-            for (int i = 0; i < numMessagesToSend; ++i)
-            {
-                clap_event_note enote;
-                enote.header.time = 0;
-                enote.header.flags = 0;
-                enote.header.space_id = CLAP_CORE_EVENT_SPACE_ID;
-                enote.header.type = CLAP_EVENT_NOTE_ON;
-                enote.header.size = sizeof(clap_event_note);
-                enote.port_index = -1;
-                enote.channel = 0;
-                enote.key = 60 + i;
-                enote.note_id = i;
-                enote.velocity = 0.8888;
-                DWORD numBytesWritten = 0;
-                auto writeClapEvent = [&numBytesWritten, &pipe](auto *ch) {
-                    // This call blocks until a client process reads all the data
-                    auto r = WriteFile(pipe,             // handle to our outbound pipe
-                                       ch,               // data to send
-                                       ch->header.size,  // length of data to send (bytes)
-                                       &numBytesWritten, // will store actual amount of data sent
-                                       NULL);            // not using overlapped IO
-                    if (!r)
-                    {
-                        std::cout << "failed to send data\n";
-                    }
-                };
-                writeClapEvent(&enote);
-                if (i == 5)
-                {
-                    auto automev = xenakios::make_event_param_value(0, 666, 0.42, nullptr);
-                    writeClapEvent(&automev);
-                }
-                if (i == 10)
-                {
-                    clap_event_midi mev;
-                    mev.header.flags = 0;
-                    mev.header.space_id = CLAP_CORE_EVENT_SPACE_ID;
-                    mev.header.type = CLAP_EVENT_MIDI;
-                    mev.header.size = sizeof(clap_event_midi);
-                    mev.header.time = 0;
-                    mev.port_index = 0;
-                    mev.data[0] = 0;
-                    mev.data[1] = 0;
-                    mev.data[2] = 0;
-                    writeClapEvent(&mev);
-                }
-                Sleep(250);
-            }
-        }
-        else
-        {
-            DWORD numBytesWritten = 0;
-            auto writeClapEvent = [&numBytesWritten, &pipe](auto *ch) {
-                // This call blocks until a client process reads all the data
-                auto r = WriteFile(pipe,             // handle to our outbound pipe
-                                   ch,               // data to send
-                                   ch->header.size,  // length of data to send (bytes)
-                                   &numBytesWritten, // will store actual amount of data sent
-                                   NULL);            // not using overlapped IO
-                if (!r)
-                {
-                    std::cout << "failed to send data\n";
-                }
-            };
-            while (true)
-            {
-                int key = -1;
-                std::cin >> key;
-                if (key >= 0 && key < 128)
-                {
-                    auto nev = xenakios::make_event_note(0, CLAP_EVENT_NOTE_ON, 0, 0, key, -1, 0.5);
-                    writeClapEvent(&nev);
-                }
-                if (key == -1)
-                {
-                    break;
-                }
-            }
-        }
-        // Close the pipe (automatically disconnects client too)
-        CloseHandle(pipe);
+        run_pipe_sender();
     }
     else
     {
-        // receiver
         run_pipe_receiver();
     }
 }
