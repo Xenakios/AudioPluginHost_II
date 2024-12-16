@@ -1,5 +1,8 @@
 #include <cstdint>
 #include <exception>
+// #include <handleapi.h>
+// #include <minwindef.h>
+
 #include <ostream>
 #include <combaseapi.h>
 #include <fstream>
@@ -1589,12 +1592,61 @@ inline void test_smallvectorenv()
     for (int i = 0; i < outlen; ++i)
         buf.getSample(0, i) = env.outputBlock[i];
     writer->appendFrames(buf.getView());
-    
 }
 
-int main()
+inline void test_envelope_iterator()
 {
-    test_smallvectorenv();
+    xenakios::Envelope env;
+    env.addPoint({0.0, 0.0});
+    env.addPoint({1.0, 1.0});
+    env.addPoint({2.0, 0.0});
+    xenakios::Envelope::Iterator enviter{env};
+
+    choc::audio::WAVAudioFileFormat<true> format;
+    choc::audio::AudioFileProperties props;
+
+    props.bitDepth = choc::audio::BitDepth::float32;
+    props.numChannels = 1;
+    props.sampleRate = 44100;
+    auto writer = format.createWriter(R"(C:\MusicAudio\clap_out\envelope_iter01.wav)", props);
+    unsigned int outlen = 2.5 * 44100;
+    choc::buffer::ChannelArrayBuffer<float> buf{1, outlen};
+    buf.clear();
+    for (int i = 0; i < outlen; ++i)
+    {
+        double tpos = i / props.sampleRate;
+        double y = enviter.evaluateAtPosition(tpos);
+        buf.getSample(0, i) = y;
+    }
+}
+
+class MyNoCtor
+{
+  public:
+    int x = 0;
+    int y = 0;
+    void *z = nullptr;
+};
+
+inline void test_no_ctor()
+{
+    /*
+    std::vector<MyNoCtor> vec;
+    vec.resize(64);
+    vec.clear();
+    vec.push_back(MyNoCtor());
+    */
+    MyNoCtor ob;
+}
+/*
+
+*/
+int main(int argc, char **argv)
+{
+    // test_pipe(argc, argv);
+    // test_no_ctor();
+    // test_envelope_iterator();
+    // test_smallvectorenv();
     // test_cv_seq();
     // test_clap_engine_multichain();
     // test_vec();

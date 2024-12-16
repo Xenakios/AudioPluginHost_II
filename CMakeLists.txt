@@ -31,6 +31,7 @@ include_directories(
     libs/oscpkt
     libs/simde
     libs/thread-pool/include
+    C:/develop/cmajlang/cmajor/include
 )
 
 # for "reasons", this is still a console app even though a GUI app is built from it
@@ -144,8 +145,14 @@ add_executable(ClapMiniHost
     Source/Host/claphost.cpp
     libs/rtaudio/RtAudio.cpp  
     )
-target_compile_definitions(ClapMiniHost PRIVATE NOJUCE=1 _USE_MATH_DEFINES=1 __WINDOWS_WASAPI__)
+target_compile_definitions(ClapMiniHost PRIVATE _WIN64 NOJUCE=1 _USE_MATH_DEFINES=1 __WINDOWS_WASAPI__)
 
+# cmaj testing
+add_executable(CMajorTester 
+    Source/Experimental/cmajtester.cpp 
+    )
+target_compile_definitions(CMajorTester PRIVATE NOJUCE=1 _USE_MATH_DEFINES=1 __WINDOWS_WASAPI__)
+target_link_libraries(CMajorTester PRIVATE c:/develop/cmajlang/cmajor/tools/CmajDLL/exports.def)
 
 # juce::juce_recommended_lto_flags
 # juce_add_bundle_resources_directory(AudioPluginHost2 Assets)

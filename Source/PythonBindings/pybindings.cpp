@@ -161,6 +161,8 @@ inline py::array_t<float> processChain(ProcessorChain &chain, const py::array_t<
     choc::buffer::SeparateChannelLayout<float> layout{chanpointers};
     choc::buffer::ChannelArrayView<float> view{
         layout, {(unsigned int)num_inchans, (unsigned int)numinsamples}};
+    // std::async is too unreliable in terms of what it actually does, there are no guarantees
+    // it uses an already running thread pool etc, so we use the BS::thread_pool class.
     auto fut = chain.thpool.submit_task([&]() { return chain.processAudio(view, {}); });
     auto err = fut.get();
     if (err == -1)
@@ -349,8 +351,8 @@ PYBIND11_MODULE(xenakios, m)
              [](const xenakios::EnvelopePoint &a) {
                  return std::format("EnvelopePoint x={} y={}", a.getX(), a.getY());
              })
-        .def("get_x", &xenakios::EnvelopePoint::getX)
-        .def("get_y", &xenakios::EnvelopePoint::getY);
+        .def("x", &xenakios::EnvelopePoint::getX)
+        .def("y", &xenakios::EnvelopePoint::getY);
 
     py::class_<xenakios::Envelope>(m, "Envelope")
         .def(py::init<>())

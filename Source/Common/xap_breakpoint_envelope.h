@@ -260,6 +260,26 @@ class Envelope
         }
     }
     std::vector<EnvelopePoint> &getPoints() { return m_points; }
+    class Iterator
+    {
+      public:
+        Iterator(Envelope &owner) : m_owner(owner) {}
+        void setCurrentPosition(double tpos) {}
+        double evaluateAtPosition(double inxpos)
+        {
+            assert(m_owner.getNumPoints() > 0);
+            const auto &curpoint = m_owner.m_points[m_currentPointIndex];
+            
+            return 0.0;
+        }
+
+      private:
+        Envelope &m_owner;
+        int m_currentPointIndex = 0;
+        double m_currentTimePos = 0.0;
+    };
+    // convenience iterator instance for use with Python etc
+    Iterator defaultIterator{*this};
 
   private:
     std::vector<EnvelopePoint> m_points;
