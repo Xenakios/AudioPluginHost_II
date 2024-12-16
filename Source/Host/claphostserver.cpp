@@ -55,15 +55,24 @@ inline void run_pipe_sender()
     }
     auto writeClapEventToPipe = [&pipe](auto *ch) {
         // This call blocks until a client process reads all the data
+        char msgbuf[512];
+        memset(msgbuf, 0, 512);
+        auto magic = messageMagic;
+        memcpy(msgbuf, &magic, sizeof(uint64_t));
+        memcpy(msgbuf + sizeof(uint64_t), ch, ch->header.size);
         DWORD numBytesWritten = 0;
-        auto r = WriteFile(pipe,             // handle to our outbound pipe
-                           ch,               // data to send
-                           ch->header.size,  // length of data to send (bytes)
+        auto r = WriteFile(pipe,                               // handle to our outbound pipe
+                           msgbuf,                             // data to send
+                           sizeof(uint64_t) + ch->header.size, // length of data to send (bytes)
                            &numBytesWritten, // will store actual amount of data sent
                            NULL);            // not using overlapped IO
         if (!r)
         {
             std::cout << "failed to send data\n";
+        }
+        else
+        {
+            std::cout << "sent " << numBytesWritten << " bytes\n";
         }
     };
     std::cout << "Sending data to pipe...\n";
@@ -145,16 +154,13 @@ inline void run_pipe_receiver()
         DWORD numBytesRead = 0;
         BOOL result = ReadFile(pipe,
                                buffer.data(), // the data from the pipe will be put here
-                               sizeof(clap_event_header),
+                               sizeof(uint64_t) + sizeof(clap_event_header),
                                &numBytesRead, // this will store number of bytes actually read
                                NULL           // not using overlapped IO
         );
 
         if (result)
         {
-            // std::cout << "Number of bytes read: " << numBytesRead << "\n";
-            /*
-            // we should probably implement the message magic properly, but not now...
             uint64_t magic = 0;
             memcpy(&magic, buffer.data(), sizeof(uint64_t));
             if (magic != messageMagic)
@@ -163,36 +169,36 @@ inline void run_pipe_receiver()
                 CloseHandle(pipe);
                 return;
             }
-            */
-            clap_event_header *h = (clap_event_header *)buffer.data();
-            if (h->space_id == CLAP_CORE_EVENT_SPACE_ID)
+
+            clap_event_header *hdr = (clap_event_header *)(buffer.data() + sizeof(uint64_t));
+            if (hdr->space_id == CLAP_CORE_EVENT_SPACE_ID)
             {
-                int bytestoread = h->size - sizeof(clap_event_header);
-                result = ReadFile(
-                    pipe,
-                    buffer.data() +
-                        sizeof(clap_event_header), // the data from the pipe will be put here
-                    bytestoread,                   // number of bytes allocated
-                    &numBytesRead,                 // this will store number of bytes actually read
-                    NULL);                         // not using overlapped IO
+                int bytestoread = hdr->size - sizeof(clap_event_header);
+                result = ReadFile(pipe,
+                                  buffer.data() + sizeof(clap_event_header) +
+                                      sizeof(uint64_t), // the data from the pipe will be put here
+                                  bytestoread,          // number of bytes allocated
+                                  &numBytesRead, // this will store number of bytes actually read
+                                  NULL);         // not using overlapped IO
+                // std::cout << "bytes to read " << bytestoread << " got " << numBytesRead << "\n";
                 if (result && bytestoread == numBytesRead)
                 {
-                    if (h->type == CLAP_EVENT_NOTE_ON && h->size == sizeof(clap_event_note))
+                    if (hdr->type == CLAP_EVENT_NOTE_ON && hdr->size == sizeof(clap_event_note))
                     {
-                        clap_event_note *nev = (clap_event_note *)buffer.data();
+                        clap_event_note *nev = (clap_event_note *)hdr;
                         std::cout << "received clap note on event " << nev->key << " "
                                   << nev->velocity << "\n";
                     }
-                    else if (h->type == CLAP_EVENT_PARAM_VALUE &&
-                             h->size == sizeof(clap_event_param_value))
+                    else if (hdr->type == CLAP_EVENT_PARAM_VALUE &&
+                             hdr->size == sizeof(clap_event_param_value))
                     {
-                        clap_event_param_value *pev = (clap_event_param_value *)buffer.data();
+                        clap_event_param_value *pev = (clap_event_param_value *)hdr;
                         std::cout << "received clap param value event " << pev->param_id << " "
                                   << pev->value << "\n";
                     }
                     else
                     {
-                        std::print("unhandled clap event of type {} size {}\n", h->type, h->size);
+                        std::print("unhandled clap event of type {} size {}\n", hdr->type, hdr->size);
                     }
                 }
                 else
