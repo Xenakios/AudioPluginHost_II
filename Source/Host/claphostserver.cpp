@@ -17,6 +17,7 @@
 #include "oscpkt.hh"
 #include "udp.hh"
 #include "memory/choc_xxHash.h"
+#include <print>
 // #include <namedpipeapi.h>
 
 const char *g_pipename = "\\\\.\\pipe\\my_pipe";
@@ -53,33 +54,47 @@ inline void run_pipe_receiver()
 
         if (result)
         {
-            std::cout << "Number of bytes read: " << numBytesRead << "\n";
+            // std::cout << "Number of bytes read: " << numBytesRead << "\n";
             clap_event_header *h = (clap_event_header *)buffer.data();
             if (h->space_id == CLAP_CORE_EVENT_SPACE_ID)
             {
-                if (h->type == CLAP_EVENT_NOTE_ON && h->size == sizeof(clap_event_note))
+                int bytestoread = h->size - sizeof(clap_event_header);
+                result = ReadFile(
+                    pipe,
+                    buffer.data() +
+                        sizeof(clap_event_header), // the data from the pipe will be put here
+                    bytestoread,                   // number of bytes allocated
+                    &numBytesRead,                 // this will store number of bytes actually read
+                    NULL);                         // not using overlapped IO
+                if (result && bytestoread == numBytesRead)
                 {
-                    std::cout << "got clap note on event from pipe\n";
-                    int bytestoread = sizeof(clap_event_note) - sizeof(clap_event_header);
-                    result = ReadFile(
-                        pipe,
-                        buffer.data() +
-                            sizeof(clap_event_header), // the data from the pipe will be put here
-                        bytestoread,                   // number of bytes allocated
-                        &numBytesRead, // this will store number of bytes actually read
-                        NULL);         // not using overlapped IO
-                    if (result && bytestoread == numBytesRead)
+                    if (h->type == CLAP_EVENT_NOTE_ON && h->size == sizeof(clap_event_note))
                     {
                         clap_event_note *nev = (clap_event_note *)buffer.data();
-                        std::cout << "received full clap note on event " << nev->key << " "
+                        std::cout << "received clap note on event " << nev->key << " "
                                   << nev->velocity << "\n";
                     }
+                    else if (h->type == CLAP_EVENT_PARAM_VALUE &&
+                             h->size == sizeof(clap_event_param_value))
+                    {
+                        clap_event_param_value *pev = (clap_event_param_value *)buffer.data();
+                        std::cout << "received clap param value event " << pev->param_id << " "
+                                  << pev->value << "\n";
+                    }
+                    else
+                    {
+                        std::print("unhandled clap event of type {} size {}\n", h->type, h->size);
+                    }
+                }
+                else
+                {
+                    std::cout << "failed to read clap concrete event from pipe\n";
                 }
             }
         }
         else
         {
-            std::cout << "Failed to read data from the pipe.\n";
+            std::cout << "Failed to read clap header from the pipe/end of messages\n";
             break;
         }
     }
@@ -143,7 +158,7 @@ inline void test_pipe(int argc, char **argv)
 
         std::cout << "Sending data to pipe...\n";
 
-        int numMessagesToSend = 2;
+        int numMessagesToSend = 12;
         for (int i = 0; i < numMessagesToSend; ++i)
         {
             clap_event_note enote;
@@ -156,25 +171,41 @@ inline void test_pipe(int argc, char **argv)
             enote.channel = 0;
             enote.key = 60 + i;
             enote.note_id = i;
-            enote.velocity = 0.666;
+            enote.velocity = 0.8888;
             DWORD numBytesWritten = 0;
-            // This call blocks until a client process reads all the data
-            result = WriteFile(pipe,              // handle to our outbound pipe
-                               &enote,            // data to send
-                               enote.header.size, // length of data to send (bytes)
-                               &numBytesWritten,  // will store actual amount of data sent
-                               NULL               // not using overlapped IO
-            );
-
-            if (result)
+            auto writeClapEvent = [&numBytesWritten, &pipe](auto *ch) {
+                // This call blocks until a client process reads all the data
+                auto r = WriteFile(pipe,             // handle to our outbound pipe
+                                   ch,               // data to send
+                                   ch->header.size,  // length of data to send (bytes)
+                                   &numBytesWritten, // will store actual amount of data sent
+                                   NULL);            // not using overlapped IO
+                if (!r)
+                {
+                    std::cout << "failed to send data\n";
+                }
+            };
+            writeClapEvent(&enote);
+            if (i == 5)
             {
-                std::cout << "Number of bytes sent: " << numBytesWritten << "\n";
+                auto automev = xenakios::make_event_param_value(0, 666, 0.42, nullptr);
+                writeClapEvent(&automev);
             }
-            else
+            if (i == 10)
             {
-                std::cout << "Failed to send data.\n";
-                // look up error code here using GetLastError()
+                clap_event_midi mev;
+                mev.header.flags = 0;
+                mev.header.space_id = CLAP_CORE_EVENT_SPACE_ID;
+                mev.header.type = CLAP_EVENT_MIDI;
+                mev.header.size = sizeof(clap_event_midi);
+                mev.header.time = 0;
+                mev.port_index = 0;
+                mev.data[0] = 0;
+                mev.data[1] = 0;
+                mev.data[2] = 0;
+                writeClapEvent(&mev);
             }
+            Sleep(250);
         }
 
         // Close the pipe (automatically disconnects client too)
