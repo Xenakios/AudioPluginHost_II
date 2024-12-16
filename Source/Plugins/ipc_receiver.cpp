@@ -1,9 +1,4 @@
-
-#define WIN32_LEAN_AND_MEAN
-#define _WINSOCK_DEPRECATED_NO_WARNINGS
 #include <windows.h>
-#undef min
-#undef max
 #include <handleapi.h>
 #include "../Common/xap_ipc.h"
 
@@ -16,13 +11,9 @@
 #include "clap/helpers/host-proxy.hxx"
 #include "clap/plugin-features.h"
 #include "sst/basic-blocks/params/ParamMetadata.h"
-#include "gui/choc_WebView.h"
 #include "containers/choc_SingleReaderSingleWriterFIFO.h"
-
 #include "../Common/xap_utils.h"
-#include <filesystem>
 #include <unordered_map>
-// #include "clap/ext/draft/param-origin.h"
 
 using ParamDesc = sst::basic_blocks::params::ParamMetaData;
 
@@ -42,7 +33,7 @@ struct xen_pipereceiver
         */
         return nullptr;
     }
-    std::unordered_map<clap_id, double> paramOrigins;
+
     xen_pipereceiver(const clap_host *host, const clap_plugin_descriptor *desc)
         : clap::helpers::Plugin<clap::helpers::MisbehaviourHandler::Terminate,
                                 clap::helpers::CheckingLevel::Maximal>(desc, host)
@@ -114,10 +105,12 @@ struct xen_pipereceiver
                     // "\n";
                     if (result && bytestoread == numBytesRead)
                     {
+                        //*(clap_multi_event *)e
+                        m_from_pipe_fifo.push(*(ClapMultiEvent *)hdr);
                         if (hdr->type == CLAP_EVENT_NOTE_ON || hdr->type == CLAP_EVENT_NOTE_OFF)
                         {
                             auto nev = (clap_event_note *)hdr;
-                            m_from_pipe_fifo.push(*nev);
+                            //m_from_pipe_fifo.push(*(ClapMultiEvent *)&nev);
                         }
                     }
                     else
@@ -136,7 +129,14 @@ struct xen_pipereceiver
     }
     std::atomic<bool> m_connected{false};
     std::atomic<bool> m_stop_pipe_thread{false};
-    choc::fifo::SingleReaderSingleWriterFIFO<clap_event_note> m_from_pipe_fifo;
+    union ClapMultiEvent
+    {
+        clap_event_header_t hdr;
+        clap_event_note_t note;
+        clap_event_note_expression_t note_exp;
+        clap_event_param_value_t par_value;
+    };
+    choc::fifo::SingleReaderSingleWriterFIFO<ClapMultiEvent> m_from_pipe_fifo;
     bool activate(double sampleRate_, uint32_t minFrameCount,
                   uint32_t maxFrameCount) noexcept override
     {
@@ -184,13 +184,6 @@ struct xen_pipereceiver
                         clap_audio_port_info *info) const noexcept override
     {
         return false;
-        // port id can be a "random" number
-        info->id = isInput ? 2112 : 90210;
-        strncpy(info->name, "main", sizeof(info->name));
-        info->flags = CLAP_AUDIO_PORT_IS_MAIN;
-        info->channel_count = 2;
-        info->port_type = CLAP_PORT_STEREO;
-        return true;
     }
     bool implementsNotePorts() const noexcept override { return true; }
     uint32_t notePortsCount(bool isInput) const noexcept override
@@ -205,14 +198,14 @@ struct xen_pipereceiver
         if (isInput)
         {
             info->id = 100;
-            strcpy(info->name, "Note Input");
+            strcpy_s(info->name, "Note Input");
             info->preferred_dialect = CLAP_NOTE_DIALECT_CLAP;
             info->supported_dialects = CLAP_NOTE_DIALECT_CLAP | CLAP_NOTE_DIALECT_MIDI;
         }
         if (!isInput)
         {
             info->id = 101;
-            strcpy(info->name, "Note Output");
+            strcpy_s(info->name, "Note Output");
             info->preferred_dialect = CLAP_NOTE_DIALECT_CLAP;
             info->supported_dialects = CLAP_NOTE_DIALECT_CLAP | CLAP_NOTE_DIALECT_MIDI;
         }
@@ -220,25 +213,18 @@ struct xen_pipereceiver
     }
     clap_process_status process(const clap_process *process) noexcept override
     {
-        clap_event_note msg;
+        // add evebts from the pipe to output events (will be at time stamp 0)
+        ClapMultiEvent msg;
         while (m_from_pipe_fifo.pop(msg))
         {
             process->out_events->try_push(process->out_events, (clap_event_header *)&msg);
         }
-        return CLAP_PROCESS_CONTINUE;
+
         int numEvents = process->in_events->size(process->in_events);
         for (int i = 0; i < numEvents; ++i)
         {
             auto ev = process->in_events->get(process->in_events, i);
             process->out_events->try_push(process->out_events, ev);
-            if (ev->type == CLAP_EVENT_NOTE_ON || ev->type == CLAP_EVENT_NOTE_OFF)
-            {
-                auto nev = (clap_event_note *)ev;
-                auto dupev = xenakios::make_event_note(nev->header.time, ev->type, nev->port_index,
-                                                       nev->channel, nev->key + 7, nev->note_id,
-                                                       nev->velocity);
-                process->out_events->try_push(process->out_events, (clap_event_header *)&dupev);
-            }
         }
 
         return CLAP_PROCESS_CONTINUE;

@@ -161,7 +161,7 @@ add_library(PipeReceiverPlugin MODULE
 Source/Plugins/ipc_receiver.cpp
 )
 set_target_properties(PipeReceiverPlugin PROPERTIES SUFFIX ".clap" PREFIX "")
-target_compile_definitions(PipeReceiverPlugin PRIVATE _USE_MATH_DEFINES=1 IS_WIN=1)
+target_compile_definitions(PipeReceiverPlugin PRIVATE _USE_MATH_DEFINES=1 IS_WIN=1 WIN32_LEAN_AND_MEAN NOMINMAX)
 # target_link_libraries(PipeReceiverPlugin PRIVATE fmt)
 set(products_folder ${CMAKE_BINARY_DIR})
     set(build_type ${CMAKE_BUILD_TYPE})

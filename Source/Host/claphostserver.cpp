@@ -120,7 +120,8 @@ inline void run_pipe_sender()
             bool note_on = false;
             int key = -1;
             double velo = 0.0;
-            std::cin >> note_on >> key >> velo;
+            double retun = 0.0;
+            std::cin >> note_on >> key >> velo >> retun;
             if (key >= 0 && key < 128)
             {
                 int ety = CLAP_EVENT_NOTE_OFF;
@@ -128,6 +129,12 @@ inline void run_pipe_sender()
                     ety = CLAP_EVENT_NOTE_ON;
                 auto nev = xenakios::make_event_note(0, ety, 0, 0, key, -1, velo);
                 writeClapEventToPipe(pipe, &nev);
+                if (std::abs(retun) > 0.0)
+                {
+                    auto nexp = xenakios::make_event_note_expression(0, CLAP_NOTE_EXPRESSION_TUNING,
+                                                                     0, 0, key, -1, retun);
+                    writeClapEventToPipe(pipe, &nexp);
+                }
             }
             if (key == -1)
             {
