@@ -145,7 +145,7 @@ add_executable(ClapMiniHost
     Source/Host/claphost.cpp
     libs/rtaudio/RtAudio.cpp  
     )
-target_compile_definitions(ClapMiniHost PRIVATE _WIN64 NOJUCE=1 _USE_MATH_DEFINES=1 __WINDOWS_WASAPI__)
+target_compile_definitions(ClapMiniHost PRIVATE _WIN64 NOJUCE=1 _USE_MATH_DEFINES=1 NOMINMAX __WINDOWS_WASAPI__ WIN32_LEAN_AND_MEAN _WINSOCK_DEPRECATED_NO_WARNINGS)
 
 # cmaj testing
 add_executable(CMajorTester 

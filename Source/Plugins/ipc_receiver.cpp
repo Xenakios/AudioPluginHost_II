@@ -68,6 +68,7 @@ struct xen_pipereceiver
     }
     void pipeThreadRun()
     {
+        std::cout << "starting xenakios pipe receiver thread..." << std::endl;
         char buffer[maxPipeMessageLen];
         while (!m_stop_pipe_thread)
         {
@@ -121,11 +122,12 @@ struct xen_pipereceiver
             }
             else
             {
-                std::cout << "Failed to read clap header from the pipe/end of messages\n";
+                //std::cout << "Failed to read clap header from the pipe/end of messages\n";
                 // break;
             }
             Sleep(10);
         }
+        std::cout << "xenakios pipe receiver thread ended" << std::endl;
     }
     std::atomic<bool> m_connected{false};
     std::atomic<bool> m_stop_pipe_thread{false};

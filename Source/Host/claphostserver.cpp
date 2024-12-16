@@ -1,6 +1,4 @@
-
-#define WIN32_LEAN_AND_MEAN
-#define _WINSOCK_DEPRECATED_NO_WARNINGS
+#include <unordered_map>
 #include <exception>
 #include "text/choc_StringUtilities.h"
 #include "clap/events.h"
@@ -45,6 +43,11 @@ template <typename EventType> inline int writeClapEventToPipe(HANDLE pipe, Event
 
 inline void runInteractiveMode(HANDLE pipe)
 {
+    std::unordered_map<std::string, int> note_exps;
+    note_exps["ETUNE"] = CLAP_NOTE_EXPRESSION_TUNING;
+    note_exps["EPAN"] = CLAP_NOTE_EXPRESSION_PAN;
+    note_exps["EPRES"] = CLAP_NOTE_EXPRESSION_PRESSURE;
+    note_exps["EVOL"] = CLAP_NOTE_EXPRESSION_VOLUME;
     while (true)
     {
         try
@@ -87,14 +90,15 @@ inline void runInteractiveMode(HANDLE pipe)
                     writeClapEventToPipe(pipe, &nev);
                 }
             }
-            if (tokens[0] == "TUNE" && tokens.size() >= 3)
+            auto it = note_exps.find(tokens[0]);
+            if (it != note_exps.end() && tokens.size() >= 3)
             {
                 int key = std::stoi(tokens[1]);
                 if (key >= 0 && key < 128)
                 {
-                    double retune = std::stod(tokens[2]);
-                    auto nexp = xenakios::make_event_note_expression(0, CLAP_NOTE_EXPRESSION_TUNING,
-                                                                     0, 0, key, -1, retune);
+                    double amount = std::stod(tokens[2]);
+                    auto nexp =
+                        xenakios::make_event_note_expression(0, it->second, 0, 0, key, -1, amount);
                     writeClapEventToPipe(pipe, &nexp);
                 }
             }
