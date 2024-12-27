@@ -86,7 +86,7 @@ class ClapPipeSender
             CloseHandle(m_pipe);
         }
     }
-    void sendNoteMessages(const std::vector<std::tuple<double, int, double>> &notes)
+    void sendNoteMessages(const std::vector<std::tuple<double, int, double, double>> &notes)
     {
         if (m_pipe == INVALID_HANDLE_VALUE || m_pipe == NULL)
             throw std::runtime_error("Pipe is not available");
@@ -96,7 +96,8 @@ class ClapPipeSender
             double t = std::get<0>(notes[i]);
             int key = std::get<1>(notes[i]);
             double dur = std::get<2>(notes[i]);
-            auto nev = xenakios::make_event_note(0, CLAP_EVENT_NOTE_ON, 0, 0, key, -1, 0.8);
+            double velo = std::get<3>(notes[i]);
+            auto nev = xenakios::make_event_note(0, CLAP_EVENT_NOTE_ON, 0, 0, key, -1, velo);
             writeClapEventToPipe(m_pipe, t, &nev);
             nev = xenakios::make_event_note(0, CLAP_EVENT_NOTE_OFF, 0, 0, key, -1, 0.0);
             writeClapEventToPipe(m_pipe, t + dur, &nev);
