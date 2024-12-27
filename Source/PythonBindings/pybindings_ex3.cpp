@@ -1,3 +1,4 @@
+#include <cstdint>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 #include <stdexcept>
@@ -19,7 +20,8 @@ static const uint64_t messageMagicCustom = 0xFFFFFFFF00EF0000;
 
 static const uint32_t maxPipeMessageLen = 512;
 
-template <typename EventType> inline int writeClapEventToPipe(HANDLE pipe, EventType *ch)
+template <typename EventType>
+inline int writeClapEventToPipe(HANDLE pipe, double timeDelay, EventType *ch)
 {
     char msgbuf[maxPipeMessageLen * 2];
     // if things are working correctly, the memset redundant, but keeping this around
@@ -28,14 +30,16 @@ template <typename EventType> inline int writeClapEventToPipe(HANDLE pipe, Event
 
     auto magic = messageMagicClap;
     memcpy(msgbuf, &magic, sizeof(uint64_t));
-    memcpy(msgbuf + sizeof(uint64_t), ch, ch->header.size);
+    memcpy(msgbuf + sizeof(uint64_t), &timeDelay, sizeof(double));
+    memcpy(msgbuf + sizeof(uint64_t) + sizeof(double), ch, ch->header.size);
+    size_t messagelen = sizeof(uint64_t) + sizeof(double) + ch->header.size;
     DWORD numBytesWritten = 0;
     // This call blocks until a client process reads all the data
-    auto r = WriteFile(pipe,                               // handle to our outbound pipe
-                       msgbuf,                             // data to send
-                       sizeof(uint64_t) + ch->header.size, // length of data to send (bytes)
-                       &numBytesWritten,                   // will store actual amount of data sent
-                       NULL);                              // not using overlapped IO
+    auto r = WriteFile(pipe,             // handle to our outbound pipe
+                       msgbuf,           // data to send
+                       messagelen,       // length of data to send (bytes)
+                       &numBytesWritten, // will store actual amount of data sent
+                       NULL);            // not using overlapped IO
     if (!r)
     {
         return 0;
@@ -86,14 +90,16 @@ class ClapPipeSender
     {
         if (m_pipe == INVALID_HANDLE_VALUE || m_pipe == NULL)
             throw std::runtime_error("Pipe is not available");
+        double t = 0.0;
         for (int i = 0; i < notes.size(); ++i)
         {
             int key = notes[i].first;
             auto nev = xenakios::make_event_note(0, CLAP_EVENT_NOTE_ON, 0, 0, key, -1, 0.8);
-            writeClapEventToPipe(m_pipe, &nev);
+            writeClapEventToPipe(m_pipe, t, &nev);
             Sleep(notes[i].second * 1000.0);
             nev = xenakios::make_event_note(0, CLAP_EVENT_NOTE_OFF, 0, 0, key, -1, 0.0);
-            writeClapEventToPipe(m_pipe, &nev);
+            writeClapEventToPipe(m_pipe, t + notes[i].second, &nev);
+            t += notes[i].second;
         }
     }
 
