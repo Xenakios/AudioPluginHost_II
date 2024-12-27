@@ -86,20 +86,20 @@ class ClapPipeSender
             CloseHandle(m_pipe);
         }
     }
-    void sendTestMessages(const std::vector<std::pair<int, double>> &notes)
+    void sendNoteMessages(const std::vector<std::tuple<double, int, double>> &notes)
     {
         if (m_pipe == INVALID_HANDLE_VALUE || m_pipe == NULL)
             throw std::runtime_error("Pipe is not available");
-        double t = 0.0;
+
         for (int i = 0; i < notes.size(); ++i)
         {
-            int key = notes[i].first;
+            double t = std::get<0>(notes[i]);
+            int key = std::get<1>(notes[i]);
+            double dur = std::get<2>(notes[i]);
             auto nev = xenakios::make_event_note(0, CLAP_EVENT_NOTE_ON, 0, 0, key, -1, 0.8);
             writeClapEventToPipe(m_pipe, t, &nev);
-            Sleep(notes[i].second * 1000.0);
             nev = xenakios::make_event_note(0, CLAP_EVENT_NOTE_OFF, 0, 0, key, -1, 0.0);
-            writeClapEventToPipe(m_pipe, t + notes[i].second, &nev);
-            t += notes[i].second;
+            writeClapEventToPipe(m_pipe, t + dur, &nev);
         }
     }
 
@@ -111,5 +111,5 @@ void init_py3(py::module_ &m, py::module_ &m_const)
 {
     py::class_<ClapPipeSender>(m, "ClapPipeSender")
         .def(py::init<>())
-        .def("send_test_messages", &ClapPipeSender::sendTestMessages);
+        .def("send_notes", &ClapPipeSender::sendNoteMessages);
 }
