@@ -30,6 +30,7 @@ namespace py = pybind11;
 
 void init_py1(py::module_ &);
 void init_py2(py::module_ &, py::module_ &);
+void init_py3(py::module_ &, py::module_ &);
 
 #if !NOJUCE
 inline void juceTest(std::string plugfilename)
@@ -252,6 +253,7 @@ PYBIND11_MODULE(xenakios, m)
 
     py::module m_const = m.def_submodule("constants", "Constants");
     init_py2(m, m_const);
+    init_py3(m, m_const);
 
 #define C(x) m_const.attr(#x) = py::int_((int)(x));
     C(CLAP_NOTE_EXPRESSION_TUNING);

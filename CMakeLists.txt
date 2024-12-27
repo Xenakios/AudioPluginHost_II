@@ -93,6 +93,7 @@ pybind11_add_module(xenakios
     Source/PythonBindings/pybindings.cpp
     Source/PythonBindings/pybindings_ex1.cpp
     Source/PythonBindings/pybindings_ex2.cpp
+    Source/PythonBindings/pybindings_ex3.cpp
     Source/Xaps/clap_xaudioprocessor.cpp
     Source/Host/claphost.cpp
     
@@ -110,6 +111,8 @@ target_compile_definitions(xenakios PRIVATE
     NOJUCE=1
     JUCE_PLUGINHOST_VST3=1
     __WINDOWS_WASAPI__
+    NOMINMAX 
+    WIN32_LEAN_AND_MEAN
     )
     
 add_custom_command(TARGET xenakios POST_BUILD 
@@ -137,6 +140,7 @@ add_executable(TestingProgram
     )
 # Source/Experimental/xaudiograph.cpp
 target_compile_definitions(TestingProgram PRIVATE XENPYTHONBINDINGS=0 NOJUCE=1 _USE_MATH_DEFINES=1 __WINDOWS_WASAPI__)
+target_link_libraries(TestingProgram PRIVATE C:/develop/AudioPluginHost_mk2/Source/Experimental/llvmstuff/test.o)
 
 # mini host that can be controlled with OSC messages etc
 add_executable(ClapMiniHost 

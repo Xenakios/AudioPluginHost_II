@@ -14,7 +14,7 @@
 #include "audio/choc_AudioFileFormat.h"
 #include "audio/choc_SampleBuffers.h"
 #include "clap/events.h"
-
+#include <print>
 #include "clap/clap.h"
 #include <algorithm>
 #include <cassert>
@@ -1620,29 +1620,75 @@ inline void test_envelope_iterator()
     }
 }
 
-class MyNoCtor
+class GritNoise
 {
   public:
-    int x = 0;
-    int y = 0;
-    void *z = nullptr;
+    GritNoise() {}
+    void setSampleRate(float s) { m_sr = s; }
+    void setGrit(float g) { m_grit = std::clamp(g, 0.0f, 1.0f); }
+    float getNext()
+    {
+        float result = 0.0f;
+        if (m_grit >= 0.0f && m_grit < (1.0 / 3))
+        {
+            result = -2.0f;
+        }
+        else if (m_grit >= (1.0 / 3) && m_grit < (1.0 / 3 * 2))
+        {
+            result = -1.0f;
+        }
+        else
+        {
+            result = m_rng.nextFloatInRange(-5.0f, 5.0f);
+        }
+        return result;
+    }
+
+  private:
+    xenakios::Xoroshiro128Plus m_rng;
+    float m_grit = 1.0f;
+    float m_sr = 44100.0f;
 };
 
-inline void test_no_ctor()
+inline void test_better_grit_noise()
 {
-    /*
-    std::vector<MyNoCtor> vec;
-    vec.resize(64);
-    vec.clear();
-    vec.push_back(MyNoCtor());
-    */
-    MyNoCtor ob;
+    GritNoise gnoise;
+    gnoise.setGrit(0.34);
+    std::print("{}\n", gnoise.getNext());
 }
-/*
+extern "C"
+{
+    struct Counter
+    {
+        int c;
+        int d;
+    };
+    int cube(int x);
+    float llvm_clamp(float, float, float);
+    void counter_init(Counter *, int, int);
+    void counter_tick(Counter *);
+}
 
-*/
+inline void test_llvm_ir()
+{
+    // std::print("{}\n", llvm_clamp(0.0f, -1.0f, 1.0f));
+    // std::print("{}\n", llvm_clamp(-1.1f, -1.0f, 1.0f));
+    // std::print("{}\n", llvm_clamp(2.3f, -1.0f, 1.0f));
+    // return;
+    Counter counter;
+    counter_init(&counter, 666, -10);
+    for (int i = 0; i < 10; ++i)
+    {
+        std::print("{}\n", counter.c);
+        counter_tick(&counter);
+    }
+}
+
 int main(int argc, char **argv)
 {
+    test_llvm_ir();
+
+    // test_better_grit_noise();
     // test_pipe(argc, argv);
     // test_no_ctor();
     // test_envelope_iterator();
