@@ -1684,9 +1684,82 @@ inline void test_llvm_ir()
     }
 }
 
+class PipeMessageBuilder
+{
+  public:
+    unsigned char *destBuffer = nullptr;
+    size_t bufSize = 0;
+    size_t pos = 0;
+    PipeMessageBuilder(unsigned char *buf, size_t sz) : destBuffer(buf), bufSize(sz)
+    {
+        memset(destBuffer, 0, bufSize);
+    }
+    template <typename T> void write(T &&value)
+    {
+        assert(pos + sizeof(T) <= bufSize);
+        memcpy(destBuffer + pos, &value, sizeof(T));
+        pos += sizeof(T);
+    }
+    void write(clap_event_header *hdr)
+    {
+        assert(pos + hdr->size <= bufSize);
+        memcpy(destBuffer + pos, hdr, hdr->size);
+        pos += hdr->size;
+    }
+};
+
+class PipeMessageReader
+{
+  public:
+    unsigned char *sourceBuffer = nullptr;
+    size_t bufSize = 0;
+    size_t pos = 0;
+    PipeMessageReader(unsigned char *src, size_t sz) : sourceBuffer(src), bufSize(sz) {}
+    template <typename T> void read(T *value)
+    {
+        memcpy(value, sourceBuffer + pos, sizeof(T));
+        pos += sizeof(T);
+    }
+    void readClapEvent(clap_event_header *ev)
+    {
+        memcpy(ev, sourceBuffer + pos, sizeof(clap_event_header));
+        memcpy(ev, sourceBuffer + pos, ev->size);
+        pos += ev->size;
+    }
+};
+
+inline void test_messagebuilder()
+{
+    unsigned char buf[512];
+    {
+        PipeMessageBuilder builder(buf, 512);
+        uint64_t magic = 666;
+        double timestamp = 0.5;
+        auto ev = xenakios::make_event_note(0, CLAP_EVENT_NOTE_ON, 0, 0, 60, -1, 0.888);
+        builder.write(magic);
+        builder.write(timestamp);
+        builder.write((clap_event_header *)&ev);
+        std::print("built message size is {}\n", builder.pos);
+    }
+    {
+        PipeMessageReader reader(buf, 512);
+        uint64_t magic = 0;
+        double timestamp = -1.0;
+        ClapEventSequence::clap_multi_event nev;
+        memset(&nev,0,sizeof(ClapEventSequence::clap_multi_event));
+        reader.read(&magic);
+        reader.read(&timestamp);
+        reader.readClapEvent((clap_event_header *)&nev.header);
+
+        std::print("read message size is {} {}\n", reader.pos,nev.note.key);
+    }
+}
+
 int main(int argc, char **argv)
 {
-    test_llvm_ir();
+
+    test_messagebuilder();
+    // test_llvm_ir();
 
     // test_better_grit_noise();
     // test_pipe(argc, argv);

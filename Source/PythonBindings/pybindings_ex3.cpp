@@ -2,6 +2,7 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 #include <stdexcept>
+#include <type_traits>
 #include <windows.h>
 #include <handleapi.h>
 #include <winbase.h>
@@ -20,10 +21,15 @@ static const uint64_t messageMagicCustom = 0xFFFFFFFF00EF0000;
 
 static const uint32_t maxPipeMessageLen = 512;
 
+
 template <typename EventType>
 inline int writeClapEventToPipe(HANDLE pipe, double timeDelay, EventType *ch)
 {
-    char msgbuf[maxPipeMessageLen * 2];
+    unsigned char msgbuf[maxPipeMessageLen * 2];
+    //PipeMessageBuilder builder(msgbuf, maxPipeMessageLen * 2);
+    //builder.write(messageMagicClap);
+    //builder.write(timeDelay);
+    //builder.write(ch);
     // if things are working correctly, the memset redundant, but keeping this around
     // for debugging/testing for now
     memset(msgbuf, 0, maxPipeMessageLen * 2);
