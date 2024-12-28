@@ -23,6 +23,7 @@
 #include "clap/plugin.h"
 #include "clap/stream.h"
 #include "libMTSClient.h"
+#include "memory/choc_xxHash.h"
 #include "testsinesynth.h"
 #include "../Common/xap_utils.h"
 #include "concurrentqueue.h"
@@ -1625,22 +1626,31 @@ class GritNoise
   public:
     GritNoise() {}
     void setSampleRate(float s) { m_sr = s; }
-    void setGrit(float g) { m_grit = std::clamp(g, 0.0f, 1.0f); }
-    float getNext()
+    void setGrit(float g)
+    {
+        g = std::clamp(g, 0.0f, 1.0f);
+        m_grit = std::pow(g, 3.0f);
+    }
+    float singleSamplePulses()
     {
         float result = 0.0f;
-        if (m_grit >= 0.0f && m_grit < (1.0 / 3))
+        float z = m_rng.nextFloatInRange(0.0f, 1.0f);
+        if (z < m_grit)
         {
-            result = -2.0f;
+            result = m_rng.nextFloatInRange(-1.0f, 1.0f);
         }
-        else if (m_grit >= (1.0 / 3) && m_grit < (1.0 / 3 * 2))
+        return result;
+    }
+    float getNext()
+    {
+        float result = m_cur_value;
+        float z = m_rng.nextFloatInRange(0.0f, 1.0f);
+        if (z < m_grit)
         {
-            result = -1.0f;
+            result = m_rng.nextFloatInRange(-1.0f, 1.0f);
+            m_cur_value = result;
         }
-        else
-        {
-            result = m_rng.nextFloatInRange(-5.0f, 5.0f);
-        }
+        m_cur_value *= m_decay_rate;
         return result;
     }
 
@@ -1648,13 +1658,84 @@ class GritNoise
     xenakios::Xoroshiro128Plus m_rng;
     float m_grit = 1.0f;
     float m_sr = 44100.0f;
+    float m_cur_value = 0.0f;
+    float m_decay_rate = 0.75f;
 };
 
 inline void test_better_grit_noise()
 {
+    auto mts = MTS_RegisterClient();
+    double sr = 44100.0;
+    unsigned int outlen = sr * 30;
+    std::array<StereoSimperSVF, 8> filters;
+    for (auto &f : filters)
+        f.init();
     GritNoise gnoise;
-    gnoise.setGrit(0.34);
-    std::print("{}\n", gnoise.getNext());
+    // gnoise.setGrit(0.1f);
+
+    xenakios::Envelope grit_env;
+    grit_env.addPoint({0.0, 0.1});
+    grit_env.addPoint({5.0, 0.05});
+    grit_env.addPoint({10.0, 0.2});
+    choc::audio::AudioFileProperties props;
+    props.numChannels = 2;
+    props.sampleRate = sr;
+    props.bitDepth = choc::audio::BitDepth::float32;
+    choc::audio::WAVAudioFileFormat<true> outformat;
+    auto writer = outformat.createWriter(
+        R"(C:\MusicAudio\sourcesamples\test_signals\bkenv\grit1.wav)", props);
+    if (writer)
+    {
+
+        choc::buffer::ChannelArrayBuffer<float> buffer{2, outlen};
+        int paramupdatecounter = 0;
+        for (int i = 0; i < outlen; ++i)
+        {
+            if (paramupdatecounter == 0)
+            {
+                double secondspos = i / sr;
+                // float grit = grit_env.getValueAtPosition(secondspos);
+                float pulse = std::abs(std::sin(2 * M_PI * 0.33 * secondspos));
+                if (pulse > 0.9)
+                    pulse = 1.0;
+                else
+                    pulse = 0.0;
+                float grit = 0.10f + 0.05 * std::sin(2 * M_PI * 0.2 * secondspos);
+                grit = 0.20;
+                gnoise.setGrit(grit);
+                for (int j = 0; j < filters.size(); ++j)
+                {
+                    float lfo_octave = -3.0 + 0.5 * j;
+                    float lfohz = std::pow(2.0, lfo_octave);
+                    float cutoff = 60.0 + 10.0 * std::sin(2 * M_PI * lfohz * secondspos);
+                    float tuningoffset = MTS_RetuningInSemitones(mts, (char)cutoff, 0);
+                    filters[j].setCoeff((int)cutoff + tuningoffset, 0.99f, 1.0 / sr);
+                }
+            }
+            float noiseL = gnoise.getNext() * 0.125;
+            float noiseR = noiseL;
+            float mix[2] = {0.0f, 0.0f};
+            for (int j = 0; j < 2; ++j)
+            {
+                float dummy = 0.0f;
+                float filtered = noiseL;
+                filters[j].step<StereoSimperSVF::LP>(filters[j], filtered, dummy);
+                float pancoeffs[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+                float pan = 1.0 / 1 * j;
+                sst::basic_blocks::dsp::pan_laws::monoEqualPower(pan, pancoeffs);
+                mix[0] += filtered * pancoeffs[0];
+                mix[1] += filtered * pancoeffs[3];
+            }
+            buffer.getSample(0, i) = mix[0];
+            buffer.getSample(1, i) = mix[1];
+            ++paramupdatecounter;
+            if (paramupdatecounter == 32)
+                paramupdatecounter = 0;
+        }
+        writer->appendFrames(buffer.getView());
+        std::cout << "finished\n";
+    }
+    MTS_DeregisterClient(mts);
 }
 extern "C"
 {
@@ -1722,6 +1803,7 @@ class PipeMessageReader
     }
     void readClapEvent(clap_event_header *ev)
     {
+        // this is pretty sus
         memcpy(ev, sourceBuffer + pos, sizeof(clap_event_header));
         memcpy(ev, sourceBuffer + pos, ev->size);
         pos += ev->size;
@@ -1746,22 +1828,86 @@ inline void test_messagebuilder()
         uint64_t magic = 0;
         double timestamp = -1.0;
         ClapEventSequence::clap_multi_event nev;
-        memset(&nev,0,sizeof(ClapEventSequence::clap_multi_event));
+        memset(&nev, 0, sizeof(ClapEventSequence::clap_multi_event));
         reader.read(&magic);
         reader.read(&timestamp);
         reader.readClapEvent((clap_event_header *)&nev.header);
 
-        std::print("read message size is {} {}\n", reader.pos,nev.note.key);
+        std::print("read message size is {} {}\n", reader.pos, nev.note.key);
     }
+}
+
+using event_target_t = std::tuple<int16_t, int16_t, int16_t, int32_t>;
+auto etsz = sizeof(event_target_t);
+
+struct hash_event_target
+{
+    size_t operator()(const event_target_t &x) const
+    {
+        choc::hash::xxHash64 h;
+        h.addInput(&std::get<0>(x), sizeof(int16_t));
+        h.addInput(&std::get<1>(x), sizeof(int16_t));
+        h.addInput(&std::get<2>(x), sizeof(int16_t));
+        h.addInput(&std::get<3>(x), sizeof(int32_t));
+        return h.getHash();
+    }
+};
+
+template <typename F>
+inline void chaseNotes(ClapEventSequence &seq, double chaseToTime, F &&callback)
+{
+    ClapEventSequence::Iterator iter(seq);
+    auto events = iter.readNextEvents(chaseToTime);
+    clap_event_note nev;
+    std::unordered_set<event_target_t, hash_event_target> activeNotes;
+    for (auto &e : events)
+    {
+        if (e.event.header.type == CLAP_EVENT_NOTE_ON)
+        {
+            auto nev = &e.event.note;
+            activeNotes.insert({nev->port_index, nev->channel, nev->key, nev->note_id});
+        }
+        if (e.event.header.type == CLAP_EVENT_NOTE_OFF ||
+            e.event.header.type == CLAP_EVENT_NOTE_CHOKE)
+        {
+            auto nev = &e.event.note;
+            activeNotes.erase({nev->port_index, nev->channel, nev->key, nev->note_id});
+        }
+    }
+    for (auto &e : activeNotes)
+    {
+        callback(std::get<2>(e));
+    }
+}
+
+inline void test_eventchase()
+{
+    std::mt19937 rng{1000};
+    std::uniform_real_distribution<double> valdist{0.0, 1.0};
+    std::uniform_int_distribution<unsigned int> parid_dist{666, 670};
+    ClapEventSequence seq;
+    seq.addNoteOn(0.0, 0, 0, 60, 0.5, -1);
+    seq.addNoteOff(1.0, 0, 0, 60, 0.5, -1);
+    seq.addNoteOn(0.5, 0, 0, 67, 0.5, -1);
+    seq.addNoteOn(0.5, 0, 0, 68, 0.5, -1);
+    seq.addNoteOn(2.0, 0, 0, 72, 0.5, -1);
+    for (int i = 0; i < 100; ++i)
+    {
+        double val = valdist(rng);
+        clap_id id = parid_dist(rng);
+        seq.addParameterEvent(false, i * 0.1, -1, -1, -1, -1, id, val);
+    }
+    seq.sortEvents();
+    chaseNotes(seq, 2.0, [](int key) { std::print("should start note {}\n", key); });
 }
 
 int main(int argc, char **argv)
 {
+    // test_eventchase();
+    //  test_messagebuilder();
+    //   test_llvm_ir();
 
-    test_messagebuilder();
-    // test_llvm_ir();
-
-    // test_better_grit_noise();
+    test_better_grit_noise();
     // test_pipe(argc, argv);
     // test_no_ctor();
     // test_envelope_iterator();
