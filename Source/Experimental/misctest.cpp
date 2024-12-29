@@ -1665,6 +1665,7 @@ class GritNoise
 inline void test_better_grit_noise()
 {
     auto mts = MTS_RegisterClient();
+    assert(mts);
     double sr = 44100.0;
     unsigned int outlen = sr * 30;
     std::array<StereoSimperSVF, 8> filters;
@@ -1674,9 +1675,9 @@ inline void test_better_grit_noise()
     // gnoise.setGrit(0.1f);
 
     xenakios::Envelope grit_env;
-    grit_env.addPoint({0.0, 0.1});
-    grit_env.addPoint({5.0, 0.05});
-    grit_env.addPoint({10.0, 0.2});
+    grit_env.addPoint({0.0, 0.01});
+    grit_env.addPoint({15.0, 0.50});
+    grit_env.addPoint({30.0, 0.1});
     choc::audio::AudioFileProperties props;
     props.numChannels = 2;
     props.sampleRate = sr;
@@ -1694,14 +1695,9 @@ inline void test_better_grit_noise()
             if (paramupdatecounter == 0)
             {
                 double secondspos = i / sr;
-                // float grit = grit_env.getValueAtPosition(secondspos);
-                float pulse = std::abs(std::sin(2 * M_PI * 0.33 * secondspos));
-                if (pulse > 0.9)
-                    pulse = 1.0;
-                else
-                    pulse = 0.0;
-                float grit = 0.10f + 0.05 * std::sin(2 * M_PI * 0.2 * secondspos);
-                grit = 0.20;
+                float grit = grit_env.getValueAtPosition(secondspos);
+                // float grit = 0.10f + 0.05 * std::sin(2 * M_PI * 0.2 * secondspos);
+                // grit = 0.1;
                 gnoise.setGrit(grit);
                 for (int j = 0; j < filters.size(); ++j)
                 {
