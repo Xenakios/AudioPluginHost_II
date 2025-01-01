@@ -2,7 +2,8 @@
 
 <body>
     <div id="topbardiv">
-        <button onclick="clearScore()" type="button">Clear</button>
+        <button onclick="clearScore()" type="button">Clear all</button>
+        <button onclick="clearSelected()" type="button">Clear selected</button>
         <button onclick="generateTestScore()" type="button">Test Data</button>
     </div>
     <div id="curvecanvasdiv"> </div>
@@ -40,12 +41,16 @@
         constructor() {
             var props = getScoreProperties();
             var canvas = document.createElement('canvas');
-            // canvas.id = cid;
+
+            this.selectedCurves = new Array;
+
             canvas.width = window.innerWidth - 30;
             canvas.height = window.innerHeight - 40;
+
             this.scorelen = props.length;
             this.minpitch = 24.0;
             this.maxpitch = 100.0;
+
             canvas.style.border = "1px solid";
             this.canvas = canvas;
             this.ctx = canvas.getContext("2d");
@@ -53,12 +58,23 @@
                 var properCoords = this.getEventMousePosition(event);
                 var hotcurve = this.getCurveIndexAtCoordinates(properCoords.x, properCoords.y);
                 this.hotCurve = hotcurve;
+
                 if (hotcurve >= 0) {
+
+                    if (this.selectedCurves.length > 0 && event.shiftKey) {
+                        this.selectedCurves.push(hotcurve);
+
+                    }
+                    if (this.selectedCurves.length === 0)
+                        this.selectedCurves.push(hotcurve);
+                    console.log(this.selectedCurves);
+
                     this.startCoordX = properCoords.x;
                     this.startCoordY = properCoords.y;
                     this.isDragging = true;
                     return;
                 }
+                this.selectedCurves.length = 0;
                 this.isdrawing = true;
                 this.curveToAdd = new Array;
                 var pos = this.getEventMousePosition(event);
@@ -104,13 +120,14 @@
             canvas.addEventListener('mouseup', (event) => {
                 this.isdrawing = false;
                 this.isDragging = false;
-                this.curveToAdd = this.curveToAdd.sort((lhs, rhs) => lhs.x - rhs.x);
-                this.curves.push(Array.from(this.curveToAdd));
-                // this.curveToAdd.length = 0;
-                // console.log("Added curve has "+this.curveToAdd.length+" points");
-                // console.log(this.curveToAdd[0][0]);
+                if (this.curveToAdd != null) {
+                    this.curveToAdd = this.curveToAdd.sort((lhs, rhs) => lhs.x - rhs.x);
+                    this.curves.push(Array.from(this.curveToAdd));
+                    onScoreChanged(this.curves, { scoreWidth: this.canvas.width, scoreHeigth: this.canvas.height });
+                    this.curveToAdd = null;
+                }
+                this.hotCurve = -1;
                 this.draw();
-                onScoreChanged(this.curves, { scoreWidth: this.canvas.width, scoreHeigth: this.canvas.height });
             });
 
             document.getElementById("curvecanvasdiv").appendChild(canvas);
@@ -131,6 +148,21 @@
                 }
             }
             return -1;
+        }
+        clearSelected() {
+            this.selectedCurves = this.selectedCurves.sort((lhs, rhs) => lhs - rhs);
+            console.log(this.selectedCurves);
+            for (var i = this.selectedCurves.length - 1; i >= 0; --i) {
+                this.curves.splice(this.selectedCurves[i], 1);
+            }
+            this.selectedCurves.length = 0;
+            this.draw();
+            onScoreChanged(this.curves, { scoreWidth: this.canvas.width, scoreHeigth: this.canvas.height });
+        }
+        clearScore() {
+            this.curvecanvas.curves.length = 0;
+            this.curvecanvas.draw();
+            onScoreChanged(this.curves, { scoreWidth: this.canvas.width, scoreHeigth: this.canvas.height });
         }
         getEventMousePosition(event) {
             return new Point(event.clientX - this.canvas.offsetLeft, event.clientY - this.canvas.offsetTop);
@@ -172,6 +204,8 @@
                 if (i == this.hotCurve)
                     this.ctx.strokeStyle = "red";
                 else this.ctx.strokeStyle = "white";
+                if (this.selectedCurves.includes(i))
+                    this.ctx.strokeStyle = "yellow";
                 this.drawCurve(this.curves[i]);
             }
         }
@@ -184,9 +218,11 @@
         curvecanvas.draw();
     }
     function clearScore() {
-        curvecanvas.curves.length = 0;
-        curvecanvas.draw();
-        onScoreChanged(curvecanvas.curves, { scoreWidth: curvecanvas.canvas.width, scoreHeigth: curvecanvas.canvas.height });
+        curvecanvas.clearScore();
+
+    }
+    function clearSelected() {
+        curvecanvas.clearSelected();
     }
     function generateTestScore() {
         curvecanvas.curves.length = 0;
@@ -199,12 +235,12 @@
             // console.log(start_time+" "+end_time+" "+pitch);
             curv.push(new Point(start_time, start_pitch));
             curv.push(new Point(end_time, end_pitch));
-            //curvecanvas.curves.push(Array.from(curv));
+            curvecanvas.curves.push(Array.from(curv));
         }
         var curv = new Array;
         curv.push(new Point(1.0, 60.0));
         curv.push(new Point(29.0, 72.0));
-        curvecanvas.curves.push(Array.from(curv));
+        // curvecanvas.curves.push(Array.from(curv));
         curvecanvas.draw();
         onScoreChanged(curvecanvas.curves, { scoreWidth: curvecanvas.canvas.width, scoreHeigth: curvecanvas.canvas.height });
     }
