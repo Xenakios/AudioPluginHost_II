@@ -1,193 +1,214 @@
 <html>
-    <body>
-        <div id="topbardiv">
-            <button onclick="clearScore()" type="button">Clear</button>
-            <button onclick="generateTestScore()" type="button">Test Data</button>
-        </div>
-        <div id="curvecanvasdiv" > </div>
-        
-    </body>
-    <script>
-        class Point
-        {
-            constructor(xcor,ycor)
-            {
-                this.x = xcor;
-                this.y = ycor;
-            }
-        }
-        class ScoreEvent
-        {
-            constructor()
-            {
-                
-            }
-        }
-        class CurvesCanvas {
-            constructor() 
-            {
-                var canvas = document.createElement('canvas');
-                // canvas.id = cid;
-                canvas.width = window.innerWidth;
-                canvas.height = window.innerHeight;
-                
-                canvas.style.border = "1px solid";
-                this.canvas = canvas;
-                this.ctx = canvas.getContext("2d");
-                canvas.addEventListener('mousedown', (event) => {
-                    var properCoords = this.getEventMousePosition(event);
-                    var hotcurve = this.getCurveIndexAtCoordinates(properCoords.x,properCoords.y);
-                    this.hotCurve = hotcurve;
-                    if (hotcurve>=0)
-                    {
-                        this.startCoordX = properCoords.x;
-                        this.startCoordY = properCoords.y;
-                        this.isDragging = true;
-                        return;
-                    }
-                    this.isdrawing = true;
-                    this.curveToAdd = new Array;
-                    this.curveToAdd.push(this.getEventMousePosition(event));
-                    
-                    this.draw();
-                });
-                canvas.addEventListener('mousemove', (event) => { 
-                    var properCoords = this.getEventMousePosition(event);
-                    if (this.isDragging && this.hotCurve >= 0)
-                    {
-                        var deltax = properCoords.x - this.startCoordX;
-                        var deltay = properCoords.y - this.startCoordY;
-                        // console.log("drag curve "+deltax+" "+deltay);
-                        const cur = this.curves[this.hotCurve];
-                        for (var i=0;i<cur.length;++i)
-                        {
-                            cur[i].x += deltax;
-                            cur[i].y += deltay;
-                        }
-                        this.startCoordX = properCoords.x;
-                        this.startCoordY = properCoords.y;
-                        this.draw();
-                        return;
-                    }
-                    if (this.isdrawing)
-                    {
-                        this.curveToAdd.push(properCoords);
-                        this.draw();
-                    } else
-                    {
-                        var hotcurve = this.getCurveIndexAtCoordinates(properCoords.x,properCoords.y);
-                        if (hotcurve!=this.hotCurve)
-                        {
-                            this.hotCurve = hotcurve;
-                            this.draw();
-                            
-                        }
-                            
-                    }
-                });
-                canvas.addEventListener('mouseup', (event) => { 
-                    this.isdrawing = false; 
-                    this.isDragging = false;
-                    this.curveToAdd = this.curveToAdd.sort((lhs,rhs) => lhs.x-rhs.x);
-                    this.curves.push(Array.from(this.curveToAdd));
-                    // this.curveToAdd.length = 0;
-                    // console.log("Added curve has "+this.curveToAdd.length+" points");
-                    // console.log(this.curveToAdd[0][0]);
-                    this.draw();
-                    onScoreChanged(this.curves,{scoreWidth:this.canvas.width,scoreHeigth:this.canvas.height});
-                });
 
-                document.getElementById("curvecanvasdiv").appendChild(canvas);
-                this.curves = new Array;
+<body>
+    <div id="topbardiv">
+        <button onclick="clearScore()" type="button">Clear</button>
+        <button onclick="generateTestScore()" type="button">Test Data</button>
+    </div>
+    <div id="curvecanvasdiv"> </div>
+
+</body>
+<script>
+    class Point {
+        constructor(xcor, ycor) {
+            this.x = xcor;
+            this.y = ycor;
+        }
+    }
+    class ScoreEvent {
+        constructor() {
+
+        }
+    }
+    function mapvalue(in_val, in_min, in_max, out_min, out_max) {
+        return (in_val - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
+    }
+    function limitvalue(in_val, min_val, max_val) {
+        if (in_val < min_val)
+            return min_val;
+        if (in_val > max_val)
+            return max_val;
+        return in_val;
+    }
+    function getScoreProperties() {
+        return { length: 30.0 };
+    }
+    function onScoreChanged(curves, properties) {
+
+    }
+    class CurvesCanvas {
+        constructor() {
+            var props = getScoreProperties();
+            var canvas = document.createElement('canvas');
+            // canvas.id = cid;
+            canvas.width = window.innerWidth - 30;
+            canvas.height = window.innerHeight - 40;
+            this.scorelen = props.length;
+            this.minpitch = 24.0;
+            this.maxpitch = 100.0;
+            canvas.style.border = "1px solid";
+            this.canvas = canvas;
+            this.ctx = canvas.getContext("2d");
+            canvas.addEventListener('mousedown', (event) => {
+                var properCoords = this.getEventMousePosition(event);
+                var hotcurve = this.getCurveIndexAtCoordinates(properCoords.x, properCoords.y);
+                this.hotCurve = hotcurve;
+                if (hotcurve >= 0) {
+                    this.startCoordX = properCoords.x;
+                    this.startCoordY = properCoords.y;
+                    this.isDragging = true;
+                    return;
+                }
+                this.isdrawing = true;
+                this.curveToAdd = new Array;
+                var pos = this.getEventMousePosition(event);
+                pos.x = this.canvasXToTime(pos.x);
+                pos.y = this.canvasYToPitch(pos.y);
+                this.curveToAdd.push(pos);
+
                 this.draw();
-            }
-            getCurveIndexAtCoordinates(x,y)
-            {
-                for (var i=0;i<this.curves.length;++i)
-                {
-                    var pt = this.curves[i][0];
-                    var x0 = pt.x - 10;
-                    var y0 = pt.y - 10;
-                    var x1 = pt.x + 10;
-                    var y1 = pt.y + 10;
-                    if (x>=x0 && x<x1 && y>y0 && y<y1)
-                    {
-                        return i;
+            });
+            canvas.addEventListener('mousemove', (event) => {
+                var properCoords = this.getEventMousePosition(event);
+                if (this.isDragging && this.hotCurve >= 0) {
+                    var deltax = (properCoords.x - this.startCoordX) * (this.scorelen / this.canvas.width);
+                    let pitchrange = this.maxpitch - this.minpitch;
+                    var deltay = -(properCoords.y - this.startCoordY) * (pitchrange / this.canvas.height);
+                    // console.log("drag curve "+deltax+" "+deltay);
+                    const cur = this.curves[this.hotCurve];
+                    for (var i = 0; i < cur.length; ++i) {
+                        cur[i].x += deltax;
+                        cur[i].y += deltay;
                     }
+                    this.startCoordX = properCoords.x;
+                    this.startCoordY = properCoords.y;
+                    this.draw();
+                    return;
                 }
-                return -1;
-            }
-            getEventMousePosition(event)
-            {
-                return new Point(event.clientX - this.canvas.offsetLeft, event.clientY - this.canvas.offsetTop);
-            }
-            drawCurve(curv)
-            {
-                this.ctx.beginPath();
-                for (var j=0;j<curv.length;++j)
-                {
-                    if (j < 1)
-                    {
-                        this.ctx.moveTo(curv[j].x,curv[j].y);
-                    } else
-                    {
-                        this.ctx.lineTo(curv[j].x,curv[j].y);
+                if (this.isdrawing) {
+                    properCoords.x = this.canvasXToTime(properCoords.x);
+                    properCoords.y = this.canvasYToPitch(properCoords.y);
+                    this.curveToAdd.push(properCoords);
+                    this.draw();
+                } else {
+                    var hotcurve = this.getCurveIndexAtCoordinates(properCoords.x, properCoords.y);
+                    // console.log(hotcurve);
+                    if (hotcurve != this.hotCurve) {
+                        this.hotCurve = hotcurve;
+                        this.draw();
+
                     }
+
                 }
-                this.ctx.stroke();
+            });
+            canvas.addEventListener('mouseup', (event) => {
+                this.isdrawing = false;
+                this.isDragging = false;
+                this.curveToAdd = this.curveToAdd.sort((lhs, rhs) => lhs.x - rhs.x);
+                this.curves.push(Array.from(this.curveToAdd));
+                // this.curveToAdd.length = 0;
+                // console.log("Added curve has "+this.curveToAdd.length+" points");
+                // console.log(this.curveToAdd[0][0]);
+                this.draw();
+                onScoreChanged(this.curves, { scoreWidth: this.canvas.width, scoreHeigth: this.canvas.height });
+            });
+
+            document.getElementById("curvecanvasdiv").appendChild(canvas);
+            this.curves = new Array;
+            this.draw();
+        }
+        getCurveIndexAtCoordinates(x, y) {
+            for (var i = 0; i < this.curves.length; ++i) {
+                let pt = this.curves[i][0];
+                let mappedx = this.timeToCanvasX(pt.x);
+                let mappedy = this.pitchToCanvasY(pt.y);
+                var x0 = mappedx - 10;
+                var y0 = mappedy - 10;
+                var x1 = mappedx + 10;
+                var y1 = mappedy + 10;
+                if (x >= x0 && x < x1 && y > y0 && y < y1) {
+                    return i;
+                }
             }
-            draw()
-            {
-                this.ctx.fillStyle = "black";
-                this.ctx.fillRect(0,0,this.canvas.width,this.canvas.height);
-                if (this.isdrawing)
-                {
-                    this.ctx.strokeStyle = "green";
-                    this.drawCurve(this.curveToAdd);
+            return -1;
+        }
+        getEventMousePosition(event) {
+            return new Point(event.clientX - this.canvas.offsetLeft, event.clientY - this.canvas.offsetTop);
+        }
+        timeToCanvasX(t) {
+            return mapvalue(t, 0.0, this.scorelen, 0.0, this.canvas.width);
+        }
+        pitchToCanvasY(pitch) {
+            return mapvalue(pitch, this.minpitch, this.maxpitch, this.canvas.height, 0.0);
+        }
+        canvasXToTime(x) {
+            return mapvalue(x, 0.0, this.canvas.width, 0.0, this.scorelen);
+        }
+        canvasYToPitch(y) {
+            return mapvalue(y, 0.0, this.canvas.height, this.maxpitch, this.minpitch);
+        }
+        drawCurve(curv) {
+            this.ctx.beginPath();
+            for (var j = 0; j < curv.length; ++j) {
+                var canvasx = this.timeToCanvasX(curv[j].x)
+                var canvasy = this.pitchToCanvasY(curv[j].y)
+                if (j < 1) {
+                    this.ctx.moveTo(canvasx, canvasy);
+                } else {
+                    this.ctx.lineTo(canvasx, canvasy);
                 }
-                
-                for (var i = 0;i<this.curves.length;++i)
-                {
-                    if (i == this.hotCurve)
-                        this.ctx.strokeStyle = "red";
-                    else this.ctx.strokeStyle = "white";
-                    this.drawCurve(this.curves[i]);
-                }
-                
-                
+            }
+            this.ctx.stroke();
+        }
+        draw() {
+            this.ctx.fillStyle = "black";
+            this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+            if (this.isdrawing) {
+                this.ctx.strokeStyle = "green";
+                this.drawCurve(this.curveToAdd);
             }
 
+            for (var i = 0; i < this.curves.length; ++i) {
+                if (i == this.hotCurve)
+                    this.ctx.strokeStyle = "red";
+                else this.ctx.strokeStyle = "white";
+                this.drawCurve(this.curves[i]);
+            }
         }
+
+    }
     curvecanvas = new CurvesCanvas;
     function onWindowSized() {
-        curvecanvas.canvas.width = window.innerWidth;
+        curvecanvas.canvas.width = window.innerWidth - 100;
         curvecanvas.canvas.height = window.innerHeight;
         curvecanvas.draw();
     }
-    function clearScore()
-    {
+    function clearScore() {
         curvecanvas.curves.length = 0;
         curvecanvas.draw();
-        onScoreChanged(curvecanvas.curves,{scoreWidth:curvecanvas.canvas.width,scoreHeigth:curvecanvas.canvas.height});
+        onScoreChanged(curvecanvas.curves, { scoreWidth: curvecanvas.canvas.width, scoreHeigth: curvecanvas.canvas.height });
     }
-    function generateTestScore()
-    {
+    function generateTestScore() {
         curvecanvas.curves.length = 0;
-        for (var i=0;i<100;++i)
-        {
+        for (var i = 0; i < 100; ++i) {
             var curv = new Array;
-            var start_time = Math.random()*curvecanvas.canvas.width-50;
-            var end_time = start_time + 50.0;
-            var start_pitch = Math.random()*curvecanvas.canvas.height;
-            var end_pitch = start_pitch + -20.0+40.0*Math.random();
+            var start_time = Math.random() * (curvecanvas.scorelen - 1.0);
+            var end_time = start_time + 1.0;
+            var start_pitch = 36.0 + Math.random() * 50.0;
+            var end_pitch = start_pitch + -12.0 + 24.0 * Math.random();
             // console.log(start_time+" "+end_time+" "+pitch);
-            curv.push(new Point(start_time,start_pitch));
-            curv.push(new Point(end_time,end_pitch));
-            curvecanvas.curves.push(Array.from(curv));
+            curv.push(new Point(start_time, start_pitch));
+            curv.push(new Point(end_time, end_pitch));
+            //curvecanvas.curves.push(Array.from(curv));
         }
+        var curv = new Array;
+        curv.push(new Point(1.0, 60.0));
+        curv.push(new Point(29.0, 72.0));
+        curvecanvas.curves.push(Array.from(curv));
         curvecanvas.draw();
-        onScoreChanged(curvecanvas.curves,{scoreWidth:curvecanvas.canvas.width,scoreHeigth:curvecanvas.canvas.height});
+        onScoreChanged(curvecanvas.curves, { scoreWidth: curvecanvas.canvas.width, scoreHeigth: curvecanvas.canvas.height });
     }
     window.onresize = onWindowSized;
-    </script>
+</script>
+
 </html>
