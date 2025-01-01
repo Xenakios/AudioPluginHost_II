@@ -22,6 +22,7 @@
 #include "clap/ext/params.h"
 #include "clap/plugin.h"
 #include "clap/stream.h"
+#include "containers/choc_Value.h"
 #include "libMTSClient.h"
 #include "memory/choc_xxHash.h"
 #include "testsinesynth.h"
@@ -1897,13 +1898,44 @@ inline void test_eventchase()
     chaseNotes(seq, 2.0, [](int key) { std::print("should start note {}\n", key); });
 }
 
+inline void test_webview_score()
+{
+    auto mts = MTS_RegisterClient();
+    choc::ui::DesktopWindow dw{{50, 50, 1200, 850}};
+    dw.setWindowTitle("Graphic Score");
+    choc::ui::WebView::Options opts;
+    opts.enableDebugMode = true;
+    choc::ui::WebView webview{opts};
+    // score pitch to Hz
+    // Hz to note number
+    // note number to score pitch
+    webview.bind("getTuningOffsetTable",
+                 [&](const choc::value::ValueView &args) -> choc::value::Value {
+                     auto arr = choc::value::createEmptyArray();
+                     for (int i = 0; i < 128; ++i)
+                     {
+                         auto offset = MTS_RetuningInSemitones(mts, i, 0);
+                         arr.addArrayElement(offset);
+                     }
+                     return arr;
+                 });
+    webview.navigate(R"(C:\develop\AudioPluginHost_mk2\html\canvastest.html)");
+    dw.setResizable(true);
+    dw.setContent(webview.getViewHandle());
+
+    dw.windowClosed = []() { choc::messageloop::stop(); };
+    choc::messageloop::run();
+    MTS_DeregisterClient(mts);
+}
+
 int main(int argc, char **argv)
 {
+    test_webview_score();
     // test_eventchase();
     //  test_messagebuilder();
     //   test_llvm_ir();
 
-    test_better_grit_noise();
+    // test_better_grit_noise();
     // test_pipe(argc, argv);
     // test_no_ctor();
     // test_envelope_iterator();

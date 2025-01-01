@@ -4,7 +4,11 @@
     <div id="topbardiv">
         <button onclick="clearScore()" type="button">Clear all</button>
         <button onclick="clearSelected()" type="button">Clear selected</button>
-        <button onclick="generateTestScore()" type="button">Test Data</button>
+        <button onclick="generateTestScore()" type="button">Generate random score</button>
+
+        <input type="checkbox" id="scales" name="scales" value="off" checked onclick="toggleScoreQuantized()" />
+        <label for="scales">Show quantized/tuned pitches</label>
+
     </div>
     <div id="curvecanvasdiv"> </div>
 
@@ -38,18 +42,27 @@
 
     }
     class CurvesCanvas {
+        onTimer() {
+            getTuningOffsetTable([]).then((result) => {
+                this.tuningOffsetTable = result;
+                this.draw();
+            });
+        }
         constructor() {
+
+
+
             var props = getScoreProperties();
             var canvas = document.createElement('canvas');
 
             this.selectedCurves = new Array;
-
+            this.tuningTable = new Array;
             canvas.width = window.innerWidth - 30;
             canvas.height = window.innerHeight - 40;
 
             this.scorelen = props.length;
-            this.minpitch = 24.0;
-            this.maxpitch = 100.0;
+            this.minpitch = 48.0;
+            this.maxpitch = 72.0;
 
             canvas.style.border = "1px solid";
             this.canvas = canvas;
@@ -138,7 +151,7 @@
             for (var i = 0; i < this.curves.length; ++i) {
                 let pt = this.curves[i][0];
                 let mappedx = this.timeToCanvasX(pt.x);
-                let mappedy = this.pitchToCanvasY(pt.y);
+                let mappedy = this.pitchToCanvasY(pt.y, this.minpitch, this.maxpitch);
                 var x0 = mappedx - 10;
                 var y0 = mappedy - 10;
                 var x1 = mappedx + 10;
@@ -160,8 +173,8 @@
             onScoreChanged(this.curves, { scoreWidth: this.canvas.width, scoreHeigth: this.canvas.height });
         }
         clearScore() {
-            this.curvecanvas.curves.length = 0;
-            this.curvecanvas.draw();
+            this.curves.length = 0;
+            this.draw();
             onScoreChanged(this.curves, { scoreWidth: this.canvas.width, scoreHeigth: this.canvas.height });
         }
         getEventMousePosition(event) {
@@ -170,8 +183,8 @@
         timeToCanvasX(t) {
             return mapvalue(t, 0.0, this.scorelen, 0.0, this.canvas.width);
         }
-        pitchToCanvasY(pitch) {
-            return mapvalue(pitch, this.minpitch, this.maxpitch, this.canvas.height, 0.0);
+        pitchToCanvasY(pitch, minpitch, maxpitch) {
+            return mapvalue(pitch, minpitch, maxpitch, this.canvas.height, 0.0);
         }
         canvasXToTime(x) {
             return mapvalue(x, 0.0, this.canvas.width, 0.0, this.scorelen);
@@ -179,11 +192,18 @@
         canvasYToPitch(y) {
             return mapvalue(y, 0.0, this.canvas.height, this.maxpitch, this.minpitch);
         }
-        drawCurve(curv) {
+        drawCurve(curv, quantized) {
             this.ctx.beginPath();
             for (var j = 0; j < curv.length; ++j) {
-                var canvasx = this.timeToCanvasX(curv[j].x)
-                var canvasy = this.pitchToCanvasY(curv[j].y)
+                var x = curv[j].x;
+                var y = curv[j].y;
+                var canvasy = this.pitchToCanvasY(y, this.minpitch, this.maxpitch)
+                if (quantized) {
+                    var offset = this.tuningOffsetTable[Math.floor(y)];
+                    canvasy = this.pitchToCanvasY(Math.floor(y) + offset, 0.0, 127.0);
+                }
+                var canvasx = this.timeToCanvasX(x)
+
                 if (j < 1) {
                     this.ctx.moveTo(canvasx, canvasy);
                 } else {
@@ -192,29 +212,35 @@
             }
             this.ctx.stroke();
         }
+        toggleQuantized() {
+            this.quantized = !this.quantized;
+            this.draw();
+        }
         draw() {
             this.ctx.fillStyle = "black";
             this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
             if (this.isdrawing) {
                 this.ctx.strokeStyle = "green";
-                this.drawCurve(this.curveToAdd);
+                this.drawCurve(this.curveToAdd, false);
             }
 
             for (var i = 0; i < this.curves.length; ++i) {
+                this.ctx.strokeStyle = "cyan";
+                this.drawCurve(this.curves[i], this.quantized);
                 if (i == this.hotCurve)
                     this.ctx.strokeStyle = "red";
                 else this.ctx.strokeStyle = "white";
                 if (this.selectedCurves.includes(i))
                     this.ctx.strokeStyle = "yellow";
-                this.drawCurve(this.curves[i]);
+                this.drawCurve(this.curves[i], false);
             }
         }
 
     }
     curvecanvas = new CurvesCanvas;
     function onWindowSized() {
-        curvecanvas.canvas.width = window.innerWidth - 100;
-        curvecanvas.canvas.height = window.innerHeight;
+        curvecanvas.canvas.width = window.innerWidth - 50;
+        curvecanvas.canvas.height = window.innerHeight - 50;
         curvecanvas.draw();
     }
     function clearScore() {
@@ -223,6 +249,9 @@
     }
     function clearSelected() {
         curvecanvas.clearSelected();
+    }
+    function toggleScoreQuantized() {
+        curvecanvas.toggleQuantized();
     }
     function generateTestScore() {
         curvecanvas.curves.length = 0;
@@ -245,6 +274,10 @@
         onScoreChanged(curvecanvas.curves, { scoreWidth: curvecanvas.canvas.width, scoreHeigth: curvecanvas.canvas.height });
     }
     window.onresize = onWindowSized;
+    function onTimer() {
+        curvecanvas.onTimer();
+    }
+    setInterval(onTimer, 1000);
 </script>
 
 </html>
