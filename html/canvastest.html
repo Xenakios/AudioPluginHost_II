@@ -200,7 +200,7 @@
                 var canvasy = this.pitchToCanvasY(y, this.minpitch, this.maxpitch)
                 if (quantized) {
                     var offset = this.tuningOffsetTable[Math.floor(y)];
-                    canvasy = this.pitchToCanvasY(Math.floor(y) + offset, 0.0, 127.0);
+                    canvasy = this.pitchToCanvasY(Math.floor(y) + offset, 24.0, 103.0);
                 }
                 var canvasx = this.timeToCanvasX(x)
 
