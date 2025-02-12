@@ -233,11 +233,11 @@ def generate_osc_sequence(parameters: list[Parameter], events: list[list]):
 def test_generate():
     params: list[Parameter] = []
     params.append(
-        Parameter("timepos", 0.0, 1.0, genmethod=GM_RandomExp, genpar0=8.0, rseed=43)
+        Parameter("timepos", 0.0, 1.0, genmethod=GM_RandomExp, genpar0=4.0, rseed=43)
     )
     # params[-1] = Parameter(0, 0.0, 1.0, genmethod=GM_Constant, genpar0=0.1)
 
-    params.append(Parameter("duration", 0.0, 1.0, genmethod=GM_Constant, genpar0=0.25))
+    params.append(Parameter("duration", 0.0, 1.0, genmethod=GM_Constant, genpar0=0.1))
     params.append(
         Parameter(
             "pitch",

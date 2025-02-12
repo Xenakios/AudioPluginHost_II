@@ -349,12 +349,16 @@ PYBIND11_MODULE(xenakios, m)
 
     py::class_<xenakios::EnvelopePoint>(m, "EnvelopePoint")
         .def(py::init<double, double>())
+        .def(py::init<double, double, int, double>())
         .def("__repr__",
              [](const xenakios::EnvelopePoint &a) {
-                 return std::format("EnvelopePoint x={} y={}", a.getX(), a.getY());
+                 return std::format("EnvelopePoint x={} y={} Shape={} Par0={}", a.getX(), a.getY(),
+                                    (int)a.getShape(), a.getPar0());
              })
         .def("x", &xenakios::EnvelopePoint::getX)
-        .def("y", &xenakios::EnvelopePoint::getY);
+        .def("y", &xenakios::EnvelopePoint::getY)
+        .def("shape", &xenakios::EnvelopePoint::getShape)
+        .def("par0", &xenakios::EnvelopePoint::getPar0);
 
     py::class_<xenakios::Envelope>(m, "Envelope")
         .def(py::init<>())

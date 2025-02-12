@@ -16,6 +16,7 @@ class EnvelopePoint
         Linear,
         Hold,
         Abrupt,
+        Power,
         Last
     };
     EnvelopePoint() {}
@@ -23,9 +24,15 @@ class EnvelopePoint
         : m_x(x), m_y(y), m_shape(s), m_p0(p0), m_p1(p1)
     {
     }
-    double getX() const { return m_x; }
-    double getY() const { return m_y; }
-    Shape getShape() const { return m_shape; }
+    EnvelopePoint(double x, double y, int s, double p0)
+        : m_x(x), m_y(y), m_shape(Shape(s)), m_p0(p0), m_p1(0.0)
+    {
+    }
+    double getX() const noexcept { return m_x; }
+    double getY() const noexcept { return m_y; }
+    Shape getShape() const noexcept { return m_shape; }
+    double getPar0() const noexcept { return m_p0; }
+    double getPar1() const noexcept { return m_p1; }
 
   private:
     double m_x = 0.0;
@@ -93,7 +100,7 @@ class Envelope
             return value;
         // holds the value for 99% the segment length, then ramps to the next value
         // literal sudden jump is almost never useful, but we might want to support that too...
-        if (shape == EnvelopePoint::Shape::Hold)
+        else if (shape == EnvelopePoint::Shape::Hold)
         {
             // we might want to somehow make this work based on samples/time,
             // but percentage will have to work for now
@@ -101,9 +108,22 @@ class Envelope
                 return 0.0;
             return xenakios::mapvalue(value, 0.99, 1.0, 0.0, 1.0);
         }
-        if (shape == EnvelopePoint::Shape::Abrupt)
+        else if (shape == EnvelopePoint::Shape::Abrupt)
         {
             return 0.0;
+        }
+        else if (shape == EnvelopePoint::Shape::Power)
+        {
+            if (p0 < 0.0)
+            {
+                double exponent = mapvalue(p0, -1.0, 0.0, 4.0, 1.0);
+                return 1.0 - std::pow(1.0 - value, exponent);
+            }
+            else
+            {
+                double exponent = mapvalue(p0, 0.0, 1.0, 1.0, 4.0);
+                return std::pow(value, exponent);
+            }
         }
         return value;
     }
@@ -212,7 +232,7 @@ class Envelope
             {
                 double ydiff = y1 - y0;
                 double normpos = ((1.0 / xdiff * (timepos - x0)));
-                outvalue = y0 + ydiff * getShapedValue(normpos, pt0.getShape(), 0.0, 0.0);
+                outvalue = y0 + ydiff * getShapedValue(normpos, pt0.getShape(), pt0.getPar0(), 0.0);
             }
             if (output_mode == 1)
             {
@@ -269,7 +289,7 @@ class Envelope
         {
             assert(m_owner.getNumPoints() > 0);
             const auto &curpoint = m_owner.m_points[m_currentPointIndex];
-            
+
             return 0.0;
         }
 
