@@ -167,6 +167,7 @@ def generate(parameters: list[Parameter], texturedur: float):
 
 OSCEvent_NoteOn = 0
 OSCEvent_NoteOff = 1
+OSCEvent_Expression = 2
 
 
 def play_osc_sequence(events):
@@ -179,7 +180,10 @@ def play_osc_sequence(events):
         ev = events[cnt]
         while time_cur >= ev[0]:
             print(f"{time_cur} {ev}")
-            client.send_message("/mnote", [float(ev[2]), float(ev[3] * 1.0)])
+            if ev[1] == OSCEvent_NoteOn:
+                client.send_message("/mnote", [float(ev[2]), float(ev[3] * 1.0)])
+            if ev[1] == OSCEvent_Expression:
+                client.send_message("/nexp", [ev[2], ev[3], ev[4]])
             cnt += 1
             if cnt == len(events):
                 break
@@ -213,24 +217,30 @@ def plot_events(parameters: list[Parameter], events: list[list]):
 
 def generate_osc_sequence(parameters: list[Parameter], events: list[list]):
     osc_events = []
+    note_id = 0
     for ev in events:
-        oev_on = [ev[0], OSCEvent_NoteOn, ev[2], ev[3]]
+        oev_on = [ev[0], OSCEvent_NoteOn, ev[2], ev[3], float(note_id)]
         osc_events.append(oev_on)
-        oev_off = [ev[0] + ev[1], OSCEvent_NoteOn, ev[2], 0.0]
+        oev_pan = [ev[0], OSCEvent_Expression, note_id, 1, ev[4]]
+        osc_events.append(oev_pan)
+        oev_off = [ev[0] + ev[1], OSCEvent_NoteOn, ev[2], 0.0, float(note_id)]
         osc_events.append(oev_off)
+        note_id += 1
     osc_events.sort(key=lambda x: x[0])
     return osc_events
 
 
 def test_generate():
     params: list[Parameter] = []
-    params.append(Parameter(0, 0.0, 1.0, genmethod=GM_RandomExp, genpar0=8.0, rseed=43))
+    params.append(
+        Parameter("timepos", 0.0, 1.0, genmethod=GM_RandomExp, genpar0=8.0, rseed=43)
+    )
     # params[-1] = Parameter(0, 0.0, 1.0, genmethod=GM_Constant, genpar0=0.1)
 
-    params.append(Parameter(1, 0.0, 1.0, genmethod=GM_Constant, genpar0=0.25))
+    params.append(Parameter("duration", 0.0, 1.0, genmethod=GM_Constant, genpar0=0.25))
     params.append(
         Parameter(
-            2,
+            "pitch",
             48.0,
             72.0,
             mask_lower=make_envelope([(0.0, 72.0), (5.0, 48.0), (10.0, 48.0)]),
@@ -242,15 +252,24 @@ def test_generate():
     )
     params.append(
         Parameter(
-            1,
+            "velocity",
             0.0,
             127.0,
             genmethod=GM_ItemList,
             items=[127.0, 63.0, 63.0, 63.0, 10.0, 10.0, 10.0],
         )
     )
+    params.append(
+        Parameter(
+            "pan",
+            0.0,
+            1.0,
+            genmethod=GM_LFO_Sine,
+            genpar0=-1.0,
+        )
+    )
 
-    dur = 30.0
+    dur = 10.0
     events = generate(params, dur)
     density = len(events) / dur
     print(f"{len(events)} events, density ~{density} events/s")
