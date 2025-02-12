@@ -130,11 +130,6 @@ class Parameter:
         return val
 
 
-def add_points(env: xenakios.Envelope, pts):
-    for pt in pts:
-        env.add_point(xenakios.EnvelopePoint(pt[0], pt[1]))
-
-
 def make_envelope(pts: list) -> xenakios.Envelope:
     env = xenakios.Envelope()
     for pt in pts:
@@ -170,7 +165,11 @@ def generate(parameters: list[Parameter], texturedur: float):
     return events
 
 
-def play_sequence(events):
+OSCEvent_NoteOn = 0
+OSCEvent_NoteOff = 1
+
+
+def play_osc_sequence(events):
     client = udp_client.SimpleUDPClient("127.0.0.1", 7001)
     time_start = time.time()
     cnt = 0
@@ -212,14 +211,10 @@ def plot_events(parameters: list[Parameter], events: list[list]):
     plt.show()
 
 
-OSCEvent_NoteOn = 0
-OSCEvent_NoteOff = 1
-
-
 def generate_osc_sequence(parameters: list[Parameter], events: list[list]):
     osc_events = []
     for ev in events:
-        oev_on = [ev[0], OSCEvent_NoteOn, ev[2], 127.0]
+        oev_on = [ev[0], OSCEvent_NoteOn, ev[2], ev[3]]
         osc_events.append(oev_on)
         oev_off = [ev[0] + ev[1], OSCEvent_NoteOn, ev[2], 0.0]
         osc_events.append(oev_off)
@@ -229,33 +224,42 @@ def generate_osc_sequence(parameters: list[Parameter], events: list[list]):
 
 def test_generate():
     params: list[Parameter] = []
-    params.append(Parameter(0, 0.0, 1.0, genmethod=GM_RandomExp, genpar0=4.0, rseed=43))
-    # params[-1] = Parameter(0, 0.0, 1.0, genmethod=GM_ItemList, items=[1.0, 0.5, 0.25, 0.125, 0.06125])
-    params.append(Parameter(1, 0.0, 1.0, genmethod=GM_Constant, genpar0=0.05))
+    params.append(Parameter(0, 0.0, 1.0, genmethod=GM_RandomExp, genpar0=8.0, rseed=43))
+    # params[-1] = Parameter(0, 0.0, 1.0, genmethod=GM_Constant, genpar0=0.1)
+
+    params.append(Parameter(1, 0.0, 1.0, genmethod=GM_Constant, genpar0=0.25))
+    params.append(
+        Parameter(
+            2,
+            48.0,
+            72.0,
+            mask_lower=make_envelope([(0.0, 72.0), (5.0, 48.0), (10.0, 48.0)]),
+            mask_higher=make_envelope([(0.0, 72.0), (5.0, 72.0), (10.0, 72.0)]),
+            genmethod=GM_RandomBeta,
+            genpar0=0.1,
+            genpar1=0.1,
+        )
+    )
     params.append(
         Parameter(
             1,
-            48.0,
-            72.0,
-            mask_lower=make_envelope([(0.0, 48.0), (5.0, 48.0), (10.0, 48.0)]),
-            mask_higher=make_envelope([(0.0, 72.0), (5.0, 72.0), (10.0, 72.0)]),
-            genmethod=GM_RandomBeta,
-            genpar0=make_envelope([(0.0, 0.05), (5.0, 0.05), (8.0, 10.0)]),
-            genpar1=make_envelope([(0.0, 0.05), (5.0, 0.05), (8.0, 10.0)]),
+            0.0,
+            127.0,
+            genmethod=GM_ItemList,
+            items=[127.0, 63.0, 63.0, 63.0, 10.0, 10.0, 10.0],
         )
     )
-    #params[-1] = Parameter(
-    #    1, 48.0, 72.0, genmethod=GM_ItemList, items=[60.0, 63.0, 67.0, 72.0]
-    #)
-    dur = 10.0
+
+    dur = 30.0
     events = generate(params, dur)
     density = len(events) / dur
     print(f"{len(events)} events, density ~{density} events/s")
     plot_events(params, events)
     osc_sequence = generate_osc_sequence(params, events)
-    play_sequence(osc_sequence)
+    play_osc_sequence(osc_sequence)
 
 
+print([1.0 - i * 0.1 for i in range(8)])
 test_generate()
 # print(random.betavariate())
 
