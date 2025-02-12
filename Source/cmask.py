@@ -9,6 +9,14 @@ import xepylib.xenutils
 from pythonosc import udp_client
 from xepylib.sieves import Sieve as SV
 
+# Reimplementation/reimagining of Cmask by Andre Bartetzki
+# https://abartetzki.users.ak.tu-berlin.de/CMaskMan/CMask-Manual.htm
+#
+# The original Cmask was developed to produce Csound scores which are basically
+# just lists of lists of numbers. We are following that model for now here but
+# recent developments like MIDI MPE and the Clap plugin format would allow for a richer
+# system where the scores contain more complicated objects.
+
 GM_RandomUniform = 0
 GM_RandomExp = 1
 GM_RandomGauss = 2
@@ -162,13 +170,8 @@ def generate(parameters: list[Parameter], texturedur: float):
     return events
 
 
-def play_sequence(data):
+def play_sequence(events):
     client = udp_client.SimpleUDPClient("127.0.0.1", 7001)
-    events = []
-    for ev in data:
-        events.append((ev["t"], ev["pitch"], ev["velo"]))
-        events.append((ev["t"] + ev["dur"], ev["pitch"], 0))
-    events.sort(key=lambda x: x[0])
     time_start = time.time()
     cnt = 0
     timing_res = 0.010
@@ -176,8 +179,8 @@ def play_sequence(data):
         time_cur = time.time() - time_start
         ev = events[cnt]
         while time_cur >= ev[0]:
-            # print(f"{time_cur} {ev}")
-            client.send_message("/mnote", [float(ev[1]), float(ev[2] * 127.0)])
+            print(f"{time_cur} {ev}")
+            client.send_message("/mnote", [float(ev[2]), float(ev[3] * 1.0)])
             cnt += 1
             if cnt == len(events):
                 break
@@ -209,11 +212,26 @@ def plot_events(parameters: list[Parameter], events: list[list]):
     plt.show()
 
 
+OSCEvent_NoteOn = 0
+OSCEvent_NoteOff = 1
+
+
+def generate_osc_sequence(parameters: list[Parameter], events: list[list]):
+    osc_events = []
+    for ev in events:
+        oev_on = [ev[0], OSCEvent_NoteOn, ev[2], 127.0]
+        osc_events.append(oev_on)
+        oev_off = [ev[0] + ev[1], OSCEvent_NoteOn, ev[2], 0.0]
+        osc_events.append(oev_off)
+    osc_events.sort(key=lambda x: x[0])
+    return osc_events
+
+
 def test_generate():
     params: list[Parameter] = []
-    params.append(
-        Parameter(0, 0.0, 1.0, genmethod=GM_RandomExp, genpar0=4.0, rseed=43)
-    )
+    params.append(Parameter(0, 0.0, 1.0, genmethod=GM_RandomExp, genpar0=4.0, rseed=43))
+    # params[-1] = Parameter(0, 0.0, 1.0, genmethod=GM_ItemList, items=[1.0, 0.5, 0.25, 0.125, 0.06125])
+    params.append(Parameter(1, 0.0, 1.0, genmethod=GM_Constant, genpar0=0.05))
     params.append(
         Parameter(
             1,
@@ -226,14 +244,16 @@ def test_generate():
             genpar1=make_envelope([(0.0, 0.05), (5.0, 0.05), (8.0, 10.0)]),
         )
     )
-    params[-1] = Parameter(
-        1, 48.0, 72.0, genmethod=GM_ItemList, items=[60.0, 63.0, 67.0, 72.0]
-    )
+    #params[-1] = Parameter(
+    #    1, 48.0, 72.0, genmethod=GM_ItemList, items=[60.0, 63.0, 67.0, 72.0]
+    #)
     dur = 10.0
     events = generate(params, dur)
     density = len(events) / dur
     print(f"{len(events)} events, density ~{density} events/s")
     plot_events(params, events)
+    osc_sequence = generate_osc_sequence(params, events)
+    play_sequence(osc_sequence)
 
 
 test_generate()
