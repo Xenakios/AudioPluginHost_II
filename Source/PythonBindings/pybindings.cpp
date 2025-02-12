@@ -1,5 +1,7 @@
 #include <pybind11/buffer_info.h>
+#include <pybind11/cast.h>
 #include <pybind11/pybind11.h>
+#include <pybind11/pytypes.h>
 #include <stdexcept>
 #include <vector>
 // #include <optional>
@@ -349,6 +351,7 @@ PYBIND11_MODULE(xenakios, m)
 
     py::class_<xenakios::EnvelopePoint>(m, "EnvelopePoint")
         .def(py::init<double, double>())
+        .def(py::init<std::tuple<double, double, double>>())
         .def(py::init<double, double, int, double>())
         .def("__repr__",
              [](const xenakios::EnvelopePoint &a) {
@@ -364,6 +367,7 @@ PYBIND11_MODULE(xenakios, m)
         .def(py::init<>())
         .def(py::init<xenakios::Envelope>())
         .def(py::init<std::vector<xenakios::EnvelopePoint>>())
+        .def(py::init<std::vector<std::tuple<double, double, double>>>())
         .def("num_points", &xenakios::Envelope::getNumPoints)
         .def("add_point", &xenakios::Envelope::addPoint)
         .def("remove_point", &xenakios::Envelope::removeEnvelopePointAtIndex)

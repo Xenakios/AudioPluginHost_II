@@ -28,6 +28,12 @@ class EnvelopePoint
         : m_x(x), m_y(y), m_shape(Shape(s)), m_p0(p0), m_p1(0.0)
     {
     }
+    EnvelopePoint(std::tuple<double, double> tup) : m_x(std::get<0>(tup)), m_y(std::get<1>(tup)) {}
+    EnvelopePoint(std::tuple<double, double, double> tup)
+        : m_x(std::get<0>(tup)), m_y(std::get<1>(tup)), m_p0(std::get<2>(tup)),
+          m_shape(Shape::Power)
+    {
+    }
     double getX() const noexcept { return m_x; }
     double getY() const noexcept { return m_y; }
     Shape getShape() const noexcept { return m_shape; }
@@ -66,6 +72,17 @@ class Envelope
     }
     Envelope(std::vector<EnvelopePoint> points) : m_points(std::move(points))
     {
+        sortPoints();
+        clearOutputBlock();
+    }
+    Envelope(const std::vector<std::tuple<double, double, double>> &points)
+    {
+        m_points.reserve(points.size());
+        for (const auto &pt : points)
+        {
+            m_points.push_back(EnvelopePoint(std::get<0>(pt), std::get<1>(pt),
+                                             EnvelopePoint::Shape::Power, std::get<2>(pt)));
+        }
         sortPoints();
         clearOutputBlock();
     }

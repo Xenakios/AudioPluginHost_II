@@ -8,6 +8,7 @@ import xepylib.sieves
 import xepylib.xenutils
 from pythonosc import udp_client
 from xepylib.sieves import Sieve as SV
+from xenakios import Envelope as Envelope
 
 # Reimplementation/reimagining of Cmask by Andre Bartetzki
 # https://abartetzki.users.ak.tu-berlin.de/CMaskMan/CMask-Manual.htm
@@ -206,10 +207,10 @@ def plot_events(parameters: list[Parameter], events: list[list]):
     fig, ax1 = plt.subplots()
     colors = ["cyan", "red", "green", "yellow", "pink", "white", "magenta"]
     ax1.set_xlabel("time (s)")
-    ax1.scatter(xarr, yarrs[0], color=colors[0])
+    ax1.scatter(xarr, yarrs[0], color=parameters[1].color)
     for i in range(1, len(yarrs)):
         ax2 = ax1.twinx()
-        ax2.scatter(xarr, yarrs[i], color=colors[i])
+        ax2.scatter(xarr, yarrs[i], color=parameters[i + 1].color)
     plt.get_current_fig_manager().window.state("zoomed")
     fig.tight_layout()
     plt.show()
@@ -233,21 +234,38 @@ def generate_osc_sequence(parameters: list[Parameter], events: list[list]):
 def test_generate():
     params: list[Parameter] = []
     params.append(
-        Parameter("timepos", 0.0, 1.0, genmethod=GM_RandomExp, genpar0=4.0, rseed=43)
+        Parameter(
+            "timepos",
+            0.0,
+            1.0,
+            genmethod=GM_RandomExp,
+            genpar0=32.0,
+            rseed=43,
+            color="#FF000000",
+        )
     )
     # params[-1] = Parameter(0, 0.0, 1.0, genmethod=GM_Constant, genpar0=0.1)
 
-    params.append(Parameter("duration", 0.0, 1.0, genmethod=GM_Constant, genpar0=0.1))
+    params.append(
+        Parameter(
+            "duration", 0.0, 1.0, genmethod=GM_Constant, genpar0=0.1, color="#FF000000"
+        )
+    )
     params.append(
         Parameter(
             "pitch",
             48.0,
             72.0,
-            mask_lower=make_envelope([(0.0, 72.0), (5.0, 48.0), (10.0, 48.0)]),
-            mask_higher=make_envelope([(0.0, 72.0), (5.0, 72.0), (10.0, 72.0)]),
-            genmethod=GM_RandomBeta,
+            mask_lower=Envelope(
+                [(0.0, 72.0, 0.8), (5.0, 48.0, -0.8), (10.0, 72.0, 0.0)]
+            ),
+            mask_higher=Envelope(
+                [(0.0, 72.0, 0.0), (5.0, 72.0, 0.0), (10.0, 72.0, 0.0)]
+            ),
+            genmethod=GM_RandomUniform,
             genpar0=0.1,
             genpar1=0.1,
+            color="yellow",
         )
     )
     params.append(
@@ -257,16 +275,11 @@ def test_generate():
             127.0,
             genmethod=GM_ItemList,
             items=[127.0, 63.0, 63.0, 63.0, 10.0, 10.0, 10.0],
+            color="#FF000000",
         )
     )
     params.append(
-        Parameter(
-            "pan",
-            0.0,
-            1.0,
-            genmethod=GM_LFO_Sine,
-            genpar0=-1.0,
-        )
+        Parameter("pan", 0.0, 1.0, genmethod=GM_LFO_Sine, genpar0=-1.0, color="#FF000000")
     )
 
     dur = 10.0
@@ -274,11 +287,11 @@ def test_generate():
     density = len(events) / dur
     print(f"{len(events)} events, density ~{density} events/s")
     plot_events(params, events)
-    osc_sequence = generate_osc_sequence(params, events)
-    play_osc_sequence(osc_sequence)
+    # osc_sequence = generate_osc_sequence(params, events)
+    # play_osc_sequence(osc_sequence)
 
 
-print([1.0 - i * 0.1 for i in range(8)])
+# print([1.0 - i * 0.1 for i in range(8)])
 test_generate()
 # print(random.betavariate())
 
