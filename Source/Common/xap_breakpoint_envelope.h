@@ -75,17 +75,7 @@ class Envelope
         sortPoints();
         clearOutputBlock();
     }
-    Envelope(const std::vector<std::tuple<double, double, double>> &points)
-    {
-        m_points.reserve(points.size());
-        for (const auto &pt : points)
-        {
-            m_points.push_back(EnvelopePoint(std::get<0>(pt), std::get<1>(pt),
-                                             EnvelopePoint::Shape::Power, std::get<2>(pt)));
-        }
-        sortPoints();
-        clearOutputBlock();
-    }
+
     auto begin() { return m_points.begin(); }
     auto end() { return m_points.end(); }
     void addPoint(EnvelopePoint pt)
