@@ -188,7 +188,7 @@ class ProcessorChain
         Volume,
         Mute
     };
-    BS::thread_pool thpool{1};
+    BS::thread_pool<> thpool{1};
 };
 
 class ClapProcessingEngine
