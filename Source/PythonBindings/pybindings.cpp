@@ -398,7 +398,8 @@ PYBIND11_MODULE(xenakios, m)
         .def("remove_point_range", removeEnvelopeXRange)
         .def("__iter__",
              [](xenakios::Envelope &v) { return py::make_iterator(v.begin(), v.end()); })
-
+        .def("__getitem__",
+             [](xenakios::Envelope &v, int index) { return v.getPointSafePython(index); })
         .def("get_point", &xenakios::Envelope::getPointSafe)
         .def("set_point", &xenakios::Envelope::setPoint)
         .def("get_value", &xenakios::Envelope::getValueAtPosition);

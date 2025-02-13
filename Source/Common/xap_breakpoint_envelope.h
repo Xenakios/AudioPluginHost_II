@@ -1,5 +1,6 @@
 #pragma once
 
+#include <stdexcept>
 #include <vector>
 #include <optional>
 #include <functional>
@@ -141,6 +142,14 @@ class Envelope
         if (index < 0)
             return m_points.front();
         if (index >= m_points.size())
+            return m_points.back();
+        return m_points[index];
+    }
+    const EnvelopePoint &getPointSafePython(int index) const
+    {
+        if (index < -1 || index >= (int)m_points.size())
+            throw std::runtime_error(std::format("Index {} out of range", index));
+        if (index == -1)
             return m_points.back();
         return m_points[index];
     }
