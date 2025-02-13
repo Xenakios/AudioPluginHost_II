@@ -105,16 +105,16 @@ class Envelope
     {
         if (shape == EnvelopePoint::Shape::Linear)
             return value;
-        // holds the value for 99% the segment length, then ramps to the next value
-        // literal sudden jump is almost never useful, but we might want to support that too...
+        // holds the value for p0 the segment length, then ramps to the next value
         else if (shape == EnvelopePoint::Shape::Hold)
         {
             // we might want to somehow make this work based on samples/time,
             // but percentage will have to work for now
-            if (value < 0.99)
+            if (value < p0)
                 return 0.0;
-            return xenakios::mapvalue(value, 0.99, 1.0, 0.0, 1.0);
+            return xenakios::mapvalue(value, p0, 1.0, 0.0, 1.0);
         }
+        // rarely really useful without some smoothing after but for completeness have this
         else if (shape == EnvelopePoint::Shape::Abrupt)
         {
             return 0.0;

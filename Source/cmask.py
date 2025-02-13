@@ -169,28 +169,34 @@ def generate(parameters: list[Parameter], texturedur: float):
 OSCEvent_NoteOn = 0
 OSCEvent_NoteOff = 1
 OSCEvent_Expression = 2
+OSCEvent_Param = 3
 
 
 def play_osc_sequence(events):
     client = udp_client.SimpleUDPClient("127.0.0.1", 7001)
     time_start = time.time()
     cnt = 0
-    timing_res = 0.010
+    timing_res = 0.01
+    error_sum = 0.0
     while cnt < len(events):
         time_cur = time.time() - time_start
         ev = events[cnt]
         while time_cur >= ev[0]:
-            print(f"{time_cur} {ev}")
+            error_sum += time_cur - ev[0]
+            # print(f"{time_cur} {ev}")
             if ev[1] == OSCEvent_NoteOn:
                 client.send_message("/mnote", [float(ev[2]), float(ev[3] * 1.0)])
             if ev[1] == OSCEvent_Expression:
                 client.send_message("/nexp", [ev[2], ev[3], ev[4]])
+            if ev[1] == OSCEvent_Param:
+                client.send_message(ev[2], ev[3])
             cnt += 1
             if cnt == len(events):
                 break
             ev = events[cnt]
         time.sleep(timing_res)
-    print("done")
+    avg_error = error_sum / (cnt - 1)
+    print(f"done, {avg_error} avg error in timing")
 
 
 def plot_events(parameters: list[Parameter], events: list[list]):
@@ -205,7 +211,6 @@ def plot_events(parameters: list[Parameter], events: list[list]):
 
     plt.style.use("dark_background")
     fig, ax1 = plt.subplots()
-    colors = ["cyan", "red", "green", "yellow", "pink", "white", "magenta"]
     ax1.set_xlabel("time (s)")
     ax1.scatter(xarr, yarrs[0], color=parameters[1].color)
     for i in range(1, len(yarrs)):
@@ -216,10 +221,21 @@ def plot_events(parameters: list[Parameter], events: list[list]):
     plt.show()
 
 
-def generate_osc_sequence(parameters: list[Parameter], events: list[list]):
+class PluginParameterAutomation:
+    def __init__(self, param_addr: str, env: Envelope):
+        self.addr = param_addr
+        self.env = env
+        pass
+
+
+def generate_osc_sequence(
+    parameters: list[Parameter],
+    maskevents: list[list],
+    paraut: PluginParameterAutomation,
+):
     osc_events = []
     note_id = 0
-    for ev in events:
+    for ev in maskevents:
         oev_on = [ev[0], OSCEvent_NoteOn, ev[2], ev[3], float(note_id)]
         osc_events.append(oev_on)
         oev_pan = [ev[0], OSCEvent_Expression, note_id, 1, ev[4]]
@@ -227,31 +243,38 @@ def generate_osc_sequence(parameters: list[Parameter], events: list[list]):
         oev_off = [ev[0] + ev[1], OSCEvent_NoteOn, ev[2], 0.0, float(note_id)]
         osc_events.append(oev_off)
         note_id += 1
+    t = 0.0
+    dur = paraut.env.get_point(paraut.env.num_points() - 1).x()
+    resol = 0.1
+    while t < dur:
+        val = paraut.env.get_value(t)
+        osc_events.append([t, OSCEvent_Param, paraut.addr, val])
+        t += resol
     osc_events.sort(key=lambda x: x[0])
     return osc_events
 
 
 def test_generate():
-    params: list[Parameter] = []
-    params.append(
+    maskparams: list[Parameter] = []
+    maskparams.append(
         Parameter(
             "timepos",
             0.0,
             1.0,
             genmethod=GM_RandomExp,
-            genpar0=32.0,
+            genpar0=4.0,
             rseed=43,
             color="#FF000000",
         )
     )
     # params[-1] = Parameter(0, 0.0, 1.0, genmethod=GM_Constant, genpar0=0.1)
 
-    params.append(
+    maskparams.append(
         Parameter(
             "duration", 0.0, 1.0, genmethod=GM_Constant, genpar0=0.1, color="#FF000000"
         )
     )
-    params.append(
+    maskparams.append(
         Parameter(
             "pitch",
             48.0,
@@ -259,16 +282,14 @@ def test_generate():
             mask_lower=Envelope(
                 [(0.0, 72.0, 0.8), (5.0, 48.0, -0.8), (10.0, 72.0, 0.0)]
             ),
-            mask_higher=Envelope(
-                [(0.0, 72.0, 0.0), (5.0, 72.0, 0.0), (10.0, 72.0, 0.0)]
-            ),
+            mask_higher=Envelope([(0.0, 72.0), (5.0, 72.0), (10.0, 72.0)]),
             genmethod=GM_RandomUniform,
             genpar0=0.1,
             genpar1=0.1,
             color="yellow",
         )
     )
-    params.append(
+    maskparams.append(
         Parameter(
             "velocity",
             0.0,
@@ -278,17 +299,22 @@ def test_generate():
             color="#FF000000",
         )
     )
-    params.append(
-        Parameter("pan", 0.0, 1.0, genmethod=GM_LFO_Sine, genpar0=-1.0, color="#FF000000")
+    maskparams.append(
+        Parameter(
+            "pan", 0.0, 1.0, genmethod=GM_LFO_Sine, genpar0=-1.0, color="#FF000000"
+        )
     )
 
     dur = 10.0
-    events = generate(params, dur)
+    events = generate(maskparams, dur)
     density = len(events) / dur
     print(f"{len(events)} events, density ~{density} events/s")
-    plot_events(params, events)
-    # osc_sequence = generate_osc_sequence(params, events)
-    # play_osc_sequence(osc_sequence)
+    # plot_events(maskparams, events)
+    paraut = PluginParameterAutomation(
+        "/param/main_pan", Envelope([(0.0, 0.0), (10.0, 1.0)])
+    )
+    osc_sequence = generate_osc_sequence(maskparams, events, paraut)
+    play_osc_sequence(osc_sequence)
 
 
 # print([1.0 - i * 0.1 for i in range(8)])

@@ -360,7 +360,8 @@ PYBIND11_MODULE(xenakios, m)
              })
         .def("x", &xenakios::EnvelopePoint::getX)
         .def("y", &xenakios::EnvelopePoint::getY)
-        .def("shape", &xenakios::EnvelopePoint::getShape)
+        .def("shape",
+             [](const xenakios::EnvelopePoint &pt) { return static_cast<int>(pt.getShape()); })
         .def("par0", &xenakios::EnvelopePoint::getPar0);
 
     py::class_<xenakios::Envelope>(m, "Envelope")
