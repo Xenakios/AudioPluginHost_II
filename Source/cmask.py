@@ -28,6 +28,9 @@ GM_LFO_Sine = 100
 GM_Constant = 1000
 GM_ItemList = 1001
 
+IM_Forward = 0
+IM_ForwardBackward = 1
+
 
 class Parameter:
     def __init__(
@@ -41,6 +44,7 @@ class Parameter:
         mask_lower=None,
         mask_higher=None,
         items: list[float] | None = None,
+        itemsmode: int = None,
         color: str = "white",
         rseed=None,
     ):
@@ -69,6 +73,8 @@ class Parameter:
         self.osc_phase = 0.0
         self.genmethod = genmethod
         self.item_counter = 0
+        self.item_counter_inc = 1
+        self.itemsmode = itemsmode
         self.items = items
 
     def get_par_value(self, source: float | xenakios.Envelope, t):
@@ -78,8 +84,15 @@ class Parameter:
 
     def generate_value_from_items(self):
         val = self.items[self.item_counter]
-        self.item_counter += 1
+        self.item_counter += self.item_counter_inc
         if self.item_counter == len(self.items):
+            if self.itemsmode == IM_Forward:
+                self.item_counter = 0
+            if self.itemsmode == IM_ForwardBackward:
+                self.item_counter_inc = -1
+                self.item_counter = len(self.items) - 1
+        if self.itemsmode == IM_ForwardBackward and self.item_counter < 0:
+            self.item_counter_inc = 1
             self.item_counter = 0
         return val
 
@@ -139,14 +152,14 @@ def make_envelope(pts: list) -> xenakios.Envelope:
 
 
 def generate(parameters: list[Parameter], texturedur: float):
-    events = []
+    events: list[list[float]] = []
     t = 0.0
 
     dt_threshold = 0.001
     dt_sanity_limit = 100
     dt_sanity_counter = 0
     while t < texturedur:
-        event = []
+        event: list[float] = []
         dt = parameters[0].generate_value(t)
         if dt < dt_threshold:
             dt_sanity_counter += 1
@@ -317,11 +330,39 @@ def test_generate():
     play_osc_sequence(osc_sequence)
 
 
-# print([1.0 - i * 0.1 for i in range(8)])
-test_generate()
-# print(random.betavariate())
+# test_generate()
 
-# print(len(evts))
-# play_sequence(evts)
-# s0 = SV(3, 1)
-# print(s0.get_list(0, 10))
+
+def test_itemlist_modes():
+    dur = 10.0
+    params: list[Parameter] = []
+    params.append(
+        Parameter(
+            "timepos",
+            0.0,
+            1.0,
+            genmethod=GM_RandomExp,
+            genpar0=8.0,
+            rseed=43,
+            color="#FF000000",
+        )
+    )
+    params.append(
+        Parameter(
+            "pan",
+            0.0,
+            1.0,
+            genmethod=GM_ItemList,
+            items=[0.0, 0.25, 0.5, 0.75, 1.0],
+            itemsmode=IM_ForwardBackward,
+            color="yellow",
+        )
+    )
+    t0 = time.time()
+    events = generate(params, dur)
+    t1 = time.time()
+    print(f"elapsed time {t1 - t0:.2f} seconds, {len(events)} events generated")
+    plot_events(params, events)
+
+
+test_itemlist_modes()

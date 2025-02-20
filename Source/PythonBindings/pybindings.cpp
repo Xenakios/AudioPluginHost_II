@@ -290,7 +290,7 @@ PYBIND11_MODULE(xenakios, m)
              "0.0 fully random, 0.5 freeze loop, >0.5 pick randomly from loop")
         .def("nextFloat", &xenakios::DejaVuRandom::nextFloatInRange)
         .def("nextInt", &xenakios::DejaVuRandom::nextIntInRange);
-    // .def("setDepth", &xenakios::BlueNoise::setDepth, "depth"_a = 4)
+    
     py::class_<xenakios::BlueNoise>(m, "BlueNoise")
         .def(py::init<unsigned int>(), "seed"_a = 0)
         .def("get_array", &getArrayWithBlueNoise)
