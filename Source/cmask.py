@@ -30,6 +30,8 @@ GM_ItemList = 1001
 
 IM_Forward = 0
 IM_ForwardBackward = 1
+IM_Shuffle = 2
+IM_Random = 3
 
 
 class Parameter:
@@ -72,6 +74,7 @@ class Parameter:
         self.last_t = 0.0
         self.osc_phase = 0.0
         self.genmethod = genmethod
+
         self.item_counter = 0
         self.item_counter_inc = 1
         self.itemsmode = itemsmode
@@ -83,6 +86,8 @@ class Parameter:
         return source
 
     def generate_value_from_items(self):
+        if self.itemsmode == IM_Random:
+            return self.rng.choice(self.items)
         val = self.items[self.item_counter]
         self.item_counter += self.item_counter_inc
         if self.item_counter == len(self.items):
@@ -91,6 +96,9 @@ class Parameter:
             if self.itemsmode == IM_ForwardBackward:
                 self.item_counter_inc = -1
                 self.item_counter = len(self.items) - 1
+            if self.itemsmode == IM_Shuffle:
+                self.item_counter = 0
+                self.rng.shuffle(self.items)
         if self.itemsmode == IM_ForwardBackward and self.item_counter < 0:
             self.item_counter_inc = 1
             self.item_counter = 0
@@ -342,7 +350,7 @@ def test_itemlist_modes():
             0.0,
             1.0,
             genmethod=GM_RandomExp,
-            genpar0=8.0,
+            genpar0=4.0,
             rseed=43,
             color="#FF000000",
         )
@@ -354,7 +362,7 @@ def test_itemlist_modes():
             1.0,
             genmethod=GM_ItemList,
             items=[0.0, 0.25, 0.5, 0.75, 1.0],
-            itemsmode=IM_ForwardBackward,
+            itemsmode=IM_Random,
             color="yellow",
         )
     )
