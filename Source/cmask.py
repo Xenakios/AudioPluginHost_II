@@ -3,6 +3,7 @@ import xepylib
 import math
 import time
 import random
+
 from matplotlib import pyplot as plt
 import xepylib.sieves
 import xepylib.xenutils
@@ -160,6 +161,10 @@ def make_envelope(pts: list) -> xenakios.Envelope:
 
 
 def generate(parameters: list[Parameter], texturedur: float):
+    if len(parameters) < 2:
+        raise RuntimeError(
+            f"You need to provide at least time and duration parameters, {len(parameters)} were provided"
+        )
     events: list[list[float]] = []
     t = 0.0
 
@@ -344,17 +349,19 @@ def test_generate():
 def test_itemlist_modes():
     dur = 10.0
     params: list[Parameter] = []
+
     params.append(
         Parameter(
             "timepos",
             0.0,
             1.0,
             genmethod=GM_RandomExp,
-            genpar0=4.0,
+            genpar0=8.0,
             rseed=43,
             color="#FF000000",
         )
     )
+
     params.append(
         Parameter(
             "pan",
@@ -373,4 +380,63 @@ def test_itemlist_modes():
     plot_events(params, events)
 
 
-test_itemlist_modes()
+# test_itemlist_modes()
+# print(xenakios.arraytest_out())
+# arr = [0.0, 1.0, 2.5, -1.11111]
+# xenakios.arraytest_in(arr)
+
+
+def audio_sqrt(ain: float):
+    if ain >= 0.0:
+        return math.sqrt(ain)
+    return -1.0 * math.sqrt(abs(ain))
+
+
+class RWalk:
+    def __init__(self, minval, maxval, mean, dev):
+        self.x0 = 0.0
+        self.minval = minval
+        self.maxval = maxval
+        self.mean = mean
+        self.dev = dev
+
+    def __call__(self, _) -> float:
+        result = self.x0
+        self.x0 = xepylib.xenutils.clamp(
+            self.x0 + xepylib.xenutils.random_cauchy(self.mean, self.dev),
+            self.minval,
+            self.maxval,
+        )
+        return result
+
+
+class RandMotion:
+    def __init__(self):
+        self.velo = 0.1
+        self.y = 0.0
+        self.counter = 0
+        self.minval = -2.0
+        self.maxval = 2.0
+        self.friction = 0.90
+
+    def __call__(self, _) -> float:
+        self.y += self.velo
+        if abs(self.velo) < 0.01:
+            self.velo = random.gauss(0, 0.5)
+            self.counter = 0
+        if self.y > self.maxval:
+            self.velo = -self.velo
+            self.y = self.maxval
+        if self.y < self.minval:
+            self.velo = -self.velo
+            self.y = self.minval
+        self.velo *= self.friction
+        self.counter += 1
+        return self.y
+
+
+rw = RandMotion()
+# xepylib.xenutils.plot_function(
+#     plt, lambda x: xepylib.xenutils.wrap(2 * math.sin(x), -1.0, 1.0), -3.1, 3.1
+# )
+xepylib.xenutils.plot_function(plt, rw, -1.0, 1.0)

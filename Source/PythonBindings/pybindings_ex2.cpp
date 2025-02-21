@@ -5,6 +5,7 @@
 #include <iostream>
 #include "libMTSMaster.h"
 #include "Tunings.h"
+#include <print>
 
 namespace py = pybind11;
 
@@ -62,4 +63,11 @@ void init_py2(py::module_ &m, py::module_ &m_const)
         .def("setNoteTuningMap", &MTSESPSource::setNoteTuningMap)
         .def("setNoteTuning", &MTSESPSource::setNoteTuning);
     m_const.attr("MIDI_0_FREQ") = Tunings::MIDI_0_FREQ;
+    m.def("arraytest_out", []() {
+        std::array<double, 16> result;
+        for (int i = 0; i < result.size(); ++i)
+            result[i] = 1.0 / result.size() * i;
+        return result;
+    });
+    m.def("arraytest_in", [](std::array<double, 4> arr) { std::print("{}", arr); });
 }
