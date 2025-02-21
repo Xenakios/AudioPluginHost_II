@@ -417,20 +417,35 @@ class RandMotion:
         self.counter = 0
         self.minval = -2.0
         self.maxval = 2.0
-        self.friction = 0.90
+        self.friction = 0.9
+        # self.obstacles = [(0.0, 1.0, -1.0), (0.0, 1.0, 1.0), (0.5, 0.6, 0.5)]
+        self.obstacles = [(0.0, 1.0, -1.0), (0.0, 1.0, 1.0)]
 
-    def __call__(self, _) -> float:
-        self.y += self.velo
+    def detect_collision(self, x, y, velo):
+        tempy = y + velo
+        for o in self.obstacles:
+            if x >= o[0] and x < o[1]:
+                distance = abs(o[2] - tempy)
+                if distance < 0.01:
+                    return (True, y)
+                # if (velo < 0.0) and distance > -0.01:
+                #     return (True, o[2])
+        return (False, 0.0)
+
+    def __call__(self, x) -> float:
+        col = self.detect_collision(x, self.y, self.velo)
+        if col[0]:
+            # print(f"collision {x}")
+            self.velo *= -1.0
+            self.y = col[1]
+        else:
+            self.y += self.velo
+            # print(f"no collision {x}")
+        self.velo *= self.friction
         if abs(self.velo) < 0.01:
             self.velo = random.gauss(0, 0.5)
             self.counter = 0
-        if self.y > self.maxval:
-            self.velo = -self.velo
-            self.y = self.maxval
-        if self.y < self.minval:
-            self.velo = -self.velo
-            self.y = self.minval
-        self.velo *= self.friction
+
         self.counter += 1
         return self.y
 
@@ -439,4 +454,4 @@ rw = RandMotion()
 # xepylib.xenutils.plot_function(
 #     plt, lambda x: xepylib.xenutils.wrap(2 * math.sin(x), -1.0, 1.0), -3.1, 3.1
 # )
-xepylib.xenutils.plot_function(plt, rw, -1.0, 1.0)
+xepylib.xenutils.plot_function(plt, rw, 0.0, 1.0)
