@@ -109,7 +109,7 @@ class Parameter:
         if self.genmethod == GM_ItemList:
             return self.generate_value_from_items()
 
-        z = 0.5
+        z = None
         genpar0 = self.get_par_value(self.gen_par0, t)
         genpar1 = self.get_par_value(self.gen_par1, t)
         if self.genmethod == GM_RandomUniform:
@@ -368,8 +368,8 @@ def test_itemlist_modes():
             0.0,
             1.0,
             genmethod=GM_ItemList,
-            items=[0.0, 0.25, 0.5, 0.75, 1.0],
-            itemsmode=IM_Random,
+            items=[0.0, 0.25, 0.5, 0.51, 0.95, 1.0],
+            itemsmode=IM_ForwardBackward,
             color="yellow",
         )
     )
@@ -380,78 +380,7 @@ def test_itemlist_modes():
     plot_events(params, events)
 
 
-# test_itemlist_modes()
+test_itemlist_modes()
 # print(xenakios.arraytest_out())
 # arr = [0.0, 1.0, 2.5, -1.11111]
 # xenakios.arraytest_in(arr)
-
-
-def audio_sqrt(ain: float):
-    if ain >= 0.0:
-        return math.sqrt(ain)
-    return -1.0 * math.sqrt(abs(ain))
-
-
-class RWalk:
-    def __init__(self, minval, maxval, mean, dev):
-        self.x0 = 0.0
-        self.minval = minval
-        self.maxval = maxval
-        self.mean = mean
-        self.dev = dev
-
-    def __call__(self, _) -> float:
-        result = self.x0
-        self.x0 = xepylib.xenutils.clamp(
-            self.x0 + xepylib.xenutils.random_cauchy(self.mean, self.dev),
-            self.minval,
-            self.maxval,
-        )
-        return result
-
-
-class RandMotion:
-    def __init__(self):
-        self.velo = 0.1
-        self.y = 0.0
-        self.counter = 0
-        self.minval = -2.0
-        self.maxval = 2.0
-        self.friction = 0.9
-        # self.obstacles = [(0.0, 1.0, -1.0), (0.0, 1.0, 1.0), (0.5, 0.6, 0.5)]
-        self.obstacles = [(0.0, 1.0, -1.0), (0.0, 1.0, 1.0)]
-
-    def detect_collision(self, x, y, velo):
-        tempy = y + velo
-        for o in self.obstacles:
-            if x >= o[0] and x < o[1]:
-                distance = abs(o[2] - tempy)
-                if distance < 0.01:
-                    return (True, y)
-                # if (velo < 0.0) and distance > -0.01:
-                #     return (True, o[2])
-        return (False, 0.0)
-
-    def __call__(self, x) -> float:
-        col = self.detect_collision(x, self.y, self.velo)
-        if col[0]:
-            # print(f"collision {x}")
-            self.velo *= -1.0
-            self.y = col[1]
-        else:
-            self.y += self.velo
-            # print(f"no collision {x}")
-        self.velo *= self.friction
-        if abs(self.velo) < 0.01:
-            self.velo = random.gauss(0, 0.5)
-            self.counter = 0
-
-        self.counter += 1
-        return self.y
-
-
-rw = RandMotion()
-# xepylib.xenutils.plot_function(
-#     plt, lambda x: xepylib.xenutils.wrap(2 * math.sin(x), -1.0, 1.0), -3.1, 3.1
-# )
-xepylib.xenutils.plot_function(plt, rw, 0.0, 1.0)

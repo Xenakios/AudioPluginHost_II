@@ -1930,7 +1930,8 @@ inline void test_webview_score()
 
 int main(int argc, char **argv)
 {
-    test_webview_score();
+    std::cout << __clang_major__ << "\n";
+    // test_webview_score();
     // test_eventchase();
     //  test_messagebuilder();
     //   test_llvm_ir();

@@ -424,3 +424,4 @@ PYBIND11_MODULE(xenakios, m)
 
     m.def("generateEnvelopeFromLFO", &generateEnvelopeFromLFO);
 }
+
