@@ -1928,9 +1928,64 @@ inline void test_webview_score()
     MTS_DeregisterClient(mts);
 }
 
+inline double weierstrass(double x, double a, int b = 7, size_t iters = 16)
+{
+    double sum = 0.0;
+    for (size_t i = 0; i < iters; ++i)
+    {
+        sum += std::pow(a, i) * std::cos(std::pow(b, i) * M_PI * x);
+    }
+    return sum;
+}
+
+inline void test_weierstrass()
+{
+    double sr = 44100;
+    auto writer =
+        xenakios::createWavWriter(R"(C:\develop\AudioPluginHost_mk2\audio\footest01.wav)", 1, sr);
+    size_t outlen = sr * 5;
+    auto outbuf = choc::buffer::ChannelArrayBuffer<float>(1, outlen);
+    int blockcounter = 0;
+    int blocklen = 64;
+    double a = 0.5;
+    double b = 9.0;
+    int iters = 0;
+    int hzcounter = 0;
+    std::array<double, 5> hzs{1.0, 2.0, 3.0, 4.0, 0.5};
+    double hz = 1.0;
+    xenakios::Envelope env_a{{{0.0, 0.4}, {2.5, 0.5}, {5.0, 0.4}}};
+    xenakios::Envelope env_b{{{0.0, 0.0}}};
+    xenakios::Envelope env_iters{{{0.0, 1.0}, {4.5, 8.0}, {5.0, 1.0}}};
+    xenakios::Envelope env_hz{{{0.0, 1.0}, {0.5, 8.0}, {2.5, 1.0}, {4.0, 1.25}}};
+    for (auto &pt : env_hz)
+        pt = pt.withShape(xenakios::EnvelopePoint::Shape::Hold).withP0(0.9);
+    double phase = 0.0;
+    for (int i = 0; i < outlen; ++i)
+    {
+        double time = i / sr;
+        if (blockcounter == 0)
+        {
+            a = env_a.getValueAtPosition(time);
+            b = 7 + 2 * std::floor(6 * env_b.getValueAtPosition(time));
+            hz = env_hz.getValueAtPosition(time);
+        }
+        double x = weierstrass(phase, a, b, 16);
+        outbuf.getSample(0, i) = x;
+        ++blockcounter;
+        if (blockcounter == blocklen)
+            blockcounter = 0;
+        phase += (2 * M_PI) / sr * hz;
+        // if (phase >= 2 * M_PI)
+        //     phase -= 2 * M_PI;
+    }
+    std::print("end phase {}\n", phase);
+    writer->appendFrames(outbuf.getView());
+}
+
 int main(int argc, char **argv)
 {
-    std::cout << __clang_major__ << "\n";
+    test_weierstrass();
+
     // test_webview_score();
     // test_eventchase();
     //  test_messagebuilder();

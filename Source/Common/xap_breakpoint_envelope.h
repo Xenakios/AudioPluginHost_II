@@ -40,7 +40,18 @@ class EnvelopePoint
     Shape getShape() const noexcept { return m_shape; }
     double getPar0() const noexcept { return m_p0; }
     double getPar1() const noexcept { return m_p1; }
-
+    EnvelopePoint withShape(Shape s)
+    {
+        auto result = *this;
+        result.m_shape = s;
+        return result;
+    }
+    EnvelopePoint withP0(double p)
+    {
+        auto result = *this;
+        result.m_p0 = p;
+        return result;
+    }
   private:
     double m_x = 0.0;
     double m_y = 0.0;
@@ -74,6 +85,7 @@ class Envelope
     Envelope(std::vector<EnvelopePoint> points) : m_points(std::move(points))
     {
         sortPoints();
+        outputBlock.resize(1);
         clearOutputBlock();
     }
 

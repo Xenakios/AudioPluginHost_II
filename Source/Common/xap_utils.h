@@ -1,6 +1,7 @@
 #pragma once
 
 #include <clap/helpers/event-list.hh>
+#include "audio/choc_AudioFileFormat.h"
 #include "containers/choc_SingleReaderSingleWriterFIFO.h"
 #include "clap/clap.h"
 #include <algorithm>
@@ -9,6 +10,7 @@
 #include <optional>
 #include "containers/choc_NonAllocatingStableSort.h"
 #include <format>
+#include "audio/choc_AudioFileFormat_WAV.h"
 
 #define XENAKIOS_CLAP_NAMESPACE 11111
 
@@ -24,6 +26,19 @@ template <typename T> inline clap_id to_clap_id(T x) { return static_cast<clap_i
 
 namespace xenakios
 {
+
+inline std::unique_ptr<choc::audio::AudioFileWriter>
+createWavWriter(std::string path, size_t num_channels, double samplerate,
+                choc::audio::BitDepth bit_depth = choc::audio::BitDepth::float32)
+{
+    choc::audio::AudioFileProperties outfileprops;
+    outfileprops.formatName = "WAV";
+    outfileprops.bitDepth = bit_depth;
+    outfileprops.numChannels = num_channels;
+    outfileprops.sampleRate = samplerate;
+    choc::audio::WAVAudioFileFormat<true> wavformat;
+    return wavformat.createWriter(path, outfileprops);
+}
 
 /* Remaps a value from a source range to a target range. Explodes if source range has zero size.
  */
