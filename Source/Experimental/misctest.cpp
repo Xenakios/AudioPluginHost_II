@@ -1940,7 +1940,7 @@ inline double weierstrass(double x, double a, int b = 7, size_t iters = 16)
 
 inline void test_weierstrass()
 {
-    double sr = 44100;
+    double sr = 192000;
     auto writer =
         xenakios::createWavWriter(R"(C:\develop\AudioPluginHost_mk2\audio\footest01.wav)", 1, sr);
     size_t outlen = sr * 5;
@@ -1953,13 +1953,14 @@ inline void test_weierstrass()
     int hzcounter = 0;
     std::array<double, 5> hzs{1.0, 2.0, 3.0, 4.0, 0.5};
     double hz = 1.0;
-    xenakios::Envelope env_a{{{0.0, 0.4}, {2.5, 0.5}, {5.0, 0.4}}};
+    xenakios::Envelope env_a{{{0.0, 0.3}, {2.5, 0.7}, {5.0, 0.1}}};
     xenakios::Envelope env_b{{{0.0, 0.0}}};
     xenakios::Envelope env_iters{{{0.0, 1.0}, {4.5, 8.0}, {5.0, 1.0}}};
-    xenakios::Envelope env_hz{{{0.0, 1.0}, {0.5, 8.0}, {2.5, 1.0}, {4.0, 1.25}}};
+    xenakios::Envelope env_hz{{{0.0, 1.0}, {0.5, 0.5}, {2.5, 1.0}, {4.0, 0.01}}};
     for (auto &pt : env_hz)
-        pt = pt.withShape(xenakios::EnvelopePoint::Shape::Hold).withP0(0.9);
+        pt = pt.withShape(xenakios::EnvelopePoint::Shape::Hold).withP0(0.5);
     double phase = 0.0;
+    double max_gain = 0.0;
     for (int i = 0; i < outlen; ++i)
     {
         double time = i / sr;
@@ -1969,8 +1970,10 @@ inline void test_weierstrass()
             b = 7 + 2 * std::floor(6 * env_b.getValueAtPosition(time));
             hz = env_hz.getValueAtPosition(time);
         }
-        double x = weierstrass(phase, a, b, 16);
+        double x = weierstrass(phase, a, b, 8);
         outbuf.getSample(0, i) = x;
+        if (std::abs(x) > max_gain)
+            max_gain = std::abs(x);
         ++blockcounter;
         if (blockcounter == blocklen)
             blockcounter = 0;
@@ -1978,7 +1981,8 @@ inline void test_weierstrass()
         // if (phase >= 2 * M_PI)
         //     phase -= 2 * M_PI;
     }
-    std::print("end phase {}\n", phase);
+    std::print("max gain {}\n", max_gain);
+    choc::buffer::applyGain(outbuf, 1.0 / max_gain);
     writer->appendFrames(outbuf.getView());
 }
 
