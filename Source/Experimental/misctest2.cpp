@@ -56,6 +56,7 @@ void test_weierstrass()
         // if (phase >= 2 * M_PI)
         //     phase -= 2 * M_PI;
     }
+    
     std::print("max gain {}\n", max_gain);
     choc::buffer::applyGain(outbuf, 1.0 / max_gain);
     writer->appendFrames(outbuf.getView());

@@ -6,6 +6,7 @@
 #include <functional>
 #include "xap_utils.h"
 #include "containers/choc_SmallVector.h"
+#include "containers/choc_NonAllocatingStableSort.h"
 
 namespace xenakios
 {

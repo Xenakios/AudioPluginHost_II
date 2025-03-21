@@ -7,9 +7,6 @@
 #include <algorithm>
 #include <cstdint>
 #include <limits>
-#include <optional>
-#include "containers/choc_NonAllocatingStableSort.h"
-#include <format>
 #include "audio/choc_AudioFileFormat_WAV.h"
 
 #define XENAKIOS_CLAP_NAMESPACE 11111

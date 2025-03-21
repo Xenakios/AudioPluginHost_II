@@ -1,10 +1,10 @@
 #pragma once
 
-#include "clap/clap.h"
 #include "../Common/xap_utils.h"
 #include "clap/events.h"
 #include "containers/choc_Span.h"
 #include "containers/choc_Value.h"
+#include "containers/choc_NonAllocatingStableSort.h"
 #include "memory/choc_xxHash.h"
 #include "text/choc_JSON.h"
 #include <limits>
