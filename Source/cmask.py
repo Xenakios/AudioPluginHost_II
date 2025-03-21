@@ -5,7 +5,6 @@ import time
 import random
 
 from matplotlib import pyplot as plt
-import xepylib.sieves
 import xepylib.xenutils
 from pythonosc import udp_client
 from xepylib.sieves import Sieve as SV

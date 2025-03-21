@@ -132,6 +132,7 @@ add_custom_command(TARGET xenakios POST_BUILD
 # this is used for simple C++ testing/experimenting stuff without Juce
 add_executable(TestingProgram 
     Source/Experimental/misctest.cpp 
+    Source/Experimental/misctest2.cpp 
     Source/Xaps/clap_xaudioprocessor.cpp
     Source/Host/claphost.cpp
     Source/Tests/first_tests.cpp
