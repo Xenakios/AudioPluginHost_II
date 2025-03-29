@@ -1,8 +1,13 @@
 #include "../Common/xap_utils.h"
 #include "../Common/xap_breakpoint_envelope.h"
+#include "../Common/clap_eventsequence.h"
 #include <print>
 #include <array>
 #include "AirwinRegistry.h"
+#include "audio/choc_AudioFileFormat.h"
+#include "audio/choc_AudioFileFormat_WAV.h"
+#include "audio/choc_SampleBuffers.h"
+#include "clap/events.h"
 
 inline double weierstrass(double x, double a, int b = 7, size_t iters = 16)
 {
@@ -62,10 +67,86 @@ void test_weierstrass()
     writer->appendFrames(outbuf.getView());
 }
 
+inline void dump_airwindows_info()
+{
+    char textbuf[2048];
+    std::ofstream ofs(
+        R"(C:\develop\AudioPluginHost_mk2\Source\Experimental\airwindowsplugins.txt)");
+    auto &reg = AirwinRegistry::registry;
+    for (size_t i = 0; i < reg.size(); ++i)
+    {
+        auto plug = reg[i].generator();
+        if (plug)
+        {
+            ofs << i << "\t" << reg[i].name << "\n";
+            for (int j = 0; j < reg[i].nParams; ++j)
+            {
+                plug->getParameterName(j, textbuf);
+                ofs << "\t" << j << "\t" << textbuf << "\n";
+            }
+        }
+    }
+}
+
 void test_airwin_registry()
 {
-    for (auto &e : AirwinRegistry::registry)
+    char textbuf[2048];
+    auto &reg = AirwinRegistry::registry;
+    int plugId = 182;
+    auto plug = reg[plugId].generator();
+    if (plug)
     {
-        std::print("{}\n", e.name);
+        ClapEventSequence seq;
+        seq.addParameterEvent(false, 0.0, -1, -1, -1, -1, 3, 0.2);
+        seq.addParameterEvent(false, 1.0, -1, -1, -1, -1, 3, 1.0);
+        seq.addParameterEvent(false, 2.0, -1, -1, -1, -1, 3, 0.2);
+        seq.addParameterEvent(false, 3.0, -1, -1, -1, -1, 3, 1.0);
+        xenakios::Envelope par0env{
+            {{0.0, 0.0}, {0.5, 1.0}, {2.0, 0.0}, {3.0, 0.0}, {3.2, 1.0}, {3.4, 0.0}}};
+        choc::audio::WAVAudioFileFormat<false> informat;
+        auto reader = informat.createReader(R"(C:\MusicAudio\sourcesamples\sheila.wav)");
+        auto &inprops = reader->getProperties();
+        ClapEventSequence::IteratorSampleTime eviter(seq, inprops.sampleRate);
+        unsigned int blockSize = 64;
+        choc::buffer::ChannelArrayBuffer<float> inbuf{inprops.numChannels, blockSize};
+        choc::buffer::ChannelArrayBuffer<float> outbuf{2, blockSize};
+        plug->setNumInputs(2);
+        plug->setNumOutputs(2);
+        plug->setSampleRate(inprops.sampleRate);
+        auto writer = xenakios::createWavWriter(
+            R"(C:\develop\AudioPluginHost_mk2\Source\Experimental\awtest01.wav)", 2,
+            inprops.sampleRate);
+        int infilepos = 0;
+        int tailLen = inprops.sampleRate * 5.0;
+        while (infilepos < inprops.numFrames + tailLen)
+        {
+            reader->readFrames(infilepos, inbuf.getView());
+
+            if (inprops.numChannels == 1)
+            {
+                choc::buffer::copy(outbuf.getChannel(0), inbuf.getChannel(0));
+                choc::buffer::copy(outbuf.getChannel(1), inbuf.getChannel(0));
+            }
+            else
+            {
+                choc::buffer::copy(outbuf.getChannel(0), inbuf.getChannel(0));
+                choc::buffer::copy(outbuf.getChannel(1), inbuf.getChannel(1));
+            }
+            auto evts = eviter.readNextEvents(blockSize);
+            for (const auto &e : evts)
+            {
+                if (e.event.header.type == CLAP_EVENT_PARAM_VALUE)
+                {
+                    auto pev = (clap_event_param_value *)&e.event.header;
+                    plug->setParameter(pev->param_id, pev->value);
+                }
+            }
+            // double tpos = infilepos / inprops.sampleRate;
+            // plug->setParameter(3, par0env.getValueAtPosition(tpos));
+            plug->processReplacing((float **)outbuf.getView().data.channels,
+                                   (float **)outbuf.getView().data.channels, blockSize);
+            writer->appendFrames(outbuf.getView());
+            infilepos += blockSize;
+        }
     }
 }
