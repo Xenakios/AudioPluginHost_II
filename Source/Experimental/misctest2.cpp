@@ -2,6 +2,7 @@
 #include "../Common/xap_breakpoint_envelope.h"
 #include <print>
 #include <array>
+#include "AirwinRegistry.h"
 
 inline double weierstrass(double x, double a, int b = 7, size_t iters = 16)
 {
@@ -56,8 +57,15 @@ void test_weierstrass()
         // if (phase >= 2 * M_PI)
         //     phase -= 2 * M_PI;
     }
-    
     std::print("max gain {}\n", max_gain);
     choc::buffer::applyGain(outbuf, 1.0 / max_gain);
     writer->appendFrames(outbuf.getView());
+}
+
+void test_airwin_registry()
+{
+    for (auto &e : AirwinRegistry::registry)
+    {
+        std::print("{}\n", e.name);
+    }
 }

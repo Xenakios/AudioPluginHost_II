@@ -1929,11 +1929,12 @@ inline void test_webview_score()
 }
 
 void test_weierstrass();
+void test_airwin_registry();
 
 int main(int argc, char **argv)
 {
-    test_weierstrass();
-
+    test_airwin_registry();
+    // test_weierstrass();
     // test_webview_score();
     // test_eventchase();
     //  test_messagebuilder();

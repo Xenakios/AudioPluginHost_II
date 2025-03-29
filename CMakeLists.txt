@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.15)
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
-
+set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 
 project(AudioPluginHost2 VERSION 0.0.1)
 
@@ -32,12 +32,14 @@ include_directories(
     libs/simde
     libs/thread-pool/include
     C:/develop/cmajlang/cmajor/include
+    C:/develop/airwin2rack/src
 )
 
 # for "reasons", this is still a console app even though a GUI app is built from it
 # we should have a separate real console app and a real GUI app
 
 add_subdirectory(libs/fmt)
+add_subdirectory(C:/develop/airwin2rack build)
 
 juce_add_console_app(MainHostApp
     PRODUCT_NAME "Console App Example") 
@@ -141,7 +143,7 @@ add_executable(TestingProgram
     )
 # Source/Experimental/xaudiograph.cpp
 target_compile_definitions(TestingProgram PRIVATE XENPYTHONBINDINGS=0 NOJUCE=1 _USE_MATH_DEFINES=1 __WINDOWS_WASAPI__)
-target_link_libraries(TestingProgram PRIVATE C:/develop/AudioPluginHost_mk2/Source/Experimental/llvmstuff/test.o)
+target_link_libraries(TestingProgram PRIVATE airwin-registry)
 
 # mini host that can be controlled with OSC messages etc
 add_executable(ClapMiniHost 
