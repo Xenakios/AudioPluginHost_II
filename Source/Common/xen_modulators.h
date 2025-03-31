@@ -5,6 +5,7 @@
 #include "xap_utils.h"
 #include "clap_eventsequence.h"
 #include "xap_breakpoint_envelope.h"
+#include <stdexcept>
 
 template <size_t BLOCK_SIZE> class SimpleLFO
 {
@@ -403,16 +404,55 @@ class AltMultiModulator
     }
     void set_modulation_amount(int source, int destination, double amt)
     {
-        mod_matrix[source][destination] = amt;
+        if (source >= 0 && source < numModulationSources && destination >= 0 &&
+            destination < numModulationDestinations)
+        {
+            mod_matrix[source][destination] = amt;
+        }
+        else
+            throw std::runtime_error(
+                "Modulation source must be in range 0..3 and destination must be between 0..11");
     }
-    void set_lfo_rate(int lfo_index, double rate) { lfo_rates[lfo_index] = rate; }
-    void set_lfo_shape(int lfo_index, int sh) { lfo_shapes[lfo_index] = sh; }
-    void set_lfo_deform(int lfo_index, double d) { lfo_deforms[lfo_index] = d; }
-    void set_lfo_shift(int lfo_index, double s) { lfo_shifts[lfo_index] = s; }
-    void set_lfo_randseed(int lfo_index, int seed) { lfo_randseeds[lfo_index] = seed; }
+    void check_lfo_index(int index)
+    {
+        if (index < 0 || index >= numLfos)
+            throw std::runtime_error(
+                std::format("LFO index {} out of allowed range 0..{}", index, numLfos - 1));
+    }
+    void set_lfo_rate(int lfo_index, double rate)
+    {
+        check_lfo_index(lfo_index);
+        lfo_rates[lfo_index] = rate;
+    }
+    void set_lfo_shape(int lfo_index, int sh)
+    {
+        check_lfo_index(lfo_index);
+        lfo_shapes[lfo_index] = sh;
+    }
+    void set_lfo_deform(int lfo_index, double d)
+    {
+        check_lfo_index(lfo_index);
+        lfo_deforms[lfo_index] = d;
+    }
+    void set_lfo_shift(int lfo_index, double s)
+    {
+        check_lfo_index(lfo_index);
+        lfo_shifts[lfo_index] = s;
+    }
+    void set_lfo_randseed(int lfo_index, int seed)
+    {
+        check_lfo_index(lfo_index);
+        lfo_randseeds[lfo_index] = seed;
+    }
     std::vector<std::pair<double, double>> get_as_vector(int from_output, double duration,
                                                          double shift, double scale, int skip = 1)
     {
+        if (from_output < 0 || from_output >= numOutputs)
+            throw std::runtime_error("Output must be in range 0..3");
+        if (duration < 0.05 || duration > 3600.0)
+            throw std::runtime_error("Duration must be in range 0.05-3600.0");
+        if (skip < 1)
+            throw std::runtime_error("Skip must be at least 1");
         for (int i = 0; i < numLfos; ++i)
         {
             m_rngs[i].reseed(lfo_randseeds[i]);
