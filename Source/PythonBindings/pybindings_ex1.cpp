@@ -292,7 +292,10 @@ void init_py1(py::module_ &m)
         .def("set_shape", &AltMultiModulator::set_lfo_shape)
         .def("set_rate", &AltMultiModulator::set_lfo_rate)
         .def("set_deform", &AltMultiModulator::set_lfo_deform)
-        .def("to_list", &AltMultiModulator::get_as_vector);
+        .def("set_shift", &AltMultiModulator::set_lfo_shift)
+        .def("set_rseed", &AltMultiModulator::set_lfo_randseed)
+        .def("to_list", &AltMultiModulator::get_as_vector, "which_output"_a, "duration"_a,
+             "shift"_a = 0.0, "scale"_a = 1.0, "skip"_a = 2);
 
     py::class_<ClapEventSequence>(m, "ClapSequence")
         .def(py::init<>())

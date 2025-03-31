@@ -331,12 +331,14 @@ class AltMultiModulator
     std::array<double, numLfos> lfo_deforms;
     std::array<double, numLfos> lfo_shifts;
     std::array<double, numLfos> lfo_unipolars;
+    std::array<uint32_t, numLfos> lfo_randseeds;
     AltMultiModulator(double sr) : samplerate(sr)
     {
         initTables();
         for (size_t i = 0; i < numLfos; ++i)
         {
-            m_rngs[i].reseed(10 + 107 * i);
+            lfo_randseeds[i] = 10 + 107 * i;
+            m_rngs[i].reseed(lfo_randseeds[i]);
             m_lfos[i] = std::make_unique<lfo_t>(this, m_rngs[i]);
             lfo_amounts[i] = 1.0;
             lfo_amt_mods[i] = 0.0;
@@ -406,9 +408,15 @@ class AltMultiModulator
     void set_lfo_rate(int lfo_index, double rate) { lfo_rates[lfo_index] = rate; }
     void set_lfo_shape(int lfo_index, int sh) { lfo_shapes[lfo_index] = sh; }
     void set_lfo_deform(int lfo_index, double d) { lfo_deforms[lfo_index] = d; }
+    void set_lfo_shift(int lfo_index, double s) { lfo_shifts[lfo_index] = s; }
+    void set_lfo_randseed(int lfo_index, int seed) { lfo_randseeds[lfo_index] = seed; }
     std::vector<std::pair<double, double>> get_as_vector(int from_output, double duration,
                                                          double shift, double scale, int skip = 1)
     {
+        for (int i = 0; i < numLfos; ++i)
+        {
+            m_rngs[i].reseed(lfo_randseeds[i]);
+        }
         std::vector<std::pair<double, double>> result;
         result.reserve(1024);
         int lensamples = duration * samplerate;
