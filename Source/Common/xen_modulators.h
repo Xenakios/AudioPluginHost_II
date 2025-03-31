@@ -336,6 +336,7 @@ class AltMultiModulator
         initTables();
         for (size_t i = 0; i < numLfos; ++i)
         {
+            m_rngs[i].reseed(10 + 107 * i);
             m_lfos[i] = std::make_unique<lfo_t>(this, m_rngs[i]);
             lfo_amounts[i] = 1.0;
             lfo_amt_mods[i] = 0.0;
@@ -345,6 +346,7 @@ class AltMultiModulator
             lfo_deforms[i] = 0.0;
             lfo_shifts[i] = 0.0;
             lfo_unipolars[i] = 0.0;
+
             m_lfos[i]->attack(lfo_shapes[i]);
         }
         for (int i = 0; i < numModulationSources; ++i)
@@ -365,7 +367,8 @@ class AltMultiModulator
         for (size_t i = 0; i < numLfos; ++i)
         {
             m_lfos[i]->applyPhaseOffset(lfo_shifts[i]);
-            m_lfos[i]->process_block(lfo_rates[i], lfo_deforms[i], lfo_shapes[i]);
+            m_lfos[i]->process_block(lfo_rates[i] + lfo_rate_mods[i], lfo_deforms[i],
+                                     lfo_shapes[i]);
             if (lfo_unipolars[i] >= 0.5)
                 m_lfos[i]->outputBlock[0] = 0.5f + 0.5f * m_lfos[i]->outputBlock[0];
         }
@@ -393,8 +396,38 @@ class AltMultiModulator
         for (size_t i = 0; i < numLfos; ++i)
         {
             lfo_amt_mods[i] = lfo_amounts[i] * modmixes[MD_LFO0Amount + i];
-            // m_lfoParams[i].rateMod = 2.0 * modmixes[MD_LFO0Rate + i];
+            lfo_rate_mods[i] = 2.0 * modmixes[MD_LFO0Rate + i];
         }
+    }
+    void set_modulation_amount(int source, int destination, double amt)
+    {
+        mod_matrix[source][destination] = amt;
+    }
+    void set_lfo_rate(int lfo_index, double rate) { lfo_rates[lfo_index] = rate; }
+    void set_lfo_shape(int lfo_index, int sh) { lfo_shapes[lfo_index] = sh; }
+    void set_lfo_deform(int lfo_index, double d) { lfo_deforms[lfo_index] = d; }
+    std::vector<std::pair<double, double>> get_as_vector(int from_output, double duration,
+                                                         double shift, double scale, int skip = 1)
+    {
+        std::vector<std::pair<double, double>> result;
+        result.reserve(1024);
+        int lensamples = duration * samplerate;
+        int outcounter = 0;
+        int blockcounter = 0;
+        while (outcounter < lensamples)
+        {
+            process_block();
+            if (blockcounter == 0)
+            {
+                double v = shift + output_values[from_output] * scale;
+                result.emplace_back(outcounter / samplerate, v);
+            }
+            ++blockcounter;
+            if (blockcounter == skip)
+                blockcounter = 0;
+            outcounter += BLOCKSIZE;
+        }
+        return result;
     }
     double samplerate = 0.0;
     void initTables()

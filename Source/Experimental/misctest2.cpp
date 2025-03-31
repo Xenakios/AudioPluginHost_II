@@ -165,12 +165,14 @@ void test_alt_multilfo()
     unsigned long outcounter = 0;
     auto blocksize = AltMultiModulator::BLOCKSIZE;
     modulator.mod_matrix[AltMultiModulator::MS_LFO0][AltMultiModulator::MD_Output0] = 1.00;
-    modulator.mod_matrix[AltMultiModulator::MS_LFO1][AltMultiModulator::MD_Output1] = 1.00;
-    modulator.mod_matrix[AltMultiModulator::MS_LFO1][AltMultiModulator::MD_LFO0Amount] = -1.0;
-    modulator.lfo_rates[AltMultiModulator::MS_LFO0] = 4.0;
+    modulator.mod_matrix[AltMultiModulator::MS_LFO2][AltMultiModulator::MD_Output1] = 1.00;
+    modulator.mod_matrix[AltMultiModulator::MS_LFO1][AltMultiModulator::MD_LFO0Rate] = 1.0;
+    modulator.lfo_rates[AltMultiModulator::MS_LFO0] = 2.0;
     modulator.lfo_rates[AltMultiModulator::MS_LFO1] = 0.4;
+    modulator.lfo_rates[AltMultiModulator::MS_LFO2] = 3.5;
     modulator.lfo_shapes[AltMultiModulator::MS_LFO1] = AltMultiModulator::lfo_t::Shape::SINE;
     modulator.lfo_unipolars[AltMultiModulator::MS_LFO1] = 1.0;
+    modulator.lfo_shapes[AltMultiModulator::MS_LFO2] = AltMultiModulator::lfo_t::Shape::SH_NOISE;
     while (outcounter < outnumsamples)
     {
         modulator.process_block();

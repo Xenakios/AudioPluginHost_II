@@ -16,6 +16,7 @@
 #include <unordered_map>
 #include "../Common/clap_eventsequence.h"
 #include "signalsmith-stretch.h"
+#include "../Common/xen_modulators.h"
 
 namespace py = pybind11;
 
@@ -284,6 +285,14 @@ void init_py1(py::module_ &m)
         .def("set_looping", &XAudioFileReader::set_looping)
         .def("set_loop_points", &XAudioFileReader::set_loop_points)
         .def("read", &XAudioFileReader::read);
+
+    py::class_<AltMultiModulator>(m, "MultiLFO")
+        .def(py::init<double>())
+        .def("set_mod_amt", &AltMultiModulator::set_modulation_amount)
+        .def("set_shape", &AltMultiModulator::set_lfo_shape)
+        .def("set_rate", &AltMultiModulator::set_lfo_rate)
+        .def("set_deform", &AltMultiModulator::set_lfo_deform)
+        .def("to_list", &AltMultiModulator::get_as_vector);
 
     py::class_<ClapEventSequence>(m, "ClapSequence")
         .def(py::init<>())
