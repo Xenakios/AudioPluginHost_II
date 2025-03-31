@@ -1930,10 +1930,12 @@ inline void test_webview_score()
 
 void test_weierstrass();
 void test_airwin_registry();
+void test_alt_multilfo();
 
 int main(int argc, char **argv)
 {
-    test_airwin_registry();
+    test_alt_multilfo();
+    // test_airwin_registry();
     // test_weierstrass();
     // test_webview_score();
     // test_eventchase();

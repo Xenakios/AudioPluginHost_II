@@ -1,6 +1,8 @@
 #include "../Common/xap_utils.h"
 #include "../Common/xap_breakpoint_envelope.h"
 #include "../Common/clap_eventsequence.h"
+#include "../Common/xen_modulators.h"
+#include <istream>
 #include <print>
 #include <array>
 #include "AirwinRegistry.h"
@@ -149,4 +151,37 @@ void test_airwin_registry()
             infilepos += blockSize;
         }
     }
+}
+
+void test_alt_multilfo()
+{
+    double sr = 44100;
+    AltMultiModulator modulator{sr};
+    auto writer = xenakios::createWavWriter(
+        R"(C:\develop\AudioPluginHost_mk2\python\cdp8\multilfo.wav)", 2, sr);
+    unsigned long outnumsamples = sr * 4.0;
+    choc::buffer::ChannelArrayBuffer<float> outbuf{2, outnumsamples + 64};
+    outbuf.clear();
+    unsigned long outcounter = 0;
+    auto blocksize = AltMultiModulator::BLOCKSIZE;
+    modulator.mod_matrix[AltMultiModulator::MS_LFO0][AltMultiModulator::MD_Output0] = 1.00;
+    modulator.mod_matrix[AltMultiModulator::MS_LFO1][AltMultiModulator::MD_Output1] = 1.00;
+    modulator.mod_matrix[AltMultiModulator::MS_LFO1][AltMultiModulator::MD_LFO0Amount] = -1.0;
+    modulator.lfo_rates[AltMultiModulator::MS_LFO0] = 4.0;
+    modulator.lfo_rates[AltMultiModulator::MS_LFO1] = 0.4;
+    modulator.lfo_shapes[AltMultiModulator::MS_LFO1] = AltMultiModulator::lfo_t::Shape::SINE;
+    modulator.lfo_unipolars[AltMultiModulator::MS_LFO1] = 1.0;
+    while (outcounter < outnumsamples)
+    {
+        modulator.process_block();
+        for (int i = 0; i < blocksize; ++i)
+        {
+            for (int j = 0; j < 2; ++j)
+            {
+                outbuf.getSample(j, outcounter + i) = modulator.output_values[j];
+            }
+        }
+        outcounter += blocksize;
+    }
+    writer->appendFrames(outbuf.getView());
 }

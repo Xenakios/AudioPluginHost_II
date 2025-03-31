@@ -41,7 +41,7 @@ template <size_t BLOCK_SIZE> class SimpleLFO
 };
 
 inline xenakios::Envelope generateEnvelopeFromLFO(double rate, double deform, int shape,
-                                                      double envlen, double envgranul)
+                                                  double envlen, double envgranul)
 {
     double sr = 44100.0;
     constexpr size_t blocklen = 64;
@@ -286,4 +286,139 @@ class MultiModulator
         double mod_depth = 0.0;
     };
     std::array<OutputProps, 8> outputprops;
+};
+
+class AltMultiModulator
+{
+  public:
+    enum ModSource
+    {
+        MS_LFO0,
+        MS_LFO1,
+        MS_LFO2,
+        MS_LFO3
+    };
+    enum ModDest
+    {
+        MD_Output0,
+        MD_Output1,
+        MD_Output2,
+        MD_Output3,
+        MD_LFO0Rate,
+        MD_LFO1Rate,
+        MD_LFO2Rate,
+        MD_LFO3Rate,
+        MD_LFO0Amount,
+        MD_LFO1Amount,
+        MD_LFO2Amount,
+        MD_LFO3Amount
+    };
+
+    static constexpr size_t BLOCKSIZE = 64;
+    static constexpr size_t BLOCK_SIZE_OS = BLOCKSIZE * 2;
+    using lfo_t = sst::basic_blocks::modulators::SimpleLFO<AltMultiModulator, BLOCKSIZE>;
+    static constexpr size_t numLfos = 4;
+    static constexpr size_t numModulationSources = 4;
+    static constexpr size_t numModulationDestinations = 12;
+    static constexpr size_t numOutputs = 4;
+    alignas(32) float mod_matrix[numModulationSources][numModulationDestinations];
+    alignas(32) std::array<double, numOutputs> output_values;
+    std::array<int, numLfos> lfo_shapes;
+    std::array<double, numLfos> lfo_amounts;
+    std::array<double, numLfos> lfo_amt_mods;
+    std::array<double, numLfos> lfo_rates;
+    std::array<double, numLfos> lfo_rate_mods;
+    std::array<double, numLfos> lfo_deforms;
+    std::array<double, numLfos> lfo_shifts;
+    std::array<double, numLfos> lfo_unipolars;
+    AltMultiModulator(double sr) : samplerate(sr)
+    {
+        initTables();
+        for (size_t i = 0; i < numLfos; ++i)
+        {
+            m_lfos[i] = std::make_unique<lfo_t>(this, m_rngs[i]);
+            lfo_amounts[i] = 1.0;
+            lfo_amt_mods[i] = 0.0;
+            lfo_shapes[i] = lfo_t::Shape::SINE;
+            lfo_rates[i] = 0.0;
+            lfo_rate_mods[i] = 0.0;
+            lfo_deforms[i] = 0.0;
+            lfo_shifts[i] = 0.0;
+            lfo_unipolars[i] = 0.0;
+            m_lfos[i]->attack(lfo_shapes[i]);
+        }
+        for (int i = 0; i < numModulationSources; ++i)
+        {
+            for (int j = 0; j < numModulationDestinations; ++j)
+            {
+                mod_matrix[i][j] = 0.0f;
+            }
+        }
+        for (int i = 0; i < numOutputs; ++i)
+        {
+            output_values[i] = 0.0;
+        }
+    }
+    std::array<double, numModulationDestinations> modmixes;
+    void process_block()
+    {
+        for (size_t i = 0; i < numLfos; ++i)
+        {
+            m_lfos[i]->applyPhaseOffset(lfo_shifts[i]);
+            m_lfos[i]->process_block(lfo_rates[i], lfo_deforms[i], lfo_shapes[i]);
+            if (lfo_unipolars[i] >= 0.5)
+                m_lfos[i]->outputBlock[0] = 0.5f + 0.5f * m_lfos[i]->outputBlock[0];
+        }
+
+        for (size_t i = 0; i < numModulationDestinations; ++i)
+        {
+            modmixes[i] = 0.0f;
+        }
+        modmixes[MD_LFO0Amount] = 1.0f;
+        modmixes[MD_LFO1Amount] = 1.0f;
+        modmixes[MD_LFO2Amount] = 1.0f;
+        modmixes[MD_LFO3Amount] = 1.0f;
+        for (size_t i = 0; i < numModulationDestinations; ++i)
+        {
+            for (size_t j = 0; j < numModulationSources; ++j)
+            {
+                float v = mod_matrix[j][i] * m_lfos[j]->outputBlock[0] * lfo_amt_mods[j];
+                modmixes[i] += v;
+            }
+        }
+        for (int i = 0; i < numOutputs; ++i)
+        {
+            output_values[i] = modmixes[MD_Output0 + i];
+        }
+        for (size_t i = 0; i < numLfos; ++i)
+        {
+            lfo_amt_mods[i] = lfo_amounts[i] * modmixes[MD_LFO0Amount + i];
+            // m_lfoParams[i].rateMod = 2.0 * modmixes[MD_LFO0Rate + i];
+        }
+    }
+    double samplerate = 0.0;
+    void initTables()
+    {
+        double dsamplerate_os = samplerate * 2;
+        for (int i = 0; i < 512; ++i)
+        {
+            double k =
+                dsamplerate_os * pow(2.0, (((double)i - 256.0) / 16.0)) / (double)BLOCK_SIZE_OS;
+            table_envrate_linear[i] = (float)(1.f / k);
+        }
+    }
+    float envelope_rate_linear_nowrap(float x)
+    {
+        x *= 16.f;
+        x += 256.f;
+        int e = std::clamp<int>((int)x, 0, 0x1ff - 1);
+
+        float a = x - (float)e;
+
+        return (1 - a) * table_envrate_linear[e & 0x1ff] +
+               a * table_envrate_linear[(e + 1) & 0x1ff];
+    }
+    alignas(32) std::array<std::unique_ptr<lfo_t>, numLfos> m_lfos;
+    alignas(32) float table_envrate_linear[512];
+    alignas(32) std::array<sst::basic_blocks::dsp::RNG, numLfos> m_rngs;
 };
