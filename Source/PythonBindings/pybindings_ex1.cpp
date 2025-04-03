@@ -290,21 +290,26 @@ class AW_Wrapper
   public:
     std::unique_ptr<AirwinConsolidatedBase> plug;
     int nparams = 0;
+    int reg_index = -1;
     AW_Wrapper(std::string plugname)
     {
+        int i = 0;
         for (auto &e : AirwinRegistry::registry)
         {
             if (choc::text::toUpperCase(plugname) == choc::text::toUpperCase(e.name))
             {
                 plug = e.generator();
                 nparams = e.nParams;
+                reg_index = i;
                 break;
             }
+            ++i;
         }
         if (!plug)
             throw std::runtime_error(
                 std::format("could not create AirWindow from name {}", plugname));
     }
+    std::string get_doc_text() const { return AirwinRegistry::documentationStringFor(reg_index); }
     int get_num_params() const { return nparams; }
     std::string get_parameter_name(int index) const
     {
@@ -473,6 +478,7 @@ void init_py1(py::module_ &m)
         .def("num_params", &AW_Wrapper::get_num_params)
         .def("render", &render_aw)
         .def("parameter_name", &AW_Wrapper::get_parameter_name)
+        .def("doc_text", &AW_Wrapper::get_doc_text)
         .def("name", [](AW_Wrapper &wrapper) {
             char buf[2048];
             wrapper.plug->getEffectName(buf);
