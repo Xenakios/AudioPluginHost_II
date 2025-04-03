@@ -1,15 +1,17 @@
 #include <algorithm>
 #include <pybind11/pybind11.h>
 #include <pybind11/buffer_info.h>
+#include <pybind11/pytypes.h>
 #include <pybind11/stl.h>
 #include <pybind11/numpy.h>
+#include "airwin_consolidated_base.h"
 #include "audio/choc_AudioFileFormat.h"
 #include "audio/choc_AudioFileFormat_WAV.h"
 // #include "audio/choc_AudioFileFormat_FLAC.h"
 // #include "audio/choc_AudioFileFormat_Ogg.h"
 // #include "audio/choc_AudioFileFormat_MP3.h"
 #include "audio/choc_SampleBuffers.h"
-
+#include "AirwinRegistry.h"
 #include <iostream>
 #include <stdexcept>
 #include <type_traits>
@@ -263,6 +265,73 @@ inline void addAudioBufferEvent(ClapEventSequence &seq, double time, int32_t tar
     seq.addAudioBufferEvent(time, target, ptr1, numChans, numframes, samplerate);
 }
 
+inline py::list get_aw_info()
+{
+    py::list result;
+    size_t i = 0;
+    for (auto &e : AirwinRegistry::registry)
+    {
+        py::dict d;
+        d[py::str("index")] = py::int_(i);
+        d[py::str("name")] = py::str(e.name);
+        d[py::str("category")] = py::str(e.category);
+        d[py::str("nparams")] = py::int_(e.nParams);
+        result.append(d);
+        ++i;
+    }
+    return result;
+}
+
+inline void render_aw(AirwinConsolidatedBase *plug, ClapEventSequence &seq, std::string infile,
+                      std::string outfile, double tail_len)
+{
+    choc::audio::WAVAudioFileFormat<false> informat;
+    auto reader = informat.createReader(infile);
+    if (!reader)
+        throw std::runtime_error("could not create audio file reader");
+    auto &inprops = reader->getProperties();
+    ClapEventSequence::IteratorSampleTime eviter(seq, inprops.sampleRate);
+    unsigned int blockSize = 64;
+    choc::buffer::ChannelArrayBuffer<float> inbuf{inprops.numChannels, blockSize};
+    choc::buffer::ChannelArrayBuffer<float> outbuf{2, blockSize};
+    plug->setNumInputs(2);
+    plug->setNumOutputs(2);
+    plug->setSampleRate(inprops.sampleRate);
+    auto writer = xenakios::createWavWriter(outfile, 2, inprops.sampleRate);
+    if (!writer)
+        throw std::runtime_error("could not create audio file writer");
+    int infilepos = 0;
+    int tailLen = inprops.sampleRate * tail_len;
+    while (infilepos < inprops.numFrames + tailLen)
+    {
+        reader->readFrames(infilepos, inbuf.getView());
+
+        if (inprops.numChannels == 1)
+        {
+            choc::buffer::copy(outbuf.getChannel(0), inbuf.getChannel(0));
+            choc::buffer::copy(outbuf.getChannel(1), inbuf.getChannel(0));
+        }
+        else
+        {
+            choc::buffer::copy(outbuf.getChannel(0), inbuf.getChannel(0));
+            choc::buffer::copy(outbuf.getChannel(1), inbuf.getChannel(1));
+        }
+        auto evts = eviter.readNextEvents(blockSize);
+        for (const auto &e : evts)
+        {
+            if (e.event.header.type == CLAP_EVENT_PARAM_VALUE)
+            {
+                auto pev = (clap_event_param_value *)&e.event.header;
+                plug->setParameter(pev->param_id, pev->value);
+            }
+        }
+        plug->processReplacing((float **)outbuf.getView().data.channels,
+                               (float **)outbuf.getView().data.channels, blockSize);
+        writer->appendFrames(outbuf.getView());
+        infilepos += blockSize;
+    }
+}
+
 using namespace pybind11::literals;
 
 void init_py1(py::module_ &m)
@@ -313,11 +382,27 @@ void init_py1(py::module_ &m)
              "ch"_a = 0, "key"_a, "nid"_a = -1, "velo"_a = 1.0, "retune"_a = 0.0)
         .def("addNoteFloatPitch", &ClapEventSequence::addNoteF, "time"_a = 0.0, "dur"_a = 0.05,
              "port"_a = 0, "ch"_a = 0, "pitch"_a, "nid"_a = -1, "velo"_a = 1.0)
-        .def("addParameterEvent", &ClapEventSequence::addParameterEvent, "ismod"_a = false,
+        .def("add_parameter_event", &ClapEventSequence::addParameterEvent, "ismod"_a = false,
              "time"_a = 0.0, "port"_a = -1, "ch"_a = -1, "key"_a = -1, "nid"_a = -1, "parid"_a,
              "val"_a)
         .def("addProgramChange", &ClapEventSequence::addProgramChange, "time"_a = 0.0,
              "port"_a = -1, "ch"_a = -1, "program"_a)
         .def("addTransportEvent", &ClapEventSequence::addTransportEvent)
         .def("addNoteExpression", &ClapEventSequence::addNoteExpression);
+    py::class_<AirwinConsolidatedBase>(m, "AirWindows")
+        .def(py::init([](int arg) { return AirwinRegistry::registry[arg].generator(); }))
+        .def("plugins_info", &get_aw_info)
+        .def("num_params", [](int index) { return AirwinRegistry::registry[index].nParams; })
+        .def("render", &render_aw)
+        .def("parameter_name",
+             [](AirwinConsolidatedBase *b, int index) {
+                 char buf[2048];
+                 b->getParameterName(index, buf);
+                 return std::string(buf);
+             })
+        .def("name", [](AirwinConsolidatedBase *b) {
+            char buf[2048];
+            b->getEffectName(buf);
+            return std::string(buf);
+        });
 }

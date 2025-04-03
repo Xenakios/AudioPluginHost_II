@@ -104,6 +104,7 @@ pybind11_add_module(xenakios
 )
 # Source/Experimental/xaudiograph.cpp
 # target_link_libraries(xenakios PRIVATE juce::juce_core juce::juce_audio_utils)
+target_link_libraries(xenakios PRIVATE airwin-registry)
 
 # PYBIND11_FINDPYTHON=ON
 
