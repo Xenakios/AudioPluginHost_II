@@ -477,6 +477,35 @@ class AltMultiModulator
         }
         return result;
     }
+    void add_to_sequence(ClapEventSequence &destination, int from_output, clap_id dest_par_id,
+                         double duration, double shift, double scale, int skip = 1)
+    {
+        if (duration < 0.05 || duration > 3600.0)
+            throw std::runtime_error("Duration must be in range 0.05-3600.0");
+        if (skip < 1)
+            throw std::runtime_error("Skip must be at least 1");
+        for (int i = 0; i < numLfos; ++i)
+        {
+            m_rngs[i].reseed(lfo_randseeds[i]);
+        }
+        int lensamples = duration * samplerate;
+        int outcounter = 0;
+        int blockcounter = 0;
+        while (outcounter < lensamples)
+        {
+            process_block();
+            if (blockcounter == 0)
+            {
+                double v = shift + output_values[from_output] * scale;
+                destination.addParameterEvent(false, outcounter / samplerate, -1, -1, -1, -1,
+                                              dest_par_id, v);
+            }
+            ++blockcounter;
+            if (blockcounter == skip)
+                blockcounter = 0;
+            outcounter += BLOCKSIZE;
+        }
+    }
     double samplerate = 0.0;
     void initTables()
     {

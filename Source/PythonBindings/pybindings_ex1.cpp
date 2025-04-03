@@ -21,6 +21,7 @@
 #include "../Common/xen_modulators.h"
 #include "sst/basic-blocks/dsp/Lag.h"
 #include "text/choc_StringUtilities.h"
+#include "sst/basic-blocks/dsp/FollowSlewAndSmooth.h"
 
 namespace py = pybind11;
 
@@ -284,7 +285,42 @@ inline py::list get_aw_info()
     return result;
 }
 
-inline void render_aw(AirwinConsolidatedBase *plug, ClapEventSequence &seq, std::string infile,
+class AW_Wrapper
+{
+  public:
+    std::unique_ptr<AirwinConsolidatedBase> plug;
+    int nparams = 0;
+    AW_Wrapper(std::string plugname)
+    {
+        for (auto &e : AirwinRegistry::registry)
+        {
+            if (choc::text::toUpperCase(plugname) == choc::text::toUpperCase(e.name))
+            {
+                plug = e.generator();
+                nparams = e.nParams;
+                break;
+            }
+        }
+        if (!plug)
+            throw std::runtime_error(
+                std::format("could not create AirWindow from name {}", plugname));
+    }
+    int get_num_params() const { return nparams; }
+    std::string get_parameter_name(int index) const
+    {
+        if (index >= 0 && index < nparams)
+        {
+            char txt[128];
+            plug->getParameterName(index, txt);
+            return std::string(txt);
+        }
+        throw std::runtime_error(
+            std::format("parameter index {} out of allowed range 0..{}", index, nparams - 1));
+        return "";
+    }
+};
+
+inline void render_aw(AW_Wrapper &wrapper, ClapEventSequence &seq, std::string infile,
                       std::string outfile, double tail_len)
 {
     seq.sortEvents();
@@ -297,19 +333,20 @@ inline void render_aw(AirwinConsolidatedBase *plug, ClapEventSequence &seq, std:
     unsigned int blockSize = 64;
     choc::buffer::ChannelArrayBuffer<float> inbuf{inprops.numChannels, blockSize};
     choc::buffer::ChannelArrayBuffer<float> outbuf{2, blockSize};
-    plug->setNumInputs(2);
-    plug->setNumOutputs(2);
-    plug->setSampleRate(inprops.sampleRate);
+    wrapper.plug->setNumInputs(2);
+    wrapper.plug->setNumOutputs(2);
+    wrapper.plug->setSampleRate(inprops.sampleRate);
     auto writer = xenakios::createWavWriter(outfile, 2, inprops.sampleRate);
     if (!writer)
         throw std::runtime_error("could not create audio file writer");
     int infilepos = 0;
     int tailLen = inprops.sampleRate * tail_len;
     double in_gain = 1.0;
-    sst::basic_blocks::dsp::LinearLag<float, false> in_gain_lag;
-    in_gain_lag.setRateInMilliseconds(10.0, inprops.sampleRate, 1.0 / blockSize);
-
+    sst::basic_blocks::dsp::SlewLimiter inGainSmoother;
+    inGainSmoother.setParams(10.0, 1.0, inprops.sampleRate);
     double out_gain = 1.0;
+    sst::basic_blocks::dsp::SlewLimiter outGainSmoother;
+    outGainSmoother.setParams(10.0, 1.0, inprops.sampleRate);
     while (infilepos < inprops.numFrames + tailLen)
     {
         reader->readFrames(infilepos, inbuf.getView());
@@ -330,31 +367,42 @@ inline void render_aw(AirwinConsolidatedBase *plug, ClapEventSequence &seq, std:
             if (e.event.header.type == CLAP_EVENT_PARAM_VALUE)
             {
                 auto pev = (clap_event_param_value *)&e.event.header;
-                if (pev->param_id >= 0 && pev->param_id < 100)
+                if (pev->param_id >= 0 && pev->param_id < wrapper.nparams)
                 {
-                    plug->setParameter(pev->param_id, pev->value);
+                    wrapper.plug->setParameter(pev->param_id, pev->value);
                 }
                 else if (pev->param_id == 100)
                 {
                     in_gain = xenakios::decibelsToGain(pev->value);
-                    in_gain_lag.setTarget(in_gain);
                 }
                 else if (pev->param_id == 101)
                 {
                     out_gain = xenakios::decibelsToGain(pev->value);
                 }
+                else
+                {
+                    throw std::runtime_error(
+                        std::format("parameter id {} is invalid", pev->param_id));
+                }
             }
         }
         for (int i = 0; i < blockSize; ++i)
         {
-            in_gain_lag.process();
-            outbuf.getSample(0, i) *= in_gain_lag.getValue();
-            outbuf.getSample(1, i) *= in_gain_lag.getValue();
+            double gain = inGainSmoother.step(in_gain);
+            outbuf.getSample(0, i) *= gain;
+            outbuf.getSample(1, i) *= gain;
         }
-        choc::buffer::applyGain(outbuf, in_gain);
-        plug->processReplacing((float **)outbuf.getView().data.channels,
-                               (float **)outbuf.getView().data.channels, blockSize);
-        choc::buffer::applyGain(outbuf, out_gain);
+
+        wrapper.plug->processReplacing((float **)outbuf.getView().data.channels,
+                                       (float **)outbuf.getView().data.channels, blockSize);
+
+        for (int i = 0; i < blockSize; ++i)
+        {
+            double gain = outGainSmoother.step(out_gain);
+            outbuf.getSample(0, i) *= gain;
+            outbuf.getSample(1, i) *= gain;
+        }
+
         writer->appendFrames(outbuf.getView());
         infilepos += blockSize;
     }
@@ -383,17 +431,6 @@ void init_py1(py::module_ &m)
         .def("set_loop_points", &XAudioFileReader::set_loop_points)
         .def("read", &XAudioFileReader::read);
 
-    py::class_<AltMultiModulator>(m, "MultiLFO")
-        .def(py::init<double>())
-        .def("set_mod_amt", &AltMultiModulator::set_modulation_amount)
-        .def("set_shape", &AltMultiModulator::set_lfo_shape)
-        .def("set_rate", &AltMultiModulator::set_lfo_rate)
-        .def("set_deform", &AltMultiModulator::set_lfo_deform)
-        .def("set_shift", &AltMultiModulator::set_lfo_shift)
-        .def("set_rseed", &AltMultiModulator::set_lfo_randseed)
-        .def("to_list", &AltMultiModulator::get_as_vector, "which_output"_a, "duration"_a,
-             "shift"_a = 0.0, "scale"_a = 1.0, "skip"_a = 2);
-
     py::class_<ClapEventSequence>(m, "ClapSequence")
         .def(py::init<>())
         .def("getNumEvents", &ClapEventSequence::getNumEvents)
@@ -417,29 +454,28 @@ void init_py1(py::module_ &m)
              "port"_a = -1, "ch"_a = -1, "program"_a)
         .def("addTransportEvent", &ClapEventSequence::addTransportEvent)
         .def("addNoteExpression", &ClapEventSequence::addNoteExpression);
-    py::class_<AirwinConsolidatedBase>(m, "AirWindows")
-        .def(py::init([](std::string arg) {
-            for (const auto &e : AirwinRegistry::registry)
-            {
-                if (choc::text::toUpperCase(e.name) == choc::text::toUpperCase(arg))
-                {
-                    return e.generator();
-                }
-            }
-            return std::unique_ptr<AirwinConsolidatedBase>();
-        }))
+
+    py::class_<AltMultiModulator>(m, "MultiLFO")
+        .def(py::init<double>())
+        .def("set_mod_amt", &AltMultiModulator::set_modulation_amount)
+        .def("set_shape", &AltMultiModulator::set_lfo_shape)
+        .def("set_rate", &AltMultiModulator::set_lfo_rate)
+        .def("set_deform", &AltMultiModulator::set_lfo_deform)
+        .def("set_shift", &AltMultiModulator::set_lfo_shift)
+        .def("set_rseed", &AltMultiModulator::set_lfo_randseed)
+        .def("add_to_sequence", &AltMultiModulator::add_to_sequence)
+        .def("to_list", &AltMultiModulator::get_as_vector, "which_output"_a, "duration"_a,
+             "shift"_a = 0.0, "scale"_a = 1.0, "skip"_a = 2);
+
+    py::class_<AW_Wrapper>(m, "AirWindows")
+        .def(py::init<std::string>())
         .def("plugins_info", &get_aw_info)
-        .def("num_params", [](int index) { return AirwinRegistry::registry[index].nParams; })
+        .def("num_params", &AW_Wrapper::get_num_params)
         .def("render", &render_aw)
-        .def("parameter_name",
-             [](AirwinConsolidatedBase *b, int index) {
-                 char buf[2048];
-                 b->getParameterName(index, buf);
-                 return std::string(buf);
-             })
-        .def("name", [](AirwinConsolidatedBase *b) {
+        .def("parameter_name", &AW_Wrapper::get_parameter_name)
+        .def("name", [](AW_Wrapper &wrapper) {
             char buf[2048];
-            b->getEffectName(buf);
+            wrapper.plug->getEffectName(buf);
             return std::string(buf);
         });
 }
