@@ -19,6 +19,7 @@
 #include "../Common/clap_eventsequence.h"
 #include "signalsmith-stretch.h"
 #include "../Common/xen_modulators.h"
+#include "sst/basic-blocks/dsp/Lag.h"
 #include "text/choc_StringUtilities.h"
 
 namespace py = pybind11;
@@ -286,6 +287,7 @@ inline py::list get_aw_info()
 inline void render_aw(AirwinConsolidatedBase *plug, ClapEventSequence &seq, std::string infile,
                       std::string outfile, double tail_len)
 {
+    seq.sortEvents();
     choc::audio::WAVAudioFileFormat<false> informat;
     auto reader = informat.createReader(infile);
     if (!reader)
@@ -304,6 +306,9 @@ inline void render_aw(AirwinConsolidatedBase *plug, ClapEventSequence &seq, std:
     int infilepos = 0;
     int tailLen = inprops.sampleRate * tail_len;
     double in_gain = 1.0;
+    sst::basic_blocks::dsp::LinearLag<float, false> in_gain_lag;
+    in_gain_lag.setRateInMilliseconds(10.0, inprops.sampleRate, 1.0 / blockSize);
+
     double out_gain = 1.0;
     while (infilepos < inprops.numFrames + tailLen)
     {
@@ -325,19 +330,26 @@ inline void render_aw(AirwinConsolidatedBase *plug, ClapEventSequence &seq, std:
             if (e.event.header.type == CLAP_EVENT_PARAM_VALUE)
             {
                 auto pev = (clap_event_param_value *)&e.event.header;
-                if (pev->param_id>=0 && pev->param_id<100)
+                if (pev->param_id >= 0 && pev->param_id < 100)
                 {
                     plug->setParameter(pev->param_id, pev->value);
                 }
                 else if (pev->param_id == 100)
                 {
                     in_gain = xenakios::decibelsToGain(pev->value);
+                    in_gain_lag.setTarget(in_gain);
                 }
                 else if (pev->param_id == 101)
                 {
                     out_gain = xenakios::decibelsToGain(pev->value);
                 }
             }
+        }
+        for (int i = 0; i < blockSize; ++i)
+        {
+            in_gain_lag.process();
+            outbuf.getSample(0, i) *= in_gain_lag.getValue();
+            outbuf.getSample(1, i) *= in_gain_lag.getValue();
         }
         choc::buffer::applyGain(outbuf, in_gain);
         plug->processReplacing((float **)outbuf.getView().data.channels,
