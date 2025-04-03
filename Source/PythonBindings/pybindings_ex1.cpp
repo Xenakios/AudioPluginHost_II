@@ -19,6 +19,7 @@
 #include "../Common/clap_eventsequence.h"
 #include "signalsmith-stretch.h"
 #include "../Common/xen_modulators.h"
+#include "text/choc_StringUtilities.h"
 
 namespace py = pybind11;
 
@@ -302,6 +303,8 @@ inline void render_aw(AirwinConsolidatedBase *plug, ClapEventSequence &seq, std:
         throw std::runtime_error("could not create audio file writer");
     int infilepos = 0;
     int tailLen = inprops.sampleRate * tail_len;
+    double in_gain = 1.0;
+    double out_gain = 1.0;
     while (infilepos < inprops.numFrames + tailLen)
     {
         reader->readFrames(infilepos, inbuf.getView());
@@ -322,11 +325,24 @@ inline void render_aw(AirwinConsolidatedBase *plug, ClapEventSequence &seq, std:
             if (e.event.header.type == CLAP_EVENT_PARAM_VALUE)
             {
                 auto pev = (clap_event_param_value *)&e.event.header;
-                plug->setParameter(pev->param_id, pev->value);
+                if (pev->param_id>=0 && pev->param_id<100)
+                {
+                    plug->setParameter(pev->param_id, pev->value);
+                }
+                else if (pev->param_id == 100)
+                {
+                    in_gain = xenakios::decibelsToGain(pev->value);
+                }
+                else if (pev->param_id == 101)
+                {
+                    out_gain = xenakios::decibelsToGain(pev->value);
+                }
             }
         }
+        choc::buffer::applyGain(outbuf, in_gain);
         plug->processReplacing((float **)outbuf.getView().data.channels,
                                (float **)outbuf.getView().data.channels, blockSize);
+        choc::buffer::applyGain(outbuf, out_gain);
         writer->appendFrames(outbuf.getView());
         infilepos += blockSize;
     }
@@ -390,7 +406,16 @@ void init_py1(py::module_ &m)
         .def("addTransportEvent", &ClapEventSequence::addTransportEvent)
         .def("addNoteExpression", &ClapEventSequence::addNoteExpression);
     py::class_<AirwinConsolidatedBase>(m, "AirWindows")
-        .def(py::init([](int arg) { return AirwinRegistry::registry[arg].generator(); }))
+        .def(py::init([](std::string arg) {
+            for (const auto &e : AirwinRegistry::registry)
+            {
+                if (choc::text::toUpperCase(e.name) == choc::text::toUpperCase(arg))
+                {
+                    return e.generator();
+                }
+            }
+            return std::unique_ptr<AirwinConsolidatedBase>();
+        }))
         .def("plugins_info", &get_aw_info)
         .def("num_params", [](int index) { return AirwinRegistry::registry[index].nParams; })
         .def("render", &render_aw)
