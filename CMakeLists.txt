@@ -19,7 +19,7 @@ include_directories(
     libs/fmt/include
     libs/sst-jucegui/include
     libs/concurrentqueue
-    libs/pybind11/include
+    
     libs/sst-voicemanager/include
     libs/rtaudio
     libs/MTS-ESP/Master
@@ -105,6 +105,8 @@ pybind11_add_module(xenakios
 )
 # Source/Experimental/xaudiograph.cpp
 # target_link_libraries(xenakios PRIVATE juce::juce_core juce::juce_audio_utils)
+
+target_include_directories(xenakios PRIVATE libs/pybind11/include)
 target_link_libraries(xenakios PRIVATE airwin-registry)
 
 # PYBIND11_FINDPYTHON=ON
