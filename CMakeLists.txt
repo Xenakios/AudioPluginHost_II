@@ -33,6 +33,7 @@ include_directories(
     libs/thread-pool/include
     C:/develop/cmajlang/cmajor/include
     C:/develop/airwin2rack/src
+    
 )
 
 # for "reasons", this is still a console app even though a GUI app is built from it
@@ -145,6 +146,18 @@ add_executable(TestingProgram
 # Source/Experimental/xaudiograph.cpp
 target_compile_definitions(TestingProgram PRIVATE XENPYTHONBINDINGS=0 NOJUCE=1 _USE_MATH_DEFINES=1 __WINDOWS_WASAPI__)
 target_link_libraries(TestingProgram PRIVATE airwin-registry)
+
+add_executable(olctest
+    Source/Experimental/olctest.cpp
+)
+add_executable(enosccli
+    Source/Experimental/enosc_cli.cpp
+    
+)
+# Source/Experimental/xaudiograph.cpp
+# target_compile_definitions(TestingProgram PRIVATE XENPYTHONBINDINGS=0 NOJUCE=1 _USE_MATH_DEFINES=1 __WINDOWS_WASAPI__)
+# target_link_libraries(TestingProgram PRIVATE airwin-registry)
+
 
 # mini host that can be controlled with OSC messages etc
 add_executable(ClapMiniHost 

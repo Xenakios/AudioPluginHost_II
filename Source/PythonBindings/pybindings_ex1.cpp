@@ -325,6 +325,87 @@ class AW_Wrapper
     }
 };
 
+inline py::array_t<float> render_aw_to_buffer(AW_Wrapper &wrapper, double samplerate,
+                                              ClapEventSequence &seq,
+                                              const py::array_t<float> &input_audio,
+                                              double tail_len)
+{
+    int num_inchans = input_audio.shape(0);
+    int numinsamples = input_audio.shape(1);
+    py::buffer_info binfo(
+        nullptr,                                /* Pointer to buffer */
+        sizeof(float),                          /* Size of one scalar */
+        py::format_descriptor<float>::format(), /* Python struct-style format descriptor */
+        2,                                      /* Number of dimensions */
+        {2, numinsamples},                      /* Buffer dimensions */
+        {sizeof(float) * numinsamples,          /* Strides (in bytes) for each index */
+         sizeof(float)});
+    py::array_t<float> output_audio{binfo};
+    wrapper.plug->setNumInputs(2);
+    wrapper.plug->setNumOutputs(2);
+    wrapper.plug->setSampleRate(samplerate);
+    int inpos = 0;
+    int blocksize = 64;
+    float *inchanpointers[2];
+    float *outchanpointers[2];
+    if (num_inchans == 1)
+    {
+        inchanpointers[0] = (float *)input_audio.data(0);
+        inchanpointers[1] = (float *)input_audio.data(0);
+    }
+    if (num_inchans == 2)
+    {
+        inchanpointers[0] = (float *)input_audio.data(0);
+        inchanpointers[1] = (float *)input_audio.data(1);
+    }
+    outchanpointers[0] = (float *)output_audio.data(0);
+    outchanpointers[1] = (float *)output_audio.data(1);
+    std::vector<float> process_buffer(2 * blocksize);
+    float *process_buffer_pointers[2];
+    process_buffer_pointers[0] = &process_buffer[0];
+    process_buffer_pointers[1] = &process_buffer[blocksize];
+    ClapEventSequence::IteratorSampleTime eviter(seq, samplerate);
+    while (inpos < (numinsamples - blocksize))
+    {
+        if (num_inchans == 1)
+        {
+            for (int i = 0; i < blocksize; ++i)
+            {
+                process_buffer_pointers[0][i] = inchanpointers[0][i + inpos];
+                process_buffer_pointers[1][i] = inchanpointers[0][i + inpos];
+            }
+        }
+        if (num_inchans == 2)
+        {
+            for (int i = 0; i < blocksize; ++i)
+            {
+                process_buffer_pointers[0][i] = inchanpointers[0][i + inpos];
+                process_buffer_pointers[1][i] = inchanpointers[1][i + inpos];
+            }
+        }
+        auto evts = eviter.readNextEvents(blocksize);
+        for (const auto &e : evts)
+        {
+            if (e.event.header.type == CLAP_EVENT_PARAM_VALUE)
+            {
+                auto pev = (clap_event_param_value *)&e.event.header;
+                if (pev->param_id >= 0 && pev->param_id < wrapper.nparams)
+                {
+                    wrapper.plug->setParameter(pev->param_id, pev->value);
+                }
+            }
+        }
+        wrapper.plug->processReplacing(process_buffer_pointers, process_buffer_pointers, blocksize);
+        for (int i = 0; i < blocksize; ++i)
+        {
+            outchanpointers[0][i + inpos] = process_buffer_pointers[0][i];
+            outchanpointers[1][i + inpos] = process_buffer_pointers[1][i];
+        }
+        inpos += blocksize;
+    }
+    return output_audio;
+}
+
 inline void render_aw(AW_Wrapper &wrapper, ClapEventSequence &seq, std::string infile,
                       std::string outfile, double tail_len)
 {
@@ -477,6 +558,7 @@ void init_py1(py::module_ &m)
         .def("plugins_info", &get_aw_info)
         .def("num_params", &AW_Wrapper::get_num_params)
         .def("render", &render_aw)
+        .def("render_buffer", &render_aw_to_buffer)
         .def("parameter_name", &AW_Wrapper::get_parameter_name)
         .def("doc_text", &AW_Wrapper::get_doc_text)
         .def("name", [](AW_Wrapper &wrapper) {

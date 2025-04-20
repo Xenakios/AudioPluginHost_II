@@ -10,6 +10,8 @@
 #include "audio/choc_AudioFileFormat_WAV.h"
 #include "audio/choc_SampleBuffers.h"
 #include "clap/events.h"
+#include <complex>
+
 
 inline double weierstrass(double x, double a, int b = 7, size_t iters = 16)
 {
@@ -186,4 +188,41 @@ void test_alt_multilfo()
         outcounter += blocksize;
     }
     writer->appendFrames(outbuf.getView());
+}
+
+void print_mandelbrot()
+{
+    size_t w = 120;
+    size_t h = 40;
+    std::vector<char> framebuffer(w * h);
+    size_t num_iters = 100;
+    double bound = 2.0;
+    for (size_t x = 0; x < w; ++x)
+    {
+        for (size_t y = 0; y < h; ++y)
+        {
+            std::complex<double> c{-2.0 + 4.0 / w * x, -1.0 + 2.0 / h * y};
+            std::complex<double> z0;
+            for (size_t i = 0; i < num_iters; ++i)
+            {
+                auto z1 = std::pow(z0, 2.0) + c;
+                z0 = z1;
+                if (std::abs(z1) > bound)
+                {
+                    framebuffer[w * y + x] = ' ';
+                    break;
+                }
+                else
+                    framebuffer[w * y + x] = '*';
+            }
+        }
+    }
+    for (size_t y = 0; y < h; ++y)
+    {
+        for (size_t x = 0; x < w; ++x)
+        {
+            std::cout << framebuffer[w * y + x];
+        }
+        std::cout << "\n";
+    }
 }

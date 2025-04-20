@@ -1931,10 +1931,12 @@ inline void test_webview_score()
 void test_weierstrass();
 void test_airwin_registry();
 void test_alt_multilfo();
+void print_mandelbrot();
 
 int main(int argc, char **argv)
 {
-    test_alt_multilfo();
+    print_mandelbrot();
+    // test_alt_multilfo();
     // test_airwin_registry();
     // test_weierstrass();
     // test_webview_score();
