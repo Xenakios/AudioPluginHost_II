@@ -1,4 +1,6 @@
 #include <algorithm>
+#include <cstdint>
+#include <print>
 #include <pybind11/pybind11.h>
 #include <pybind11/buffer_info.h>
 #include <pybind11/pytypes.h>
@@ -11,7 +13,9 @@
 // #include "audio/choc_AudioFileFormat_Ogg.h"
 // #include "audio/choc_AudioFileFormat_MP3.h"
 #include "audio/choc_SampleBuffers.h"
+#if XENPYAIRWINDOWS
 #include "AirwinRegistry.h"
+#endif
 #include <iostream>
 #include <stdexcept>
 #include <type_traits>
@@ -267,7 +271,7 @@ inline void addAudioBufferEvent(ClapEventSequence &seq, double time, int32_t tar
         numframes = arr.shape(0);
     seq.addAudioBufferEvent(time, target, ptr1, numChans, numframes, samplerate);
 }
-
+#if XENPYAIRWINDOWS
 inline py::list get_aw_info()
 {
     py::list result;
@@ -493,6 +497,37 @@ inline void render_aw(AW_Wrapper &wrapper, ClapEventSequence &seq, std::string i
         infilepos += blockSize;
     }
 }
+#endif
+
+template <bool Interrubtable> inline uint64_t fibonacci_impl(uint64_t n, uint64_t &callcount)
+{
+    if constexpr (Interrubtable)
+    {
+        if (callcount == 0)
+        {
+            if (PyErr_CheckSignals() != 0)
+                throw py::error_already_set();
+        }
+        ++callcount;
+        if (callcount == 1000000)
+        {
+            callcount = 0;
+        }
+    }
+
+    if (n <= 1)
+        return n;
+    return fibonacci_impl<Interrubtable>(n - 1, callcount) +
+           fibonacci_impl<Interrubtable>(n - 2, callcount);
+}
+
+inline uint64_t fibonacci(uint64_t n, bool allow_keyboard_interrupt)
+{
+    uint64_t callcount = 0;
+    if (!allow_keyboard_interrupt)
+        return fibonacci_impl<false>(n, callcount);
+    return fibonacci_impl<true>(n, callcount);
+}
 
 using namespace pybind11::literals;
 
@@ -552,7 +587,7 @@ void init_py1(py::module_ &m)
         .def("add_to_sequence", &AltMultiModulator::add_to_sequence)
         .def("to_list", &AltMultiModulator::get_as_vector, "which_output"_a, "duration"_a,
              "shift"_a = 0.0, "scale"_a = 1.0, "skip"_a = 2);
-
+#if XENPYAIRWINDOWS
     py::class_<AW_Wrapper>(m, "AirWindows")
         .def(py::init<std::string>())
         .def("plugins_info", &get_aw_info)
@@ -566,4 +601,7 @@ void init_py1(py::module_ &m)
             wrapper.plug->getEffectName(buf);
             return std::string(buf);
         });
+#endif
+    m.def("fibonacci", &fibonacci, "n"_a, "keyboard_interrubtable"_a = true);
+
 }

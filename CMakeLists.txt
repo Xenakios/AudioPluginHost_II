@@ -12,7 +12,7 @@ include_directories(
     libs/clap/include
     libs/clap-helpers/include
     Source/AudioGraph
-    
+    libs/signalsmith-linear/include
     libs/signalsmith-stretch
     libs/choc
     libs/sst-basic-blocks/include
@@ -40,7 +40,7 @@ include_directories(
 # we should have a separate real console app and a real GUI app
 
 add_subdirectory(libs/fmt)
-add_subdirectory(C:/develop/airwin2rack build)
+# add_subdirectory(C:/develop/airwin2rack build)
 
 juce_add_console_app(MainHostApp
     PRODUCT_NAME "Console App Example") 
@@ -107,7 +107,7 @@ pybind11_add_module(xenakios
 # target_link_libraries(xenakios PRIVATE juce::juce_core juce::juce_audio_utils)
 
 target_include_directories(xenakios PRIVATE libs/pybind11/include)
-target_link_libraries(xenakios PRIVATE airwin-registry)
+# target_link_libraries(xenakios PRIVATE airwin-registry)
 
 # PYBIND11_FINDPYTHON=ON
 
@@ -119,6 +119,7 @@ target_compile_definitions(xenakios PRIVATE
     __WINDOWS_WASAPI__
     NOMINMAX 
     WIN32_LEAN_AND_MEAN
+    XENPYAIRWINDOWS=0
     )
     
 add_custom_command(TARGET xenakios POST_BUILD 
