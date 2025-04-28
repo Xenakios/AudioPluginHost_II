@@ -572,26 +572,27 @@ void init_py1(py::module_ &m)
 
     py::class_<ClapEventSequence>(m, "ClapSequence")
         .def(py::init<>())
-        .def("getNumEvents", &ClapEventSequence::getNumEvents)
-        .def("clearEvents", &ClapEventSequence::clearEvents)
-        .def("getSizeInBytes", &ClapEventSequence::getApproxSizeInBytes)
-        .def("getMaximumEventTime", &ClapEventSequence::getMaximumEventTime)
-        .def("addString", &ClapEventSequence::addString)
-        .def("addStringEvent", &ClapEventSequence::addStringEvent)
-        .def("addAudioBufferEvent", addAudioBufferEvent)
-        .def("addAudioRoutingEvent", &ClapEventSequence::addAudioRoutingEvent)
-        .def("addNoteOn", &ClapEventSequence::addNoteOn)
-        .def("addNoteOff", &ClapEventSequence::addNoteOff)
+        .def("size", &ClapEventSequence::getNumEvents)
+        .def("__len__", &ClapEventSequence::getNumEvents)
+        .def("clear", &ClapEventSequence::clearEvents)
+        .def("get_size_in_bytes", &ClapEventSequence::getApproxSizeInBytes)
+        .def("get_max_event_time", &ClapEventSequence::getMaximumEventTime)
+        .def("add_string_to_pool", &ClapEventSequence::addString)
+        .def("add_string_event", &ClapEventSequence::addStringEvent)
+        .def("add_audio_buffer_event", addAudioBufferEvent)
+        .def("add_audio_routing_event", &ClapEventSequence::addAudioRoutingEvent)
+        .def("add_note_on", &ClapEventSequence::addNoteOn)
+        .def("add_note_off", &ClapEventSequence::addNoteOff)
         .def("add_note", &ClapEventSequence::addNote, "time"_a = 0.0, "dur"_a = 0.05, "port"_a = 0,
              "ch"_a = 0, "key"_a, "nid"_a = -1, "velo"_a = 1.0, "retune"_a = 0.0)
-        .def("addNoteFloatPitch", &ClapEventSequence::addNoteF, "time"_a = 0.0, "dur"_a = 0.05,
+        .def("add_note_float_pitch", &ClapEventSequence::addNoteF, "time"_a = 0.0, "dur"_a = 0.05,
              "port"_a = 0, "ch"_a = 0, "pitch"_a, "nid"_a = -1, "velo"_a = 1.0)
         .def("add_parameter_event", &ClapEventSequence::addParameterEvent, "ismod"_a = false,
              "time"_a = 0.0, "port"_a = -1, "ch"_a = -1, "key"_a = -1, "nid"_a = -1, "parid"_a,
              "val"_a)
-        .def("addProgramChange", &ClapEventSequence::addProgramChange, "time"_a = 0.0,
+        .def("add_program_change", &ClapEventSequence::addProgramChange, "time"_a = 0.0,
              "port"_a = -1, "ch"_a = -1, "program"_a)
-        .def("addTransportEvent", &ClapEventSequence::addTransportEvent)
+        .def("add_transport_event", &ClapEventSequence::addTransportEvent)
         .def("add_note_expression", &ClapEventSequence::addNoteExpression, "time"_a = 0.0,
              "port"_a = -1, "ch"_a = 0, "key"_a = -1, "note_id"_a = -1, "exp_type"_a, "value"_a);
 
