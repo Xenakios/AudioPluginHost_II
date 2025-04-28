@@ -582,7 +582,7 @@ void init_py1(py::module_ &m)
         .def("addAudioRoutingEvent", &ClapEventSequence::addAudioRoutingEvent)
         .def("addNoteOn", &ClapEventSequence::addNoteOn)
         .def("addNoteOff", &ClapEventSequence::addNoteOff)
-        .def("addNote", &ClapEventSequence::addNote, "time"_a = 0.0, "dur"_a = 0.05, "port"_a = 0,
+        .def("add_note", &ClapEventSequence::addNote, "time"_a = 0.0, "dur"_a = 0.05, "port"_a = 0,
              "ch"_a = 0, "key"_a, "nid"_a = -1, "velo"_a = 1.0, "retune"_a = 0.0)
         .def("addNoteFloatPitch", &ClapEventSequence::addNoteF, "time"_a = 0.0, "dur"_a = 0.05,
              "port"_a = 0, "ch"_a = 0, "pitch"_a, "nid"_a = -1, "velo"_a = 1.0)
@@ -592,7 +592,8 @@ void init_py1(py::module_ &m)
         .def("addProgramChange", &ClapEventSequence::addProgramChange, "time"_a = 0.0,
              "port"_a = -1, "ch"_a = -1, "program"_a)
         .def("addTransportEvent", &ClapEventSequence::addTransportEvent)
-        .def("addNoteExpression", &ClapEventSequence::addNoteExpression);
+        .def("add_note_expression", &ClapEventSequence::addNoteExpression, "time"_a = 0.0,
+             "port"_a = -1, "ch"_a = 0, "key"_a = -1, "note_id"_a = -1, "exp_type"_a, "value"_a);
 
     py::class_<AltMultiModulator>(m, "MultiLFO")
         .def(py::init<double>())

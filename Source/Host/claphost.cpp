@@ -281,7 +281,7 @@ void ClapProcessingEngine::processToFile2(std::string filename, double duration,
     th.join();
 }
 
-void ClapProcessingEngine::processToFile(std::string filename, double duration, double samplerate,
+void ClapProcessingEngine::processToFile(std::string outfilename, double duration, double samplerate,
                                          int numoutchans)
 {
 
@@ -398,10 +398,9 @@ void ClapProcessingEngine::processToFile(std::string filename, double duration, 
         outfileprops.numChannels = numoutchans;
         outfileprops.sampleRate = samplerate;
         choc::audio::WAVAudioFileFormat<true> wavformat;
-        auto writer = wavformat.createWriter(filename, outfileprops);
+        auto writer = wavformat.createWriter(outfilename, outfileprops);
         if (!writer)
-            throw std::runtime_error("Could not create audio file for writing: " + filename);
-
+            throw std::runtime_error("Could not create audio file for writing: " + outfilename);
         int blockcount = 0;
         int wakeup_blocks = 10;
         for (int j = 0; j < wakeup_blocks; ++j)
@@ -472,8 +471,11 @@ void ClapProcessingEngine::processToFile(std::string filename, double duration, 
             uint32_t framesToWrite = std::min(int(outlensamples - outcounter), procblocksize);
             auto writeSectionView = outputbuffers[0].getSection(
                 choc::buffer::ChannelRange{0, (unsigned int)numoutchans}, {0, framesToWrite});
-            writer->appendFrames(writeSectionView);
-            // std::cout << outcounter << " ";
+            if (!writer->appendFrames(writeSectionView))
+            {
+                throw std::runtime_error(std::format("Writing to output file {} failed", outfilename));
+            }
+                
             cp.steady_time = outcounter;
 
             outcounter += procblocksize;
