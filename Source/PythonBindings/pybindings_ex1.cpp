@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <chrono>
 #include <cstdint>
 #include <print>
 #include <pybind11/pybind11.h>
@@ -499,34 +500,51 @@ inline void render_aw(AW_Wrapper &wrapper, ClapEventSequence &seq, std::string i
 }
 #endif
 
-template <bool Interrubtable> inline uint64_t fibonacci_impl(uint64_t n, uint64_t &callcount)
+template <bool Interrubtable>
+inline uint64_t fibonacci_impl(uint64_t n, std::atomic<int> &thread_flag)
 {
     if constexpr (Interrubtable)
     {
-        if (callcount == 0)
-        {
-            if (PyErr_CheckSignals() != 0)
-                throw py::error_already_set();
-        }
-        ++callcount;
-        if (callcount == 1000000)
-        {
-            callcount = 0;
-        }
+        if (thread_flag.load() == 1)
+            return 0;
     }
 
     if (n <= 1)
+    {
         return n;
-    return fibonacci_impl<Interrubtable>(n - 1, callcount) +
-           fibonacci_impl<Interrubtable>(n - 2, callcount);
+    }
+
+    return fibonacci_impl<Interrubtable>(n - 1, thread_flag) +
+           fibonacci_impl<Interrubtable>(n - 2, thread_flag);
 }
 
 inline uint64_t fibonacci(uint64_t n, bool allow_keyboard_interrupt)
 {
-    uint64_t callcount = 0;
-    if (!allow_keyboard_interrupt)
-        return fibonacci_impl<false>(n, callcount);
-    return fibonacci_impl<true>(n, callcount);
+    std::atomic<int> thread_flag{0};
+    if (n < 31 || !allow_keyboard_interrupt)
+        return fibonacci_impl<false>(n, thread_flag);
+    uint64_t result = 0;
+    std::thread fibo_th{[n, &result, &thread_flag]() {
+        result = fibonacci_impl<true>(n, thread_flag);
+        thread_flag = 2;
+    }};
+    while (true)
+    {
+        if (thread_flag == 2)
+        {
+            fibo_th.join();
+            return result;
+        }
+        if (PyErr_CheckSignals() != 0)
+        {
+            thread_flag.store(1);
+            fibo_th.join();
+            throw py::error_already_set();
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+    fibo_th.join();
+    return result;
 }
 
 using namespace pybind11::literals;
@@ -603,5 +621,4 @@ void init_py1(py::module_ &m)
         });
 #endif
     m.def("fibonacci", &fibonacci, "n"_a, "keyboard_interrubtable"_a = true);
-
 }

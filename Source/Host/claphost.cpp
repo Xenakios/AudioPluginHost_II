@@ -403,6 +403,15 @@ void ClapProcessingEngine::processToFile(std::string filename, double duration, 
             throw std::runtime_error("Could not create audio file for writing: " + filename);
 
         int blockcount = 0;
+        int wakeup_blocks = 10;
+        for (int j = 0; j < wakeup_blocks; ++j)
+        {
+            for (size_t i = 0; i < m_chain.size(); ++i)
+            {
+                auto proc = m_chain[i]->m_proc.get();
+                auto status = m_chain[i]->m_proc->process(&cp);
+            }
+        }
         using clock = std::chrono::system_clock;
         using ms = std::chrono::duration<double, std::milli>;
         const auto start_time = clock::now();
