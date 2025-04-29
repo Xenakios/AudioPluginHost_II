@@ -53,7 +53,7 @@ ClapProcessingEngine::ClapProcessingEngine()
 
 ClapProcessingEngine::~ClapProcessingEngine()
 {
-    std::cout << "ClapProcessingengine dtor\n";
+    // std::cout << "ClapProcessingengine dtor\n";
     stopStreaming();
 
     g_engineinstances.erase(this);
@@ -281,14 +281,16 @@ void ClapProcessingEngine::processToFile2(std::string filename, double duration,
     th.join();
 }
 
-void ClapProcessingEngine::processToFile(std::string outfilename, double duration, double samplerate,
-                                         int numoutchans)
+int ClapProcessingEngine::processToFile(std::string outfilename, double duration,
+                                         double samplerate, int numoutchans,
+                                         std::function<int()> errcheckfunc)
 {
 
     if (m_chain.size() == 0)
         throw std::runtime_error("There are no plugins in the chain to process");
     int procblocksize = 64;
-    std::atomic<bool> renderloopfinished{false};
+    // 0 not started, 1 running, 2 finished ok, 3 cancel requested, 4 cancelled
+    std::atomic<int> thread_status{0};
     double maxTailSeconds = 0.0;
     size_t chainIndex = 0;
 
@@ -324,6 +326,7 @@ void ClapProcessingEngine::processToFile(std::string outfilename, double duratio
     //  even offline, do the processing in another another thread because things
     //  can get complicated with plugins like Surge XT because of the thread checks
     std::thread th([&] {
+        thread_status = 1;
         std::vector<ClapEventSequence::IteratorSampleTime> eviters;
         int events_in_seqs = 0;
         for (auto &p : m_chain)
@@ -417,6 +420,8 @@ void ClapProcessingEngine::processToFile(std::string outfilename, double duratio
         int eventssent = 0;
         while (outcounter < outlensamples)
         {
+            if (thread_status == 3)
+                break;
             list_in.clear();
             list_out.clear();
             double pos_seconds = outcounter / samplerate;
@@ -436,9 +441,6 @@ void ClapProcessingEngine::processToFile(std::string outfilename, double duratio
                     if (ecopy.header.type == CLAP_EVENT_PARAM_VALUE)
                     {
                         auto aev = (clap_event_param_value *)&ecopy;
-                        // std::cout << outcounter / samplerate << "\t" << aev->param_id << "\t"
-                        //          << aev->value << "\t"
-                        //          << (outcounter + aev->header.time) / samplerate << "\n";
                     }
                     if (ecopy.header.type == CLAP_EVENT_TRANSPORT)
                     {
@@ -458,14 +460,11 @@ void ClapProcessingEngine::processToFile(std::string outfilename, double duratio
                     ++eventssent;
                 }
                 auto proc = m_chain[i]->m_proc.get();
-                // sanityCheckBuffer(inputbuffer);
                 auto status = m_chain[i]->m_proc->process(&cp);
                 if (status == CLAP_PROCESS_ERROR)
                     throw std::runtime_error("Clap processing failed");
-                // sanityCheckBuffer(outputbuffers[0]);
                 list_in.clear();
                 list_out.clear();
-
                 choc::buffer::copy(inputbuffer, outputbuffers[0]);
             }
             uint32_t framesToWrite = std::min(int(outlensamples - outcounter), procblocksize);
@@ -473,9 +472,10 @@ void ClapProcessingEngine::processToFile(std::string outfilename, double duratio
                 choc::buffer::ChannelRange{0, (unsigned int)numoutchans}, {0, framesToWrite});
             if (!writer->appendFrames(writeSectionView))
             {
-                throw std::runtime_error(std::format("Writing to output file {} failed", outfilename));
+                throw std::runtime_error(
+                    std::format("Writing to output file {} failed", outfilename));
             }
-                
+
             cp.steady_time = outcounter;
 
             outcounter += procblocksize;
@@ -492,7 +492,10 @@ void ClapProcessingEngine::processToFile(std::string outfilename, double duratio
         std::cout << std::format("finished in {} seconds, {}x realtime\n",
                                  render_duration.count() / 1000.0, rtfactor);
 
-        renderloopfinished = true;
+        if (thread_status == 1)
+            thread_status = 2;
+        if (thread_status == 3)
+            thread_status = 4;
     });
 
     choc::messageloop::Timer timer{10, [&]() {
@@ -500,8 +503,14 @@ void ClapProcessingEngine::processToFile(std::string outfilename, double duratio
                                        {
                                            p->m_proc->runMainThreadTasks();
                                        }
-                                       if (!renderloopfinished)
+                                       if (errcheckfunc() != 0)
+                                       {
+                                           thread_status = 3;
                                            return true;
+                                       }
+                                       if (thread_status == 1)
+                                           return true;
+                                       
                                        choc::messageloop::stop();
                                        return false;
                                    }};
@@ -511,6 +520,12 @@ void ClapProcessingEngine::processToFile(std::string outfilename, double duratio
     {
         p->m_proc->deactivate();
     }
+    if (thread_status == 4)
+    {
+        std::cout << "render was cancelled\n";    
+        return -1;    
+    }
+    return 0;
     // std::cout << "cleaned up after rendering\n";
 }
 

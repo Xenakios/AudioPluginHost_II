@@ -2,6 +2,7 @@
 #include <pybind11/cast.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/pytypes.h>
+#include <pyerrors.h>
 #include <stdexcept>
 #include <vector>
 // #include <optional>
@@ -103,6 +104,14 @@ static void addChainWithPlugins(ClapProcessingEngine &eng,
         auto &chain = eng.addChain();
         chain.addProcessor(e.first, e.second);
     }
+}
+
+inline void clap_process_to_file_wrapper(ClapProcessingEngine &eng, std::string filename,
+                                         double duration, double samplerate, int numoutchans)
+{
+    auto err = eng.processToFile(filename, duration, samplerate, numoutchans, PyErr_CheckSignals);
+    if (err == -1)
+        throw py::error_already_set();
 }
 
 static void startStreaming(ClapProcessingEngine &eng, std::optional<unsigned int> deviceId,
@@ -290,7 +299,7 @@ PYBIND11_MODULE(xenakios, m)
              "0.0 fully random, 0.5 freeze loop, >0.5 pick randomly from loop")
         .def("nextFloat", &xenakios::DejaVuRandom::nextFloatInRange)
         .def("nextInt", &xenakios::DejaVuRandom::nextIntInRange);
-    
+
     py::class_<xenakios::BlueNoise>(m, "BlueNoise")
         .def(py::init<unsigned int>(), "seed"_a = 0)
         .def("get_array", &getArrayWithBlueNoise)
@@ -346,7 +355,7 @@ PYBIND11_MODULE(xenakios, m)
         .def("stopStreaming", &ClapProcessingEngine::stopStreaming)
         .def("saveStateToBinaryFile", &ClapProcessingEngine::saveStateToBinaryFile)
         .def("loadStateFromBinaryFile", &ClapProcessingEngine::loadStateFromBinaryFile)
-        .def("processToFile", &ClapProcessingEngine::processToFile, "filename"_a, "duration"_a,
+        .def("render_to_file", clap_process_to_file_wrapper, "filename"_a, "duration"_a,
              "samplerate"_a, "numoutchannels"_a = 2);
 
     py::class_<xenakios::EnvelopePoint>(m, "EnvelopePoint")
@@ -424,4 +433,3 @@ PYBIND11_MODULE(xenakios, m)
 
     m.def("generateEnvelopeFromLFO", &generateEnvelopeFromLFO);
 }
-
