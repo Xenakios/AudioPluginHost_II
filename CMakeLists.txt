@@ -148,7 +148,7 @@ add_executable(TestingProgram
     )
 # Source/Experimental/xaudiograph.cpp
 target_compile_definitions(TestingProgram PRIVATE XENPYTHONBINDINGS=0 NOJUCE=1 _USE_MATH_DEFINES=1 __WINDOWS_WASAPI__)
-target_link_libraries(TestingProgram PRIVATE airwin-registry)
+# target_link_libraries(TestingProgram PRIVATE airwin-registry)
 
 add_executable(olctest
     Source/Experimental/olctest.cpp

@@ -2,6 +2,7 @@
 #include "../Common/xap_breakpoint_envelope.h"
 #include "../Common/clap_eventsequence.h"
 #include "../Common/xen_modulators.h"
+#include <exception>
 #include <istream>
 #include <print>
 #include <array>
@@ -10,8 +11,9 @@
 #include "audio/choc_AudioFileFormat_WAV.h"
 #include "audio/choc_SampleBuffers.h"
 #include "clap/events.h"
+#include "text/choc_Files.h"
+#include "text/choc_JSON.h"
 #include <complex>
-
 
 inline double weierstrass(double x, double a, int b = 7, size_t iters = 16)
 {
@@ -94,6 +96,7 @@ inline void dump_airwindows_info()
 
 void test_airwin_registry()
 {
+#ifdef AW_AVAILABLE
     char textbuf[2048];
     auto &reg = AirwinRegistry::registry;
     int plugId = 182;
@@ -153,28 +156,62 @@ void test_airwin_registry()
             infilepos += blockSize;
         }
     }
+#endif
 }
 
 void test_alt_multilfo()
 {
     double sr = 44100;
     AltMultiModulator modulator{sr};
+    try
+    {
+        auto jsontxt = choc::file::loadFileAsString(
+            R"(C:\develop\AudioPluginHost_mk2\python\lfosettings.json)");
+        auto tree = choc::json::parse(jsontxt);
+        for (int i = 0; i < 4; ++i)
+        {
+            modulator.lfo_rates[i] = tree["lfo" + std::to_string(i) + "rate"].getWithDefault(0.0);
+            modulator.lfo_shapes[i] = tree["lfo" + std::to_string(i) + "shape"].getWithDefault(0);
+        }
+        auto matrix = tree["modmatrix"];
+        if (matrix.isArray())
+        {
+            for (int i = 0; i < matrix.size(); ++i)
+            {
+                auto mentry = matrix[i];
+                int source = mentry["s"].get<int>();
+                int dest = mentry["d"].get<int>();
+                double amt = mentry["a"].get<double>();
+                if (source >= 0 && source < AltMultiModulator::numModulationSources && dest >= 0 &&
+                    dest < AltMultiModulator::numModulationDestinations)
+                {
+                    modulator.mod_matrix[source][dest] = amt;
+                }
+            }
+        }
+    }
+    catch (std::exception &ex)
+    {
+        std::cout << ex.what() << "\n";
+    }
+
     auto writer = xenakios::createWavWriter(
         R"(C:\develop\AudioPluginHost_mk2\python\cdp8\multilfo.wav)", 2, sr);
     unsigned long outnumsamples = sr * 4.0;
-    choc::buffer::ChannelArrayBuffer<float> outbuf{2, outnumsamples + 64};
-    outbuf.clear();
-    unsigned long outcounter = 0;
     auto blocksize = AltMultiModulator::BLOCKSIZE;
-    modulator.mod_matrix[AltMultiModulator::MS_LFO0][AltMultiModulator::MD_Output0] = 1.00;
-    modulator.mod_matrix[AltMultiModulator::MS_LFO2][AltMultiModulator::MD_Output1] = 1.00;
-    modulator.mod_matrix[AltMultiModulator::MS_LFO1][AltMultiModulator::MD_LFO0Rate] = 1.0;
-    modulator.lfo_rates[AltMultiModulator::MS_LFO0] = 2.0;
-    modulator.lfo_rates[AltMultiModulator::MS_LFO1] = 0.4;
-    modulator.lfo_rates[AltMultiModulator::MS_LFO2] = 3.5;
-    modulator.lfo_shapes[AltMultiModulator::MS_LFO1] = AltMultiModulator::lfo_t::Shape::SINE;
-    modulator.lfo_unipolars[AltMultiModulator::MS_LFO1] = 1.0;
-    modulator.lfo_shapes[AltMultiModulator::MS_LFO2] = AltMultiModulator::lfo_t::Shape::SH_NOISE;
+    choc::buffer::ChannelArrayBuffer<float> writebuf{2, (unsigned int)blocksize};
+    writebuf.clear();
+    unsigned long outcounter = 0;
+
+    // modulator.mod_matrix[AltMultiModulator::MS_LFO0][AltMultiModulator::MD_Output0] = 1.00;
+    // modulator.mod_matrix[AltMultiModulator::MS_LFO1][AltMultiModulator::MD_Output1] = 1.00;
+    // modulator.mod_matrix[AltMultiModulator::MS_LFO1][AltMultiModulator::MD_LFO0Rate] = 1.0;
+    // modulator.lfo_rates[AltMultiModulator::MS_LFO0] = 2.0;
+    // modulator.lfo_rates[AltMultiModulator::MS_LFO1] = 0.4;
+    // modulator.lfo_rates[AltMultiModulator::MS_LFO2] = 3.5;
+    // modulator.lfo_shapes[AltMultiModulator::MS_LFO1] = AltMultiModulator::lfo_t::Shape::SINE;
+    // modulator.lfo_unipolars[AltMultiModulator::MS_LFO1] = 1.0;
+    // modulator.lfo_shapes[AltMultiModulator::MS_LFO2] = AltMultiModulator::lfo_t::Shape::SH_NOISE;
     while (outcounter < outnumsamples)
     {
         modulator.process_block();
@@ -182,12 +219,12 @@ void test_alt_multilfo()
         {
             for (int j = 0; j < 2; ++j)
             {
-                outbuf.getSample(j, outcounter + i) = modulator.output_values[j];
+                writebuf.getSample(j, i) = modulator.output_values[j];
             }
         }
+        writer->appendFrames(writebuf.getView());
         outcounter += blocksize;
     }
-    writer->appendFrames(outbuf.getView());
 }
 
 void print_mandelbrot()

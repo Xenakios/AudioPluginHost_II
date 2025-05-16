@@ -13,6 +13,7 @@
 #include <array>
 #include "audio/choc_AudioFileFormat.h"
 #include "audio/choc_SampleBuffers.h"
+#include "platform/choc_Execute.h"
 #include "clap/events.h"
 #include <print>
 #include "clap/clap.h"
@@ -620,7 +621,7 @@ inline void testWebviewCurveEditor()
                             0);
     eng.setSequence(0, sequence);
     eng.processToFile(R"(C:\develop\AudioPluginHost_mk2\audio\webview_xupic_offline02.wav)", 30.0,
-                      44100.0, 2);
+                      44100.0, 2, nullptr);
 }
 
 inline void test_chained_offline()
@@ -653,7 +654,7 @@ inline void test_chained_offline()
     }
 
     eng.processToFile(R"(C:\develop\AudioPluginHost_mk2\audio\chain_offline_02.wav)", 16.0, 44100.0,
-                      2);
+                      2, nullptr);
 }
 
 inline void test_tempomap()
@@ -814,7 +815,7 @@ inline void test_sc()
     seq.addNote(0.4, 4.0, 0, 0, 51, -1, 1.0, 0.0);
     seq.addNote(2.0, 4.0, 0, 0, 40, -1, 1.0, 0.0);
     eng->processToFile(R"(C:\develop\AudioPluginHost_mk2\clapstatetests\SCtestfile.wav)", 5.0,
-                       44100.0, 2);
+                       44100.0, 2, nullptr);
 }
 
 class GrainDelay
@@ -1169,7 +1170,8 @@ inline void test_clapengineRT(int iter)
 
     // auto &seq2 = eng->getSequence(1);
     // seq2.addParameterEvent(false, 0.1, 0, 0, 0, 0, 3034571532, 0.02);
-    eng->processToFile(std::format(R"(C:\MusicAudio\clap_out\out{}.wav)", iter), 5, 44100.0, 2);
+    eng->processToFile(std::format(R"(C:\MusicAudio\clap_out\out{}.wav)", iter), 5, 44100.0, 2,
+                       nullptr);
     return;
 
     eng->startStreaming(132, 44100.0, 256, false);
@@ -1933,10 +1935,43 @@ void test_airwin_registry();
 void test_alt_multilfo();
 void print_mandelbrot();
 
+inline int test_choc_subprocess(int mode)
+{
+    if (mode == 0)
+    {
+        using namespace std::chrono_literals;
+        std::cout << "\e[0;33mstarting sleep...\n";
+        std::this_thread::sleep_for(30000ms);
+        std::cout << "ended sleep\e[0m\n";
+        return 0;
+    }
+    if (mode == 1)
+    {
+        std::cout << "starting external process...\n";
+        auto r = choc::execute(R"(C:\develop\AudioPluginHost_mk2\build\TestingProgram.exe 0)");
+        if (r.statusCode == 0)
+        {
+            std::cout << r.output << "\n";
+        } else
+        {
+            std::cout << "external process exited with error " << r.statusCode << "\n";
+            std::cout << r.output << "\n";
+        }
+        return 0;
+    }
+    if (mode == 2)
+    {
+        std::cout << "\e[0;31mcould not calculate\e[0m\n";
+        return 42;
+    }
+}
+
 int main(int argc, char **argv)
 {
-    print_mandelbrot();
-    // test_alt_multilfo();
+    //if (argc >= 2)
+    //    return test_choc_subprocess(atoi(argv[1]));
+    // print_mandelbrot();
+    test_alt_multilfo();
     // test_airwin_registry();
     // test_weierstrass();
     // test_webview_score();
