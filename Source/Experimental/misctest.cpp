@@ -3,6 +3,7 @@
 // #include <handleapi.h>
 // #include <minwindef.h>
 
+#include <filesystem>
 #include <ostream>
 #include <combaseapi.h>
 #include <fstream>
@@ -1952,7 +1953,8 @@ inline int test_choc_subprocess(int mode)
         if (r.statusCode == 0)
         {
             std::cout << r.output << "\n";
-        } else
+        }
+        else
         {
             std::cout << "external process exited with error " << r.statusCode << "\n";
             std::cout << r.output << "\n";
@@ -1966,18 +1968,37 @@ inline int test_choc_subprocess(int mode)
     }
 }
 
+inline void test_choc_execute()
+{
+    std::string_view infile = R"(C:\MusicAudio\sourcesamples\sheila.wav)";
+
+    for (int i = 0; i < 12; ++i)
+    {
+        double semitones = -6.0 + i;
+        auto outfile =
+            std::format(R"(C:\develop\AudioPluginHost_mk2\python\cdp8\sheila_test_{:02d}.wav)", i);
+        std::filesystem::remove(outfile);
+        auto cmd = std::format(R"(C:\CDPR8\_cdp\_cdprogs\modify.exe speed 2 {} {} {})", infile,
+                               outfile, semitones);
+        auto r = choc::execute(cmd);
+    }
+
+    // std::cout << r.output << "\n";
+}
+
 int main(int argc, char **argv)
 {
-    //if (argc >= 2)
-    //    return test_choc_subprocess(atoi(argv[1]));
-    // print_mandelbrot();
-    test_alt_multilfo();
-    // test_airwin_registry();
-    // test_weierstrass();
-    // test_webview_score();
-    // test_eventchase();
-    //  test_messagebuilder();
-    //   test_llvm_ir();
+    test_choc_execute();
+    // if (argc >= 2)
+    //     return test_choc_subprocess(atoi(argv[1]));
+    //  print_mandelbrot();
+    //  test_alt_multilfo();
+    //  test_airwin_registry();
+    //  test_weierstrass();
+    //  test_webview_score();
+    //  test_eventchase();
+    //   test_messagebuilder();
+    //    test_llvm_ir();
 
     // test_better_grit_noise();
     // test_pipe(argc, argv);
