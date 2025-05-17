@@ -7,10 +7,18 @@
 #include <print>
 #include "signalsmith-stretch.h"
 #include "CLI11.hpp"
+#include "../Common/xap_breakpoint_envelope.h"
 
-inline int render_signal_smith(std::string infile, std::string outfile, double timefactor,
-                               double pitchfactor)
+inline int render_signalsmith(std::string infile, std::string outfile,
+                              xenakios::Envelope &rate_envelope, xenakios::Envelope &pitch_envelope,
+                              xenakios::Envelope &formant_envelope)
 {
+    if (rate_envelope.getNumPoints() == 0)
+        rate_envelope.addPoint({0.0, 1.0});
+    if (pitch_envelope.getNumPoints() == 0)
+        pitch_envelope.addPoint({0.0, 1.0});
+    if (formant_envelope.getNumPoints() == 0)
+        formant_envelope.addPoint({0.0, 1.0});
     choc::audio::WAVAudioFileFormat<true> wavformat;
     auto reader = wavformat.createReader(infile);
     if (!reader)
@@ -34,9 +42,13 @@ inline int render_signal_smith(std::string infile, std::string outfile, double t
     choc::buffer::ChannelArrayBuffer<float> writebuffer{inprops.numChannels, blockSize};
     writebuffer.clear();
     int inposcounter = 0;
-    stretch->setTransposeFactor(pitchfactor);
     while (inposcounter < inprops.numFrames)
     {
+        double tpos = inposcounter / inprops.sampleRate;
+        double pfac = pitch_envelope.getValueAtPosition(tpos);
+        stretch->setTransposeFactor(pfac);
+        double timefactor = rate_envelope.getValueAtPosition(tpos);
+
         unsigned int framesToRead = timefactor * blockSize;
         auto inview = readbuffer.getFrameRange({0, framesToRead});
         reader->readFrames(inposcounter, inview);
@@ -57,14 +69,17 @@ int main(int argc, char **argv)
     app.require_subcommand();
     std::string infilename;
     std::string outfilename;
-    double strechfactor = 1.0;
-    std::optional<double> pitchfactor;
-    std::optional<double> pitchsemis;
-    sscommand->add_option("-i,--infile", infilename, "A help string");
-    sscommand->add_option("-o,--outfile", outfilename, "A help string");
-    sscommand->add_option("--timefactor", strechfactor, "A help string");
-    sscommand->add_option("--pitchfactor", pitchfactor, "A help string");
-    sscommand->add_option("--pitchsemis", pitchsemis, "A help string");
+
+    std::vector<double> pitchautomation;
+    std::vector<double> rate_automation;
+    bool allow_overwrite = false;
+    bool rate_in_octaves = false;
+    sscommand->add_option("-i,--infile", infilename, "Input WAV file");
+    sscommand->add_option("-o,--outfile", outfilename, "Output WAV file (32 bit float)");
+    sscommand->add_option("--rate", rate_automation, "Time stretch amount (factor/octave)");
+    sscommand->add_option("--pitch", pitchautomation, "Pitch shift (semitones)");
+    sscommand->add_flag("--overwrite", allow_overwrite, "Overwrite output file even if it exists");
+    sscommand->add_flag("--roct", rate_in_octaves, "Play rate is in time octaves");
     CLI11_PARSE(app, argc, argv);
     if (app.got_subcommand("signalsmith"))
     {
@@ -73,19 +88,55 @@ int main(int argc, char **argv)
             std::cout << "input file " << infilename << " does not exist\n";
             return 1;
         }
+        if (std::filesystem::exists(outfilename))
+        {
+            std::cout << "output file already exists...\n";
+            if (allow_overwrite)
+                std::cout << "but will overwrite it\n";
+            else
+                return 1;
+        }
         std::cout << "processing with signalsmith stretch...\n";
         std::cout << infilename << " -> " << outfilename << "\n";
-        std::cout << strechfactor << " time stretch\n";
-        if (pitchfactor)
-            std::cout << "pitch factor " << *pitchfactor << "\n";
-        if (pitchsemis)
+        xenakios::Envelope rate_envelope;
+        xenakios::Envelope pitch_envelope;
+        xenakios::Envelope formant_envelope;
+        if (pitchautomation.size() == 1)
         {
-            std::cout << "pitch semitones " << *pitchsemis << "\n";
-            pitchfactor = std::pow(2.0, 1.0 / 12 * *pitchsemis);
+            pitch_envelope.addPoint({0.0, std::pow(2.0, 1.0 / 12 * pitchautomation[0])});
         }
-        strechfactor = std::clamp(strechfactor, 0.01, 15.9);
-        *pitchfactor = std::clamp(*pitchfactor, 0.125, 8.0);
-        render_signal_smith(infilename, outfilename, strechfactor, *pitchfactor);
+        if (pitchautomation.size() > 1 && pitchautomation.size() % 2 == 0)
+        {
+            std::cout << "command line has pitch automation\n";
+            for (int i = 0; i < pitchautomation.size(); i += 2)
+            {
+                std::cout << pitchautomation[i] << "\t" << pitchautomation[i + 1] << "\n";
+                pitch_envelope.addPoint(
+                    {pitchautomation[i], std::pow(2.0, 1.0 / 12.0 * pitchautomation[i + 1])});
+            }
+        }
+        if (rate_automation.size() == 1)
+        {
+            if (!rate_in_octaves)
+                rate_envelope.addPoint({0.0, rate_automation[0]});
+            else
+                rate_envelope.addPoint({0.0, std::pow(2.0, rate_automation[0])});
+        }
+        if (rate_automation.size() > 1 && rate_automation.size() % 2 == 0)
+        {
+            std::cout << "command line has rate automation\n";
+            for (int i = 0; i < rate_automation.size(); i += 2)
+            {
+                std::cout << rate_automation[i] << "\t" << rate_automation[i + 1] << "\n";
+                if (!rate_in_octaves)
+                    rate_envelope.addPoint({rate_automation[i], rate_automation[i + 1]});
+                else
+                    rate_envelope.addPoint(
+                        {rate_automation[i], std::pow(2.0, rate_automation[i + 1])});
+            }
+        }
+        render_signalsmith(infilename, outfilename, rate_envelope, pitch_envelope,
+                           formant_envelope);
     }
     if (app.got_subcommand("varispeed"))
     {
