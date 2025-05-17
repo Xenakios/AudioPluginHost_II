@@ -11,7 +11,8 @@
 
 inline int render_signalsmith(std::string infile, std::string outfile,
                               xenakios::Envelope &rate_envelope, xenakios::Envelope &pitch_envelope,
-                              xenakios::Envelope &formant_envelope)
+                              xenakios::Envelope &formant_envelope, bool compensate_formant_pitch,
+                              bool nowrite)
 {
     if (rate_envelope.getNumPoints() == 0)
         rate_envelope.addPoint({0.0, 1.0});
@@ -34,14 +35,17 @@ inline int render_signalsmith(std::string infile, std::string outfile,
     outprops.sampleRate = inprops.sampleRate;
     outprops.bitDepth = choc::audio::BitDepth::float32;
     outprops.numChannels = inprops.numChannels;
-    auto writer = wavformat.createWriter(outfile, outprops);
-    if (!writer)
+    std::unique_ptr<choc::audio::AudioFileWriter> writer;
+    if (!nowrite)
+        writer = wavformat.createWriter(outfile, outprops);
+    if (!nowrite && !writer)
         return 1;
     choc::buffer::ChannelArrayBuffer<float> readbuffer{inprops.numChannels, blockSize * 17};
     readbuffer.clear();
     choc::buffer::ChannelArrayBuffer<float> writebuffer{inprops.numChannels, blockSize};
     writebuffer.clear();
     int inposcounter = 0;
+    int outposcounter = 0;
     while (inposcounter < inprops.numFrames)
     {
         double tpos = inposcounter / inprops.sampleRate;
@@ -50,17 +54,25 @@ inline int render_signalsmith(std::string infile, std::string outfile,
         stretch->setTransposeFactor(pfac);
         double forfac = formant_envelope.getValueAtPosition(tpos);
         forfac = std::clamp(forfac, 0.125, 8.0);
-        stretch->setFormantFactor(forfac, true);
+        stretch->setFormantFactor(forfac, compensate_formant_pitch);
         double timefactor = rate_envelope.getValueAtPosition(tpos);
         timefactor = std::clamp(timefactor, 0.01, 16.0);
         unsigned int framesToRead = timefactor * blockSize;
         auto inview = readbuffer.getFrameRange({0, framesToRead});
         reader->readFrames(inposcounter, inview);
-        stretch->process(inview.data.channels, framesToRead, writebuffer.getView().data.channels,
-                         blockSize);
-        writer->appendFrames(writebuffer.getView());
+        if (!nowrite)
+        {
+            stretch->process(inview.data.channels, framesToRead,
+                             writebuffer.getView().data.channels, blockSize);
+            writer->appendFrames(writebuffer.getView());
+        }
+
         inposcounter += framesToRead;
+        outposcounter += blockSize;
     }
+    if (nowrite)
+        std::cout << "output file would have length of " << outposcounter / inprops.sampleRate
+                  << " seconds\n";
     return 0;
 }
 
@@ -79,6 +91,8 @@ int main(int argc, char **argv)
     std::vector<double> formant_automation;
     bool allow_overwrite = false;
     bool rate_in_octaves = false;
+    bool compen_formant_pitch = false;
+    bool dontwrite = false;
     sscommand->add_option("-i,--infile", infilename, "Input WAV file");
     sscommand->add_option("-o,--outfile", outfilename, "Output WAV file (32 bit float)");
     sscommand->add_option("--rate", rate_automation, "Time stretch amount (factor/octave)");
@@ -86,6 +100,10 @@ int main(int argc, char **argv)
     sscommand->add_option("--formant", formant_automation, "Formant shift (semitones)");
     sscommand->add_flag("--overwrite", allow_overwrite, "Overwrite output file even if it exists");
     sscommand->add_flag("--roct", rate_in_octaves, "Play rate is in time octaves");
+    sscommand->add_flag("--cfp", compen_formant_pitch, "Attempt formant correction when pitch shifting");
+    sscommand->add_flag("--odur", dontwrite,
+                        "Don't write output file, only print out how long it would be with the "
+                        "play rate processing");
     CLI11_PARSE(app, argc, argv);
     if (app.got_subcommand("signalsmith"))
     {
@@ -158,8 +176,8 @@ int main(int argc, char **argv)
                         {rate_automation[i], std::pow(2.0, rate_automation[i + 1])});
             }
         }
-        render_signalsmith(infilename, outfilename, rate_envelope, pitch_envelope,
-                           formant_envelope);
+        render_signalsmith(infilename, outfilename, rate_envelope, pitch_envelope, formant_envelope,
+                           compen_formant_pitch, dontwrite);
     }
     if (app.got_subcommand("varispeed"))
     {
