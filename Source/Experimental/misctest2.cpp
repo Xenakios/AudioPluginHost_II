@@ -2,6 +2,7 @@
 #include "../Common/xap_breakpoint_envelope.h"
 #include "../Common/clap_eventsequence.h"
 #include "../Common/xen_modulators.h"
+#include <algorithm>
 #include <exception>
 #include <istream>
 #include <print>
@@ -161,17 +162,25 @@ void test_airwin_registry()
 
 void test_alt_multilfo()
 {
+    std::string jsonfilename = R"(C:\develop\AudioPluginHost_mk2\python\lfosettings.json)";
     double sr = 44100;
     AltMultiModulator modulator{sr};
     try
     {
-        auto jsontxt = choc::file::loadFileAsString(
-            R"(C:\develop\AudioPluginHost_mk2\python\lfosettings.json)");
+        auto jsontxt = choc::file::loadFileAsString(jsonfilename);
         auto tree = choc::json::parse(jsontxt);
-        for (int i = 0; i < 4; ++i)
+        for (int i = 0; i < AltMultiModulator::numLfos; ++i)
         {
-            modulator.lfo_rates[i] = tree["lfo" + std::to_string(i) + "rate"].getWithDefault(0.0);
-            modulator.lfo_shapes[i] = tree["lfo" + std::to_string(i) + "shape"].getWithDefault(0);
+            std::string prefix = "lfo" + std::to_string(i);
+            modulator.lfo_rates[i] =
+                std::clamp(tree[prefix + "rate"].getWithDefault(0.0), -7.0, 6.0);
+            modulator.lfo_shapes[i] = std::clamp(tree[prefix + "shape"].getWithDefault(0), 0, 8);
+            modulator.lfo_deforms[i] =
+                std::clamp(tree[prefix + "deform"].getWithDefault(0.0), -1.0, 1.0);
+            modulator.lfo_shifts[i] =
+                std::clamp(tree[prefix + "shift"].getWithDefault(0.0), -1.0, 1.0);
+            modulator.lfo_randseeds[i] = tree[prefix + "randseed"].getWithDefault(100 + 107 * i);
+            modulator.lfo_unipolars[i] = tree[prefix + "unipolar"].getWithDefault(0);
         }
         auto matrix = tree["modmatrix"];
         if (matrix.isArray())
@@ -192,17 +201,19 @@ void test_alt_multilfo()
     }
     catch (std::exception &ex)
     {
-        std::cout << ex.what() << "\n";
+        std::cout << "error parsing " << jsonfilename << " : " << ex.what() << "\n";
     }
-
+    for (int i = 0; i < AltMultiModulator::numLfos; ++i)
+    {
+        modulator.m_rngs[i].reseed(modulator.lfo_randseeds[i]);
+    }
+    unsigned int num_write_channels = 4;
     auto writer = xenakios::createWavWriter(
-        R"(C:\develop\AudioPluginHost_mk2\python\cdp8\multilfo.wav)", 2, sr);
+        R"(C:\develop\AudioPluginHost_mk2\python\cdp8\multilfo.wav)", num_write_channels, sr);
     unsigned long outnumsamples = sr * 4.0;
     auto blocksize = AltMultiModulator::BLOCKSIZE;
-    choc::buffer::ChannelArrayBuffer<float> writebuf{2, (unsigned int)blocksize};
+    choc::buffer::ChannelArrayBuffer<float> writebuf{num_write_channels, (unsigned int)blocksize};
     writebuf.clear();
-    unsigned long outcounter = 0;
-
     // modulator.mod_matrix[AltMultiModulator::MS_LFO0][AltMultiModulator::MD_Output0] = 1.00;
     // modulator.mod_matrix[AltMultiModulator::MS_LFO1][AltMultiModulator::MD_Output1] = 1.00;
     // modulator.mod_matrix[AltMultiModulator::MS_LFO1][AltMultiModulator::MD_LFO0Rate] = 1.0;
@@ -212,12 +223,13 @@ void test_alt_multilfo()
     // modulator.lfo_shapes[AltMultiModulator::MS_LFO1] = AltMultiModulator::lfo_t::Shape::SINE;
     // modulator.lfo_unipolars[AltMultiModulator::MS_LFO1] = 1.0;
     // modulator.lfo_shapes[AltMultiModulator::MS_LFO2] = AltMultiModulator::lfo_t::Shape::SH_NOISE;
+    unsigned long outcounter = 0;
     while (outcounter < outnumsamples)
     {
         modulator.process_block();
         for (int i = 0; i < blocksize; ++i)
         {
-            for (int j = 0; j < 2; ++j)
+            for (int j = 0; j < num_write_channels; ++j)
             {
                 writebuf.getSample(j, i) = modulator.output_values[j];
             }
