@@ -37,7 +37,7 @@ inline int render_signalsmith(std::string infile, std::string outfile,
     auto writer = wavformat.createWriter(outfile, outprops);
     if (!writer)
         return 1;
-    choc::buffer::ChannelArrayBuffer<float> readbuffer{inprops.numChannels, blockSize * 16};
+    choc::buffer::ChannelArrayBuffer<float> readbuffer{inprops.numChannels, blockSize * 17};
     readbuffer.clear();
     choc::buffer::ChannelArrayBuffer<float> writebuffer{inprops.numChannels, blockSize};
     writebuffer.clear();
@@ -46,9 +46,13 @@ inline int render_signalsmith(std::string infile, std::string outfile,
     {
         double tpos = inposcounter / inprops.sampleRate;
         double pfac = pitch_envelope.getValueAtPosition(tpos);
+        pfac = std::clamp(pfac, 0.125, 8.0);
         stretch->setTransposeFactor(pfac);
+        double forfac = formant_envelope.getValueAtPosition(tpos);
+        forfac = std::clamp(forfac, 0.125, 8.0);
+        stretch->setFormantFactor(forfac, true);
         double timefactor = rate_envelope.getValueAtPosition(tpos);
-
+        timefactor = std::clamp(timefactor, 0.01, 16.0);
         unsigned int framesToRead = timefactor * blockSize;
         auto inview = readbuffer.getFrameRange({0, framesToRead});
         reader->readFrames(inposcounter, inview);
@@ -72,12 +76,14 @@ int main(int argc, char **argv)
 
     std::vector<double> pitchautomation;
     std::vector<double> rate_automation;
+    std::vector<double> formant_automation;
     bool allow_overwrite = false;
     bool rate_in_octaves = false;
     sscommand->add_option("-i,--infile", infilename, "Input WAV file");
     sscommand->add_option("-o,--outfile", outfilename, "Output WAV file (32 bit float)");
     sscommand->add_option("--rate", rate_automation, "Time stretch amount (factor/octave)");
     sscommand->add_option("--pitch", pitchautomation, "Pitch shift (semitones)");
+    sscommand->add_option("--formant", formant_automation, "Formant shift (semitones)");
     sscommand->add_flag("--overwrite", allow_overwrite, "Overwrite output file even if it exists");
     sscommand->add_flag("--roct", rate_in_octaves, "Play rate is in time octaves");
     CLI11_PARSE(app, argc, argv);
@@ -115,6 +121,23 @@ int main(int argc, char **argv)
                     {pitchautomation[i], std::pow(2.0, 1.0 / 12.0 * pitchautomation[i + 1])});
             }
         }
+
+        if (formant_automation.size() == 1)
+        {
+            formant_envelope.addPoint({0.0, std::pow(2.0, 1.0 / 12 * formant_automation[0])});
+        }
+
+        if (formant_automation.size() > 1 && formant_automation.size() % 2 == 0)
+        {
+            std::cout << "command line has formant automation\n";
+            for (int i = 0; i < formant_automation.size(); i += 2)
+            {
+                std::cout << formant_automation[i] << "\t" << formant_automation[i + 1] << "\n";
+                formant_envelope.addPoint(
+                    {formant_automation[i], std::pow(2.0, 1.0 / 12.0 * formant_automation[i + 1])});
+            }
+        }
+
         if (rate_automation.size() == 1)
         {
             if (!rate_in_octaves)
