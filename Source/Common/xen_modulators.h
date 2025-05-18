@@ -1,5 +1,6 @@
 #pragma once
 
+#include "containers/choc_Value.h"
 #include "sst/basic-blocks/modulators/SimpleLFO.h"
 #include "sst/basic-blocks/mod-matrix/ModMatrix.h"
 #include "xap_utils.h"
@@ -535,12 +536,10 @@ class AltMultiModulator
     alignas(32) std::array<sst::basic_blocks::dsp::RNG, numLfos> m_rngs;
 };
 
-inline void init_multimod_from_json(AltMultiModulator &modulator, std::string jsonfilename)
+inline void init_multimod_from_value(AltMultiModulator &modulator, choc::value::ValueView tree)
 {
     try
     {
-        auto jsontxt = choc::file::loadFileAsString(jsonfilename);
-        auto tree = choc::json::parse(jsontxt);
         for (int i = 0; i < AltMultiModulator::numLfos; ++i)
         {
             std::string prefix = "lfo" + std::to_string(i);
@@ -573,7 +572,7 @@ inline void init_multimod_from_json(AltMultiModulator &modulator, std::string js
     }
     catch (std::exception &ex)
     {
-        std::cout << "error parsing " << jsonfilename << " : " << ex.what() << "\n";
+        std::cout << "error : " << ex.what() << "\n";
     }
     for (int i = 0; i < AltMultiModulator::numLfos; ++i)
     {

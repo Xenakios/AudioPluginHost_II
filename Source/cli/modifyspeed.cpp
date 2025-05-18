@@ -32,8 +32,14 @@ inline int render_signalsmith(std::string infile, std::string outfile,
     std::print("infile [samplerate {} Hz] [length {} seconds]\n", inprops.sampleRate,
                inprops.numFrames / inprops.sampleRate);
     auto multimod = std::make_unique<AltMultiModulator>(inprops.sampleRate);
-    init_multimod_from_json(*multimod,
-                            R"(C:\develop\AudioPluginHost_mk2\python\lfosettings2.json)");
+    auto jsontxt =
+        choc::file::loadFileAsString(R"(C:\develop\AudioPluginHost_mk2\python\lfosettings2.json)");
+    auto tree = choc::json::parse(jsontxt);
+    init_multimod_from_value(*multimod, tree);
+    double pitch_base = tree["pitch"].getWithDefault(0.0);
+    double pitch_mod_amt = tree["pitch_mod_depth"].getWithDefault(0.0);
+    double rate_base = tree["playrate"].getWithDefault(0.0);
+    double rate_mod_amt = tree["playrate_mod_depth"].getWithDefault(0.0);
     unsigned int blockSize = 64;
     auto stretch = std::make_unique<signalsmith::stretch::SignalsmithStretch<float>>();
     stretch->presetDefault(inprops.numChannels, inprops.sampleRate);
@@ -56,7 +62,7 @@ inline int render_signalsmith(std::string infile, std::string outfile,
     {
         multimod->process_block();
         double tpos = inposcounter / inprops.sampleRate;
-        double pitch = 0.0 + 12.0 * multimod->output_values[1];
+        double pitch = pitch_base + pitch_mod_amt * multimod->output_values[1];
         pitch = std::clamp(pitch, -36.0, 36.0);
         // double pfac = pitch_envelope.getValueAtPosition(tpos);
         double pfac = std::pow(2.0, 1.0 / 12 * pitch);
@@ -65,8 +71,10 @@ inline int render_signalsmith(std::string infile, std::string outfile,
         double forfac = formant_envelope.getValueAtPosition(tpos);
         forfac = std::clamp(forfac, 0.125, 8.0);
         stretch->setFormantFactor(forfac, compensate_formant_pitch);
-        double timefactor = rate_envelope.getValueAtPosition(tpos);
-        timefactor = std::clamp(timefactor, 0.01, 16.0);
+        // double timefactor = rate_envelope.getValueAtPosition(tpos);
+        double timefactor = rate_base + rate_mod_amt * multimod->output_values[0];
+        timefactor = std::clamp(timefactor, -4.0, 4.0);
+        timefactor = std::pow(2.0, timefactor);
         unsigned int framesToRead = timefactor * blockSize;
         auto inview = readbuffer.getFrameRange({0, framesToRead});
         reader->readFrames(inposcounter, inview);
