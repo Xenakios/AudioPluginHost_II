@@ -12,6 +12,82 @@
 #include "../Common/xap_breakpoint_envelope.h"
 #include "text/choc_Files.h"
 #include "text/choc_StringUtilities.h"
+#include "sst\basic-blocks\dsp\LanczosResampler.h"
+
+inline int render_varispeed(std::string infile, std::string outfile,
+                            xenakios::Envelope &pitch_envelope)
+{
+    if (pitch_envelope.getNumPoints() == 0)
+        pitch_envelope.addPoint({0.0, 0.0});
+    choc::audio::WAVAudioFileFormat<true> wavformat;
+    auto reader = wavformat.createReader(infile);
+    if (!reader)
+        return 1;
+    auto resampler = std::make_unique<sst::basic_blocks::dsp::LanczosResampler<128>>(1.0, 1.0);
+
+    auto inprops = reader->getProperties();
+    std::print("infile [samplerate {} Hz] [length {} seconds]\n", inprops.sampleRate,
+               inprops.numFrames / inprops.sampleRate);
+    unsigned int blockSize = 128;
+    choc::audio::AudioFileProperties outprops;
+    outprops.sampleRate = inprops.sampleRate;
+    outprops.bitDepth = choc::audio::BitDepth::float32;
+    outprops.numChannels = inprops.numChannels;
+
+    std::unique_ptr<choc::audio::AudioFileWriter> writer;
+    writer = wavformat.createWriter(outfile, outprops);
+    if (!writer)
+        return 1;
+    choc::buffer::ChannelArrayBuffer<float> readbuffer{inprops.numChannels, blockSize * 33};
+    readbuffer.clear();
+    choc::buffer::ChannelArrayBuffer<float> writebuffer{inprops.numChannels, blockSize};
+    writebuffer.clear();
+    choc::buffer::ChannelArrayBuffer<float> processbuffer{2, blockSize};
+    processbuffer.clear();
+    int inposcounter = 0;
+    int outposcounter = 0;
+    while (inposcounter < inprops.numFrames)
+    {
+        double tpos = inposcounter / inprops.sampleRate;
+        double rate = pitch_envelope.getValueAtPosition(tpos);
+        rate = std::clamp(rate, -60.0, 60.0);
+        rate = std::pow(2.0, 1.0 / 12 * rate);
+        resampler->sri = inprops.sampleRate;
+        resampler->sro = inprops.sampleRate / rate;
+        resampler->dPhaseO = inprops.sampleRate / resampler->sro;
+        unsigned int framestoread = resampler->inputsRequiredToGenerateOutputs(blockSize);
+        auto inview = readbuffer.getFrameRange({0, framestoread});
+        reader->readFrames(inposcounter, inview);
+        for (int i = 0; i < framestoread; ++i)
+        {
+            if (inprops.numChannels == 1)
+            {
+                resampler->push(inview.getSample(0, i), 0.0f);
+            }
+            if (inprops.numChannels == 2)
+            {
+                resampler->push(inview.getSample(0, i), inview.getSample(1, i));
+            }
+        }
+        float *rsoutleft = processbuffer.getView().data.channels[0];
+        float *rsoutright = processbuffer.getView().data.channels[1];
+        auto produced = resampler->populateNext(rsoutleft, rsoutright, blockSize);
+        for (int i = 0; i < blockSize; ++i)
+        {
+            if (inprops.numChannels == 1)
+            {
+                writebuffer.getSample(0, i) = processbuffer.getSample(0, i);
+            }
+            if (inprops.numChannels == 2)
+            {
+                writebuffer.getSample(0, i) = processbuffer.getSample(0, i);
+                writebuffer.getSample(1, i) = processbuffer.getSample(1, i);
+            }
+        }
+        writer->appendFrames(writebuffer.getView());
+        inposcounter += framestoread;
+    }
+}
 
 inline int render_signalsmith(std::string infile, std::string outfile,
                               xenakios::Envelope &rate_envelope, bool rate_is_octaves,
@@ -183,6 +259,11 @@ int main(int argc, char **argv)
                         "play rate processing");
 
     sscommand->add_option("--pitch", pitch_string, "Pitch in semitones/breakpoint file name");
+
+    rscommand->add_option("-i,--infile", infilename, "Input WAV file");
+    rscommand->add_option("-o,--outfile", outfilename, "Output WAV file (32 bit float)");
+    rscommand->add_option("--pitch", pitch_string, "Pitch in semitones/breakpoint file name");
+    rscommand->add_flag("--overwrite", allow_overwrite, "Overwrite output file even if it exists");
     CLI11_PARSE(app, argc, argv);
 
     if (app.got_subcommand("signalsmith"))
@@ -194,14 +275,16 @@ int main(int argc, char **argv)
         }
         if (std::filesystem::exists(outfilename))
         {
-            std::cout << "output file already exists...\n";
+
             if (allow_overwrite)
-                std::cout << "but will overwrite it\n";
+                std::cout << "output file already exists, but will overwrite it\n";
             else
+            {
+                std::cout << "output file already exists!\n";
                 return 1;
+            }
         }
-        std::cout << "processing with signalsmith stretch...\n";
-        std::cout << infilename << " -> " << outfilename << "\n";
+
         xenakios::Envelope rate_envelope;
         if (!rate_string.empty())
             init_envelope_from_string(rate_envelope, rate_string);
@@ -211,12 +294,38 @@ int main(int argc, char **argv)
         xenakios::Envelope formant_envelope;
         if (!formant_string.empty())
             init_envelope_from_string(formant_envelope, formant_string);
-        render_signalsmith(infilename, outfilename, rate_envelope, rate_in_octaves, pitch_envelope,
-                           formant_envelope, compen_formant_pitch, dontwrite);
+        std::cout << "processing with signalsmith stretch...\n";
+        std::cout << infilename << " -> " << outfilename << "\n";
+        auto err =
+            render_signalsmith(infilename, outfilename, rate_envelope, rate_in_octaves,
+                               pitch_envelope, formant_envelope, compen_formant_pitch, dontwrite);
+        return err;
     }
     if (app.got_subcommand("varispeed"))
     {
+        if (!std::filesystem::exists(infilename))
+        {
+            std::cout << "input file " << infilename << " does not exist\n";
+            return 1;
+        }
+        if (std::filesystem::exists(outfilename))
+        {
+
+            if (allow_overwrite)
+                std::cout << "output file already exists, but will overwrite it\n";
+            else
+            {
+                std::cout << "output file already exists!\n";
+                return 1;
+            }
+        }
+
+        xenakios::Envelope pitch_envelope;
+        if (!pitch_string.empty())
+            init_envelope_from_string(pitch_envelope, pitch_string);
         std::cout << "processing with resampling varispeed...\n";
+        std::cout << infilename << " -> " << outfilename << "\n";
+        render_varispeed(infilename, outfilename, pitch_envelope);
     }
     return 0;
 }
