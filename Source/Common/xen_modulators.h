@@ -6,6 +6,8 @@
 #include "clap_eventsequence.h"
 #include "xap_breakpoint_envelope.h"
 #include <stdexcept>
+#include "text/choc_Files.h"
+#include "text/choc_JSON.h"
 
 template <size_t BLOCK_SIZE> class SimpleLFO
 {
@@ -532,3 +534,49 @@ class AltMultiModulator
     alignas(32) float table_envrate_linear[512];
     alignas(32) std::array<sst::basic_blocks::dsp::RNG, numLfos> m_rngs;
 };
+
+inline void init_multimod_from_json(AltMultiModulator &modulator, std::string jsonfilename)
+{
+    try
+    {
+        auto jsontxt = choc::file::loadFileAsString(jsonfilename);
+        auto tree = choc::json::parse(jsontxt);
+        for (int i = 0; i < AltMultiModulator::numLfos; ++i)
+        {
+            std::string prefix = "lfo" + std::to_string(i);
+            modulator.lfo_rates[i] =
+                std::clamp(tree[prefix + "rate"].getWithDefault(0.0), -7.0, 6.0);
+            modulator.lfo_shapes[i] = std::clamp(tree[prefix + "shape"].getWithDefault(0), 0, 8);
+            modulator.lfo_deforms[i] =
+                std::clamp(tree[prefix + "deform"].getWithDefault(0.0), -1.0, 1.0);
+            modulator.lfo_shifts[i] =
+                std::clamp(tree[prefix + "shift"].getWithDefault(0.0), -1.0, 1.0);
+            modulator.lfo_randseeds[i] = tree[prefix + "randseed"].getWithDefault(100 + 107 * i);
+            modulator.lfo_unipolars[i] = tree[prefix + "unipolar"].getWithDefault(0);
+        }
+        auto matrix = tree["modmatrix"];
+        if (matrix.isArray())
+        {
+            for (int i = 0; i < matrix.size(); ++i)
+            {
+                auto mentry = matrix[i];
+                int source = mentry["s"].get<int>();
+                int dest = mentry["d"].get<int>();
+                double amt = mentry["a"].get<double>();
+                if (source >= 0 && source < AltMultiModulator::numModulationSources && dest >= 0 &&
+                    dest < AltMultiModulator::numModulationDestinations)
+                {
+                    modulator.mod_matrix[source][dest] = amt;
+                }
+            }
+        }
+    }
+    catch (std::exception &ex)
+    {
+        std::cout << "error parsing " << jsonfilename << " : " << ex.what() << "\n";
+    }
+    for (int i = 0; i < AltMultiModulator::numLfos; ++i)
+    {
+        modulator.m_rngs[i].reseed(modulator.lfo_randseeds[i]);
+    }
+}

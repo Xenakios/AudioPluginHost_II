@@ -1,6 +1,7 @@
 #include "audio/choc_AudioFileFormat.h"
 #include "audio/choc_SampleBuffers.h"
 #include "audio/choc_AudioFileFormat_WAV.h"
+#include <algorithm>
 #include <exception>
 #include <filesystem>
 #include <iostream>
@@ -8,6 +9,7 @@
 #include "signalsmith-stretch.h"
 #include "CLI11.hpp"
 #include "../Common/xap_breakpoint_envelope.h"
+#include "../Common/xen_modulators.h"
 
 inline int render_signalsmith(std::string infile, std::string outfile,
                               xenakios::Envelope &rate_envelope, xenakios::Envelope &pitch_envelope,
@@ -20,6 +22,7 @@ inline int render_signalsmith(std::string infile, std::string outfile,
         pitch_envelope.addPoint({0.0, 1.0});
     if (formant_envelope.getNumPoints() == 0)
         formant_envelope.addPoint({0.0, 1.0});
+
     choc::audio::WAVAudioFileFormat<true> wavformat;
     auto reader = wavformat.createReader(infile);
     if (!reader)
@@ -28,7 +31,10 @@ inline int render_signalsmith(std::string infile, std::string outfile,
     auto inprops = reader->getProperties();
     std::print("infile [samplerate {} Hz] [length {} seconds]\n", inprops.sampleRate,
                inprops.numFrames / inprops.sampleRate);
-    unsigned int blockSize = 512;
+    auto multimod = std::make_unique<AltMultiModulator>(inprops.sampleRate);
+    init_multimod_from_json(*multimod,
+                            R"(C:\develop\AudioPluginHost_mk2\python\lfosettings2.json)");
+    unsigned int blockSize = 64;
     auto stretch = std::make_unique<signalsmith::stretch::SignalsmithStretch<float>>();
     stretch->presetDefault(inprops.numChannels, inprops.sampleRate);
     choc::audio::AudioFileProperties outprops;
@@ -48,8 +54,12 @@ inline int render_signalsmith(std::string infile, std::string outfile,
     int outposcounter = 0;
     while (inposcounter < inprops.numFrames)
     {
+        multimod->process_block();
         double tpos = inposcounter / inprops.sampleRate;
-        double pfac = pitch_envelope.getValueAtPosition(tpos);
+        double pitch = 0.0 + 12.0 * multimod->output_values[1];
+        pitch = std::clamp(pitch, -36.0, 36.0);
+        // double pfac = pitch_envelope.getValueAtPosition(tpos);
+        double pfac = std::pow(2.0, 1.0 / 12 * pitch);
         pfac = std::clamp(pfac, 0.125, 8.0);
         stretch->setTransposeFactor(pfac);
         double forfac = formant_envelope.getValueAtPosition(tpos);
@@ -100,7 +110,8 @@ int main(int argc, char **argv)
     sscommand->add_option("--formant", formant_automation, "Formant shift (semitones)");
     sscommand->add_flag("--overwrite", allow_overwrite, "Overwrite output file even if it exists");
     sscommand->add_flag("--roct", rate_in_octaves, "Play rate is in time octaves");
-    sscommand->add_flag("--cfp", compen_formant_pitch, "Attempt formant correction when pitch shifting");
+    sscommand->add_flag("--cfp", compen_formant_pitch,
+                        "Attempt formant correction when pitch shifting");
     sscommand->add_flag("--odur", dontwrite,
                         "Don't write output file, only print out how long it would be with the "
                         "play rate processing");

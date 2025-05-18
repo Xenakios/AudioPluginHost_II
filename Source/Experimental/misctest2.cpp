@@ -160,53 +160,14 @@ void test_airwin_registry()
 #endif
 }
 
+
 void test_alt_multilfo()
 {
     std::string jsonfilename = R"(C:\develop\AudioPluginHost_mk2\python\lfosettings.json)";
     double sr = 44100;
     AltMultiModulator modulator{sr};
-    try
-    {
-        auto jsontxt = choc::file::loadFileAsString(jsonfilename);
-        auto tree = choc::json::parse(jsontxt);
-        for (int i = 0; i < AltMultiModulator::numLfos; ++i)
-        {
-            std::string prefix = "lfo" + std::to_string(i);
-            modulator.lfo_rates[i] =
-                std::clamp(tree[prefix + "rate"].getWithDefault(0.0), -7.0, 6.0);
-            modulator.lfo_shapes[i] = std::clamp(tree[prefix + "shape"].getWithDefault(0), 0, 8);
-            modulator.lfo_deforms[i] =
-                std::clamp(tree[prefix + "deform"].getWithDefault(0.0), -1.0, 1.0);
-            modulator.lfo_shifts[i] =
-                std::clamp(tree[prefix + "shift"].getWithDefault(0.0), -1.0, 1.0);
-            modulator.lfo_randseeds[i] = tree[prefix + "randseed"].getWithDefault(100 + 107 * i);
-            modulator.lfo_unipolars[i] = tree[prefix + "unipolar"].getWithDefault(0);
-        }
-        auto matrix = tree["modmatrix"];
-        if (matrix.isArray())
-        {
-            for (int i = 0; i < matrix.size(); ++i)
-            {
-                auto mentry = matrix[i];
-                int source = mentry["s"].get<int>();
-                int dest = mentry["d"].get<int>();
-                double amt = mentry["a"].get<double>();
-                if (source >= 0 && source < AltMultiModulator::numModulationSources && dest >= 0 &&
-                    dest < AltMultiModulator::numModulationDestinations)
-                {
-                    modulator.mod_matrix[source][dest] = amt;
-                }
-            }
-        }
-    }
-    catch (std::exception &ex)
-    {
-        std::cout << "error parsing " << jsonfilename << " : " << ex.what() << "\n";
-    }
-    for (int i = 0; i < AltMultiModulator::numLfos; ++i)
-    {
-        modulator.m_rngs[i].reseed(modulator.lfo_randseeds[i]);
-    }
+    init_multimod_from_json(modulator, jsonfilename);
+
     unsigned int num_write_channels = 4;
     auto writer = xenakios::createWavWriter(
         R"(C:\develop\AudioPluginHost_mk2\python\cdp8\multilfo.wav)", num_write_channels, sr);
