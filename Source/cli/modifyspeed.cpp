@@ -6,10 +6,13 @@
 #include <filesystem>
 #include <iostream>
 #include <print>
+#include <stdexcept>
 #include "signalsmith-stretch.h"
 #include "CLI11.hpp"
 #include "../Common/xap_breakpoint_envelope.h"
 #include "../Common/xen_modulators.h"
+#include "text/choc_Files.h"
+#include "text/choc_StringUtilities.h"
 
 inline int render_signalsmith(std::string infile, std::string outfile,
                               xenakios::Envelope &rate_envelope, xenakios::Envelope &pitch_envelope,
@@ -43,6 +46,9 @@ inline int render_signalsmith(std::string infile, std::string outfile,
     unsigned int blockSize = 64;
     auto stretch = std::make_unique<signalsmith::stretch::SignalsmithStretch<float>>();
     stretch->presetDefault(inprops.numChannels, inprops.sampleRate);
+    int olatency = stretch->outputLatency();
+    std::cout << "input latency " << stretch->inputLatency() << " output latency "
+              << stretch->outputLatency() << "\n";
     choc::audio::AudioFileProperties outprops;
     outprops.sampleRate = inprops.sampleRate;
     outprops.bitDepth = choc::audio::BitDepth::float32;
@@ -62,7 +68,8 @@ inline int render_signalsmith(std::string infile, std::string outfile,
     {
         multimod->process_block();
         double tpos = inposcounter / inprops.sampleRate;
-        double pitch = pitch_base + pitch_mod_amt * multimod->output_values[1];
+        // double pitch = pitch_base + pitch_mod_amt * multimod->output_values[1];
+        double pitch = pitch_envelope.getValueAtPosition(tpos);
         pitch = std::clamp(pitch, -36.0, 36.0);
         // double pfac = pitch_envelope.getValueAtPosition(tpos);
         double pfac = std::pow(2.0, 1.0 / 12 * pitch);
@@ -71,10 +78,10 @@ inline int render_signalsmith(std::string infile, std::string outfile,
         double forfac = formant_envelope.getValueAtPosition(tpos);
         forfac = std::clamp(forfac, 0.125, 8.0);
         stretch->setFormantFactor(forfac, compensate_formant_pitch);
-        // double timefactor = rate_envelope.getValueAtPosition(tpos);
-        double timefactor = rate_base + rate_mod_amt * multimod->output_values[0];
+        double timefactor = rate_envelope.getValueAtPosition(tpos);
+        // double timefactor = rate_base + rate_mod_amt * multimod->output_values[0];
         timefactor = std::clamp(timefactor, -4.0, 4.0);
-        timefactor = std::pow(2.0, timefactor);
+        // timefactor = std::pow(2.0, timefactor);
         unsigned int framesToRead = timefactor * blockSize;
         auto inview = readbuffer.getFrameRange({0, framesToRead});
         reader->readFrames(inposcounter, inview);
@@ -82,7 +89,20 @@ inline int render_signalsmith(std::string infile, std::string outfile,
         {
             stretch->process(inview.data.channels, framesToRead,
                              writebuffer.getView().data.channels, blockSize);
-            writer->appendFrames(writebuffer.getView());
+            int framesToWrite = blockSize;
+            if (outposcounter < olatency)
+            {
+                framesToWrite = (outposcounter - olatency) + blockSize;
+                if (framesToWrite < 0)
+                    framesToWrite = 0;
+            }
+            if (framesToWrite > 0)
+            {
+                unsigned int startFrame = blockSize - framesToWrite;
+                unsigned int endFrame = startFrame + framesToWrite;
+                auto outview = writebuffer.getFrameRange({startFrame, endFrame});
+                writer->appendFrames(outview);
+            }
         }
 
         inposcounter += framesToRead;
@@ -92,6 +112,39 @@ inline int render_signalsmith(std::string infile, std::string outfile,
         std::cout << "output file would have length of " << outposcounter / inprops.sampleRate
                   << " seconds\n";
     return 0;
+}
+
+inline void init_envelope_from_string(xenakios::Envelope &env, std::string str)
+{
+    try
+    {
+        if (std::filesystem::exists(str))
+        {
+            std::cout << "loading " << str << " as envelope\n";
+            auto envtxt = choc::file::loadFileAsString(str);
+            auto lines = choc::text::splitIntoLines(envtxt, false);
+            for (const auto &line : lines)
+            {
+                auto tokens = choc::text::splitString(line, ' ', false);
+                if (tokens.size() >= 2)
+                {
+                    double time = std::stod(tokens[0]);
+                    double value = std::stod(tokens[1]);
+                    env.addPoint({time, value});
+                }
+            }
+        }
+        else
+        {
+            double val = std::stod(str);
+            std::cout << "parsed value " << val << "\n";
+            env.addPoint({0.0, val});
+        }
+    }
+    catch (std::exception &ex)
+    {
+        std::cout << ex.what() << "\n";
+    }
 }
 
 int main(int argc, char **argv)
@@ -111,6 +164,8 @@ int main(int argc, char **argv)
     bool rate_in_octaves = false;
     bool compen_formant_pitch = false;
     bool dontwrite = false;
+    double foo_float = 1.0;
+    std::string foo_string;
     sscommand->add_option("-i,--infile", infilename, "Input WAV file");
     sscommand->add_option("-o,--outfile", outfilename, "Output WAV file (32 bit float)");
     sscommand->add_option("--rate", rate_automation, "Time stretch amount (factor/octave)");
@@ -123,7 +178,10 @@ int main(int argc, char **argv)
     sscommand->add_flag("--odur", dontwrite,
                         "Don't write output file, only print out how long it would be with the "
                         "play rate processing");
+
+    sscommand->add_flag("--foo", foo_string, "Foo string");
     CLI11_PARSE(app, argc, argv);
+
     if (app.got_subcommand("signalsmith"))
     {
         if (!std::filesystem::exists(infilename))
@@ -143,10 +201,11 @@ int main(int argc, char **argv)
         std::cout << infilename << " -> " << outfilename << "\n";
         xenakios::Envelope rate_envelope;
         xenakios::Envelope pitch_envelope;
+        init_envelope_from_string(pitch_envelope, foo_string);
         xenakios::Envelope formant_envelope;
         if (pitchautomation.size() == 1)
         {
-            pitch_envelope.addPoint({0.0, std::pow(2.0, 1.0 / 12 * pitchautomation[0])});
+            // pitch_envelope.addPoint({0.0, std::pow(2.0, 1.0 / 12 * pitchautomation[0])});
         }
         if (pitchautomation.size() > 1 && pitchautomation.size() % 2 == 0)
         {
@@ -154,8 +213,8 @@ int main(int argc, char **argv)
             for (int i = 0; i < pitchautomation.size(); i += 2)
             {
                 std::cout << pitchautomation[i] << "\t" << pitchautomation[i + 1] << "\n";
-                pitch_envelope.addPoint(
-                    {pitchautomation[i], std::pow(2.0, 1.0 / 12.0 * pitchautomation[i + 1])});
+                // pitch_envelope.addPoint(
+                //     {pitchautomation[i], std::pow(2.0, 1.0 / 12.0 * pitchautomation[i + 1])});
             }
         }
 
