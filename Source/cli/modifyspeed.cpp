@@ -72,16 +72,11 @@ inline int render_varispeed(std::string infile, std::string outfile,
         float *rsoutleft = processbuffer.getView().data.channels[0];
         float *rsoutright = processbuffer.getView().data.channels[1];
         auto produced = resampler->populateNext(rsoutleft, rsoutright, blockSize);
-        for (int i = 0; i < blockSize; ++i)
+        for (int j = 0; j < inprops.numChannels; ++j)
         {
-            if (inprops.numChannels == 1)
+            for (int i = 0; i < blockSize; ++i)
             {
-                writebuffer.getSample(0, i) = processbuffer.getSample(0, i);
-            }
-            if (inprops.numChannels == 2)
-            {
-                writebuffer.getSample(0, i) = processbuffer.getSample(0, i);
-                writebuffer.getSample(1, i) = processbuffer.getSample(1, i);
+                writebuffer.getSample(j, i) = processbuffer.getSample(j, i);
             }
         }
         writer->appendFrames(writebuffer.getView());
