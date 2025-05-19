@@ -64,13 +64,14 @@ inline int render_scrub(std::string infile, std::string outfile, xenakios::Envel
         float outputs[2];
         for (int i = 0; i < blocksize; ++i)
         {
-            scrubber->processFrame(outputs, inprops.numChannels, inprops.sampleRate, 5.0);
+            scrubber->processFrame(outputs, inprops.numChannels, inprops.sampleRate, 2.0);
             writebuffer.getSample(0, i) = outputs[0];
             writebuffer.getSample(1, i) = outputs[1];
         }
         writer->appendFrames(writebuffer);
         outcounter += blocksize;
     }
+    writer->flush();
 }
 
 inline int render_varispeed(std::string infile, std::string outfile,
@@ -141,6 +142,7 @@ inline int render_varispeed(std::string infile, std::string outfile,
         writer->appendFrames(writebuffer.getView());
         inposcounter += framestoread;
     }
+    writer->flush();
 }
 
 inline int render_signalsmith(std::string infile, std::string outfile,
@@ -232,7 +234,7 @@ inline int render_signalsmith(std::string infile, std::string outfile,
         inposcounter += framesToRead;
         outposcounter += blockSize;
     }
-
+    writer->flush();
     std::cout << "output file length is " << outposcounter / inprops.sampleRate << " seconds\n";
     return 0;
 }
