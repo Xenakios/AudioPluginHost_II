@@ -347,8 +347,12 @@ template <typename T, size_t N, size_t M = 256> struct Sinc
                   int sposmin, int sposmax)
     {
         auto sincTableOffset = (size_t)((1.0 - delayFrac) * (T)M) * N * 2;
+        for (int i = 0; i < N; ++i)
+        {
+            srcbuf[i] =
+                buffer.getBufferSampleSafeAndFade(delayInt + i, channel, sposmin, sposmax, 512);
+        }
 
-        buffer.getSamplesSafeAndFade(srcbuf, delayInt, N, channel, sposmin, sposmax, 512);
 #ifndef SIMDSINC
         auto out = ((T)0);
         for (size_t i = 0; i < N; i += 1)
@@ -496,9 +500,9 @@ class BufferScrubber
                 }
                 else
                 {
-                    // float y2 = m_sinc_interpolator.call(*m_src, index0, frac, bogus, i,
-                    //                                     srcstartsamples, srcendsamples);
-                    // outbuf[i] = y2 * gain;
+                    float y2 = m_sinc_interpolator.call(*this, index0, frac, bogus, i,
+                                                        srcstartsamples, srcendsamples);
+                    outbuf[i] = y2 * gain;
                 }
             }
             else
