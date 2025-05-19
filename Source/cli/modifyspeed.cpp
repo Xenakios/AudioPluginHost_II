@@ -15,7 +15,7 @@
 #include "sst\basic-blocks\dsp\LanczosResampler.h"
 #include "scrub.h"
 
-inline int render_scrub(std::string infile, std::string outfile, xenakios::Envelope &scan_env)
+inline int render_scrub(std::string infile, std::string outfile, xenakios::Envelope &scan_env, bool use_sinc)
 {
     if (scan_env.getNumPoints() < 1)
         return 1;
@@ -44,6 +44,8 @@ inline int render_scrub(std::string infile, std::string outfile, xenakios::Envel
     scanbuffer.clear();
     reader->readFrames(0, scanbuffer.getView());
     auto scrubber = std::make_unique<BufferScrubber>(scanbuffer, inprops.sampleRate);
+    if (use_sinc)
+        scrubber->m_resampler_type = 1;
     unsigned int blocksize = 128;
     int outcounter = 0;
     int outlen =
@@ -52,7 +54,7 @@ inline int render_scrub(std::string infile, std::string outfile, xenakios::Envel
         return 1;
     choc::buffer::ChannelArrayBuffer<float> writebuffer{{2, (unsigned int)blocksize}};
     writebuffer.clear();
-    scrubber->setSeparation(0.51);
+    // scrubber->setSeparation(0.51);
     while (outcounter < outlen)
     {
         double tpos = outcounter / inprops.sampleRate;
@@ -296,6 +298,7 @@ int main(int argc, char **argv)
     bool rate_in_octaves = false;
     bool compen_formant_pitch = false;
     bool dontwrite = false;
+    bool scrub_sinc = false;
     double foo_float = 1.0;
     std::string rate_string;
     std::string pitch_string;
@@ -329,7 +332,8 @@ int main(int argc, char **argv)
     scrubcommand->add_option("--scan", scrub_string, "Breakpoint file with scrub curve");
     scrubcommand->add_flag("--overwrite", allow_overwrite,
                            "Overwrite output file even if it exists");
-
+    scrubcommand->add_flag("--sinc", scrub_sinc,
+                           "Use higher quality (sinc) interpolation");
     CLI11_PARSE(app, argc, argv);
 
     if (app.got_subcommand("signalsmith"))
@@ -417,7 +421,7 @@ int main(int argc, char **argv)
             init_envelope_from_string(scrub_envelope, scrub_string);
         std::cout << "processing with scrub...\n";
         std::cout << infilename << " -> " << outfilename << "\n";
-        render_scrub(infilename, outfilename, scrub_envelope);
+        render_scrub(infilename, outfilename, scrub_envelope, scrub_sinc);
     }
     return 0;
 }
