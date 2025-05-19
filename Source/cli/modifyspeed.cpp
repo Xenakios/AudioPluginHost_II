@@ -71,7 +71,7 @@ inline int render_scrub(std::string infile, std::string outfile, xenakios::Envel
         writer->appendFrames(writebuffer);
         outcounter += blocksize;
     }
-    writer->flush();
+    return 0;
 }
 
 inline int render_varispeed(std::string infile, std::string outfile,
@@ -142,7 +142,7 @@ inline int render_varispeed(std::string infile, std::string outfile,
         writer->appendFrames(writebuffer.getView());
         inposcounter += framestoread;
     }
-    writer->flush();
+    return 0;
 }
 
 inline int render_signalsmith(std::string infile, std::string outfile,
@@ -234,7 +234,6 @@ inline int render_signalsmith(std::string infile, std::string outfile,
         inposcounter += framesToRead;
         outposcounter += blockSize;
     }
-    writer->flush();
     std::cout << "output file length is " << outposcounter / inprops.sampleRate << " seconds\n";
     return 0;
 }
