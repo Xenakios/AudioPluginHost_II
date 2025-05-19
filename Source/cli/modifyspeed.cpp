@@ -15,10 +15,15 @@
 #include "sst\basic-blocks\dsp\LanczosResampler.h"
 #include "scrub.h"
 
-inline int render_scrub(std::string infile, std::string outfile, xenakios::Envelope &scan_env, bool use_sinc)
+inline int render_scrub(std::string infile, std::string outfile, xenakios::Envelope &scan_env,
+                        bool use_sinc)
 {
-    if (scan_env.getNumPoints() < 1)
+    if (scan_env.getNumPoints() < 2)
+    {
+        std::cout << "error : scan envelope should have at least 2 breakpoints\n";
         return 1;
+    }
+
     choc::audio::WAVAudioFileFormat<true> wavformat;
     auto reader = wavformat.createReader(infile);
     if (!reader)
@@ -333,8 +338,7 @@ int main(int argc, char **argv)
     scrubcommand->add_option("--scan", scrub_string, "Breakpoint file with scrub curve");
     scrubcommand->add_flag("--overwrite", allow_overwrite,
                            "Overwrite output file even if it exists");
-    scrubcommand->add_flag("--sinc", scrub_sinc,
-                           "Use higher quality (sinc) interpolation");
+    scrubcommand->add_flag("--sinc", scrub_sinc, "Use higher quality (sinc) interpolation");
     CLI11_PARSE(app, argc, argv);
 
     if (app.got_subcommand("signalsmith"))

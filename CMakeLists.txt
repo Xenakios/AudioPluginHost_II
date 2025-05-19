@@ -155,6 +155,7 @@ add_executable(modifyspeed
     )
 # Source/Experimental/xaudiograph.cpp
 target_compile_definitions(modifyspeed PRIVATE XENPYTHONBINDINGS=0 NOJUCE=1 _USE_MATH_DEFINES=1 __WINDOWS_WASAPI__)
+target_compile_options(modifyspeed PRIVATE -Werror=return-type)
 
 add_executable(olctest
     Source/Experimental/olctest.cpp
