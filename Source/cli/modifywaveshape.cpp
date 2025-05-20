@@ -6,8 +6,10 @@
 #include "audio/choc_AudioFileFormat_WAV.h"
 #include "include/sst/waveshapers.h"
 #include "include/sst/waveshapers/WaveshaperConfiguration.h"
+#include "../Common/xap_breakpoint_envelope.h"
 
-inline int render_waveshaper(std::string infile, std::string outfile, int wstypei)
+inline int render_waveshaper(std::string infile, std::string outfile,
+                             xenakios::Envelope &wstype_env)
 {
     choc::audio::WAVAudioFileFormat<true> wavformat;
     auto reader = wavformat.createReader(infile);
@@ -29,17 +31,7 @@ inline int render_waveshaper(std::string infile, std::string outfile, int wstype
     }
     sst::waveshapers::QuadWaveshaperState wss{};
     float R[sst::waveshapers::n_waveshaper_registers];
-    auto wstype = sst::waveshapers::WaveshaperType(wstypei);
-    initializeWaveshaperRegister(wstype, R);
-
-    for (int i = 0; i < sst::waveshapers::n_waveshaper_registers; ++i)
-    {
-        wss.R[i] = _mm_set1_ps(R[i]);
-    }
-
-    wss.init = _mm_cmpneq_ps(_mm_setzero_ps(), _mm_setzero_ps());
-    auto wsptr = sst::waveshapers::GetQuadWaveshaper(wstype);
-
+    int oldtype = (int)sst::waveshapers::WaveshaperType::wst_none;
     double ingain = 4.0;
 
     unsigned int blocksize = 64;
@@ -48,8 +40,26 @@ inline int render_waveshaper(std::string infile, std::string outfile, int wstype
     choc::buffer::ChannelArrayBuffer<float> writebuffer{inprops.numChannels, blocksize};
     writebuffer.clear();
     int outcounter = 0;
+    auto wsptr = sst::waveshapers::GetQuadWaveshaper(sst::waveshapers::WaveshaperType::wst_none);
     while (outcounter < inprops.numFrames)
     {
+        double tpos = outcounter / inprops.sampleRate;
+        int next_type = wstype_env.getValueAtPosition(tpos);
+        next_type = std::clamp(next_type, 1, 44);
+        if (next_type != oldtype)
+        {
+            oldtype = next_type;
+            auto wstype = sst::waveshapers::WaveshaperType(oldtype);
+            initializeWaveshaperRegister(wstype, R);
+
+            for (int i = 0; i < sst::waveshapers::n_waveshaper_registers; ++i)
+            {
+                wss.R[i] = _mm_set1_ps(R[i]);
+            }
+
+            wss.init = _mm_cmpneq_ps(_mm_setzero_ps(), _mm_setzero_ps());
+            wsptr = sst::waveshapers::GetQuadWaveshaper(wstype);
+        }
         reader->readFrames(outcounter, readbuffer.getView());
         float din alignas(16)[4] = {0, 0, 0, 0};
         auto *leftData = readbuffer.getView().data.channels[0];
@@ -89,5 +99,9 @@ int main(int argc, char **argv)
     app.add_option("--ws", wstype, "Waveshaper type");
     CLI11_PARSE(app, argc, argv);
     wstype = std::clamp(wstype, 0, 44);
-    render_waveshaper(infile, outfile, wstype);
+    xenakios::Envelope ws_envelope;
+    ws_envelope.addPoint({0.0, 1.0});
+    ws_envelope.addPoint({2.0, 44.0});
+    ws_envelope.addPoint({10.0, 20.0});
+    render_waveshaper(infile, outfile, ws_envelope);
 }
