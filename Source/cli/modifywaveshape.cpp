@@ -1,16 +1,15 @@
 #include <string>
 #include <cmath>
-// #include "include/sst/waveshapers/QuadWaveshaper.h"
+#include "include/sst/waveshapers/WaveshaperConfiguration.h"
+#include "include/sst/waveshapers/WaveshaperTables.h"
 #include "sst/basic-blocks/simd/setup.h"
 #include "include/sst/waveshapers.h"
-// #include "include/sst/waveshapers/WaveshaperConfiguration.h"
-// #include "include/sst/waveshapers/QuadWaveshaper.h"
 #include <iostream>
+#include <print>
 #include "CLI11.hpp"
 #include "audio/choc_AudioFileFormat.h"
 #include "audio/choc_SampleBuffers.h"
 #include "audio/choc_AudioFileFormat_WAV.h"
-
 #include "../Common/xap_breakpoint_envelope.h"
 #include "xcli_utils.h"
 
@@ -32,7 +31,13 @@ inline void process_waveshaper(sst::waveshapers::QuadWaveshaperPtr wsptr, float 
         float res alignas(16)[4];
 
         _mm_store_ps(res, dat);
-
+#ifdef DETECT_WS_BAD
+        if (res[0] < -2.0 || res[0] > 2.0 || std::isnan(res[0]) || std::isinf(res[0]) ||
+            res[1] < -2.0 || res[1] > 2.0 || std::isinf(res[1]) || std::isnan(res[1]))
+        {
+            std::print("bad sample produced by waveshaper {} {}\n", res[0], res[1]);
+        }
+#endif
         osleftchannel[i] = res[0];
         osrightchannel[i] = res[1];
     }
@@ -87,6 +92,7 @@ inline int render_waveshaper(std::string infile, std::string outfile,
         next_type = std::clamp(next_type, 1, 44);
         if (next_type != oldtype)
         {
+            // std::cout << "switching to " << sst::waveshapers::wst_names[next_type] << "\n";
             oldtype = next_type;
             auto wstype = sst::waveshapers::WaveshaperType(oldtype);
             initializeWaveshaperRegister(wstype, R);
@@ -96,12 +102,13 @@ inline int render_waveshaper(std::string infile, std::string outfile,
             }
             wss.init = _mm_cmpneq_ps(_mm_setzero_ps(), _mm_setzero_ps());
             wsptr = sst::waveshapers::GetQuadWaveshaper(wstype);
-            oversampler->oversampledbuffer.clear();
+            
             struct DummySmoother
             {
                 float process(float x) { return x; }
             };
             DummySmoother smth;
+            oversampler->oversampledbuffer.clear();
             process_waveshaper(wsptr, osleftchannel, osrightchannel, 0.0, blocksize, osfactor, smth,
                                wss);
         }
