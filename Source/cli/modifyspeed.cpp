@@ -14,6 +14,7 @@
 #include "text/choc_StringUtilities.h"
 #include "sst\basic-blocks\dsp\LanczosResampler.h"
 #include "scrub.h"
+#include "xcli_utils.h"
 
 inline int render_scrub(std::string infile, std::string outfile, xenakios::Envelope &scan_env,
                         bool use_sinc)
@@ -243,51 +244,6 @@ inline int render_signalsmith(std::string infile, std::string outfile,
     }
     std::cout << "output file length is " << outposcounter / inprops.sampleRate << " seconds\n";
     return 0;
-}
-
-inline void init_envelope_from_string(xenakios::Envelope &env, std::string str)
-{
-    try
-    {
-        if (std::filesystem::exists(str))
-        {
-            std::cout << "loading " << str << " as envelope\n";
-            auto envtxt = choc::file::loadFileAsString(str);
-            auto lines = choc::text::splitIntoLines(envtxt, false);
-            for (auto &line : lines)
-            {
-                line = choc::text::trim(line);
-                auto tokens = choc::text::splitString(line, ' ', false);
-                if (tokens.size() >= 2)
-                {
-                    double time = std::stod(tokens[0]);
-                    double value = std::stod(tokens[1]);
-                    int shape = 0;
-                    double p0 = 0.0;
-                    if (tokens.size() >= 3)
-                    {
-                        shape = std::stoi(tokens[2]);
-                    }
-                    if (tokens.size() == 4)
-                    {
-                        p0 = stod(tokens[3]);
-                    }
-
-                    env.addPoint({time, value, shape, p0});
-                }
-            }
-        }
-        else
-        {
-            double val = std::stod(str);
-            std::cout << "parsed value " << val << "\n";
-            env.addPoint({0.0, val});
-        }
-    }
-    catch (std::exception &ex)
-    {
-        std::cout << ex.what() << "\n";
-    }
 }
 
 int main(int argc, char **argv)
