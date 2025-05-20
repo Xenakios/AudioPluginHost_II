@@ -28,6 +28,7 @@ include_directories(
     libs/tuning-library/include
     libs/sst-filters/include
     libs/sst-effects/include
+    libs/sst-waveshapers
     libs/oscpkt
     libs/simde
     libs/thread-pool/include
@@ -149,13 +150,21 @@ add_executable(TestingProgram
 # Source/Experimental/xaudiograph.cpp
 target_compile_definitions(TestingProgram PRIVATE XENPYTHONBINDINGS=0 NOJUCE=1 _USE_MATH_DEFINES=1 __WINDOWS_WASAPI__)
 # target_link_libraries(TestingProgram PRIVATE airwin-registry)
+# Source/Experimental/xaudiograph.cpp
 
 add_executable(modifyspeed 
     Source/cli/modifyspeed.cpp
     )
-# Source/Experimental/xaudiograph.cpp
+
 target_compile_definitions(modifyspeed PRIVATE XENPYTHONBINDINGS=0 NOJUCE=1 _USE_MATH_DEFINES=1 __WINDOWS_WASAPI__)
 target_compile_options(modifyspeed PRIVATE -Werror=return-type)
+
+add_executable(modifywaveshape 
+    Source/cli/modifywaveshape.cpp
+    )
+
+target_compile_definitions(modifywaveshape PRIVATE XENPYTHONBINDINGS=0 NOJUCE=1 _USE_MATH_DEFINES=1 __WINDOWS_WASAPI__)
+target_compile_options(modifywaveshape PRIVATE -Werror=return-type)
 
 add_executable(olctest
     Source/Experimental/olctest.cpp

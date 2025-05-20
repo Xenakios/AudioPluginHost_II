@@ -33,6 +33,8 @@ inline int render_scrub(std::string infile, std::string outfile, xenakios::Envel
     }
 
     auto inprops = reader->getProperties();
+    std::print("infile [samplerate {} Hz] [length {} seconds]\n", inprops.sampleRate,
+               inprops.numFrames / inprops.sampleRate);
     choc::audio::AudioFileProperties outprops;
     outprops.sampleRate = inprops.sampleRate;
     outprops.bitDepth = choc::audio::BitDepth::float32;
