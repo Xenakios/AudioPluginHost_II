@@ -11,6 +11,7 @@
 #include "audio/choc_SampleBuffers.h"
 #include "audio/choc_AudioFileFormat_WAV.h"
 #include "../Common/xap_breakpoint_envelope.h"
+#include "../Common/xapdsp.h"
 #include "xcli_utils.h"
 
 inline void process_waveshaper(sst::waveshapers::QuadWaveshaperPtr wsptr, float *osleftchannel,
@@ -71,8 +72,11 @@ inline int render_waveshaper(std::string infile, std::string outfile,
     unsigned int blocksize = 64;
     choc::buffer::ChannelArrayBuffer<float> readbuffer{inprops.numChannels, blocksize};
     readbuffer.clear();
-    choc::buffer::ChannelArrayBuffer<float> writebuffer{inprops.numChannels, blocksize};
-    writebuffer.clear();
+    choc::buffer::ChannelArrayBuffer<float> xfadebuffer{inprops.numChannels, blocksize};
+    xfadebuffer.clear();
+    StereoSimperSVF highpassfilter;
+    highpassfilter.setCoeff(12.0f, 0.01f, 1.0 / inprops.sampleRate);
+    highpassfilter.init();
     int outcounter = 0;
     auto wsptr = sst::waveshapers::GetQuadWaveshaper(sst::waveshapers::WaveshaperType::wst_none);
     dsp::BiquadFilter gain_smoother;
@@ -80,9 +84,11 @@ inline int render_waveshaper(std::string infile, std::string outfile,
                                 1.0f);
 
     constexpr int osfactor = 4;
-    auto oversampler = std::make_unique<OverSampler<osfactor, 16>>(inprops.numChannels, blocksize);
+    auto oversampler = std::make_unique<OverSampler<osfactor, 32>>(inprops.numChannels, blocksize);
     while (outcounter < inprops.numFrames)
     {
+        auto readview = readbuffer.getView();
+        reader->readFrames(outcounter, readview);
         auto osleftchannel = oversampler->oversampledbuffer.getView().data.channels[0];
         auto osrightchannel =
             oversampler->oversampledbuffer.getView().data.channels[1 % inprops.numChannels];
@@ -90,8 +96,10 @@ inline int render_waveshaper(std::string infile, std::string outfile,
         double tpos = outcounter / inprops.sampleRate;
         int next_type = wstype_env.getValueAtPosition(tpos);
         next_type = std::clamp(next_type, 1, 44);
+        bool do_xfade = false;
         if (next_type != oldtype)
         {
+            do_xfade = true;
             // std::cout << "switching to " << sst::waveshapers::wst_names[next_type] << "\n";
             oldtype = next_type;
             auto wstype = sst::waveshapers::WaveshaperType(oldtype);
@@ -100,23 +108,23 @@ inline int render_waveshaper(std::string infile, std::string outfile,
             {
                 wss.R[i] = _mm_set1_ps(R[i]);
             }
-            wss.init = _mm_cmpneq_ps(_mm_setzero_ps(), _mm_setzero_ps());
+            wss.init = _mm_cmpeq_ps(_mm_setzero_ps(), _mm_setzero_ps());
             wsptr = sst::waveshapers::GetQuadWaveshaper(wstype);
-            
+
             struct DummySmoother
             {
                 float process(float x) { return x; }
             };
-            DummySmoother smth;
-            oversampler->oversampledbuffer.clear();
-            process_waveshaper(wsptr, osleftchannel, osrightchannel, 0.0, blocksize, osfactor, smth,
-                               wss);
+            // DummySmoother smth;
+            // oversampler->oversampledbuffer.clear();
+            // process_waveshaper(wsptr, osleftchannel, osrightchannel, 0.0, blocksize, osfactor,
+            // smth,
+            //                   wss);
         }
         double ingain = ingain_env.getValueAtPosition(tpos);
         ingain = std::clamp(ingain, -60.0, 60.0);
         ingain = xenakios::decibelsToGain(ingain);
-        auto readview = readbuffer.getView();
-        reader->readFrames(outcounter, readview);
+
         oversampler->pushBuffer(readview);
 
         auto *leftData = readbuffer.getView().data.channels[0];
@@ -124,6 +132,11 @@ inline int render_waveshaper(std::string infile, std::string outfile,
         process_waveshaper(wsptr, osleftchannel, osrightchannel, ingain, blocksize, osfactor,
                            gain_smoother, wss);
         oversampler->downSample(readview);
+        for (int i = 0; i < blocksize; ++i)
+        {
+            // StereoSimperSVF::step<StereoSimperSVF::HP>(highpassfilter, leftData[i],
+            // rightData[i]);
+        }
         writer->appendFrames(readbuffer.getView());
         outcounter += blocksize;
     }

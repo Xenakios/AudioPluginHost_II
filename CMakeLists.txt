@@ -166,6 +166,13 @@ add_executable(modifywaveshape
 target_compile_definitions(modifywaveshape PRIVATE XENPYTHONBINDINGS=0 NOJUCE=1 _USE_MATH_DEFINES=1 __WINDOWS_WASAPI__)
 target_compile_options(modifywaveshape PRIVATE -Werror=return-type)
 
+add_executable(waveshapertest
+    Source/cli/waveshapertest.cpp
+    )
+
+target_compile_definitions(waveshapertest PRIVATE XENPYTHONBINDINGS=0 NOJUCE=1 _USE_MATH_DEFINES=1 __WINDOWS_WASAPI__)
+target_compile_options(waveshapertest PRIVATE -Werror=return-type)
+
 add_executable(olctest
     Source/Experimental/olctest.cpp
 )
