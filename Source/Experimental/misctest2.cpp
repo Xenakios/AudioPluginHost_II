@@ -164,9 +164,11 @@ void test_airwin_registry()
 void test_alt_multilfo()
 {
     std::string jsonfilename = R"(C:\develop\AudioPluginHost_mk2\python\lfosettings.json)";
+    auto jsontxt = choc::file::loadFileAsString(jsonfilename);
+    auto tree = choc::json::parse(jsontxt);
     double sr = 44100;
     AltMultiModulator modulator{sr};
-    init_multimod_from_json(modulator, jsonfilename);
+    init_multimod_from_value(modulator, tree);
 
     unsigned int num_write_channels = 4;
     auto writer = xenakios::createWavWriter(

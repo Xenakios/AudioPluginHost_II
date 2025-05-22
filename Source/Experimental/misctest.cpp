@@ -1966,6 +1966,7 @@ inline int test_choc_subprocess(int mode)
         std::cout << "\e[0;31mcould not calculate\e[0m\n";
         return 42;
     }
+    return 0;
 }
 
 inline void test_choc_execute()
