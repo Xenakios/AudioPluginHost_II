@@ -411,13 +411,14 @@ template <int OVERSAMPLE, int QUALITY> struct Upsampler
 
 } // namespace dsp
 
-inline void init_envelope_from_string(xenakios::Envelope &env, std::string str)
+inline void init_envelope_from_string(xenakios::Envelope &env, std::string str, std::string env_id)
 {
+    env.envelope_id = env_id;
     try
     {
         if (std::filesystem::exists(str))
         {
-            std::cout << "loading " << str << " as envelope\n";
+            // std::cout << "loading " << str << " as envelope\n";
             auto envtxt = choc::file::loadFileAsString(str);
             auto lines = choc::text::splitIntoLines(envtxt, false);
             for (auto &line : lines)
@@ -446,13 +447,13 @@ inline void init_envelope_from_string(xenakios::Envelope &env, std::string str)
         else
         {
             double val = std::stod(str);
-            std::cout << "parsed value " << val << "\n";
+            // std::cout << "parsed value " << val << "\n";
             env.addPoint({0.0, val});
         }
     }
     catch (std::exception &ex)
     {
-        std::cout << ex.what() << "\n";
+        std::cout << "error initializing parameter " << env_id << " : " << ex.what() << "\n";
     }
 }
 

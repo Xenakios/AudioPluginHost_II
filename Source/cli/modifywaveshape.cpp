@@ -14,6 +14,14 @@
 #include "../Common/xapdsp.h"
 #include "xcli_utils.h"
 
+enum PARAMS
+{
+    PAR_DRIVE = 0,
+    PAR_TYPE,
+    PAR_OUTGAIN,
+    PAR_END
+};
+
 inline void process_waveshaper(sst::waveshapers::QuadWaveshaperPtr wsptr, float *osleftchannel,
                                float *osrightchannel, double ingain, unsigned int blocksize,
                                unsigned int osfactor, auto &gain_smoother, auto &wss)
@@ -45,7 +53,7 @@ inline void process_waveshaper(sst::waveshapers::QuadWaveshaperPtr wsptr, float 
 }
 
 inline int render_waveshaper(std::string infile, std::string outfile,
-                             xenakios::Envelope &wstype_env, xenakios::Envelope &ingain_env)
+                             std::vector<xenakios::Envelope> &envelopes)
 {
     choc::audio::WAVAudioFileFormat<true> wavformat;
     auto reader = wavformat.createReader(infile);
@@ -79,10 +87,12 @@ inline int render_waveshaper(std::string infile, std::string outfile,
     highpassfilter.init();
     int outcounter = 0;
     auto wsptr = sst::waveshapers::GetQuadWaveshaper(sst::waveshapers::WaveshaperType::wst_none);
-    dsp::BiquadFilter gain_smoother;
-    gain_smoother.setParameters(dsp::BiquadFilter::LOWPASS_1POLE, 10.0 / inprops.sampleRate, 1.0,
-                                1.0f);
-
+    dsp::BiquadFilter drive_smoother;
+    drive_smoother.setParameters(dsp::BiquadFilter::LOWPASS_1POLE, 10.0 / inprops.sampleRate, 1.0,
+                                 1.0f);
+    dsp::BiquadFilter outgain_smoother;
+    outgain_smoother.setParameters(dsp::BiquadFilter::LOWPASS_1POLE, 10.0 / inprops.sampleRate, 1.0,
+                                   1.0f);
     constexpr int osfactor = 4;
     auto oversampler = std::make_unique<OverSampler<osfactor, 32>>(inprops.numChannels, blocksize);
     while (outcounter < inprops.numFrames)
@@ -94,7 +104,7 @@ inline int render_waveshaper(std::string infile, std::string outfile,
             oversampler->oversampledbuffer.getView().data.channels[1 % inprops.numChannels];
 
         double tpos = outcounter / inprops.sampleRate;
-        int next_type = wstype_env.getValueAtPosition(tpos);
+        int next_type = envelopes[PAR_TYPE].getValueAtPosition(tpos);
         next_type = std::clamp(next_type, 1, 44);
         bool do_xfade = false;
         if (next_type != oldtype)
@@ -110,18 +120,8 @@ inline int render_waveshaper(std::string infile, std::string outfile,
             }
             wss.init = _mm_cmpeq_ps(_mm_setzero_ps(), _mm_setzero_ps());
             wsptr = sst::waveshapers::GetQuadWaveshaper(wstype);
-
-            struct DummySmoother
-            {
-                float process(float x) { return x; }
-            };
-            // DummySmoother smth;
-            // oversampler->oversampledbuffer.clear();
-            // process_waveshaper(wsptr, osleftchannel, osrightchannel, 0.0, blocksize, osfactor,
-            // smth,
-            //                   wss);
         }
-        double ingain = ingain_env.getValueAtPosition(tpos);
+        double ingain = envelopes[PAR_DRIVE].getValueAtPosition(tpos);
         ingain = std::clamp(ingain, -60.0, 60.0);
         ingain = xenakios::decibelsToGain(ingain);
 
@@ -130,18 +130,28 @@ inline int render_waveshaper(std::string infile, std::string outfile,
         auto *leftData = readbuffer.getView().data.channels[0];
         auto *rightData = readbuffer.getView().data.channels[1 % inprops.numChannels];
         process_waveshaper(wsptr, osleftchannel, osrightchannel, ingain, blocksize, osfactor,
-                           gain_smoother, wss);
+                           drive_smoother, wss);
         oversampler->downSample(readview);
+        double ogain = envelopes[PAR_OUTGAIN].getValueAtPosition(tpos);
+        ogain = std::clamp(ogain, -100.0, 24.0);
+        ogain = xenakios::decibelsToGain(ogain);
         for (int i = 0; i < blocksize; ++i)
         {
-            // StereoSimperSVF::step<StereoSimperSVF::HP>(highpassfilter, leftData[i],
-            // rightData[i]);
+            double smoothedgain = outgain_smoother.process(ogain);
+            leftData[i] *= smoothedgain;
+            rightData[i] *= smoothedgain;
         }
         writer->appendFrames(readbuffer.getView());
         outcounter += blocksize;
     }
     return 0;
 }
+
+struct ParamInfo
+{
+    int id = 0;
+    std::string envfn_or_value;
+};
 
 int main(int argc, char **argv)
 {
@@ -151,16 +161,26 @@ int main(int argc, char **argv)
     std::string outfile;
     std::string ingainstring;
     std::string wstypestring;
+    std::string outgainstring = "-24.0";
 
     app.add_option("-i", infile, "Input file");
     app.add_option("-o", outfile, "Output file");
     app.add_option("--ws", wstypestring, "Waveshaper type");
     app.add_option("--ingain", ingainstring, "Input gain");
+    app.add_option("--outgain", outgainstring, "Output gain");
     CLI11_PARSE(app, argc, argv);
-
-    xenakios::Envelope ws_envelope;
-    init_envelope_from_string(ws_envelope, wstypestring);
-    xenakios::Envelope ingain_envelope;
-    init_envelope_from_string(ingain_envelope, ingainstring);
-    render_waveshaper(infile, outfile, ws_envelope, ingain_envelope);
+    std::vector<xenakios::Envelope> envelopes;
+    envelopes.resize(PAR_END);
+    init_envelope_from_string(envelopes[PAR_TYPE], wstypestring, "waveshaper_type");
+    init_envelope_from_string(envelopes[PAR_DRIVE], ingainstring, "drive");
+    init_envelope_from_string(envelopes[PAR_OUTGAIN], outgainstring, "out_gain");
+    for (auto &e : envelopes)
+    {
+        if (e.getNumPoints() == 0)
+        {
+            std::cout << "parameter " << e.envelope_id << " was not initialized\n";
+            return 1;
+        }
+    }
+    render_waveshaper(infile, outfile, envelopes);
 }

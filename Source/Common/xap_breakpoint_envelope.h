@@ -84,6 +84,7 @@ class Envelope
 {
   public:
     choc::SmallVector<float, 64> outputBlock;
+    std::string envelope_id;
     void clearOutputBlock()
     {
         for (size_t i = 0; i < outputBlock.size(); ++i)
