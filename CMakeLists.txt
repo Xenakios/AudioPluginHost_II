@@ -112,14 +112,17 @@ target_include_directories(xenakios PRIVATE libs/pybind11/include)
 
 # PYBIND11_FINDPYTHON=ON
 
+# WIN32_LEAN_AND_MEAN
+
 target_compile_definitions(xenakios PRIVATE 
+    _CRT_SECURE_NO_WARNINGS
     _USE_MATH_DEFINES=1 
     XENPYTHONBINDINGS=1 
     NOJUCE=1
-    JUCE_PLUGINHOST_VST3=1
+    JUCE_PLUGINHOST_VST3=0
     __WINDOWS_WASAPI__
     NOMINMAX 
-    WIN32_LEAN_AND_MEAN
+    
     XENPYAIRWINDOWS=0
     )
     
