@@ -105,7 +105,7 @@ inline int render_waveshaper(std::string infile, std::string outfile,
 
         double tpos = outcounter / inprops.sampleRate;
         int next_type = envelopes[PAR_TYPE].getValueAtPosition(tpos);
-        next_type = std::clamp(next_type, 1, 44);
+        next_type = std::clamp(next_type, 1, (int)sst::waveshapers::WaveshaperType::n_ws_types - 1);
         bool do_xfade = false;
         if (next_type != oldtype)
         {
@@ -133,7 +133,7 @@ inline int render_waveshaper(std::string infile, std::string outfile,
                            drive_smoother, wss);
         oversampler->downSample(readview);
         double ogain = envelopes[PAR_OUTGAIN].getValueAtPosition(tpos);
-        ogain = std::clamp(ogain, -100.0, 24.0);
+        ogain = std::clamp(ogain, -101.0, 24.0);
         ogain = xenakios::decibelsToGain(ogain);
         for (int i = 0; i < blocksize; ++i)
         {
@@ -157,18 +157,29 @@ int main(int argc, char **argv)
 {
     CLI::App app{"modifyspeed"};
     argv = app.ensure_utf8(argv);
+    app.require_option();
     std::string infile;
     std::string outfile;
     std::string ingainstring;
     std::string wstypestring;
     std::string outgainstring = "-24.0";
-
+    bool list_shaper_types = false;
     app.add_option("-i", infile, "Input file");
     app.add_option("-o", outfile, "Output file");
     app.add_option("--ws", wstypestring, "Waveshaper type");
     app.add_option("--ingain", ingainstring, "Input gain");
     app.add_option("--outgain", outgainstring, "Output gain");
+    app.add_flag("--types", list_shaper_types, "List waveshaper types");
     CLI11_PARSE(app, argc, argv);
+    if (list_shaper_types)
+    {
+        for (size_t i = 1; i < (size_t)sst::waveshapers::WaveshaperType::n_ws_types; ++i)
+        {
+            std::print("{:2} : {}\n", i, sst::waveshapers::wst_names[i]);
+        }
+
+        return 0;
+    }
     std::vector<xenakios::Envelope> envelopes;
     envelopes.resize(PAR_END);
     init_envelope_from_string(envelopes[PAR_TYPE], wstypestring, "waveshaper_type");
