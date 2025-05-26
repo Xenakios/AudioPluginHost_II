@@ -55,6 +55,7 @@ inline void process_waveshaper(sst::waveshapers::QuadWaveshaperPtr wsptr, float 
 inline int render_waveshaper(std::string infile, std::string outfile,
                              std::vector<xenakios::Envelope> &envelopes)
 {
+    auto t0 = std::chrono::high_resolution_clock::now();
     choc::audio::WAVAudioFileFormat<true> wavformat;
     auto reader = wavformat.createReader(infile);
     if (!reader)
@@ -93,8 +94,10 @@ inline int render_waveshaper(std::string infile, std::string outfile,
     dsp::BiquadFilter outgain_smoother;
     outgain_smoother.setParameters(dsp::BiquadFilter::LOWPASS_1POLE, 10.0 / inprops.sampleRate, 1.0,
                                    1.0f);
-    constexpr int osfactor = 4;
-    auto oversampler = std::make_unique<OverSampler<osfactor, 32>>(inprops.numChannels, blocksize);
+    constexpr int osfactor = 2;
+    auto oversampler = std::make_unique<OverSampler<osfactor, 16>>(inprops.numChannels, blocksize);
+    auto t1 = std::chrono::high_resolution_clock::now();
+    auto t2 = std::chrono::high_resolution_clock::now();
     while (outcounter < inprops.numFrames)
     {
         auto readview = readbuffer.getView();
@@ -144,6 +147,12 @@ inline int render_waveshaper(std::string infile, std::string outfile,
         writer->appendFrames(readbuffer.getView());
         outcounter += blocksize;
     }
+    auto t3 = std::chrono::high_resolution_clock::now();
+    auto setupmillis = std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count();
+    auto rendermillis = std::chrono::duration_cast<std::chrono::milliseconds>(t3 - t2).count();
+    double rtfactor = (inprops.numFrames / inprops.sampleRate * 1000.0) / rendermillis;
+    std::print("setup took {} milliseconds, render took {} milliseconds {:.2f}x real time\n",
+               setupmillis, rendermillis, rtfactor);
     return 0;
 }
 
@@ -160,12 +169,12 @@ int main(int argc, char **argv)
     app.require_option();
     std::string infile;
     std::string outfile;
-    std::string ingainstring;
-    std::string wstypestring;
+    std::string ingainstring = "0.0";
+    std::string wstypestring = "1";
     std::string outgainstring = "-24.0";
     bool list_shaper_types = false;
-    app.add_option("-i", infile, "Input file");
-    app.add_option("-o", outfile, "Output file");
+    app.add_option("-i", infile, "Input file")->mandatory(true);
+    app.add_option("-o", outfile, "Output file")->mandatory(true);
     app.add_option("--ws", wstypestring, "Waveshaper type");
     app.add_option("--ingain", ingainstring, "Input gain");
     app.add_option("--outgain", outgainstring, "Output gain");
@@ -177,7 +186,6 @@ int main(int argc, char **argv)
         {
             std::print("{:2} : {}\n", i, sst::waveshapers::wst_names[i]);
         }
-
         return 0;
     }
     std::vector<xenakios::Envelope> envelopes;
@@ -193,5 +201,5 @@ int main(int argc, char **argv)
             return 1;
         }
     }
-    render_waveshaper(infile, outfile, envelopes);
+    return render_waveshaper(infile, outfile, envelopes);
 }
