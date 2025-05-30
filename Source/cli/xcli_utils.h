@@ -492,3 +492,28 @@ template <int OSFACTOR, int QUALITY> class OverSampler
         }
     }
 };
+
+inline std::pair<bool, std::string> can_file_be_written(std::string path, bool allow_overwrite)
+{
+    bool exists = std::filesystem::exists(path);
+    if (!exists)
+        return {true, ""};
+    if (exists && !allow_overwrite)
+        return {false, "File already exists and wasn't allowed to be overwritten"};
+    if (exists && allow_overwrite)
+    {
+        std::error_code ec;
+        if (!std::filesystem::remove(path, ec))
+        {
+            return {
+                false,
+                "File already exists and can't be overwritten, perhaps open in another process?"};
+        }
+        else
+        {
+            return {true, "File exists but will be overwritten as specified"};
+        }
+    }
+    return {false, "Unknown error"};
+}
+

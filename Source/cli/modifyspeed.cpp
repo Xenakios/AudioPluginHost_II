@@ -162,7 +162,7 @@ inline int render_signalsmith(std::string infile, std::string outfile,
     if (rate_envelope.getNumPoints() == 0)
         rate_envelope.addPoint({0.0, 1.0});
     if (pitch_envelope.getNumPoints() == 0)
-        pitch_envelope.addPoint({0.0, 1.0});
+        pitch_envelope.addPoint({0.0, 0.0});
     if (formant_envelope.getNumPoints() == 0)
         formant_envelope.addPoint({0.0, 1.0});
 
@@ -265,12 +265,13 @@ int main(int argc, char **argv)
     bool scrub_sinc = false;
     double foo_float = 1.0;
     std::string rate_string;
-    std::string pitch_string;
+    std::string pitch_string = "0.0";
     std::string formant_string;
     std::string scrub_string;
     stretchcommand->add_option("-i,--infile", infilename, "Input WAV file");
     stretchcommand->add_option("-o,--outfile", outfilename, "Output WAV file (32 bit float)");
     stretchcommand->add_option("--rate", rate_string, "Time stretch amount (factor/octave)");
+    stretchcommand->add_option("--pitch", pitch_string, "Pitch in semitones/breakpoint file name");
     stretchcommand->add_option("--formant", formant_string, "Formant shift (semitones)");
     stretchcommand->add_flag("--overwrite", allow_overwrite,
                              "Overwrite output file even if it exists");
@@ -281,8 +282,6 @@ int main(int argc, char **argv)
         "--odur", dontwrite,
         "Don't write output file, only print out how long it would be with the "
         "play rate processing");
-
-    stretchcommand->add_option("--pitch", pitch_string, "Pitch in semitones/breakpoint file name");
 
     varispeedcommand->add_option("-i,--infile", infilename, "Input WAV file");
     varispeedcommand->add_option("-o,--outfile", outfilename, "Output WAV file (32 bit float)");
@@ -306,27 +305,24 @@ int main(int argc, char **argv)
             std::cout << "input file " << infilename << " does not exist\n";
             return 1;
         }
-        if (std::filesystem::exists(outfilename))
+        auto ofstatus = can_file_be_written(outfilename, allow_overwrite);
+        if (!ofstatus.first)
         {
-
-            if (allow_overwrite)
-                std::cout << "output file already exists, but will overwrite it\n";
-            else
-            {
-                std::cout << "output file already exists!\n";
-                return 1;
-            }
+            std::cout << ofstatus.second << "\n";
+            return 1;
         }
-
+        if (!ofstatus.second.empty())
+            std::cout << ofstatus.second << "\n";
+        
         xenakios::Envelope rate_envelope;
         if (!rate_string.empty())
-            init_envelope_from_string(rate_envelope, rate_string);
+            init_envelope_from_string(rate_envelope, rate_string, "rate");
         xenakios::Envelope pitch_envelope;
         if (!pitch_string.empty())
-            init_envelope_from_string(pitch_envelope, pitch_string);
+            init_envelope_from_string(pitch_envelope, pitch_string, "pitch");
         xenakios::Envelope formant_envelope;
         if (!formant_string.empty())
-            init_envelope_from_string(formant_envelope, formant_string);
+            init_envelope_from_string(formant_envelope, formant_string, "formant");
         std::cout << "processing with signalsmith stretch...\n";
         std::cout << infilename << " -> " << outfilename << "\n";
         auto err =
@@ -355,7 +351,7 @@ int main(int argc, char **argv)
 
         xenakios::Envelope pitch_envelope;
         if (!pitch_string.empty())
-            init_envelope_from_string(pitch_envelope, pitch_string);
+            init_envelope_from_string(pitch_envelope, pitch_string, "pitch");
         std::cout << "processing with resampling varispeed...\n";
         std::cout << infilename << " -> " << outfilename << "\n";
         render_varispeed(infilename, outfilename, pitch_envelope);
@@ -381,7 +377,7 @@ int main(int argc, char **argv)
 
         xenakios::Envelope scrub_envelope;
         if (!scrub_string.empty())
-            init_envelope_from_string(scrub_envelope, scrub_string);
+            init_envelope_from_string(scrub_envelope, scrub_string, "scanpos");
         std::cout << "processing with scrub...\n";
         std::cout << infilename << " -> " << outfilename << "\n";
         render_scrub(infilename, outfilename, scrub_envelope, scrub_sinc);

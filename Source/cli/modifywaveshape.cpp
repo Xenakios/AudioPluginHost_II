@@ -173,8 +173,8 @@ int main(int argc, char **argv)
     std::string wstypestring = "1";
     std::string outgainstring = "-24.0";
     bool list_shaper_types = false;
-    app.add_option("-i", infile, "Input file")->mandatory(true);
-    app.add_option("-o", outfile, "Output file")->mandatory(true);
+    app.add_option("-i", infile, "Input file")->mandatory(false);
+    app.add_option("-o", outfile, "Output file")->mandatory(false);
     app.add_option("--ws", wstypestring, "Waveshaper type");
     app.add_option("--ingain", ingainstring, "Input gain");
     app.add_option("--outgain", outgainstring, "Output gain");
@@ -184,7 +184,9 @@ int main(int argc, char **argv)
     {
         for (size_t i = 1; i < (size_t)sst::waveshapers::WaveshaperType::n_ws_types; ++i)
         {
-            std::print("{:2} : {}\n", i, sst::waveshapers::wst_names[i]);
+            std::print("{:2} : {:30}", i, sst::waveshapers::wst_names[i]);
+            if (i % 3 == 0)
+                std::print("\n");
         }
         return 0;
     }
