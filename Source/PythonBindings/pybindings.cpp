@@ -250,6 +250,31 @@ void removeEnvelopeXRange(xenakios::Envelope &env, double x0, double x1)
     });
 }
 
+inline xenakios::Envelope env_from_tuple_vec(const std::vector<py::tuple> &tups)
+{
+    xenakios::Envelope result;
+    result.getPoints().reserve(tups.size());
+    for (const auto &pt : tups)
+    {
+        double x = py::cast<double>(pt[0]);
+        double y = py::cast<double>(pt[1]);
+        double p0 = 0.0;
+        auto shape = xenakios::EnvelopePoint::Shape::Linear;
+        if (pt.size() == 3)
+        {
+            p0 = py::cast<double>(pt[2]);
+            shape = xenakios::EnvelopePoint::Shape::Power;
+        }
+        else if (pt.size() == 4)
+        {
+            p0 = py::cast<double>(pt[3]);
+            shape = (xenakios::EnvelopePoint::Shape)py::cast<int>(pt[2]);
+        }
+        result.addPoint({x, y, shape, p0, 0.0});
+    }
+    return result;
+}
+
 PYBIND11_MODULE(xenakios, m)
 {
     using namespace pybind11::literals;
@@ -378,27 +403,7 @@ PYBIND11_MODULE(xenakios, m)
         .def(py::init<xenakios::Envelope>())
         .def(py::init<std::vector<xenakios::EnvelopePoint>>())
         .def(py::init([](const std::vector<py::tuple> &tups) {
-            xenakios::Envelope result;
-            result.getPoints().reserve(tups.size());
-            for (const auto &pt : tups)
-            {
-                double x = py::cast<double>(pt[0]);
-                double y = py::cast<double>(pt[1]);
-                double p0 = 0.0;
-                auto shape = xenakios::EnvelopePoint::Shape::Linear;
-                if (pt.size() == 3)
-                {
-                    p0 = py::cast<double>(pt[2]);
-                    shape = xenakios::EnvelopePoint::Shape::Power;
-                }
-                else if (pt.size() == 4)
-                {
-                    p0 = py::cast<double>(pt[3]);
-                    shape = (xenakios::EnvelopePoint::Shape)py::cast<int>(pt[2]);
-                }
-                result.addPoint({x, y, shape, p0, 0.0});
-            }
-            return result;
+            return env_from_tuple_vec(tups);
         }))
         .def("num_points", &xenakios::Envelope::getNumPoints)
         .def("add_point", &xenakios::Envelope::addPoint)

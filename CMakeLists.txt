@@ -14,7 +14,7 @@ include_directories(
     Source/AudioGraph
     libs/signalsmith-linear/include
     libs/signalsmith-stretch
-    libs/choc
+    libs/choc/choc
     libs/sst-basic-blocks/include
     libs/fmt/include
     libs/sst-jucegui/include
@@ -91,8 +91,10 @@ target_link_libraries(MainHostApp
 
 # add_subdirectory(libs/rtaudio)
 project(cmaketest)
+set (PYBIND11_PYTHON_VERSION "3.13")
+# set (PYBIND11_FINDPYTHON ON "OLD")
 add_subdirectory(libs/pybind11)
-# set (PYBIND11_PYTHON_VERSION "3.13")
+
 pybind11_add_module(xenakios 
     Source/PythonBindings/pybindings.cpp
     Source/PythonBindings/pybindings_ex1.cpp
@@ -110,7 +112,7 @@ pybind11_add_module(xenakios
 target_include_directories(xenakios PRIVATE libs/pybind11/include)
 # target_link_libraries(xenakios PRIVATE airwin-registry)
 
-# PYBIND11_FINDPYTHON=ON
+
 
 # WIN32_LEAN_AND_MEAN
 
@@ -125,18 +127,19 @@ target_compile_definitions(xenakios PRIVATE
     
     XENPYAIRWINDOWS=0
     )
-    
+
+
 add_custom_command(TARGET xenakios POST_BUILD 
   COMMAND "${CMAKE_COMMAND}" -E copy 
      "$<TARGET_FILE:xenakios>"
-     "C:/Users/teemu/AppData/Local/Programs/Python/Python313/Lib/site-packages/$<TARGET_FILE_NAME:xenakios>" 
+     "C:/Users/teemu/AppData/Local/Python/pythoncore-3.13-64/Lib/site-packages/$<TARGET_FILE_NAME:xenakios>" 
   COMMENT "Copying to output directory")
 
 add_custom_command(TARGET xenakios POST_BUILD 
-  COMMAND pybind11-stubgen 
+  COMMAND C:/Users/teemu/AppData/Local/Python/pythoncore-3.13-64/Scripts/pybind11-stubgen.exe 
   "xenakios" 
   "-o" 
-  "C:/Users/teemu/AppData/Local/Programs/Python/Python313/Lib/site-packages"
+  "C:/Users/teemu/AppData/Local/Python/pythoncore-3.13-64/Lib/site-packages"
      
   COMMENT "Generating Python stubs")
 

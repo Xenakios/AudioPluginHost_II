@@ -1,9 +1,10 @@
 #pragma once
 
+#include "clap/clap.h"
 #include <clap/helpers/event-list.hh>
 #include "audio/choc_AudioFileFormat.h"
 #include "containers/choc_SingleReaderSingleWriterFIFO.h"
-#include "clap/clap.h"
+
 #include <algorithm>
 #include <cstdint>
 #include <limits>
