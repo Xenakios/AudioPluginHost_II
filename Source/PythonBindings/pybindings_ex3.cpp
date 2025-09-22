@@ -9,8 +9,39 @@
 #include <print>
 #include "../Common/xap_utils.h"
 #include "clap/events.h"
+#include "libMTSClient.h"
 
 namespace py = pybind11;
+
+class MTSESP_Client
+{
+  public:
+    MTSESP_Client(bool enable)
+    {
+        m_client = MTS_RegisterClient();
+        if (!m_client)
+            throw std::runtime_error("Could not register MTS-ESP client");
+        m_enabled = enable;
+    }
+    ~MTSESP_Client()
+    {
+        if (m_client)
+            MTS_DeregisterClient(m_client);
+    }
+    void set_enabled(bool b) { m_enabled = b; }
+    double note_to_frequency(int key, int channel)
+    {
+        if (m_client && m_enabled)
+        {
+            return MTS_NoteToFrequency(m_client, key, channel);
+        }
+        return 440.0 * (std::pow(2.0, (1.0 / 12) * (key - 69)));
+    }
+
+  private:
+    MTSClient *m_client = nullptr;
+    bool m_enabled = true;
+};
 
 static const char *g_pipename = "\\\\.\\pipe\\clap_pipe";
 
@@ -21,17 +52,16 @@ static const uint64_t messageMagicCustom = 0xFFFFFFFF00EF0000;
 
 static const uint32_t maxPipeMessageLen = 512;
 
-
 template <typename EventType>
 inline int writeClapEventToPipe(HANDLE pipe, double timeDelay, EventType *ch)
 {
     unsigned char msgbuf[maxPipeMessageLen * 2];
-    //PipeMessageBuilder builder(msgbuf, maxPipeMessageLen * 2);
-    //builder.write(messageMagicClap);
-    //builder.write(timeDelay);
-    //builder.write(ch);
-    // if things are working correctly, the memset redundant, but keeping this around
-    // for debugging/testing for now
+    // PipeMessageBuilder builder(msgbuf, maxPipeMessageLen * 2);
+    // builder.write(messageMagicClap);
+    // builder.write(timeDelay);
+    // builder.write(ch);
+    //  if things are working correctly, the memset redundant, but keeping this around
+    //  for debugging/testing for now
     memset(msgbuf, 0, maxPipeMessageLen * 2);
 
     auto magic = messageMagicClap;
@@ -116,6 +146,9 @@ class ClapPipeSender
 
 void init_py3(py::module_ &m, py::module_ &m_const)
 {
+    py::class_<MTSESP_Client>(m, "MTS_Client")
+        .def(py::init<bool>())
+        .def("note_to_frequency", &MTSESP_Client::note_to_frequency);
     py::class_<ClapPipeSender>(m, "ClapPipeSender")
         .def(py::init<>())
         .def("send_notes", &ClapPipeSender::sendNoteMessages);

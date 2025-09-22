@@ -105,11 +105,12 @@ pybind11_add_module(xenakios
     Source/Host/claphost.cpp
     
     libs/MTS-ESP/Master/libMTSMaster.cpp
+    libs/MTS-ESP/Client/libMTSClient.cpp
     libs/rtaudio/RtAudio.cpp 
 )
 # Source/Experimental/xaudiograph.cpp
 # target_link_libraries(xenakios PRIVATE juce::juce_core juce::juce_audio_utils)
-
+target_compile_options(xenakios PRIVATE -Werror=return-type)
 target_include_directories(xenakios PRIVATE libs/pybind11/include)
 # target_link_libraries(xenakios PRIVATE airwin-registry)
 
