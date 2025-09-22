@@ -5,8 +5,9 @@ set(CMAKE_CXX_STANDARD_REQUIRED True)
 set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 
 project(AudioPluginHost2 VERSION 0.0.1)
-
+if (JUCE_AVAILABLE)
 add_subdirectory(JUCE)
+endif()
 
 include_directories(
     libs/clap/include
@@ -42,7 +43,7 @@ include_directories(
 
 add_subdirectory(libs/fmt)
 # add_subdirectory(C:/develop/airwin2rack build)
-
+if (JUCE_AVAILABLE)
 juce_add_console_app(MainHostApp
     PRODUCT_NAME "Console App Example") 
 juce_generate_juce_header(MainHostApp)
@@ -86,7 +87,7 @@ target_link_libraries(MainHostApp
         # juce::juce_recommended_config_flags
         # juce::juce_recommended_warning_flags)
 )    
-
+endif()
 # add_subdirectory(libs/fmt EXCLUDE_FROM_ALL)
 
 # add_subdirectory(libs/rtaudio)
@@ -163,6 +164,7 @@ add_executable(enosccli
     Source/Experimental/enosc_cli.cpp
     
 )
+target_include_directories(enosccli PRIVATE libs/metamodule-core-modules/4ms/core)
 # Source/Experimental/xaudiograph.cpp
 # target_compile_definitions(TestingProgram PRIVATE XENPYTHONBINDINGS=0 NOJUCE=1 _USE_MATH_DEFINES=1 __WINDOWS_WASAPI__)
 # target_link_libraries(TestingProgram PRIVATE airwin-registry)

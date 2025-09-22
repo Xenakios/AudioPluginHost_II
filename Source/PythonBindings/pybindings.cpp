@@ -114,6 +114,26 @@ inline void clap_process_to_file_wrapper(ClapProcessingEngine &eng, std::string 
         throw py::error_already_set();
 }
 
+static py::list getParamsDict(ClapProcessingEngine &eng, size_t index)
+{
+    if (index >= eng.m_chain.size())
+        throw std::runtime_error("Chain index out of bounds");
+    py::list parlist;
+    auto plug = eng.m_chain[index]->m_proc.get();
+    for (uint32_t i = 0; i < plug->paramsCount(); ++i)
+    {
+        clap_param_info info;
+        if (plug->paramsInfo(i, &info))
+        {
+            py::dict d;
+            d["name"] = info.name;
+            d["id"] = info.id;
+            parlist.append(d);
+        }
+    }
+    return parlist;
+}
+
 static void startStreaming(ClapProcessingEngine &eng, std::optional<unsigned int> deviceId,
                            double sampleRate, int preferredBufferSize, int blockExecution)
 {
@@ -364,6 +384,7 @@ PYBIND11_MODULE(xenakios, m)
         .def_static("scanPluginDirs", &ClapProcessingEngine::scanPluginDirectories)
         .def("setSequence", &ClapProcessingEngine::setSequence)
         .def("getParametersJSON", &ClapProcessingEngine::getParametersAsJSON)
+        .def("get_parameter_infos", getParamsDict)
         .def("getParameterValueAsText", &ClapProcessingEngine::getParameterValueAsText)
         .def("showGUIBlocking", &ClapProcessingEngine::openPluginGUIBlocking)
         .def("openWindow", &ClapProcessingEngine::openPersistentWindow)
@@ -402,9 +423,7 @@ PYBIND11_MODULE(xenakios, m)
         .def(py::init<>())
         .def(py::init<xenakios::Envelope>())
         .def(py::init<std::vector<xenakios::EnvelopePoint>>())
-        .def(py::init([](const std::vector<py::tuple> &tups) {
-            return env_from_tuple_vec(tups);
-        }))
+        .def(py::init([](const std::vector<py::tuple> &tups) { return env_from_tuple_vec(tups); }))
         .def("num_points", &xenakios::Envelope::getNumPoints)
         .def("add_point", &xenakios::Envelope::addPoint)
         .def("remove_point", &xenakios::Envelope::removeEnvelopePointAtIndex)
