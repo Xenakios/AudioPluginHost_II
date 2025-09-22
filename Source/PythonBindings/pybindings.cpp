@@ -120,6 +120,7 @@ static py::list getParamsDict(ClapProcessingEngine &eng, size_t index)
         throw std::runtime_error("Chain index out of bounds");
     py::list parlist;
     auto plug = eng.m_chain[index]->m_proc.get();
+    plug->activate(44100.0, 64, 64);
     for (uint32_t i = 0; i < plug->paramsCount(); ++i)
     {
         clap_param_info info;
@@ -128,9 +129,18 @@ static py::list getParamsDict(ClapProcessingEngine &eng, size_t index)
             py::dict d;
             d["name"] = info.name;
             d["id"] = info.id;
+            d["min"] = info.min_value;
+            d["max"] = info.max_value;
+            d["def"] = info.default_value;
+            if (strlen(info.module) > 0)
+                d["module"] = info.module;
+            else
+                d["module"] = "/";
+            d["flags"] = info.flags;
             parlist.append(d);
         }
     }
+    plug->deactivate();
     return parlist;
 }
 
@@ -301,7 +311,7 @@ PYBIND11_MODULE(xenakios, m)
     m.doc() = "pybind11 xenakios plugin"; // optional module docstring
     PyOS_InputHook = XInputHook;
 
-    m.def("writeArrayToFile", &writeArrayToFile);
+    m.def("write_array_to_file", &writeArrayToFile);
     // m.def("chocLoop", &runChocLoop);
     m.def("numInputHookCallbacks", []() { return g_inputHookCount; });
 
@@ -339,11 +349,11 @@ PYBIND11_MODULE(xenakios, m)
 
     py::class_<xenakios::DejaVuRandom>(m, "DejaVuRandom")
         .def(py::init<unsigned int>(), "seed"_a = 0)
-        .def("setLoopLength", &xenakios::DejaVuRandom::setLoopLength, "count"_a)
-        .def("setDejaVu", &xenakios::DejaVuRandom::setDejaVu, "amount"_a,
+        .def("set_loop_length", &xenakios::DejaVuRandom::setLoopLength, "count"_a)
+        .def("set_dejavu", &xenakios::DejaVuRandom::setDejaVu, "amount"_a,
              "0.0 fully random, 0.5 freeze loop, >0.5 pick randomly from loop")
-        .def("nextFloat", &xenakios::DejaVuRandom::nextFloatInRange)
-        .def("nextInt", &xenakios::DejaVuRandom::nextIntInRange);
+        .def("next_float", &xenakios::DejaVuRandom::nextFloatInRange)
+        .def("next_int", &xenakios::DejaVuRandom::nextIntInRange);
 
     py::class_<xenakios::BlueNoise>(m, "BlueNoise")
         .def(py::init<unsigned int>(), "seed"_a = 0)
@@ -375,18 +385,18 @@ PYBIND11_MODULE(xenakios, m)
 
     py::class_<ClapProcessingEngine>(m, "ClapEngine")
         .def(py::init<>())
-        .def("addPlugin", &ClapProcessingEngine::addProcessorToChain)
-        .def("addChain", &addChainWithPlugins)
-        .def("getChain", &ClapProcessingEngine::getChain, py::return_value_policy::reference)
-        .def("getSequence", &ClapProcessingEngine::getSequence, py::return_value_policy::reference)
-        .def_static("scanPluginFile", &ClapProcessingEngine::scanPluginFile,
+        .def("add_plugin", &ClapProcessingEngine::addProcessorToChain)
+        .def("add_chain", &addChainWithPlugins)
+        .def("get_chain", &ClapProcessingEngine::getChain, py::return_value_policy::reference)
+        .def("get_sequence", &ClapProcessingEngine::getSequence, py::return_value_policy::reference)
+        .def_static("scan_plugin_file", &ClapProcessingEngine::scanPluginFile,
                     "Returns plugin info as JSON formatted string")
         .def_static("scanPluginDirs", &ClapProcessingEngine::scanPluginDirectories)
-        .def("setSequence", &ClapProcessingEngine::setSequence)
+        .def("set_sequence", &ClapProcessingEngine::setSequence)
         .def("getParametersJSON", &ClapProcessingEngine::getParametersAsJSON)
         .def("get_parameter_infos", getParamsDict)
         .def("getParameterValueAsText", &ClapProcessingEngine::getParameterValueAsText)
-        .def("showGUIBlocking", &ClapProcessingEngine::openPluginGUIBlocking)
+        .def("show_gui_blocking", &ClapProcessingEngine::openPluginGUIBlocking)
         .def("openWindow", &ClapProcessingEngine::openPersistentWindow)
         .def("getDeviceNames", &ClapProcessingEngine::getDeviceNames)
         .def("startStreaming", &startStreaming, "deviceID"_a = std::optional<unsigned int>(),
@@ -396,11 +406,11 @@ PYBIND11_MODULE(xenakios, m)
         .def("postParameterMessage", &ClapProcessingEngine::postParameterMessage)
         .def("panic", &ClapProcessingEngine::allNotesOff,
              "Send all note offs to all plugins in chain")
-        .def("setMainVolume", &ClapProcessingEngine::setMainVolume,
+        .def("set_main_volume", &ClapProcessingEngine::setMainVolume,
              "Set engine main volume in decibels")
-        .def("stopStreaming", &ClapProcessingEngine::stopStreaming)
-        .def("saveStateToBinaryFile", &ClapProcessingEngine::saveStateToBinaryFile)
-        .def("loadStateFromBinaryFile", &ClapProcessingEngine::loadStateFromBinaryFile)
+        .def("stop_streaming", &ClapProcessingEngine::stopStreaming)
+        .def("save_state_to_binary_file", &ClapProcessingEngine::saveStateToBinaryFile)
+        .def("load_state_from_binary_file", &ClapProcessingEngine::loadStateFromBinaryFile)
         .def("render_to_file", clap_process_to_file_wrapper, "filename"_a, "duration"_a,
              "samplerate"_a, "numoutchannels"_a = 2);
 
