@@ -14,6 +14,11 @@ class MTSESPSource
   public:
     MTSESPSource()
     {
+        if (MTS_ShouldUpdateLibrary())
+        {
+            throw std::runtime_error(
+                "MTS-ESP system library is out of date, you should update it!\n");
+        }
         if (MTS_CanRegisterMaster())
         {
             MTS_RegisterMaster();
@@ -32,6 +37,7 @@ class MTSESPSource
         MTS_DeregisterMaster();
         std::cout << "deregistered MTS Source\n";
     }
+
     void setNoteTuning(int midikey, double hz)
     {
         if (midikey >= 0 && midikey < 128)
@@ -60,8 +66,8 @@ void init_py2(py::module_ &m, py::module_ &m_const)
 {
     py::class_<MTSESPSource>(m, "MTS_Source")
         .def(py::init<>())
-        .def("setNoteTuningMap", &MTSESPSource::setNoteTuningMap)
-        .def("setNoteTuning", &MTSESPSource::setNoteTuning);
+        .def("set_note_tuning_map", &MTSESPSource::setNoteTuningMap)
+        .def("set_note_tuning", &MTSESPSource::setNoteTuning);
     m_const.attr("MIDI_0_FREQ") = Tunings::MIDI_0_FREQ;
     m.def("arraytest_out", []() {
         std::array<double, 16> result;
@@ -69,5 +75,5 @@ void init_py2(py::module_ &m, py::module_ &m_const)
             result[i] = 1.0 / result.size() * i;
         return result;
     });
-    m.def("arraytest_in", [](std::array<double, 4> arr) { std::print("{}", arr); });
+    // m.def("arraytest_in", [](std::array<double, 4> arr) { std::print("{}", arr); });
 }
