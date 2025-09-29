@@ -143,7 +143,7 @@ template <> struct std::hash<Config::TargetIdentifier>
         return h1 ^ (h2 << 1);
     }
 };
-
+#ifdef MODMATRIX_UPDATED
 class MultiModulator
 {
   public:
@@ -291,7 +291,7 @@ class MultiModulator
     };
     std::array<OutputProps, 8> outputprops;
 };
-
+#endif
 class AltMultiModulator
 {
   public:

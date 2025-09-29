@@ -16,7 +16,7 @@
 #include "../Common/xap_utils.h"
 #include "../Host/claphost.h"
 #include "../Common/dejavurandom.h"
-#include "../Common/xen_modulators.h"
+// #include "../Common/xen_modulators.h"
 #include "clap/ext/audio-ports.h"
 #include "clap/ext/params.h"
 #include "gui/choc_MessageLoop.h"
@@ -447,14 +447,15 @@ PYBIND11_MODULE(xenakios, m)
         .def("set_point", &xenakios::Envelope::setPoint)
         .def("get_value", &xenakios::Envelope::getValueAtPosition);
 
-    py::class_<MultiModulator>(m, "MultiModulator")
+    /*
+        py::class_<MultiModulator>(m, "MultiModulator")
         .def(py::init<double>())
         .def("applyToSequence", &MultiModulator::applyToSequence)
         .def("setOutputAsParameter", &MultiModulator::setOutputAsParameter)
         .def("setOutputAsParameterModulation", &MultiModulator::setOutputAsParameterModulation)
         .def("setConnection", &MultiModulator::setConnection)
         .def("setLFOProps", &MultiModulator::setLFOProps);
-
+    */
     m.def("generateNoteExpressionsFromEnvelope", &generateNoteExpressionsFromEnvelope, "",
           py::arg("targetSequence"), py::arg("sourceEnvelope"), py::arg("eventsStartTime"),
           py::arg("duration"), py::arg("granularity"), py::arg("noteExpressionType"),
@@ -465,5 +466,5 @@ PYBIND11_MODULE(xenakios, m)
           "granularity"_a = 0.05, "parid"_a, "port"_a = -1, "chan"_a = -1, "key"_a = -1,
           "nid"_a = -1);
 
-    m.def("generateEnvelopeFromLFO", &generateEnvelopeFromLFO);
+    // m.def("generateEnvelopeFromLFO", &generateEnvelopeFromLFO);
 }
