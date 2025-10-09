@@ -34,6 +34,7 @@ namespace py = pybind11;
 void init_py1(py::module_ &);
 void init_py2(py::module_ &, py::module_ &);
 void init_py3(py::module_ &, py::module_ &);
+void init_py4(py::module_ &, py::module_ &);
 
 #if !NOJUCE
 inline void juceTest(std::string plugfilename)
@@ -54,8 +55,11 @@ inline void juceTest(std::string plugfilename)
 inline void writeArrayToFile(const py::array_t<double> &arr, double samplerate,
                              std::filesystem::path path)
 {
-
+    if (arr.ndim() != 2)
+        throw std::runtime_error(std::format("array ndim {} incompatible, must be 2", arr.ndim()));
     uint32_t numChans = arr.shape(0);
+    if (numChans < 1 || numChans > 64)
+        throw std::runtime_error(std::format("array channel count {} out of bounds", numChans));
     choc::audio::AudioFileProperties outfileprops;
     outfileprops.formatName = "WAV";
     outfileprops.bitDepth = choc::audio::BitDepth::float32;
@@ -302,6 +306,7 @@ inline xenakios::Envelope env_from_tuple_vec(const std::vector<py::tuple> &tups)
         }
         result.addPoint({x, y, shape, p0, 0.0});
     }
+    result.sortPoints();
     return result;
 }
 
@@ -465,7 +470,7 @@ PYBIND11_MODULE(xenakios, m)
         .def("get_point", &xenakios::Envelope::getPointSafe)
         .def("set_point", &xenakios::Envelope::setPoint)
         .def("get_value", &xenakios::Envelope::getValueAtPosition);
-
+    init_py4(m, m_const);
     /*
         py::class_<MultiModulator>(m, "MultiModulator")
         .def(py::init<double>())

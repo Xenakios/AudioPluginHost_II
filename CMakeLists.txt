@@ -35,7 +35,7 @@ include_directories(
     libs/thread-pool/include
     C:/develop/cmajlang/cmajor/include
     C:/develop/airwin2rack/src
-    
+    libs/sst-basic-blocks/libs
 )
 
 # for "reasons", this is still a console app even though a GUI app is built from it
@@ -101,6 +101,7 @@ pybind11_add_module(xenakios
     Source/PythonBindings/pybindings_ex1.cpp
     Source/PythonBindings/pybindings_ex2.cpp
     Source/PythonBindings/pybindings_ex3.cpp
+    Source/PythonBindings/pybindings_ex4.cpp
     Source/Xaps/clap_xaudioprocessor.cpp
     Source/Host/claphost.cpp
     
