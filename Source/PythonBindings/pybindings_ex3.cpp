@@ -21,7 +21,7 @@ class MTSESP_Client
         m_client = MTS_RegisterClient();
         if (!m_client)
             throw std::runtime_error("Could not register MTS-ESP client");
-        if (MTS_ShouldUpdateLibraryClient(m_client))
+        if (MTS_Client_ShouldUpdateLibrary(m_client))
         {
             throw std::runtime_error(
                 "MTS-ESP system library is out of date, you should update it!\n");

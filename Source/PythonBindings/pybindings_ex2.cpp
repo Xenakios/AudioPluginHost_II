@@ -15,7 +15,7 @@ class MTSESPSource
   public:
     MTSESPSource()
     {
-        if (MTS_ShouldUpdateLibrary())
+        if (MTS_Master_ShouldUpdateLibrary())
         {
             throw std::runtime_error(
                 "MTS-ESP system library is out of date, you should update it!\n");

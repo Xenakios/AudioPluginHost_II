@@ -92,7 +92,7 @@ endif()
 
 # add_subdirectory(libs/rtaudio)
 project(cmaketest)
-set (PYBIND11_PYTHON_VERSION "3.13")
+# set (PYBIND11_PYTHON_VERSION "3.14")
 # set (PYBIND11_FINDPYTHON ON "OLD")
 add_subdirectory(libs/pybind11)
 
@@ -134,14 +134,14 @@ target_compile_definitions(xenakios PRIVATE
 add_custom_command(TARGET xenakios POST_BUILD 
   COMMAND "${CMAKE_COMMAND}" -E copy 
      "$<TARGET_FILE:xenakios>"
-     "C:/Users/teemu/AppData/Local/Python/pythoncore-3.13-64/Lib/site-packages/$<TARGET_FILE_NAME:xenakios>" 
+     "C:/Users/teemu/AppData/Local/Python/pythoncore-3.14-64/Lib/site-packages/$<TARGET_FILE_NAME:xenakios>" 
   COMMENT "Copying to output directory")
 
 add_custom_command(TARGET xenakios POST_BUILD 
-  COMMAND C:/Users/teemu/AppData/Local/Python/pythoncore-3.13-64/Scripts/pybind11-stubgen.exe 
+  COMMAND C:/Users/teemu/AppData/Local/Python/pythoncore-3.14-64/Scripts/pybind11-stubgen.exe 
   "xenakios" 
   "-o" 
-  "C:/Users/teemu/AppData/Local/Python/pythoncore-3.13-64/Lib/site-packages"
+  "C:/Users/teemu/AppData/Local/Python/pythoncore-3.14-64/Lib/site-packages"
      
   COMMENT "Generating Python stubs")
 

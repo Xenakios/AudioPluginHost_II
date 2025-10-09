@@ -5,7 +5,7 @@
 #include <pyerrors.h>
 #include <stdexcept>
 #include <vector>
-// #include <optional>
+#include <print>
 #include <pybind11/stl.h>
 #include <pybind11/stl/filesystem.h>
 #include <pybind11/numpy.h>
@@ -305,6 +305,21 @@ inline xenakios::Envelope env_from_tuple_vec(const std::vector<py::tuple> &tups)
     return result;
 }
 
+BOOL WINAPI DllMain(HINSTANCE hinstDLL, // handle to DLL module
+                    DWORD fdwReason,    // reason for calling function
+                    LPVOID lpvReserved) // reserved
+{
+    /*
+    if (fdwReason == DLL_PROCESS_ATTACH)
+    {
+        char buf[512];
+        auto r = GetModuleFileName(hinstDLL, buf, 512);
+        std::print("python extension file name : {}\n", buf);
+    }
+    */
+    return TRUE;
+}
+
 PYBIND11_MODULE(xenakios, m)
 {
     using namespace pybind11::literals;
@@ -436,6 +451,10 @@ PYBIND11_MODULE(xenakios, m)
         .def(py::init([](const std::vector<py::tuple> &tups) { return env_from_tuple_vec(tups); }))
         .def("num_points", &xenakios::Envelope::getNumPoints)
         .def("add_point", &xenakios::Envelope::addPoint)
+        .def("add_point",
+             [](xenakios::Envelope &env, std::pair<double, double> pt) {
+                 env.addPoint(xenakios::EnvelopePoint(pt.first, pt.second));
+             })
         .def("remove_point", &xenakios::Envelope::removeEnvelopePointAtIndex)
         .def("remove_points", &xenakios::Envelope::removeEnvelopePoints)
         .def("remove_point_range", removeEnvelopeXRange)
