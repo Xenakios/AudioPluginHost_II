@@ -326,7 +326,7 @@ PYBIND11_MODULE(xenakios, m)
     m.doc() = "pybind11 xenakios plugin"; // optional module docstring
     PyOS_InputHook = XInputHook;
 
-    m.def("write_array_to_file", &writeArrayToFile);
+    m.def("write_array_to_file", &writeArrayToFile, "array"_a, "sample_rate"_a = 44100.0, "path"_a);
     // m.def("chocLoop", &runChocLoop);
     m.def("numInputHookCallbacks", []() { return g_inputHookCount; });
 

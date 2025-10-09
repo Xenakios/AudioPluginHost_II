@@ -177,7 +177,8 @@ class Envelope
     const EnvelopePoint &getPointSafePython(int index) const
     {
         if (index < -1 || index >= (int)m_points.size())
-            throw std::runtime_error(std::format("Index {} out of range", index));
+            throw std::runtime_error(
+                std::format("Index {} out of range -1..{}", index, m_points.size() - 1));
         if (index == -1)
             return m_points.back();
         return m_points[index];
