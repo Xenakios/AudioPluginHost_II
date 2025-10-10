@@ -67,7 +67,7 @@ inline py::array_t<float> generate_tone(int tone_type, xenakios::Envelope &pitch
             double gain = volume_env.outputBlock[i];
             gain = std::clamp(gain, 0.0, 1.0);
             gain = gain * gain * gain;
-            writebuf[framecount + i] = sample * gain;
+            writebuf[framecount + i] = sample * gain * 0.8;
         }
         framecount += blocksize;
     }
