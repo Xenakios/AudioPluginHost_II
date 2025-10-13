@@ -4,13 +4,15 @@
 #include <pybind11/numpy.h>
 #include "../Common/xap_breakpoint_envelope.h"
 #include "sst/basic-blocks/dsp/EllipticBlepOscillators.h"
+#include "sst/basic-blocks/dsp/DPWSawPulseOscillator.h"
+#include <print>
 
 namespace py = pybind11;
 
 inline py::array_t<float> generate_tone(int tone_type, xenakios::Envelope &pitch_env,
                                         xenakios::Envelope &volume_env, double sr, double duration)
 {
-    tone_type = std::clamp(tone_type, 0, 3);
+    tone_type = std::clamp(tone_type, 0, 5);
     pitch_env.sortPoints();
     volume_env.sortPoints();
     int chans = 1;
@@ -28,11 +30,14 @@ inline py::array_t<float> generate_tone(int tone_type, xenakios::Envelope &pitch
     sst::basic_blocks::dsp::EBTri<> osc_tri;
     sst::basic_blocks::dsp::EBSaw<> osc_saw;
     sst::basic_blocks::dsp::EBPulse<> osc_pulse;
+    sst::basic_blocks::dsp::DPWSawOscillator<> osc_saw_dpw;
+    sst::basic_blocks::dsp::DPWPulseOscillator<> osc_pulse_dpw;
     osc_sin.setSampleRate(sr);
     osc_tri.setSampleRate(sr);
     osc_saw.setSampleRate(sr);
     osc_pulse.setSampleRate(sr);
-    const size_t blocksize = 64;
+
+    const size_t blocksize = 8;
     int framecount = 0;
     float *writebuf = output_audio.mutable_data(0);
     volume_env.clearOutputBlock();
@@ -51,7 +56,11 @@ inline py::array_t<float> generate_tone(int tone_type, xenakios::Envelope &pitch
             osc_saw.setFrequency(hz);
         else if (tone_type == 3)
             osc_pulse.setFrequency(hz);
-        volume_env.processBlock(tpos, sr, 0, 64);
+        else if (tone_type == 4)
+            osc_saw_dpw.setFrequency(hz, 1.0 / sr);
+        else if (tone_type == 5)
+            osc_pulse_dpw.setFrequency(hz, 1.0 / sr);
+        volume_env.processBlock(tpos, sr, 0, blocksize);
         for (int i = 0; i < framestoprocess; ++i)
         {
             float sample = 0.0f;
@@ -63,6 +72,10 @@ inline py::array_t<float> generate_tone(int tone_type, xenakios::Envelope &pitch
                 sample = osc_saw.step();
             else if (tone_type == 3)
                 sample = osc_pulse.step();
+            else if (tone_type == 4)
+                sample = osc_saw_dpw.step();
+            else if (tone_type == 5)
+                sample = osc_pulse_dpw.step();
             // double gain = xenakios::decibelsToGain(volume_env.outputBlock[i]);
             double gain = volume_env.outputBlock[i];
             gain = std::clamp(gain, 0.0, 1.0);
@@ -74,4 +87,25 @@ inline py::array_t<float> generate_tone(int tone_type, xenakios::Envelope &pitch
     return output_audio;
 }
 
-void init_py4(py::module_ &m, py::module_ &m_const) { m.def("generate_tone", &generate_tone); }
+using EnvOrDouble = std::variant<double, xenakios::Envelope *>;
+template <class... Ts> struct overloaded : Ts...
+{
+    using Ts::operator()...;
+};
+void vartest(EnvOrDouble x)
+{
+    std::visit(overloaded{[](double val) { std::print("got double {}\n", val); },
+                          [](xenakios::Envelope *env) {
+                              std::print("got envelope object ptr {}\n", (void *)env);
+                          }},
+               x);
+}
+
+void init_py4(py::module_ &m, py::module_ &m_const)
+{
+
+    using namespace pybind11::literals;
+    // m.def("vartest", &vartest);
+    m.def("generate_tone", &generate_tone, "tone_type"_a, "pitch"_a, "volume"_a, "samplerate"_a,
+          "duration"_a);
+}

@@ -53,7 +53,7 @@ inline void juceTest(std::string plugfilename)
 #endif
 
 inline void writeArrayToFile(const py::array_t<double> &arr, double samplerate,
-                             std::filesystem::path path)
+                             std::string path)
 {
     if (arr.ndim() != 2)
         throw std::runtime_error(std::format("array ndim {} incompatible, must be 2", arr.ndim()));
@@ -66,7 +66,9 @@ inline void writeArrayToFile(const py::array_t<double> &arr, double samplerate,
     outfileprops.numChannels = numChans;
     outfileprops.sampleRate = samplerate;
     choc::audio::WAVAudioFileFormat<true> wavformat;
-    auto writer = wavformat.createWriter(path.string(), outfileprops);
+    std::filesystem::path outpath{std::filesystem::u8path(path)};
+    std::shared_ptr<std::ostream> os{new std::ofstream(outpath, std::ios::binary)};
+    auto writer = wavformat.createWriter(os, outfileprops);
     if (writer)
     {
         py::buffer_info buf1 = arr.request();
@@ -83,7 +85,8 @@ inline void writeArrayToFile(const py::array_t<double> &arr, double samplerate,
         writer->flush();
     }
     else
-        throw std::runtime_error("Could not create audio file writer");
+        throw std::runtime_error(
+            std::format("Could not create audio file writer"));
 }
 
 int g_inputHookCount = 0;
