@@ -9,10 +9,37 @@
 
 namespace py = pybind11;
 
-inline py::array_t<float> generate_tone(int tone_type, xenakios::Envelope &pitch_env,
+struct tone_info
+{
+    int index = -1;
+    const char *name = nullptr;
+};
+
+tone_info osc_infos[7] = {{0, "EBSINE"},   {1, "EBSEMISINE"}, {2, "EBTRIANGLE"}, {3, "EBSAW"},
+                          {4, "EBSQUARE"}, {5, "DPWSAW"},     {6, "DPWSQUARE"}};
+
+inline std::vector<std::string> osc_types()
+{
+    std::vector<std::string> result;
+    for (int i = 0; i < 7; ++i)
+        result.push_back(osc_infos[i].name);
+    return result;
+}
+
+inline int osc_name_to_index(std::string name)
+{
+    for (int i = 0; i < 7; ++i)
+        if (name == osc_infos[i].name)
+            return osc_infos[i].index;
+    return -1;
+}
+
+inline py::array_t<float> generate_tone(std::string tone_name, xenakios::Envelope &pitch_env,
                                         xenakios::Envelope &volume_env, double sr, double duration)
 {
-    tone_type = std::clamp(tone_type, 0, 6);
+    auto tone_type = osc_name_to_index(tone_name);
+    if (tone_type < 0 || tone_type > 6)
+        throw std::runtime_error("Invalid tone type");
     pitch_env.sortPoints();
     volume_env.sortPoints();
     int chans = 1;
@@ -86,7 +113,6 @@ inline py::array_t<float> generate_tone(int tone_type, xenakios::Envelope &pitch
             renderfunc(osc_saw_dpw);
         else if (tone_type == 6)
             renderfunc(osc_pulse_dpw);
-
         framecount += blocksize;
     }
     return output_audio;
@@ -113,4 +139,5 @@ void init_py4(py::module_ &m, py::module_ &m_const)
     // m.def("vartest", &vartest);
     m.def("generate_tone", &generate_tone, "tone_type"_a, "pitch"_a, "volume"_a, "samplerate"_a,
           "duration"_a);
+    m.def("tone_types", &osc_types);
 }
