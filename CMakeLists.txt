@@ -36,6 +36,7 @@ include_directories(
     C:/develop/cmajlang/cmajor/include
     C:/develop/airwin2rack/src
     libs/sst-basic-blocks/libs
+    libs/tracktion_engine/modules/tracktion_graph
 )
 
 # for "reasons", this is still a console app even though a GUI app is built from it
@@ -102,6 +103,7 @@ pybind11_add_module(xenakios
     Source/PythonBindings/pybindings_ex2.cpp
     Source/PythonBindings/pybindings_ex3.cpp
     Source/PythonBindings/pybindings_ex4.cpp
+    # Source/PythonBindings/pybindings_ex5.cpp
     Source/Xaps/clap_xaudioprocessor.cpp
     Source/Host/claphost.cpp
     
@@ -187,6 +189,14 @@ add_executable(CMajorTester
     )
 target_compile_definitions(CMajorTester PRIVATE NOJUCE=1 _USE_MATH_DEFINES=1 __WINDOWS_WASAPI__)
 target_link_libraries(CMajorTester PRIVATE c:/develop/cmajlang/cmajor/tools/CmajDLL/exports.def)
+
+# te testing
+
+add_executable(te_tester 
+    Source/Experimental/te_tester.cpp 
+    )
+target_compile_definitions(te_tester PRIVATE NOJUCE=1 _USE_MATH_DEFINES=1 __WINDOWS_WASAPI__)
+# target_link_libraries(CMajorTester PRIVATE c:/develop/cmajlang/cmajor/tools/CmajDLL/exports.def)
 
 # juce::juce_recommended_lto_flags
 # juce_add_bundle_resources_directory(AudioPluginHost2 Assets)

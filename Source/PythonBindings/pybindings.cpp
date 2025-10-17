@@ -35,6 +35,7 @@ void init_py1(py::module_ &);
 void init_py2(py::module_ &, py::module_ &);
 void init_py3(py::module_ &, py::module_ &);
 void init_py4(py::module_ &, py::module_ &);
+// void init_py5(py::module_ &, py::module_ &);
 
 #if !NOJUCE
 inline void juceTest(std::string plugfilename)
@@ -52,8 +53,7 @@ inline void juceTest(std::string plugfilename)
 }
 #endif
 
-inline void writeArrayToFile(const py::array_t<double> &arr, double samplerate,
-                             std::string path)
+inline void writeArrayToFile(const py::array_t<double> &arr, double samplerate, std::string path)
 {
     if (arr.ndim() != 2)
         throw std::runtime_error(std::format("array ndim {} incompatible, must be 2", arr.ndim()));
@@ -85,8 +85,7 @@ inline void writeArrayToFile(const py::array_t<double> &arr, double samplerate,
         writer->flush();
     }
     else
-        throw std::runtime_error(
-            std::format("Could not create audio file writer"));
+        throw std::runtime_error(std::format("Could not create audio file writer"));
 }
 
 int g_inputHookCount = 0;
@@ -492,6 +491,6 @@ PYBIND11_MODULE(xenakios, m)
           "ismod"_a = false, "targetseq"_a, "env"_a, "start_time"_a = 0.0, "duration"_a,
           "granularity"_a = 0.05, "parid"_a, "port"_a = -1, "chan"_a = -1, "key"_a = -1,
           "nid"_a = -1);
-
+    // init_py5(m, m_const);
     // m.def("generateEnvelopeFromLFO", &generateEnvelopeFromLFO);
 }

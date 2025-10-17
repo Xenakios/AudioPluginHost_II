@@ -34,6 +34,156 @@ inline int osc_name_to_index(std::string name)
     return -1;
 }
 
+class GranulatorVoice
+{
+  public:
+    sst::basic_blocks::dsp::EBApproxSin<> osc_sin;
+    sst::basic_blocks::dsp::EBApproxSemiSin<> osc_semisin;
+    sst::basic_blocks::dsp::EBTri<> osc_tri;
+    sst::basic_blocks::dsp::EBSaw<> osc_saw;
+    sst::basic_blocks::dsp::EBPulse<> osc_pulse;
+    int phase = 0;
+    int endphase = 0;
+    double sr = 0.0;
+    bool active = false;
+    int osctype = 0;
+    double pancoeff = 0.0;
+    GranulatorVoice() {}
+    void set_samplerate(double hz)
+    {
+        sr = hz;
+        osc_sin.setSampleRate(hz);
+        osc_semisin.setSampleRate(hz);
+        osc_tri.setSampleRate(hz);
+        osc_saw.setSampleRate(hz);
+        osc_pulse.setSampleRate(hz);
+    }
+    void start(double dur_secs, double hz, int tonetype, double pan)
+    {
+        active = true;
+        pancoeff = xenakios::mapvalue(pan, -1.0, 1.0, 0.0, 1.0);
+        osctype = tonetype;
+        phase = 0;
+        endphase = sr * dur_secs;
+        osc_sin.setFrequency(hz);
+        osc_semisin.setFrequency(hz);
+        osc_tri.setFrequency(hz);
+        osc_saw.setFrequency(hz);
+        osc_pulse.setFrequency(hz);
+    }
+    void step(float *outputs)
+    {
+        float outsample = 0.0f;
+        if (osctype == 0)
+            outsample = osc_sin.step();
+        else if (osctype == 1)
+            outsample = osc_semisin.step();
+        else if (osctype == 2)
+            outsample = osc_tri.step();
+        else if (osctype == 3)
+            outsample = osc_saw.step();
+        else if (osctype == 4)
+            outsample = osc_pulse.step();
+        float gain = 1.0f;
+        if (phase < endphase / 2)
+            gain = 1.0 / (endphase / 2.0) * phase;
+        else if (phase >= endphase / 2)
+            gain = 1.0 - (1.0 / (endphase / 2.0) * (phase - endphase / 2.0));
+        outsample *= gain;
+        ++phase;
+        if (phase >= endphase)
+        {
+            active = false;
+            std::print("ended voice {}\n", (void *)this);
+        }
+        outputs[0] = outsample * pancoeff;
+        outputs[1] = outsample * (1.0 - pancoeff);
+    }
+};
+
+using events_t = std::vector<std::vector<float>>;
+
+class ToneGranulator
+{
+  public:
+    const int numvoices = 32;
+    double playpos = 0.0;
+    double m_sr = 44100.0;
+    std::vector<std::unique_ptr<GranulatorVoice>> voices;
+
+    events_t events;
+
+    ToneGranulator(double sr, events_t evts) : events{evts}
+    {
+        for (int i = 0; i < numvoices; ++i)
+        {
+            auto v = std::make_unique<GranulatorVoice>();
+            v->set_samplerate(sr);
+            voices.push_back(std::move(v));
+        }
+    }
+    inline py::array_t<float> generate()
+    {
+        int chans = 2;
+        int frames = (events.back()[0] + events.back()[1]) * m_sr;
+        py::buffer_info binfo(
+            nullptr,                                /* Pointer to buffer */
+            sizeof(float),                          /* Size of one scalar */
+            py::format_descriptor<float>::format(), /* Python struct-style format descriptor */
+            2,                                      /* Number of dimensions */
+            {chans, frames},                        /* Buffer dimensions */
+            {sizeof(float) * frames,                /* Strides (in bytes) for each index */
+             sizeof(float)});
+        py::array_t<float> output_audio{binfo};
+        float *writebufleft = output_audio.mutable_data(0);
+        float *writebufright = output_audio.mutable_data(1);
+        int evindex = 0;
+        for (int i = 0; i < frames; ++i)
+        {
+            std::vector<float> *ev = nullptr;
+            if (evindex < events.size())
+                ev = &events[evindex];
+            while (ev && std::floor((*ev)[0] * m_sr) == i)
+            {
+                bool wasfound = false;
+                for (int j = 0; j < voices.size(); ++j)
+                {
+                    if (!voices[j]->active)
+                    {
+                        std::print("starting voice {} for event {}\n", j, evindex);
+                        voices[j]->start((*ev)[1], (*ev)[2], (*ev)[3], (*ev)[4]);
+                        wasfound = true;
+                        break;
+                    }
+                }
+                if (!wasfound)
+                {
+                    std::print("Could not find voice for event {}\n", evindex);
+                }
+                ++evindex;
+                if (evindex >= events.size())
+                    ev = nullptr;
+                else
+                    ev = &events[evindex];
+            }
+            double mixsum[2] = {0.0, 0.0};
+            for (int j = 0; j < voices.size(); ++j)
+            {
+                if (voices[j]->active)
+                {
+                    float voiceout[2] = {0.0f, 0.0f};
+                    voices[j]->step(voiceout);
+                    mixsum[0] += voiceout[0];
+                    mixsum[1] += voiceout[1];
+                }
+            }
+            writebufleft[i] = mixsum[0] * (2.0 / numvoices);
+            writebufright[i] = mixsum[1] * (2.0 / numvoices);
+        }
+        return output_audio;
+    }
+};
+
 inline py::array_t<float> generate_tone(std::string tone_name, xenakios::Envelope &pitch_env,
                                         xenakios::Envelope &volume_env, double sr, double duration)
 {
@@ -140,4 +290,7 @@ void init_py4(py::module_ &m, py::module_ &m_const)
     m.def("generate_tone", &generate_tone, "tone_type"_a, "pitch"_a, "volume"_a, "samplerate"_a,
           "duration"_a);
     m.def("tone_types", &osc_types);
+    py::class_<ToneGranulator>(m, "ToneGranulator")
+        .def(py::init<double, events_t>())
+        .def("generate", &ToneGranulator::generate);
 }
