@@ -47,7 +47,7 @@ class GranulatorVoice
     double sr = 0.0;
     bool active = false;
     int osctype = 0;
-    double pancoeff = 0.0;
+    float ambcoeffs[4] = {};
     GranulatorVoice() {}
     void set_samplerate(double hz)
     {
@@ -58,10 +58,13 @@ class GranulatorVoice
         osc_saw.setSampleRate(hz);
         osc_pulse.setSampleRate(hz);
     }
-    void start(double dur_secs, double hz, int tonetype, double pan)
+    void start(double dur_secs, double hz, int tonetype, double horz_angle, double vert_angle)
     {
         active = true;
-        pancoeff = xenakios::mapvalue(pan, -1.0, 1.0, 0.0, 1.0);
+        ambcoeffs[0] = 1.0 / std::sqrt(2.0);
+        ambcoeffs[1] = std::cos(horz_angle) * std::cos(vert_angle);
+        ambcoeffs[2] = std::sin(horz_angle) * std::cos(vert_angle);
+        ambcoeffs[3] = std::sin(vert_angle);
         osctype = tonetype;
         phase = 0;
         endphase = sr * dur_secs;
@@ -96,8 +99,10 @@ class GranulatorVoice
             active = false;
             std::print("ended voice {}\n", (void *)this);
         }
-        outputs[0] = outsample * pancoeff;
-        outputs[1] = outsample * (1.0 - pancoeff);
+        outputs[0] = outsample * ambcoeffs[0];
+        outputs[1] = outsample * ambcoeffs[1];
+        outputs[2] = outsample * ambcoeffs[2];
+        outputs[3] = outsample * ambcoeffs[3];
     }
 };
 
@@ -115,6 +120,8 @@ class ToneGranulator
 
     ToneGranulator(double sr, events_t evts) : events{evts}
     {
+        std::sort(events.begin(), events.end(),
+                  [](auto &lhs, auto &rhs) { return lhs[0] < rhs[0]; });
         for (int i = 0; i < numvoices; ++i)
         {
             auto v = std::make_unique<GranulatorVoice>();
@@ -124,7 +131,7 @@ class ToneGranulator
     }
     inline py::array_t<float> generate()
     {
-        int chans = 2;
+        int chans = 4;
         int frames = (events.back()[0] + events.back()[1]) * m_sr;
         py::buffer_info binfo(
             nullptr,                                /* Pointer to buffer */
@@ -135,8 +142,10 @@ class ToneGranulator
             {sizeof(float) * frames,                /* Strides (in bytes) for each index */
              sizeof(float)});
         py::array_t<float> output_audio{binfo};
-        float *writebufleft = output_audio.mutable_data(0);
-        float *writebufright = output_audio.mutable_data(1);
+        float *writebufs[4];
+        for (int i = 0; i < 4; ++i)
+            writebufs[i] = output_audio.mutable_data(i);
+
         int evindex = 0;
         for (int i = 0; i < frames; ++i)
         {
@@ -151,7 +160,7 @@ class ToneGranulator
                     if (!voices[j]->active)
                     {
                         std::print("starting voice {} for event {}\n", j, evindex);
-                        voices[j]->start((*ev)[1], (*ev)[2], (*ev)[3], (*ev)[4]);
+                        voices[j]->start((*ev)[1], (*ev)[2], (*ev)[3], (*ev)[4], (*ev)[5]);
                         wasfound = true;
                         break;
                     }
@@ -166,19 +175,23 @@ class ToneGranulator
                 else
                     ev = &events[evindex];
             }
-            double mixsum[2] = {0.0, 0.0};
+            double mixsum[4] = {0.0, 0.0, 0.0, 0.0};
             for (int j = 0; j < voices.size(); ++j)
             {
                 if (voices[j]->active)
                 {
-                    float voiceout[2] = {0.0f, 0.0f};
+                    float voiceout[4] = {0.0f, 0.0f, 0.0f, 0.0f};
                     voices[j]->step(voiceout);
                     mixsum[0] += voiceout[0];
                     mixsum[1] += voiceout[1];
+                    mixsum[2] += voiceout[2];
+                    mixsum[3] += voiceout[3];
                 }
             }
-            writebufleft[i] = mixsum[0] * (2.0 / numvoices);
-            writebufright[i] = mixsum[1] * (2.0 / numvoices);
+            for (int j = 0; j < 4; ++j)
+            {
+                writebufs[j][i] = mixsum[j] * (2.0 / numvoices);
+            }
         }
         return output_audio;
     }
