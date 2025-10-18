@@ -5,9 +5,12 @@
 #include "../Common/xap_breakpoint_envelope.h"
 #include "sst/basic-blocks/dsp/EllipticBlepOscillators.h"
 #include "sst/basic-blocks/dsp/DPWSawPulseOscillator.h"
+#include "sst/filters++.h"
 #include <print>
 
 namespace py = pybind11;
+
+const int granul_block_size = 8;
 
 struct tone_info
 {
@@ -33,6 +36,60 @@ inline int osc_name_to_index(std::string name)
             return osc_infos[i].index;
     return -1;
 }
+namespace sfpp = sst::filtersplusplus;
+struct FilterInfo
+{
+    std::string address;
+    sfpp::FilterModel model;
+    sfpp::FilterSubModel submodel;
+    sfpp::ModelConfig modelconfig;
+};
+
+std::vector<FilterInfo> g_filter_infos;
+
+void init_filter_infos()
+{
+    if (g_filter_infos.size() > 0)
+        return;
+    auto models = sfpp::Filter::availableModels();
+    std::string address;
+    address.reserve(256);
+    for (auto &mod : models)
+    {
+        auto subm = sfpp::Filter::availableModelConfigurations(mod, true);
+        for (auto s : subm)
+        {
+            address = sfpp::toString(mod);
+            if (s == sfpp::ModelConfig())
+            {
+            }
+            auto [pt, st, dt, smt] = s;
+            if (pt != sfpp::Passband::UNSUPPORTED)
+            {
+                address += "/" + sfpp::toString(pt);
+            }
+            if (st != sfpp::Slope::UNSUPPORTED)
+            {
+                address += "/" + sfpp::toString(st);
+            }
+            if (dt != sfpp::DriveMode::UNSUPPORTED)
+            {
+                address += "/" + sfpp::toString(dt);
+            }
+            if (smt != sfpp::FilterSubModel::UNSUPPORTED)
+            {
+                address += "/" + sfpp::toString(smt);
+            }
+            address = choc::text::toLowerCase(address);
+            address = choc::text::replace(address, " ", "_", "&", "and", ",", "");
+            FilterInfo info;
+            info.address = address;
+            info.model = mod;
+            info.modelconfig = s;
+            g_filter_infos.push_back(info);
+        }
+    }
+}
 
 class GranulatorVoice
 {
@@ -42,12 +99,14 @@ class GranulatorVoice
     sst::basic_blocks::dsp::EBTri<> osc_tri;
     sst::basic_blocks::dsp::EBSaw<> osc_saw;
     sst::basic_blocks::dsp::EBPulse<> osc_pulse;
+    sst::filtersplusplus::Filter thefilter;
     int phase = 0;
     int endphase = 0;
     double sr = 0.0;
     bool active = false;
     int osctype = 0;
     float ambcoeffs[4] = {};
+    double cutoff = 0.0;
     GranulatorVoice() {}
     void set_samplerate(double hz)
     {
@@ -58,12 +117,49 @@ class GranulatorVoice
         osc_saw.setSampleRate(hz);
         osc_pulse.setSampleRate(hz);
     }
-    void start(double dur_secs, double hz, int tonetype, double horz_angle, double vert_angle)
+    void set_filter_type(std::string ft)
+    {
+        bool foundfilter = false;
+        for (const auto &finfo : g_filter_infos)
+        {
+            if (finfo.address == ft)
+            {
+                thefilter.setFilterModel(finfo.model);
+                thefilter.setModelConfiguration(finfo.modelconfig);
+                std::print("processing with {}\n", finfo.address);
+                foundfilter = true;
+                // filsu.makeCoefficients(0, 440.0f, 0.5f);
+                break;
+            }
+        }
+        if (!foundfilter)
+        {
+            std::print("could not instantiate filter \"{}\", ensure the name is correct\n", ft);
+        }
+        thefilter.setSampleRateAndBlockSize(sr, granul_block_size);
+        thefilter.setMono();
+        if (!thefilter.prepareInstance())
+        {
+            std::print("could not prepare filter\n");
+        }
+    }
+    void start(double dur_secs, double hz, int tonetype, double horz_angle, double vert_angle,
+               double filt_cutoff)
     {
         active = true;
+        /* from ATK toolkit js code
+        // W
+  matrixNewDSP[0] =  kInvSqrt2;
+  // X
+  matrixNewDSP[1] =  mCosAzi * mCosEle;
+  // Y
+  matrixNewDSP[2] = -mSinAzi * mCosEle;
+  // Z
+  matrixNewDSP[3] =  mSinEle;
+  */
         ambcoeffs[0] = 1.0 / std::sqrt(2.0);
         ambcoeffs[1] = std::cos(horz_angle) * std::cos(vert_angle);
-        ambcoeffs[2] = std::sin(horz_angle) * std::cos(vert_angle);
+        ambcoeffs[2] = -std::sin(horz_angle) * std::cos(vert_angle);
         ambcoeffs[3] = std::sin(vert_angle);
         osctype = tonetype;
         phase = 0;
@@ -73,36 +169,46 @@ class GranulatorVoice
         osc_tri.setFrequency(hz);
         osc_saw.setFrequency(hz);
         osc_pulse.setFrequency(hz);
+
+        cutoff = filt_cutoff;
     }
-    void step(float *outputs)
+    void process(float *outputs, int nframes)
     {
-        float outsample = 0.0f;
-        if (osctype == 0)
-            outsample = osc_sin.step();
-        else if (osctype == 1)
-            outsample = osc_semisin.step();
-        else if (osctype == 2)
-            outsample = osc_tri.step();
-        else if (osctype == 3)
-            outsample = osc_saw.step();
-        else if (osctype == 4)
-            outsample = osc_pulse.step();
-        float gain = 1.0f;
-        if (phase < endphase / 2)
-            gain = 1.0 / (endphase / 2.0) * phase;
-        else if (phase >= endphase / 2)
-            gain = 1.0 - (1.0 / (endphase / 2.0) * (phase - endphase / 2.0));
-        outsample *= gain;
-        ++phase;
-        if (phase >= endphase)
+        thefilter.makeCoefficients(0, cutoff, 0.1);
+        thefilter.prepareBlock();
+        for (int i = 0; i < nframes; ++i)
         {
-            active = false;
-            std::print("ended voice {}\n", (void *)this);
+            float outsample = 0.0f;
+            if (osctype == 0)
+                outsample = osc_sin.step();
+            else if (osctype == 1)
+                outsample = osc_semisin.step();
+            else if (osctype == 2)
+                outsample = osc_tri.step();
+            else if (osctype == 3)
+                outsample = osc_saw.step();
+            else if (osctype == 4)
+                outsample = osc_pulse.step();
+            float gain = 1.0f;
+            if (phase < endphase / 2)
+                gain = 1.0 / (endphase / 2.0) * phase;
+            else if (phase >= endphase / 2)
+                gain = 1.0 - (1.0 / (endphase / 2.0) * (phase - endphase / 2.0));
+            outsample *= gain;
+            outsample = thefilter.processMonoSample(outsample);
+            outputs[i * 4 + 0] = outsample * ambcoeffs[0];
+            outputs[i * 4 + 1] = outsample * ambcoeffs[1];
+            outputs[i * 4 + 2] = outsample * ambcoeffs[2];
+            outputs[i * 4 + 3] = outsample * ambcoeffs[3];
+            ++phase;
+            if (phase >= endphase)
+            {
+                active = false;
+                std::print("ended voice {}\n", (void *)this);
+            }
         }
-        outputs[0] = outsample * ambcoeffs[0];
-        outputs[1] = outsample * ambcoeffs[1];
-        outputs[2] = outsample * ambcoeffs[2];
-        outputs[3] = outsample * ambcoeffs[3];
+
+        thefilter.concludeBlock();
     }
 };
 
@@ -118,14 +224,16 @@ class ToneGranulator
 
     events_t events;
 
-    ToneGranulator(double sr, events_t evts) : events{evts}
+    ToneGranulator(double sr, events_t evts, std::string filtertype) : events{evts}
     {
+        init_filter_infos();
         std::sort(events.begin(), events.end(),
                   [](auto &lhs, auto &rhs) { return lhs[0] < rhs[0]; });
         for (int i = 0; i < numvoices; ++i)
         {
             auto v = std::make_unique<GranulatorVoice>();
             v->set_samplerate(sr);
+            v->set_filter_type(filtertype);
             voices.push_back(std::move(v));
         }
     }
@@ -147,12 +255,14 @@ class ToneGranulator
             writebufs[i] = output_audio.mutable_data(i);
 
         int evindex = 0;
-        for (int i = 0; i < frames; ++i)
+        int framecount = 0;
+        while (framecount < frames - granul_block_size)
         {
             std::vector<float> *ev = nullptr;
             if (evindex < events.size())
                 ev = &events[evindex];
-            while (ev && std::floor((*ev)[0] * m_sr) == i)
+            while (ev && std::floor((*ev)[0] * m_sr) >= framecount &&
+                   std::floor((*ev)[0] * m_sr) < framecount + granul_block_size)
             {
                 bool wasfound = false;
                 for (int j = 0; j < voices.size(); ++j)
@@ -160,7 +270,8 @@ class ToneGranulator
                     if (!voices[j]->active)
                     {
                         std::print("starting voice {} for event {}\n", j, evindex);
-                        voices[j]->start((*ev)[1], (*ev)[2], (*ev)[3], (*ev)[4], (*ev)[5]);
+                        voices[j]->start((*ev)[1], (*ev)[2], (*ev)[3], (*ev)[4], (*ev)[5],
+                                         (*ev)[6]);
                         wasfound = true;
                         break;
                     }
@@ -175,23 +286,31 @@ class ToneGranulator
                 else
                     ev = &events[evindex];
             }
-            double mixsum[4] = {0.0, 0.0, 0.0, 0.0};
+            double mixsum[4][granul_block_size];
+            for (int i = 0; i < 4; ++i)
+                for (int j = 0; j < granul_block_size; ++j)
+                    mixsum[i][j] = 0.0f;
             for (int j = 0; j < voices.size(); ++j)
             {
                 if (voices[j]->active)
                 {
-                    float voiceout[4] = {0.0f, 0.0f, 0.0f, 0.0f};
-                    voices[j]->step(voiceout);
-                    mixsum[0] += voiceout[0];
-                    mixsum[1] += voiceout[1];
-                    mixsum[2] += voiceout[2];
-                    mixsum[3] += voiceout[3];
+                    float voiceout[4 * granul_block_size];
+                    voices[j]->process(voiceout, granul_block_size);
+                    for (int k = 0; k < granul_block_size; ++k)
+                    {
+                        mixsum[0][k] += voiceout[4 * k + 0];
+                        mixsum[1][k] += voiceout[4 * k + 1];
+                        mixsum[2][k] += voiceout[4 * k + 2];
+                        mixsum[3][k] += voiceout[4 * k + 3];
+                    }
                 }
             }
             for (int j = 0; j < 4; ++j)
             {
-                writebufs[j][i] = mixsum[j] * (2.0 / numvoices);
+                for (int k = 0; k < granul_block_size; ++k)
+                    writebufs[j][framecount + k] = mixsum[j][k] * (2.0 / numvoices);
             }
+            framecount += granul_block_size;
         }
         return output_audio;
     }
@@ -304,6 +423,6 @@ void init_py4(py::module_ &m, py::module_ &m_const)
           "duration"_a);
     m.def("tone_types", &osc_types);
     py::class_<ToneGranulator>(m, "ToneGranulator")
-        .def(py::init<double, events_t>())
+        .def(py::init<double, events_t, std::string>())
         .def("generate", &ToneGranulator::generate);
 }
