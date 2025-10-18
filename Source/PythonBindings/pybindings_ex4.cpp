@@ -94,32 +94,25 @@ void init_filter_infos()
 class GranulatorVoice
 {
   public:
-    sst::basic_blocks::dsp::EBApproxSin<> osc_sin;
-    sst::basic_blocks::dsp::EBApproxSemiSin<> osc_semisin;
-    sst::basic_blocks::dsp::EBTri<> osc_tri;
-    sst::basic_blocks::dsp::EBSaw<> osc_saw;
-    sst::basic_blocks::dsp::EBPulse<> osc_pulse;
+    std::variant<sst::basic_blocks::dsp::EBApproxSin<>, sst::basic_blocks::dsp::EBApproxSemiSin<>,
+                 sst::basic_blocks::dsp::EBTri<>, sst::basic_blocks::dsp::EBSaw<>,
+                 sst::basic_blocks::dsp::EBPulse<>>
+        theoscillator;
+
     sst::filtersplusplus::Filter filter0;
     int phase = 0;
     int endphase = 0;
     double sr = 0.0;
     bool active = false;
-    int osctype = 0;
+
+    int prior_osc_type = -1;
     float ambcoeffs[4] = {};
     double cutoff0 = 0.0;
     double reson0 = 0.0;
     double graingain = 0.0;
     double envshape = 0.5;
     GranulatorVoice() {}
-    void set_samplerate(double hz)
-    {
-        sr = hz;
-        osc_sin.setSampleRate(hz);
-        osc_semisin.setSampleRate(hz);
-        osc_tri.setSampleRate(hz);
-        osc_saw.setSampleRate(hz);
-        osc_pulse.setSampleRate(hz);
-    }
+    void set_samplerate(double hz) { sr = hz; }
     void set_filter_type(std::string ft)
     {
         bool foundfilter = false;
@@ -165,16 +158,7 @@ class GranulatorVoice
         PAR_FILT2EXT0,
         NUM_PARS
     };
-    void start(std::vector<float> &evpars)
-    {
-        /*
-        if (evpars.size() < NUM_PARS)
-            throw std::runtime_error(
-                std::format("too few event parameters {}, need to have {} parameters",
-                            evpars.size(), (int)NUM_PARS));
-        */
-        active = true;
-        /* from ATK toolkit js code
+    /* ambisonics panning code from ATK toolkit js code
         // W
   matrixNewDSP[0] =  kInvSqrt2;
   // X
@@ -184,26 +168,43 @@ class GranulatorVoice
   // Z
   matrixNewDSP[3] =  mSinEle;
   */
+
+    void start(std::vector<float> &evpars)
+    {
+        active = true;
+        int newosctype = std::clamp<int>(evpars[PAR_TONETYPE], 0.0, 4.0);
+        if (newosctype != prior_osc_type)
+        {
+            prior_osc_type = newosctype;
+            if (newosctype == 0)
+                theoscillator = sst::basic_blocks::dsp::EBApproxSin<>();
+            else if (newosctype == 1)
+                theoscillator = sst::basic_blocks::dsp::EBApproxSemiSin<>();
+            else if (newosctype == 2)
+                theoscillator = sst::basic_blocks::dsp::EBTri<>();
+            else if (newosctype == 3)
+                theoscillator = sst::basic_blocks::dsp::EBSaw<>();
+            else
+                theoscillator = sst::basic_blocks::dsp::EBPulse<>();
+            std::visit([this](auto &q) { q.setSampleRate(sr); }, theoscillator);
+        }
+        auto hz = std::clamp(evpars[PAR_FREQHZ], 1.0f, 22050.0f);
+
+        std::visit(
+            [hz](auto &q) {
+                q.reset();
+                q.setFrequency(hz);
+            },
+            theoscillator);
         float horz_angle = evpars[PAR_HOR_ANGLE];
         float vert_angle = evpars[PAR_VER_ANGLE];
         ambcoeffs[0] = 1.0 / std::sqrt(2.0);
         ambcoeffs[1] = std::cos(horz_angle) * std::cos(vert_angle);
         ambcoeffs[2] = -std::sin(horz_angle) * std::cos(vert_angle);
         ambcoeffs[3] = std::sin(vert_angle);
-        osctype = std::clamp<int>(evpars[PAR_TONETYPE], 0.0, 4.0);
+
         phase = 0;
         endphase = sr * std::clamp(evpars[PAR_DUR], 0.001f, 1.0f);
-        auto hz = std::clamp(evpars[PAR_FREQHZ], 1.0f, 22050.0f);
-        osc_sin.reset();
-        osc_sin.setFrequency(hz);
-        osc_semisin.reset();
-        osc_semisin.setFrequency(hz);
-        osc_tri.reset();
-        osc_tri.setFrequency(hz);
-        osc_saw.reset();
-        osc_saw.setFrequency(hz);
-        osc_pulse.reset();
-        osc_pulse.setFrequency(hz);
 
         cutoff0 = std::clamp(evpars[PAR_FILT1CUTOFF], -60.0f, 65.0f);
         reson0 = std::clamp(evpars[PAR_FILT1RESON], 0.0f, 1.0f);
@@ -220,16 +221,7 @@ class GranulatorVoice
         for (int i = 0; i < nframes; ++i)
         {
             float outsample = 0.0f;
-            if (osctype == 0)
-                outsample = osc_sin.step();
-            else if (osctype == 1)
-                outsample = osc_semisin.step();
-            else if (osctype == 2)
-                outsample = osc_tri.step();
-            else if (osctype == 3)
-                outsample = osc_saw.step();
-            else if (osctype == 4)
-                outsample = osc_pulse.step();
+            outsample = std::visit([](auto &q) { return q.step(); }, theoscillator);
             float envgain = 1.0f;
             if (phase < envpeakpos)
                 envgain = xenakios::mapvalue<float>(phase, 0.0, envpeakpos, 0.0f, 1.0f);
