@@ -174,7 +174,7 @@ class GranulatorVoice
     }
     void process(float *outputs, int nframes)
     {
-        thefilter.makeCoefficients(0, cutoff, 0.1);
+        thefilter.makeCoefficients(0, cutoff, 0.5);
         thefilter.prepareBlock();
         for (int i = 0; i < nframes; ++i)
         {
@@ -204,7 +204,7 @@ class GranulatorVoice
             if (phase >= endphase)
             {
                 active = false;
-                std::print("ended voice {}\n", (void *)this);
+                // std::print("ended voice {}\n", (void *)this);
             }
         }
 
@@ -237,9 +237,17 @@ class ToneGranulator
             voices.push_back(std::move(v));
         }
     }
-    inline py::array_t<float> generate()
+    inline py::array_t<float> generate(std::string outputmode)
     {
-        int chans = 4;
+        int chans = 0;
+        if (outputmode == "mono")
+            chans = 1;
+        if (outputmode == "stereo")
+            chans = 2;
+        if (outputmode == "ambisonics")
+            chans = 4;
+        if (chans == 0)
+            throw std::runtime_error("output mode must be mono, stereo or ambisonics");
         int frames = (events.back()[0] + events.back()[1]) * m_sr;
         py::buffer_info binfo(
             nullptr,                                /* Pointer to buffer */
@@ -251,7 +259,7 @@ class ToneGranulator
              sizeof(float)});
         py::array_t<float> output_audio{binfo};
         float *writebufs[4];
-        for (int i = 0; i < 4; ++i)
+        for (int i = 0; i < chans; ++i)
             writebufs[i] = output_audio.mutable_data(i);
 
         int evindex = 0;
@@ -269,7 +277,7 @@ class ToneGranulator
                 {
                     if (!voices[j]->active)
                     {
-                        std::print("starting voice {} for event {}\n", j, evindex);
+                        // std::print("starting voice {} for event {}\n", j, evindex);
                         voices[j]->start((*ev)[1], (*ev)[2], (*ev)[3], (*ev)[4], (*ev)[5],
                                          (*ev)[6]);
                         wasfound = true;
@@ -305,10 +313,28 @@ class ToneGranulator
                     }
                 }
             }
-            for (int j = 0; j < 4; ++j)
+            if (chans == 4)
+            {
+                for (int j = 0; j < 4; ++j)
+                {
+                    for (int k = 0; k < granul_block_size; ++k)
+                        writebufs[j][framecount + k] = mixsum[j][k] * (2.0 / numvoices);
+                }
+            }
+            else if (chans == 1)
             {
                 for (int k = 0; k < granul_block_size; ++k)
-                    writebufs[j][framecount + k] = mixsum[j][k] * (2.0 / numvoices);
+                    writebufs[0][framecount + k] = mixsum[0][k] * (2.0 / numvoices);
+            }
+            else if (chans == 2)
+            {
+                for (int k = 0; k < granul_block_size; ++k)
+                {
+                    float mid = mixsum[0][k] * (2.0 / numvoices);
+                    float side = mixsum[1][k] * (2.0 / numvoices);
+                    writebufs[0][framecount + k] = 0.5 * (mid + side);
+                    writebufs[1][framecount + k] = 0.5 * (mid - side);
+                }
             }
             framecount += granul_block_size;
         }
