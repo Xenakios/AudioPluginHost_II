@@ -99,14 +99,17 @@ class GranulatorVoice
     sst::basic_blocks::dsp::EBTri<> osc_tri;
     sst::basic_blocks::dsp::EBSaw<> osc_saw;
     sst::basic_blocks::dsp::EBPulse<> osc_pulse;
-    sst::filtersplusplus::Filter thefilter;
+    sst::filtersplusplus::Filter filter0;
     int phase = 0;
     int endphase = 0;
     double sr = 0.0;
     bool active = false;
     int osctype = 0;
     float ambcoeffs[4] = {};
-    double cutoff = 0.0;
+    double cutoff0 = 0.0;
+    double reson0 = 0.0;
+    double graingain = 0.0;
+    double envshape = 0.5;
     GranulatorVoice() {}
     void set_samplerate(double hz)
     {
@@ -124,8 +127,8 @@ class GranulatorVoice
         {
             if (finfo.address == ft)
             {
-                thefilter.setFilterModel(finfo.model);
-                thefilter.setModelConfiguration(finfo.modelconfig);
+                filter0.setFilterModel(finfo.model);
+                filter0.setModelConfiguration(finfo.modelconfig);
                 std::print("processing with {}\n", finfo.address);
                 foundfilter = true;
                 // filsu.makeCoefficients(0, 440.0f, 0.5f);
@@ -136,16 +139,40 @@ class GranulatorVoice
         {
             std::print("could not instantiate filter \"{}\", ensure the name is correct\n", ft);
         }
-        thefilter.setSampleRateAndBlockSize(sr, granul_block_size);
-        thefilter.setMono();
-        if (!thefilter.prepareInstance())
+        filter0.setSampleRateAndBlockSize(sr, granul_block_size);
+        filter0.setMono();
+        if (!filter0.prepareInstance())
         {
             std::print("could not prepare filter\n");
         }
     }
-    void start(double dur_secs, double hz, int tonetype, double horz_angle, double vert_angle,
-               double filt_cutoff)
+    // t, dur, hz, 4, volume, horz_angle, vert_angle, cutoff, reson
+    enum PARS
     {
+        PAR_TPOS,
+        PAR_DUR,
+        PAR_FREQHZ,
+        PAR_TONETYPE,
+        PAR_VOLUME,
+        PAR_ENVSHAPE,
+        PAR_HOR_ANGLE,
+        PAR_VER_ANGLE,
+        PAR_FILT1CUTOFF,
+        PAR_FILT1RESON,
+        PAR_FILT1EXT0,
+        PAR_FILT2CUTOFF,
+        PAR_FILT2RESON,
+        PAR_FILT2EXT0,
+        NUM_PARS
+    };
+    void start(std::vector<float> &evpars)
+    {
+        /*
+        if (evpars.size() < NUM_PARS)
+            throw std::runtime_error(
+                std::format("too few event parameters {}, need to have {} parameters",
+                            evpars.size(), (int)NUM_PARS));
+        */
         active = true;
         /* from ATK toolkit js code
         // W
@@ -157,25 +184,33 @@ class GranulatorVoice
   // Z
   matrixNewDSP[3] =  mSinEle;
   */
+        float horz_angle = evpars[PAR_HOR_ANGLE];
+        float vert_angle = evpars[PAR_VER_ANGLE];
         ambcoeffs[0] = 1.0 / std::sqrt(2.0);
         ambcoeffs[1] = std::cos(horz_angle) * std::cos(vert_angle);
         ambcoeffs[2] = -std::sin(horz_angle) * std::cos(vert_angle);
         ambcoeffs[3] = std::sin(vert_angle);
-        osctype = tonetype;
+        osctype = std::clamp<int>(evpars[PAR_TONETYPE], 0.0, 4.0);
         phase = 0;
-        endphase = sr * dur_secs;
+        endphase = sr * std::clamp(evpars[PAR_DUR], 0.001f, 1.0f);
+        auto hz = std::clamp(evpars[PAR_FREQHZ], 1.0f, 22050.0f);
         osc_sin.setFrequency(hz);
         osc_semisin.setFrequency(hz);
         osc_tri.setFrequency(hz);
         osc_saw.setFrequency(hz);
         osc_pulse.setFrequency(hz);
 
-        cutoff = filt_cutoff;
+        cutoff0 = std::clamp(evpars[PAR_FILT1CUTOFF], -60.0f, 65.0f);
+        reson0 = std::clamp(evpars[PAR_FILT1RESON], 0.0f, 1.0f);
+        graingain = std::clamp(evpars[PAR_VOLUME], 0.0f, 1.0f);
+        graingain = graingain * graingain * graingain;
+        envshape = std::clamp(evpars[PAR_ENVSHAPE], 0.0f, 1.0f);
     }
     void process(float *outputs, int nframes)
     {
-        thefilter.makeCoefficients(0, cutoff, 0.5);
-        thefilter.prepareBlock();
+        filter0.makeCoefficients(0, cutoff0, reson0);
+        filter0.prepareBlock();
+        int envpeakpos = envshape * endphase;
         for (int i = 0; i < nframes; ++i)
         {
             float outsample = 0.0f;
@@ -189,13 +224,15 @@ class GranulatorVoice
                 outsample = osc_saw.step();
             else if (osctype == 4)
                 outsample = osc_pulse.step();
-            float gain = 1.0f;
-            if (phase < endphase / 2)
-                gain = 1.0 / (endphase / 2.0) * phase;
-            else if (phase >= endphase / 2)
-                gain = 1.0 - (1.0 / (endphase / 2.0) * (phase - endphase / 2.0));
-            outsample *= gain;
-            outsample = thefilter.processMonoSample(outsample);
+            float envgain = 1.0f;
+            if (phase < envpeakpos)
+                envgain = xenakios::mapvalue<float>(phase, 0.0, envpeakpos, 0.0f, 1.0f);
+            else if (phase >= envpeakpos)
+                envgain = xenakios::mapvalue<float>(phase, envpeakpos, endphase, 1.0f, 0.0f);
+            envgain = 1.0f - envgain;
+            envgain = 1.0f - (envgain * envgain * envgain);
+            outsample *= envgain * graingain;
+            outsample = filter0.processMonoSample(outsample);
             outputs[i * 4 + 0] = outsample * ambcoeffs[0];
             outputs[i * 4 + 1] = outsample * ambcoeffs[1];
             outputs[i * 4 + 2] = outsample * ambcoeffs[2];
@@ -208,7 +245,7 @@ class GranulatorVoice
             }
         }
 
-        thefilter.concludeBlock();
+        filter0.concludeBlock();
     }
 };
 
@@ -278,8 +315,7 @@ class ToneGranulator
                     if (!voices[j]->active)
                     {
                         // std::print("starting voice {} for event {}\n", j, evindex);
-                        voices[j]->start((*ev)[1], (*ev)[2], (*ev)[3], (*ev)[4], (*ev)[5],
-                                         (*ev)[6]);
+                        voices[j]->start(*ev);
                         wasfound = true;
                         break;
                     }
@@ -313,25 +349,26 @@ class ToneGranulator
                     }
                 }
             }
+            double compengain = 8.0 / numvoices;
             if (chans == 4)
             {
                 for (int j = 0; j < 4; ++j)
                 {
                     for (int k = 0; k < granul_block_size; ++k)
-                        writebufs[j][framecount + k] = mixsum[j][k] * (2.0 / numvoices);
+                        writebufs[j][framecount + k] = mixsum[j][k] * compengain;
                 }
             }
             else if (chans == 1)
             {
                 for (int k = 0; k < granul_block_size; ++k)
-                    writebufs[0][framecount + k] = mixsum[0][k] * (2.0 / numvoices);
+                    writebufs[0][framecount + k] = mixsum[0][k] * compengain;
             }
             else if (chans == 2)
             {
                 for (int k = 0; k < granul_block_size; ++k)
                 {
-                    float mid = mixsum[0][k] * (2.0 / numvoices);
-                    float side = mixsum[1][k] * (2.0 / numvoices);
+                    float mid = mixsum[0][k] * compengain;
+                    float side = mixsum[1][k] * compengain;
                     writebufs[0][framecount + k] = 0.5 * (mid + side);
                     writebufs[1][framecount + k] = 0.5 * (mid - side);
                 }
