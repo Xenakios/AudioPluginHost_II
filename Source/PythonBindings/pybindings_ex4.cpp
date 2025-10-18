@@ -194,10 +194,15 @@ class GranulatorVoice
         phase = 0;
         endphase = sr * std::clamp(evpars[PAR_DUR], 0.001f, 1.0f);
         auto hz = std::clamp(evpars[PAR_FREQHZ], 1.0f, 22050.0f);
+        osc_sin.reset();
         osc_sin.setFrequency(hz);
+        osc_semisin.reset();
         osc_semisin.setFrequency(hz);
+        osc_tri.reset();
         osc_tri.setFrequency(hz);
+        osc_saw.reset();
         osc_saw.setFrequency(hz);
+        osc_pulse.reset();
         osc_pulse.setFrequency(hz);
 
         cutoff0 = std::clamp(evpars[PAR_FILT1CUTOFF], -60.0f, 65.0f);
@@ -211,6 +216,7 @@ class GranulatorVoice
         filter0.makeCoefficients(0, cutoff0, reson0);
         filter0.prepareBlock();
         int envpeakpos = envshape * endphase;
+        envpeakpos = std::clamp(envpeakpos, 16, endphase - 16);
         for (int i = 0; i < nframes; ++i)
         {
             float outsample = 0.0f;
@@ -306,8 +312,7 @@ class ToneGranulator
             std::vector<float> *ev = nullptr;
             if (evindex < events.size())
                 ev = &events[evindex];
-            while (ev && std::floor((*ev)[0] * m_sr) >= framecount &&
-                   std::floor((*ev)[0] * m_sr) < framecount + granul_block_size)
+            while (ev && std::floor((*ev)[0] * m_sr) < framecount + granul_block_size)
             {
                 bool wasfound = false;
                 for (int j = 0; j < voices.size(); ++j)
