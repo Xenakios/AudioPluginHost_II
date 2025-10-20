@@ -114,25 +114,11 @@ class GranulatorVoice
     double envshape = 0.5;
     GranulatorVoice() {}
     void set_samplerate(double hz) { sr = hz; }
-    void set_filter_type(std::string ft)
+    void set_filter_type(const FilterInfo &finfo)
     {
-        bool foundfilter = false;
-        for (const auto &finfo : g_filter_infos)
-        {
-            if (finfo.address == ft)
-            {
-                filter0.setFilterModel(finfo.model);
-                filter0.setModelConfiguration(finfo.modelconfig);
-                std::print("processing with {}\n", finfo.address);
-                foundfilter = true;
-                // filsu.makeCoefficients(0, 440.0f, 0.5f);
-                break;
-            }
-        }
-        if (!foundfilter)
-        {
-            std::print("could not instantiate filter \"{}\", ensure the name is correct\n", ft);
-        }
+        filter0.setFilterModel(finfo.model);
+        filter0.setModelConfiguration(finfo.modelconfig);
+
         filter0.setSampleRateAndBlockSize(sr, granul_block_size);
         filter0.setMono();
         if (!filter0.prepareInstance())
@@ -200,8 +186,10 @@ class GranulatorVoice
                 q.setSyncRatio(syncratio);
             },
             theoscillator);
-        float horz_angle = evpars[PAR_HOR_ANGLE];
-        float vert_angle = evpars[PAR_VER_ANGLE];
+        float horz_angle = std::clamp(evpars[PAR_HOR_ANGLE], -180.0f, 180.0f);
+        float vert_angle = std::clamp(evpars[PAR_VER_ANGLE], -180.0f, 180.0f);
+        horz_angle = horz_angle * (M_PI / 180.0);
+        vert_angle = vert_angle * (M_PI / 180.0);
         ambcoeffs[0] = 1.0 / std::sqrt(2.0);
         ambcoeffs[1] = std::cos(horz_angle) * std::cos(vert_angle);
         ambcoeffs[2] = -std::sin(horz_angle) * std::cos(vert_angle);
@@ -276,13 +264,29 @@ class ToneGranulator
     ToneGranulator(double sr, events_t evts, std::string filtertype) : events{evts}
     {
         init_filter_infos();
-        std::sort(events.begin(), events.end(),
-                  [](auto &lhs, auto &rhs) { return lhs[0] < rhs[0]; });
+        const FilterInfo *foundinfo = nullptr;
+        for (const auto &finfo : g_filter_infos)
+        {
+            if (finfo.address == filtertype)
+            {
+                foundinfo = &finfo;
+                std::print("processing with {}\n", finfo.address);
+                break;
+            }
+        }
+        if (!foundinfo)
+        {
+            throw std::runtime_error(std::format(
+                "could not instantiate filter \"{}\", ensure the name is correct", filtertype));
+        }
+        std::sort(events.begin(), events.end(), [](auto &lhs, auto &rhs) {
+            return lhs[GranulatorVoice::PAR_TPOS] < rhs[GranulatorVoice::PAR_TPOS];
+        });
         for (int i = 0; i < numvoices; ++i)
         {
             auto v = std::make_unique<GranulatorVoice>();
             v->set_samplerate(sr);
-            v->set_filter_type(filtertype);
+            v->set_filter_type(*foundinfo);
             voices.push_back(std::move(v));
         }
     }
