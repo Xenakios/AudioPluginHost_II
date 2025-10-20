@@ -99,7 +99,7 @@ class GranulatorVoice
                  sst::basic_blocks::dsp::EBPulse<>>
         theoscillator;
 
-    sst::filtersplusplus::Filter filter0;
+    std::array<sst::filtersplusplus::Filter, 2> filters;
     int phase = 0;
     int endphase = 0;
     double sr = 0.0;
@@ -107,23 +107,23 @@ class GranulatorVoice
 
     int prior_osc_type = -1;
     float ambcoeffs[4] = {};
-    double cutoff0 = 0.0;
-    double reson0 = 0.0;
+    std::array<double, 2> cutoffs = {0.0, 0.0};
+    std::array<double, 2> resons = {0.0, 0.0};
     double graingain = 0.0;
     int envtype = 0;
     double envshape = 0.5;
     GranulatorVoice() {}
     void set_samplerate(double hz) { sr = hz; }
-    void set_filter_type(const FilterInfo &finfo)
+    void set_filter_type(size_t filtindex, const FilterInfo &finfo)
     {
-        filter0.setFilterModel(finfo.model);
-        filter0.setModelConfiguration(finfo.modelconfig);
+        filters[filtindex].setFilterModel(finfo.model);
+        filters[filtindex].setModelConfiguration(finfo.modelconfig);
 
-        filter0.setSampleRateAndBlockSize(sr, granul_block_size);
-        filter0.setMono();
-        if (!filter0.prepareInstance())
+        filters[filtindex].setSampleRateAndBlockSize(sr, granul_block_size);
+        filters[filtindex].setMono();
+        if (!filters[filtindex].prepareInstance())
         {
-            std::print("could not prepare filter\n");
+            std::print("could not prepare filter {}\n", filtindex);
         }
     }
     // t, dur, hz, 4, volume, horz_angle, vert_angle, cutoff, reson
@@ -198,8 +198,12 @@ class GranulatorVoice
         phase = 0;
         endphase = sr * std::clamp(evpars[PAR_DUR], 0.001f, 1.0f);
 
-        cutoff0 = std::clamp(evpars[PAR_FILT1CUTOFF], -60.0f, 65.0f);
-        reson0 = std::clamp(evpars[PAR_FILT1RESON], 0.0f, 1.0f);
+        for (size_t i = 0; i < filters.size(); ++i)
+        {
+            cutoffs[i] = std::clamp(evpars[PAR_FILT1CUTOFF + 3 * i], -60.0f, 65.0f);
+            resons[i] = std::clamp(evpars[PAR_FILT1RESON + 3 * i], 0.0f, 1.0f);
+        }
+
         graingain = std::clamp(evpars[PAR_VOLUME], 0.0f, 1.0f);
         graingain = graingain * graingain * graingain;
         envtype = std::clamp<int>(evpars[PAR_ENVTYPE], 0, 1);
@@ -207,8 +211,12 @@ class GranulatorVoice
     }
     void process(float *outputs, int nframes)
     {
-        filter0.makeCoefficients(0, cutoff0, reson0);
-        filter0.prepareBlock();
+        for (size_t i = 0; i < filters.size(); ++i)
+        {
+            filters[i].makeCoefficients(0, cutoffs[i], resons[i]);
+            filters[i].prepareBlock();
+        }
+
         int envpeakpos = envshape * endphase;
         envpeakpos = std::clamp(envpeakpos, 16, endphase - 16);
         for (int i = 0; i < nframes; ++i)
@@ -232,7 +240,8 @@ class GranulatorVoice
                     0.5f + 0.5f * std::sin(M_PI * 2 / endphase * phase * envfreq + (1.5f * M_PI));
             }
             outsample *= envgain * graingain;
-            outsample = filter0.processMonoSample(outsample);
+            outsample = filters[0].processMonoSample(outsample);
+            outsample = filters[1].processMonoSample(outsample);
             outputs[i * 4 + 0] = outsample * ambcoeffs[0];
             outputs[i * 4 + 1] = outsample * ambcoeffs[1];
             outputs[i * 4 + 2] = outsample * ambcoeffs[2];
@@ -244,8 +253,8 @@ class GranulatorVoice
                 // std::print("ended voice {}\n", (void *)this);
             }
         }
-
-        filter0.concludeBlock();
+        for (auto &f : filters)
+            f.concludeBlock();
     }
 };
 
@@ -261,23 +270,34 @@ class ToneGranulator
 
     events_t events;
 
-    ToneGranulator(double sr, events_t evts, std::string filtertype) : events{evts}
+    ToneGranulator(double sr, events_t evts, std::string filtertype0, std::string filtertype1)
+        : events{evts}
     {
         init_filter_infos();
-        const FilterInfo *foundinfo = nullptr;
+        const FilterInfo *filter0info = nullptr;
+        const FilterInfo *filter1info = nullptr;
         for (const auto &finfo : g_filter_infos)
         {
-            if (finfo.address == filtertype)
+            if (finfo.address == filtertype0)
             {
-                foundinfo = &finfo;
-                std::print("processing with {}\n", finfo.address);
-                break;
+                filter0info = &finfo;
+                std::print("filter 0 is {}\n", finfo.address);
+            }
+            if (finfo.address == filtertype1)
+            {
+                filter1info = &finfo;
+                std::print("filter 1 is {}\n", finfo.address);
             }
         }
-        if (!foundinfo)
+        if (!filter0info)
         {
             throw std::runtime_error(std::format(
-                "could not instantiate filter \"{}\", ensure the name is correct", filtertype));
+                "could not find filter 0 \"{}\", ensure the name is correct", filtertype0));
+        }
+        if (!filter1info)
+        {
+            throw std::runtime_error(std::format(
+                "could not find filter 1 \"{}\", ensure the name is correct", filtertype1));
         }
         std::sort(events.begin(), events.end(), [](auto &lhs, auto &rhs) {
             return lhs[GranulatorVoice::PAR_TPOS] < rhs[GranulatorVoice::PAR_TPOS];
@@ -286,7 +306,8 @@ class ToneGranulator
         {
             auto v = std::make_unique<GranulatorVoice>();
             v->set_samplerate(sr);
-            v->set_filter_type(*foundinfo);
+            v->set_filter_type(0, *filter0info);
+            v->set_filter_type(1, *filter1info);
             voices.push_back(std::move(v));
         }
     }
@@ -521,6 +542,6 @@ void init_py4(py::module_ &m, py::module_ &m_const)
           "duration"_a);
     m.def("tone_types", &osc_types);
     py::class_<ToneGranulator>(m, "ToneGranulator")
-        .def(py::init<double, events_t, std::string>())
+        .def(py::init<double, events_t, std::string, std::string>())
         .def("generate", &ToneGranulator::generate);
 }
