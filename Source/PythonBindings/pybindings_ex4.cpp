@@ -110,6 +110,7 @@ class GranulatorVoice
     double cutoff0 = 0.0;
     double reson0 = 0.0;
     double graingain = 0.0;
+    int envtype = 0;
     double envshape = 0.5;
     GranulatorVoice() {}
     void set_samplerate(double hz) { sr = hz; }
@@ -145,8 +146,10 @@ class GranulatorVoice
         PAR_TPOS,
         PAR_DUR,
         PAR_FREQHZ,
+        PAR_SYNCRATIO,
         PAR_TONETYPE,
         PAR_VOLUME,
+        PAR_ENVTYPE,
         PAR_ENVSHAPE,
         PAR_HOR_ANGLE,
         PAR_VER_ANGLE,
@@ -189,11 +192,12 @@ class GranulatorVoice
             std::visit([this](auto &q) { q.setSampleRate(sr); }, theoscillator);
         }
         auto hz = std::clamp(evpars[PAR_FREQHZ], 1.0f, 22050.0f);
-
+        auto syncratio = std::clamp(evpars[PAR_SYNCRATIO], 1.0f, 16.0f);
         std::visit(
-            [hz](auto &q) {
+            [hz, syncratio](auto &q) {
                 q.reset();
                 q.setFrequency(hz);
+                q.setSyncRatio(syncratio);
             },
             theoscillator);
         float horz_angle = evpars[PAR_HOR_ANGLE];
@@ -210,6 +214,7 @@ class GranulatorVoice
         reson0 = std::clamp(evpars[PAR_FILT1RESON], 0.0f, 1.0f);
         graingain = std::clamp(evpars[PAR_VOLUME], 0.0f, 1.0f);
         graingain = graingain * graingain * graingain;
+        envtype = std::clamp<int>(evpars[PAR_ENVTYPE], 0, 1);
         envshape = std::clamp(evpars[PAR_ENVSHAPE], 0.0f, 1.0f);
     }
     void process(float *outputs, int nframes)
@@ -223,12 +228,21 @@ class GranulatorVoice
             float outsample = 0.0f;
             outsample = std::visit([](auto &q) { return q.step(); }, theoscillator);
             float envgain = 1.0f;
-            if (phase < envpeakpos)
-                envgain = xenakios::mapvalue<float>(phase, 0.0, envpeakpos, 0.0f, 1.0f);
-            else if (phase >= envpeakpos)
-                envgain = xenakios::mapvalue<float>(phase, envpeakpos, endphase, 1.0f, 0.0f);
-            envgain = 1.0f - envgain;
-            envgain = 1.0f - (envgain * envgain * envgain);
+            if (envtype == 0)
+            {
+                if (phase < envpeakpos)
+                    envgain = xenakios::mapvalue<float>(phase, 0.0, envpeakpos, 0.0f, 1.0f);
+                else if (phase >= envpeakpos)
+                    envgain = xenakios::mapvalue<float>(phase, envpeakpos, endphase, 1.0f, 0.0f);
+                envgain = 1.0f - envgain;
+                envgain = 1.0f - (envgain * envgain * envgain);
+            }
+            else if (envtype == 1)
+            {
+                float envfreq = 1.0f + std::floor(15.0f * envshape);
+                envgain =
+                    0.5f + 0.5f * std::sin(M_PI * 2 / endphase * phase * envfreq + (1.5f * M_PI));
+            }
             outsample *= envgain * graingain;
             outsample = filter0.processMonoSample(outsample);
             outputs[i * 4 + 0] = outsample * ambcoeffs[0];
@@ -299,6 +313,11 @@ class ToneGranulator
 
         int evindex = 0;
         int framecount = 0;
+        using clock = std::chrono::system_clock;
+        using ms = std::chrono::duration<double, std::milli>;
+        const auto start_time = clock::now();
+        sst::basic_blocks::dsp::OnePoleLag<float, true> gainlag;
+        gainlag.setRateInMilliseconds(500.0, m_sr, 1.0 / granul_block_size);
         while (framecount < frames - granul_block_size)
         {
             std::vector<float> *ev = nullptr;
@@ -331,10 +350,12 @@ class ToneGranulator
             for (int i = 0; i < 4; ++i)
                 for (int j = 0; j < granul_block_size; ++j)
                     mixsum[i][j] = 0.0f;
+            int numactive = 0;
             for (int j = 0; j < voices.size(); ++j)
             {
                 if (voices[j]->active)
                 {
+                    ++numactive;
                     float voiceout[4 * granul_block_size];
                     voices[j]->process(voiceout, granul_block_size);
                     for (int k = 0; k < granul_block_size; ++k)
@@ -346,13 +367,20 @@ class ToneGranulator
                     }
                 }
             }
-            double compengain = 8.0 / numvoices;
+            double compengain = 0.0;
+            if (numactive > 0)
+                compengain = 1.0 / numactive;
+            gainlag.setTarget(compengain);
             if (chans == 4)
             {
-                for (int j = 0; j < 4; ++j)
+                for (int k = 0; k < granul_block_size; ++k)
                 {
-                    for (int k = 0; k < granul_block_size; ++k)
-                        writebufs[j][framecount + k] = mixsum[j][k] * compengain;
+                    gainlag.process();
+                    float gain = gainlag.getValue();
+                    for (int j = 0; j < 4; ++j)
+                    {
+                        writebufs[j][framecount + k] = mixsum[j][k] * gain;
+                    }
                 }
             }
             else if (chans == 1)
@@ -364,14 +392,20 @@ class ToneGranulator
             {
                 for (int k = 0; k < granul_block_size; ++k)
                 {
-                    float mid = mixsum[0][k] * compengain;
-                    float side = mixsum[1][k] * compengain;
+                    gainlag.process();
+                    float gain = gainlag.getValue();
+                    float mid = mixsum[0][k] * gain;
+                    float side = mixsum[1][k] * gain;
                     writebufs[0][framecount + k] = 0.5 * (mid + side);
                     writebufs[1][framecount + k] = 0.5 * (mid - side);
                 }
             }
             framecount += granul_block_size;
         }
+        const ms render_duration = clock::now() - start_time;
+        double rtfactor = (frames / m_sr * 1000.0) / render_duration.count();
+        std::print("render took {} milliseconds, {:.2f}x realtime\n", render_duration.count(),
+                   rtfactor);
         return output_audio;
     }
 };
