@@ -10,6 +10,8 @@
 
 namespace py = pybind11;
 
+template <typename T> inline T degreesToRadians(T degrees) { return degrees * (M_PI / 180.0); }
+
 const int granul_block_size = 8;
 
 struct tone_info
@@ -188,8 +190,8 @@ class GranulatorVoice
             theoscillator);
         float horz_angle = std::clamp(evpars[PAR_HOR_ANGLE], -180.0f, 180.0f);
         float vert_angle = std::clamp(evpars[PAR_VER_ANGLE], -180.0f, 180.0f);
-        horz_angle = horz_angle * (M_PI / 180.0);
-        vert_angle = vert_angle * (M_PI / 180.0);
+        horz_angle = degreesToRadians(horz_angle);
+        vert_angle = degreesToRadians(vert_angle);
         ambcoeffs[0] = 1.0 / std::sqrt(2.0);
         ambcoeffs[1] = std::cos(horz_angle) * std::cos(vert_angle);
         ambcoeffs[2] = -std::sin(horz_angle) * std::cos(vert_angle);
@@ -257,6 +259,32 @@ class GranulatorVoice
             f.concludeBlock();
     }
 };
+
+/*
+from atk js code
+********************************************************************
+Matrix: Generate 2x4 matrix for stereo decoding
+********************************************************************
+*/
+void generateDecodeStereoMatrix(float *aMatrix, float anAngle, float aPattern)
+{
+    // calculate lG0, lG1, lG2 (scaled by pattern)
+    float lG0 = (1.0 - aPattern) * std::sqrt(2.0);
+    float lG1 = aPattern * cos(anAngle);
+    float lG2 = aPattern * sin(anAngle);
+
+    // Left
+    aMatrix[0] = lG0;
+    aMatrix[1] = lG1;
+    aMatrix[2] = lG2;
+    aMatrix[3] = 0.0;
+
+    // Right
+    aMatrix[4] = lG0;
+    aMatrix[5] = lG1;
+    aMatrix[6] = -lG2;
+    aMatrix[7] = 0.0;
+}
 
 using events_t = std::vector<std::vector<float>>;
 
@@ -335,7 +363,8 @@ class ToneGranulator
         float *writebufs[4];
         for (int i = 0; i < chans; ++i)
             writebufs[i] = output_audio.mutable_data(i);
-
+        alignas(16) float decodeToStereoMatrix[8];
+        generateDecodeStereoMatrix(decodeToStereoMatrix, degreesToRadians(30.0), 0.5);
         int evindex = 0;
         int framecount = 0;
         using clock = std::chrono::system_clock;
@@ -371,7 +400,7 @@ class ToneGranulator
                 else
                     ev = &events[evindex];
             }
-            double mixsum[4][granul_block_size];
+            alignas(16) double mixsum[4][granul_block_size];
             for (int i = 0; i < 4; ++i)
                 for (int j = 0; j < granul_block_size; ++j)
                     mixsum[i][j] = 0.0f;
@@ -381,7 +410,7 @@ class ToneGranulator
                 if (voices[j]->active)
                 {
                     ++numactive;
-                    float voiceout[4 * granul_block_size];
+                    alignas(16) float voiceout[4 * granul_block_size];
                     voices[j]->process(voiceout, granul_block_size);
                     for (int k = 0; k < granul_block_size; ++k)
                     {
@@ -419,10 +448,18 @@ class ToneGranulator
                 {
                     gainlag.process();
                     float gain = gainlag.getValue();
-                    float mid = mixsum[0][k] * gain;
-                    float side = mixsum[1][k] * gain;
-                    writebufs[0][framecount + k] = 0.5 * (mid + side);
-                    writebufs[1][framecount + k] = 0.5 * (mid - side);
+                    float wIn = mixsum[0][k] * gain;
+                    float xIn = mixsum[1][k] * gain;
+                    float yIn = mixsum[2][k] * gain;
+                    float zIn = mixsum[3][k] * gain;
+
+                    float spl0 = wIn * decodeToStereoMatrix[0] + xIn * decodeToStereoMatrix[1] +
+                                 yIn * decodeToStereoMatrix[2] + zIn * decodeToStereoMatrix[3];
+                    float spl1 = wIn * decodeToStereoMatrix[4] + xIn * decodeToStereoMatrix[5] +
+                                 yIn * decodeToStereoMatrix[6] + zIn * decodeToStereoMatrix[7];
+                    writebufs[0][framecount + k] = spl0;
+                    writebufs[1][framecount + k] = spl1;
+                    
                 }
             }
             framecount += granul_block_size;
