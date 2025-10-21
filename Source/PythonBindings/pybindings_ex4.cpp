@@ -366,6 +366,8 @@ class ToneGranulator
         if (outputmode == "mono")
             chans = 1;
         if (outputmode == "stereo")
+            chans = 2;
+        if (outputmode == "stereo+aux")
             chans = 3;
         if (outputmode == "ambisonics")
             chans = 4;
@@ -451,7 +453,7 @@ class ToneGranulator
             }
             double compengain = 0.0;
             if (numactive > 0)
-                compengain = 1.0 / numactive;
+                compengain = 1.0 / std::sqrt(numactive);
             gainlag.setTarget(compengain);
             if (chans == 4)
             {
@@ -470,7 +472,7 @@ class ToneGranulator
                 for (int k = 0; k < granul_block_size; ++k)
                     writebufs[0][framecount + k] = mixsum[0][k] * compengain;
             }
-            else if (chans == 3)
+            else if (chans == 2 || chans == 3)
             {
                 for (int k = 0; k < granul_block_size; ++k)
                 {
@@ -487,7 +489,8 @@ class ToneGranulator
                                  yIn * decodeToStereoMatrix[6] + zIn * decodeToStereoMatrix[7];
                     writebufs[0][framecount + k] = spl0;
                     writebufs[1][framecount + k] = spl1;
-                    writebufs[2][framecount + k] = mixsum[4][k] * gain;
+                    if (chans == 3)
+                        writebufs[2][framecount + k] = mixsum[4][k] * gain;
                 }
             }
             framecount += granul_block_size;
