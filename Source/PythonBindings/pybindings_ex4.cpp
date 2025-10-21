@@ -189,6 +189,7 @@ class GranulatorVoice
                 q.reset();
                 q.setFrequency(hz);
                 q.setSyncRatio(syncratio);
+                // setWidth is not available for all osc classes, so...
                 if constexpr (std::is_same_v<decltype(q), sst::basic_blocks::dsp::EBPulse<> &>)
                 {
                     q.setWidth(pw);
@@ -238,11 +239,16 @@ class GranulatorVoice
             if (envtype == 0)
             {
                 if (phase < envpeakpos)
+                {
                     envgain = xenakios::mapvalue<float>(phase, 0.0, envpeakpos, 0.0f, 1.0f);
+                    envgain = 1.0f - envgain;
+                    envgain = 1.0f - (envgain * envgain * envgain);
+                }
                 else if (phase >= envpeakpos)
+                {
                     envgain = xenakios::mapvalue<float>(phase, envpeakpos, endphase, 1.0f, 0.0f);
-                envgain = 1.0f - envgain;
-                envgain = 1.0f - (envgain * envgain * envgain);
+                    envgain = envgain * envgain * envgain;
+                }
             }
             else if (envtype == 1)
             {
@@ -250,6 +256,8 @@ class GranulatorVoice
                 envgain =
                     0.5f + 0.5f * std::sin(M_PI * 2 / endphase * phase * envfreq + (1.5f * M_PI));
             }
+            // ensure silence if we end up looping past the grain end
+            envgain = envgain * (float)active;
             outsample *= envgain * graingain;
             outsample = filters[0].processMonoSample(outsample);
             outsample = filters[1].processMonoSample(outsample);
@@ -387,7 +395,8 @@ class ToneGranulator
         using ms = std::chrono::duration<double, std::milli>;
         const auto start_time = clock::now();
         sst::basic_blocks::dsp::OnePoleLag<float, true> gainlag;
-        gainlag.setRateInMilliseconds(500.0, m_sr, 1.0 / granul_block_size);
+        gainlag.setRateInMilliseconds(1000.0, m_sr, 1.0 / granul_block_size);
+        gainlag.setTarget(0.0);
         while (framecount < frames - granul_block_size)
         {
             std::vector<float> *ev = nullptr;
