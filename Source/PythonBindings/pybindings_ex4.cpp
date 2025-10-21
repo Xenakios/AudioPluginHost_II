@@ -101,17 +101,18 @@ class GranulatorVoice
                  sst::basic_blocks::dsp::EBPulse<>>
         theoscillator;
 
-    std::array<sst::filtersplusplus::Filter, 2> filters;
+    alignas(16) std::array<sst::filtersplusplus::Filter, 2> filters;
     int phase = 0;
     int endphase = 0;
     double sr = 0.0;
     bool active = false;
 
     int prior_osc_type = -1;
-    float ambcoeffs[4] = {};
+    alignas(16) float ambcoeffs[4] = {};
     std::array<double, 2> cutoffs = {0.0, 0.0};
     std::array<double, 2> resons = {0.0, 0.0};
-    double graingain = 0.0;
+    float graingain = 0.0;
+    float auxsend1 = 0.0;
     int envtype = 0;
     double envshape = 0.5;
     GranulatorVoice() {}
@@ -128,7 +129,6 @@ class GranulatorVoice
             std::print("could not prepare filter {}\n", filtindex);
         }
     }
-    // t, dur, hz, 4, volume, horz_angle, vert_angle, cutoff, reson
     enum PARS
     {
         PAR_TPOS,
@@ -147,6 +147,7 @@ class GranulatorVoice
         PAR_FILT2CUTOFF,
         PAR_FILT2RESON,
         PAR_FILT2EXT0,
+        PAR_AUXSEND1,
         NUM_PARS
     };
     /* ambisonics panning code from ATK toolkit js code
@@ -208,6 +209,8 @@ class GranulatorVoice
 
         graingain = std::clamp(evpars[PAR_VOLUME], 0.0f, 1.0f);
         graingain = graingain * graingain * graingain;
+        auxsend1 = std::clamp(evpars[PAR_AUXSEND1], 0.0f, 1.0f);
+
         envtype = std::clamp<int>(evpars[PAR_ENVTYPE], 0, 1);
         envshape = std::clamp(evpars[PAR_ENVSHAPE], 0.0f, 1.0f);
     }
@@ -244,10 +247,13 @@ class GranulatorVoice
             outsample *= envgain * graingain;
             outsample = filters[0].processMonoSample(outsample);
             outsample = filters[1].processMonoSample(outsample);
-            outputs[i * 4 + 0] = outsample * ambcoeffs[0];
-            outputs[i * 4 + 1] = outsample * ambcoeffs[1];
-            outputs[i * 4 + 2] = outsample * ambcoeffs[2];
-            outputs[i * 4 + 3] = outsample * ambcoeffs[3];
+            float send1 = auxsend1 * outsample;
+            outsample = (1.0f - auxsend1) * outsample;
+            outputs[i * 5 + 0] = outsample * ambcoeffs[0];
+            outputs[i * 5 + 1] = outsample * ambcoeffs[1];
+            outputs[i * 5 + 2] = outsample * ambcoeffs[2];
+            outputs[i * 5 + 3] = outsample * ambcoeffs[3];
+            outputs[i * 5 + 4] = send1;
             ++phase;
             if (phase >= endphase)
             {
@@ -346,7 +352,7 @@ class ToneGranulator
         if (outputmode == "mono")
             chans = 1;
         if (outputmode == "stereo")
-            chans = 2;
+            chans = 3;
         if (outputmode == "ambisonics")
             chans = 4;
         if (chans == 0)
@@ -404,24 +410,27 @@ class ToneGranulator
                 else
                     ev = &events[evindex];
             }
-            alignas(16) double mixsum[4][granul_block_size];
-            for (int i = 0; i < 4; ++i)
+            alignas(16) double mixsum[5][granul_block_size];
+            for (int i = 0; i < 5; ++i)
                 for (int j = 0; j < granul_block_size; ++j)
                     mixsum[i][j] = 0.0f;
             int numactive = 0;
+
             for (int j = 0; j < voices.size(); ++j)
             {
                 if (voices[j]->active)
                 {
                     ++numactive;
-                    alignas(16) float voiceout[4 * granul_block_size];
+                    alignas(16) float voiceout[5 * granul_block_size];
+                    float aux0 = 0.0f;
                     voices[j]->process(voiceout, granul_block_size);
                     for (int k = 0; k < granul_block_size; ++k)
                     {
-                        mixsum[0][k] += voiceout[4 * k + 0];
-                        mixsum[1][k] += voiceout[4 * k + 1];
-                        mixsum[2][k] += voiceout[4 * k + 2];
-                        mixsum[3][k] += voiceout[4 * k + 3];
+                        mixsum[0][k] += voiceout[5 * k + 0];
+                        mixsum[1][k] += voiceout[5 * k + 1];
+                        mixsum[2][k] += voiceout[5 * k + 2];
+                        mixsum[3][k] += voiceout[5 * k + 3];
+                        mixsum[4][k] += voiceout[5 * k + 4];
                     }
                 }
             }
@@ -446,7 +455,7 @@ class ToneGranulator
                 for (int k = 0; k < granul_block_size; ++k)
                     writebufs[0][framecount + k] = mixsum[0][k] * compengain;
             }
-            else if (chans == 2)
+            else if (chans == 3)
             {
                 for (int k = 0; k < granul_block_size; ++k)
                 {
@@ -456,13 +465,14 @@ class ToneGranulator
                     float xIn = mixsum[1][k] * gain;
                     float yIn = mixsum[2][k] * gain;
                     float zIn = mixsum[3][k] * gain;
-
+                    
                     float spl0 = wIn * decodeToStereoMatrix[0] + xIn * decodeToStereoMatrix[1] +
                                  yIn * decodeToStereoMatrix[2] + zIn * decodeToStereoMatrix[3];
                     float spl1 = wIn * decodeToStereoMatrix[4] + xIn * decodeToStereoMatrix[5] +
                                  yIn * decodeToStereoMatrix[6] + zIn * decodeToStereoMatrix[7];
                     writebufs[0][framecount + k] = spl0;
                     writebufs[1][framecount + k] = spl1;
+                    writebufs[2][framecount + k] = mixsum[4][k] * gain;
                 }
             }
             framecount += granul_block_size;
