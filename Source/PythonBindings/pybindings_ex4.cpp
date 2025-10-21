@@ -339,7 +339,8 @@ class ToneGranulator
             voices.push_back(std::move(v));
         }
     }
-    inline py::array_t<float> generate(std::string outputmode)
+    inline py::array_t<float> generate(std::string outputmode, double stereoangle,
+                                       double stereopattern)
     {
         int chans = 0;
         if (outputmode == "mono")
@@ -364,7 +365,10 @@ class ToneGranulator
         for (int i = 0; i < chans; ++i)
             writebufs[i] = output_audio.mutable_data(i);
         alignas(16) float decodeToStereoMatrix[8];
-        generateDecodeStereoMatrix(decodeToStereoMatrix, degreesToRadians(30.0), 0.5);
+        stereoangle = std::clamp(stereoangle, 0.0, 180.0);
+        stereopattern = std::clamp(stereopattern, 0.0, 1.0);
+        generateDecodeStereoMatrix(decodeToStereoMatrix, degreesToRadians(stereoangle),
+                                   stereopattern);
         int evindex = 0;
         int framecount = 0;
         using clock = std::chrono::system_clock;
@@ -459,7 +463,6 @@ class ToneGranulator
                                  yIn * decodeToStereoMatrix[6] + zIn * decodeToStereoMatrix[7];
                     writebufs[0][framecount + k] = spl0;
                     writebufs[1][framecount + k] = spl1;
-                    
                 }
             }
             framecount += granul_block_size;
@@ -580,5 +583,6 @@ void init_py4(py::module_ &m, py::module_ &m_const)
     m.def("tone_types", &osc_types);
     py::class_<ToneGranulator>(m, "ToneGranulator")
         .def(py::init<double, events_t, std::string, std::string>())
-        .def("generate", &ToneGranulator::generate);
+        .def("generate", &ToneGranulator::generate, "omode"_a, "stereoangle"_a = 30.0,
+             "stereopattern"_a = 0.5);
 }
