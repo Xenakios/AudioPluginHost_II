@@ -136,6 +136,7 @@ class GranulatorVoice
         PAR_FREQHZ,
         PAR_SYNCRATIO,
         PAR_TONETYPE,
+        PAR_PULSEWIDTH,
         PAR_VOLUME,
         PAR_ENVTYPE,
         PAR_ENVSHAPE,
@@ -182,11 +183,16 @@ class GranulatorVoice
         }
         auto hz = std::clamp(evpars[PAR_FREQHZ], 1.0f, 22050.0f);
         auto syncratio = std::clamp(evpars[PAR_SYNCRATIO], 1.0f, 16.0f);
+        auto pw = evpars[PAR_PULSEWIDTH]; // osc implementation clamps itself to 0..1
         std::visit(
-            [hz, syncratio](auto &q) {
+            [hz, syncratio, pw](auto &q) {
                 q.reset();
                 q.setFrequency(hz);
                 q.setSyncRatio(syncratio);
+                if constexpr (std::is_same_v<decltype(q), sst::basic_blocks::dsp::EBPulse<> &>)
+                {
+                    q.setWidth(pw);
+                }
             },
             theoscillator);
         float horz_angle = std::clamp(evpars[PAR_HOR_ANGLE], -180.0f, 180.0f);
@@ -465,7 +471,7 @@ class ToneGranulator
                     float xIn = mixsum[1][k] * gain;
                     float yIn = mixsum[2][k] * gain;
                     float zIn = mixsum[3][k] * gain;
-                    
+
                     float spl0 = wIn * decodeToStereoMatrix[0] + xIn * decodeToStereoMatrix[1] +
                                  yIn * decodeToStereoMatrix[2] + zIn * decodeToStereoMatrix[3];
                     float spl1 = wIn * decodeToStereoMatrix[4] + xIn * decodeToStereoMatrix[5] +
