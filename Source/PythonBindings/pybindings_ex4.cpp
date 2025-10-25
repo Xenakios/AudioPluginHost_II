@@ -108,7 +108,7 @@ class GranulatorVoice
     bool active = false;
 
     int prior_osc_type = -1;
-    alignas(16) float ambcoeffs[4] = {};
+    alignas(16) std::array<float, 4> ambcoeffs = {0.0f, 0.0f, 0.0f, 0.0f};
     enum FilterRouting
     {
         FR_SERIAL,
@@ -117,6 +117,8 @@ class GranulatorVoice
     FilterRouting filter_routing = FR_SERIAL;
     std::array<double, 2> cutoffs = {0.0, 0.0};
     std::array<double, 2> resons = {0.0, 0.0};
+    alignas(16) std::array<double, 2> feedbacksignals = {0.0, 0.0};
+    float feedbackamt = 0.0f;
     float graingain = 0.0;
     float auxsend1 = 0.0;
     int envtype = 0;
@@ -148,6 +150,7 @@ class GranulatorVoice
         PAR_ENVSHAPE,
         PAR_HOR_ANGLE,
         PAR_VER_ANGLE,
+        PAR_FILTERFEEDBACKAMOUNT,
         PAR_FILT1CUTOFF,
         PAR_FILT1RESON,
         PAR_FILT1EXT0,
@@ -216,6 +219,7 @@ class GranulatorVoice
 
         for (size_t i = 0; i < filters.size(); ++i)
         {
+            filters[i].reset();
             cutoffs[i] = std::clamp(evpars[PAR_FILT1CUTOFF + 3 * i], -60.0f, 65.0f);
             resons[i] = std::clamp(evpars[PAR_FILT1RESON + 3 * i], 0.0f, 1.0f);
         }
@@ -226,6 +230,11 @@ class GranulatorVoice
 
         envtype = std::clamp<int>(evpars[PAR_ENVTYPE], 0, 1);
         envshape = std::clamp(evpars[PAR_ENVSHAPE], 0.0f, 1.0f);
+
+        feedbackamt = std::clamp(evpars[PAR_FILTERFEEDBACKAMOUNT], 0.0f, 0.9999f);
+        feedbacksignals[0] = 0.0;
+        feedbacksignals[1] = 0.0;
+
     }
     void process(float *outputs, int nframes)
     {
@@ -267,8 +276,10 @@ class GranulatorVoice
             outsample *= envgain * graingain;
             if (filter_routing == FR_SERIAL)
             {
-                outsample = filters[0].processMonoSample(outsample);
+                outsample =
+                    filters[0].processMonoSample(outsample + feedbacksignals[0]);
                 outsample = filters[1].processMonoSample(outsample);
+                feedbacksignals[0] = outsample * feedbackamt;
             }
             else if (filter_routing == FR_PARALLEL)
             {
