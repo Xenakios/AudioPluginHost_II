@@ -109,6 +109,12 @@ class GranulatorVoice
 
     int prior_osc_type = -1;
     alignas(16) float ambcoeffs[4] = {};
+    enum FilterRouting
+    {
+        FR_SERIAL,
+        FR_PARALLEL
+    };
+    FilterRouting filter_routing = FR_SERIAL;
     std::array<double, 2> cutoffs = {0.0, 0.0};
     std::array<double, 2> resons = {0.0, 0.0};
     float graingain = 0.0;
@@ -259,8 +265,19 @@ class GranulatorVoice
             // ensure silence if we end up looping past the grain end
             envgain = envgain * (float)active;
             outsample *= envgain * graingain;
-            outsample = filters[0].processMonoSample(outsample);
-            outsample = filters[1].processMonoSample(outsample);
+            if (filter_routing == FR_SERIAL)
+            {
+                outsample = filters[0].processMonoSample(outsample);
+                outsample = filters[1].processMonoSample(outsample);
+            }
+            else if (filter_routing == FR_PARALLEL)
+            {
+                float split = outsample;
+                split = filters[0].processMonoSample(split);
+                outsample = filters[1].processMonoSample(outsample);
+                outsample = split + outsample;
+            }
+
             float send1 = auxsend1 * outsample;
             outsample = (1.0f - auxsend1) * outsample;
             outputs[i * 5 + 0] = outsample * ambcoeffs[0];
@@ -318,7 +335,8 @@ class ToneGranulator
 
     events_t events;
 
-    ToneGranulator(double sr, events_t evts, std::string filtertype0, std::string filtertype1)
+    ToneGranulator(double sr, events_t evts, int filter_routing, std::string filtertype0,
+                   std::string filtertype1)
         : events{evts}
     {
         init_filter_infos();
@@ -356,6 +374,7 @@ class ToneGranulator
             v->set_samplerate(sr);
             v->set_filter_type(0, *filter0info);
             v->set_filter_type(1, *filter1info);
+            v->filter_routing = (GranulatorVoice::FilterRouting)filter_routing;
             voices.push_back(std::move(v));
         }
     }
@@ -397,7 +416,7 @@ class ToneGranulator
         using ms = std::chrono::duration<double, std::milli>;
         const auto start_time = clock::now();
         sst::basic_blocks::dsp::OnePoleLag<float, true> gainlag;
-        gainlag.setRateInMilliseconds(1000.0, m_sr, 1.0 / granul_block_size);
+        gainlag.setRateInMilliseconds(1000.0, m_sr, 1.0);
         gainlag.setTarget(0.0);
         while (framecount < frames - granul_block_size)
         {
@@ -610,7 +629,7 @@ void init_py4(py::module_ &m, py::module_ &m_const)
           "duration"_a);
     m.def("tone_types", &osc_types);
     py::class_<ToneGranulator>(m, "ToneGranulator")
-        .def(py::init<double, events_t, std::string, std::string>())
+        .def(py::init<double, events_t, int, std::string, std::string>())
         .def("generate", &ToneGranulator::generate, "omode"_a, "stereoangle"_a = 30.0,
              "stereopattern"_a = 0.5);
 }

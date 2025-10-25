@@ -53,7 +53,8 @@ inline void juceTest(std::string plugfilename)
 }
 #endif
 
-inline void writeArrayToFile(const py::array_t<double> &arr, double samplerate, std::string path)
+inline void writeArrayToFile(const py::array_t<double> &arr, double samplerate, std::string path,
+                             std::string metadata)
 {
     if (arr.ndim() != 2)
         throw std::runtime_error(std::format("array ndim {} incompatible, must be 2", arr.ndim()));
@@ -65,6 +66,16 @@ inline void writeArrayToFile(const py::array_t<double> &arr, double samplerate, 
     outfileprops.bitDepth = choc::audio::BitDepth::float32;
     outfileprops.numChannels = numChans;
     outfileprops.sampleRate = samplerate;
+    auto mdob = choc::value::createEmptyArray();
+    auto bext = choc::value::createObject("");
+    bext.setMember("type", "bext");
+    bext.setMember("originator", "Python code");
+    if (!metadata.empty())
+        bext.setMember("codingHistory", metadata);
+    mdob.addArrayElement(bext);
+    
+
+    outfileprops.metadata = mdob;
     choc::audio::WAVAudioFileFormat<true> wavformat;
     std::filesystem::path outpath{std::filesystem::u8path(path)};
     std::shared_ptr<std::ostream> os{new std::ofstream(outpath, std::ios::binary)};
@@ -333,7 +344,8 @@ PYBIND11_MODULE(xenakios, m)
     m.doc() = "pybind11 xenakios plugin"; // optional module docstring
     PyOS_InputHook = XInputHook;
 
-    m.def("write_array_to_file", &writeArrayToFile, "array"_a, "sample_rate"_a = 44100.0, "path"_a);
+    m.def("write_array_to_file", &writeArrayToFile, "array"_a, "sample_rate"_a = 44100.0, "path"_a,
+          "metadatastring"_a = std::string());
     // m.def("chocLoop", &runChocLoop);
     m.def("numInputHookCallbacks", []() { return g_inputHookCount; });
 
