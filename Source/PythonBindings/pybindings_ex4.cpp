@@ -220,7 +220,7 @@ class GranulatorVoice
         for (size_t i = 0; i < filters.size(); ++i)
         {
             filters[i].reset();
-            cutoffs[i] = std::clamp(evpars[PAR_FILT1CUTOFF + 3 * i], -60.0f, 65.0f);
+            cutoffs[i] = std::clamp(evpars[PAR_FILT1CUTOFF + 3 * i] - 69.0f, -45.0f, 60.0f);
             resons[i] = std::clamp(evpars[PAR_FILT1RESON + 3 * i], 0.0f, 1.0f);
         }
 
@@ -231,10 +231,9 @@ class GranulatorVoice
         envtype = std::clamp<int>(evpars[PAR_ENVTYPE], 0, 1);
         envshape = std::clamp(evpars[PAR_ENVSHAPE], 0.0f, 1.0f);
 
-        feedbackamt = std::clamp(evpars[PAR_FILTERFEEDBACKAMOUNT], 0.0f, 0.9999f);
+        feedbackamt = std::clamp(evpars[PAR_FILTERFEEDBACKAMOUNT], -0.9999f, 0.9999f);
         feedbacksignals[0] = 0.0;
         feedbacksignals[1] = 0.0;
-
     }
     void process(float *outputs, int nframes)
     {
@@ -276,15 +275,15 @@ class GranulatorVoice
             outsample *= envgain * graingain;
             if (filter_routing == FR_SERIAL)
             {
-                outsample =
-                    filters[0].processMonoSample(outsample + feedbacksignals[0]);
+                outsample = filters[0].processMonoSample(outsample + feedbacksignals[0]);
                 outsample = filters[1].processMonoSample(outsample);
                 feedbacksignals[0] = outsample * feedbackamt;
             }
             else if (filter_routing == FR_PARALLEL)
             {
                 float split = outsample;
-                split = filters[0].processMonoSample(split);
+                split = filters[0].processMonoSample(split + feedbacksignals[0]);
+                feedbacksignals[0] = split * feedbackamt;
                 outsample = filters[1].processMonoSample(outsample);
                 outsample = split + outsample;
             }
