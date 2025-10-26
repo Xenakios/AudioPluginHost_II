@@ -7,7 +7,7 @@
 #include "sst/basic-blocks/dsp/DPWSawPulseOscillator.h"
 #include "sst/filters++.h"
 #include <print>
-
+#include "sst/basic-blocks/dsp/SmoothingStrategies.h"
 namespace py = pybind11;
 
 template <typename T> inline T degreesToRadians(T degrees) { return degrees * (M_PI / 180.0); }
@@ -99,10 +99,88 @@ void init_filter_infos()
     }
 }
 
+struct FMOsc
+{
+  
+    FMOsc() = default;
+    
+    void setSampleRate(double hz)
+    {
+        sampleRate = hz;
+        carrierPhaseInc = calculatePhaseIncrement(carrierFreq);
+        modulatorPhaseInc = calculatePhaseIncrement(modulatorFreq);
+    }
+    float step()
+    {
+        double modulatorOutput = modIndex * std::sin(modulatorPhase);
+
+        double carrierPhaseInput = carrierPhase + modulatorOutput;
+
+        double output = std::sin(carrierPhaseInput);
+
+        carrierPhase += carrierPhaseInc;
+        modulatorPhase += modulatorPhaseInc;
+
+        if (carrierPhase >= PI_2)
+        {
+            carrierPhase -= PI_2;
+        }
+        if (modulatorPhase >= PI_2)
+        {
+            modulatorPhase -= PI_2;
+        }
+
+        return output;
+    }
+
+    void setFrequency(double freq)
+    {
+        if (freq > 0.0)
+        {
+            carrierFreq = freq;
+            carrierPhaseInc = calculatePhaseIncrement(freq);
+        }
+    }
+
+    void setModulatorFreq(double freq)
+    {
+        if (freq > 0.0)
+        {
+            modulatorFreq = freq;
+            modulatorPhaseInc = calculatePhaseIncrement(freq);
+        }
+    }
+
+    void setModIndex(double index)
+    {
+        if (index >= 0.0)
+        {
+            modIndex = index;
+        }
+    }
+    void reset() {}
+    void setSyncRatio(double) {}
+  
+    static constexpr double PI_2 = 2.0 * M_PI;
+    double sampleRate;
+
+    double carrierFreq = 440.0;
+    double modulatorFreq = 440.0;
+    double modIndex = 1.0;
+
+    double carrierPhase = 0.0;
+    double modulatorPhase = 0.0;
+
+    double carrierPhaseInc = 0.0;
+    double modulatorPhaseInc = 0.0;
+
+    double calculatePhaseIncrement(double freq) const { return (PI_2 * freq) / sampleRate; }
+};
+
 class GranulatorVoice
 {
   public:
-    std::variant<sst::basic_blocks::dsp::EBApproxSin<>, sst::basic_blocks::dsp::EBApproxSemiSin<>,
+    std::variant<FMOsc, sst::basic_blocks::dsp::EBApproxSin<>, sst::basic_blocks::dsp::EBApproxSemiSin<>,
                  sst::basic_blocks::dsp::EBTri<>, sst::basic_blocks::dsp::EBSaw<>,
                  sst::basic_blocks::dsp::EBPulse<>>
         theoscillator;
@@ -129,6 +207,7 @@ class GranulatorVoice
     float auxsend1 = 0.0;
     int envtype = 0;
     double envshape = 0.5;
+    double fmmodamount = 10.0;
     GranulatorVoice() {}
     void set_samplerate(double hz) { sr = hz; }
     void set_filter_type(size_t filtindex, const FilterInfo &finfo)
@@ -164,6 +243,7 @@ class GranulatorVoice
         PAR_FILT2RESON,
         PAR_FILT2EXT0,
         PAR_AUXSEND1,
+        PAR_FMAMOUT,
         NUM_PARS
     };
     /* ambisonics panning code from ATK toolkit js code
@@ -180,7 +260,7 @@ class GranulatorVoice
     void start(std::vector<float> &evpars)
     {
         active = true;
-        int newosctype = std::clamp<int>(evpars[PAR_TONETYPE], 0.0, 4.0);
+        int newosctype = std::clamp<int>(evpars[PAR_TONETYPE], 0.0, 5.0);
         if (newosctype != prior_osc_type)
         {
             prior_osc_type = newosctype;
@@ -192,8 +272,10 @@ class GranulatorVoice
                 theoscillator = sst::basic_blocks::dsp::EBTri<>();
             else if (newosctype == 3)
                 theoscillator = sst::basic_blocks::dsp::EBSaw<>();
-            else
+            else if (newosctype == 4)
                 theoscillator = sst::basic_blocks::dsp::EBPulse<>();
+            else if (newosctype == 5)
+                theoscillator = FMOsc();
             std::visit([this](auto &q) { q.setSampleRate(sr); }, theoscillator);
         }
         auto hz = std::clamp(evpars[PAR_FREQHZ], 1.0f, 22050.0f);
@@ -240,6 +322,7 @@ class GranulatorVoice
         feedbackamt = std::clamp(evpars[PAR_FILTERFEEDBACKAMOUNT], -0.9999f, 0.9999f);
         feedbacksignals[0] = 0.0;
         feedbacksignals[1] = 0.0;
+        fmmodamount = evpars[PAR_FMAMOUT];
     }
     void process(float *outputs, int nframes)
     {
@@ -255,6 +338,7 @@ class GranulatorVoice
         {
             float outsample = 0.0f;
             outsample = std::visit([](auto &q) { return q.step(); }, theoscillator);
+
             float envgain = 1.0f;
             if (envtype == 0)
             {
@@ -352,7 +436,7 @@ class ToneGranulator
     events_t events;
 
     ToneGranulator(double sr, events_t evts, int filter_routing, std::string filtertype0,
-                   std::string filtertype1)
+                   std::string filtertype1, double fmmodfrequency)
         : events{evts}
     {
         init_filter_infos();
@@ -464,8 +548,13 @@ class ToneGranulator
             }
             alignas(16) double mixsum[5][granul_block_size];
             for (int i = 0; i < 5; ++i)
+            {
                 for (int j = 0; j < granul_block_size; ++j)
+                {
                     mixsum[i][j] = 0.0f;
+                }
+            }
+
             int numactive = 0;
 
             for (int j = 0; j < voices.size(); ++j)
@@ -636,6 +725,47 @@ void vartest(EnvOrDouble x)
                x);
 }
 
+inline py::array_t<float> generate_fm(double carrierfreq, double modulationfreq, double modindex,
+                                      double sr, double duration)
+{
+    int chans = 1;
+    int frames = duration * sr;
+    py::buffer_info binfo(
+        nullptr,                                /* Pointer to buffer */
+        sizeof(float),                          /* Size of one scalar */
+        py::format_descriptor<float>::format(), /* Python struct-style format descriptor */
+        2,                                      /* Number of dimensions */
+        {chans, frames},                        /* Buffer dimensions */
+        {sizeof(float) * frames,                /* Strides (in bytes) for each index */
+         sizeof(float)});
+    py::array_t<float> output_audio{binfo};
+
+    const size_t blocksize = 8;
+    int framecount = 0;
+    float *writebuf = output_audio.mutable_data(0);
+    FMOsc fmosc;
+    fmosc.setSampleRate(sr);
+    fmosc.setFrequency(carrierfreq);
+    fmosc.setModulatorFreq(modulationfreq);
+    fmosc.setModIndex(modindex);
+    double gain = 0.5;
+    while (framecount < frames)
+    {
+        size_t framestoprocess = std::min<int>(blocksize, frames - framecount);
+        double tpos = framecount / sr;
+
+        for (int i = 0; i < framestoprocess; ++i)
+        {
+            float sample = fmosc.step();
+
+            writebuf[framecount + i] = sample * gain * 0.8;
+        }
+
+        framecount += blocksize;
+    }
+    return output_audio;
+}
+
 void init_py4(py::module_ &m, py::module_ &m_const)
 {
 
@@ -643,9 +773,10 @@ void init_py4(py::module_ &m, py::module_ &m_const)
     // m.def("vartest", &vartest);
     m.def("generate_tone", &generate_tone, "tone_type"_a, "pitch"_a, "volume"_a, "samplerate"_a,
           "duration"_a);
+    m.def("generate_fmtone", &generate_fm);
     m.def("tone_types", &osc_types);
     py::class_<ToneGranulator>(m, "ToneGranulator")
-        .def(py::init<double, events_t, int, std::string, std::string>())
+        .def(py::init<double, events_t, int, std::string, std::string, double>())
         .def("generate", &ToneGranulator::generate, "omode"_a, "stereoangle"_a = 30.0,
              "stereopattern"_a = 0.5);
 }
