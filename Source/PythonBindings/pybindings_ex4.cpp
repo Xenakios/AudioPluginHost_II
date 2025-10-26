@@ -53,9 +53,15 @@ void init_filter_infos()
 {
     if (g_filter_infos.size() > 0)
         return;
+    g_filter_infos.reserve(256);
     auto models = sfpp::Filter::availableModels();
     std::string address;
     address.reserve(256);
+    FilterInfo ninfo;
+    ninfo.address = "none";
+    ninfo.model = sst::filtersplusplus::FilterModel::None;
+    ninfo.modelconfig = {};
+    g_filter_infos.push_back(ninfo);
     for (auto &mod : models)
     {
         auto subm = sfpp::Filter::availableModelConfigurations(mod, true);
