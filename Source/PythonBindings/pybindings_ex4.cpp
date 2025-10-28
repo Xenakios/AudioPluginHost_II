@@ -3,11 +3,14 @@
 #include <pybind11/stl.h>
 #include <pybind11/numpy.h>
 #include "../Common/xap_breakpoint_envelope.h"
+#include "sst/basic-blocks/dsp/CorrelatedNoise.h"
 #include "sst/basic-blocks/dsp/EllipticBlepOscillators.h"
 #include "sst/basic-blocks/dsp/DPWSawPulseOscillator.h"
 #include "sst/filters++.h"
 #include <print>
 #include "sst/basic-blocks/dsp/SmoothingStrategies.h"
+#include <random>
+
 namespace py = pybind11;
 
 template <typename T> inline T degreesToRadians(T degrees) { return degrees * (M_PI / 180.0); }
@@ -101,9 +104,9 @@ void init_filter_infos()
 
 struct FMOsc
 {
-  
+
     FMOsc() = default;
-    
+
     void setSampleRate(double hz)
     {
         sampleRate = hz;
@@ -158,9 +161,13 @@ struct FMOsc
             modIndex = index;
         }
     }
-    void reset() {}
+    void reset()
+    {
+        carrierPhase = 0.0;
+        modulatorPhase = 0.0;
+    }
     void setSyncRatio(double) {}
-  
+
     static constexpr double PI_2 = 2.0 * M_PI;
     double sampleRate;
 
@@ -177,12 +184,47 @@ struct FMOsc
     double calculatePhaseIncrement(double freq) const { return (PI_2 * freq) / sampleRate; }
 };
 
+class NoiseGen
+{
+  public:
+    NoiseGen() {}
+    float step()
+    {
+        phase += 1.0 / sr * frequency;
+        if (phase >= 1.0)
+        {
+            phase -= 1.0;
+            heldvalue = sst::basic_blocks::dsp::correlated_noise_o2mk2_supplied_value(
+                history[0], history[1], correlation, bpdist(rng));
+        }
+        return heldvalue;
+    }
+    void reset()
+    {
+        history[0] = 0.0f;
+        history[1] = 0.0f;
+        phase = 0.0;
+        heldvalue = 0.0;
+    }
+    void setFrequency(double freq) { frequency = freq; };
+    void setSampleRate(double hz) { sr = hz; }
+    void setSyncRatio(double) {}
+    alignas(16) std::minstd_rand0 rng{100};
+    alignas(16) float history[2] = {0.0f, 0.0f};
+    alignas(16) std::uniform_real_distribution<float> bpdist{-1.0, 1.0f};
+    float heldvalue = 0.0;
+    double sr = 0.0;
+    double frequency = 1.0;
+    double phase = 0.0;
+    float correlation = 0.5;
+};
+
 class GranulatorVoice
 {
   public:
-    std::variant<FMOsc, sst::basic_blocks::dsp::EBApproxSin<>, sst::basic_blocks::dsp::EBApproxSemiSin<>,
-                 sst::basic_blocks::dsp::EBTri<>, sst::basic_blocks::dsp::EBSaw<>,
-                 sst::basic_blocks::dsp::EBPulse<>>
+    std::variant<FMOsc, sst::basic_blocks::dsp::EBApproxSin<>,
+                 sst::basic_blocks::dsp::EBApproxSemiSin<>, sst::basic_blocks::dsp::EBTri<>,
+                 sst::basic_blocks::dsp::EBSaw<>, sst::basic_blocks::dsp::EBPulse<>>
         theoscillator;
 
     alignas(16) std::array<sst::filtersplusplus::Filter, 2> filters;
@@ -207,7 +249,7 @@ class GranulatorVoice
     float auxsend1 = 0.0;
     int envtype = 0;
     double envshape = 0.5;
-    double fmmodamount = 10.0;
+
     GranulatorVoice() {}
     void set_samplerate(double hz) { sr = hz; }
     void set_filter_type(size_t filtindex, const FilterInfo &finfo)
@@ -243,6 +285,7 @@ class GranulatorVoice
         PAR_FILT2RESON,
         PAR_FILT2EXT0,
         PAR_AUXSEND1,
+        PAR_FMFREQ,
         PAR_FMAMOUT,
         NUM_PARS
     };
@@ -281,8 +324,11 @@ class GranulatorVoice
         auto hz = std::clamp(evpars[PAR_FREQHZ], 1.0f, 22050.0f);
         auto syncratio = std::clamp(evpars[PAR_SYNCRATIO], 1.0f, 16.0f);
         auto pw = evpars[PAR_PULSEWIDTH]; // osc implementation clamps itself to 0..1
+        auto fmhz = evpars[PAR_FMFREQ];
+        auto fmmodamount = std::clamp(evpars[PAR_FMAMOUT], 0.0f, 1.0f);
+        fmmodamount = std::pow(fmmodamount, 3.0f) * 128.0f;
         std::visit(
-            [hz, syncratio, pw](auto &q) {
+            [hz, syncratio, pw, fmhz, fmmodamount](auto &q) {
                 q.reset();
                 q.setFrequency(hz);
                 q.setSyncRatio(syncratio);
@@ -290,6 +336,11 @@ class GranulatorVoice
                 if constexpr (std::is_same_v<decltype(q), sst::basic_blocks::dsp::EBPulse<> &>)
                 {
                     q.setWidth(pw);
+                }
+                if constexpr (std::is_same_v<decltype(q), FMOsc &>)
+                {
+                    q.setModulatorFreq(fmhz);
+                    q.setModIndex(fmmodamount);
                 }
             },
             theoscillator);
@@ -322,7 +373,6 @@ class GranulatorVoice
         feedbackamt = std::clamp(evpars[PAR_FILTERFEEDBACKAMOUNT], -0.9999f, 0.9999f);
         feedbacksignals[0] = 0.0;
         feedbacksignals[1] = 0.0;
-        fmmodamount = evpars[PAR_FMAMOUT];
     }
     void process(float *outputs, int nframes)
     {
@@ -725,6 +775,43 @@ void vartest(EnvOrDouble x)
                x);
 }
 
+inline py::array_t<float> generate_corrnoise(xenakios::Envelope &freqenv,
+                                             xenakios::Envelope &correnv, double sr,
+                                             double duration)
+{
+    int chans = 1;
+    int frames = duration * sr;
+    py::buffer_info binfo(
+        nullptr,                                /* Pointer to buffer */
+        sizeof(float),                          /* Size of one scalar */
+        py::format_descriptor<float>::format(), /* Python struct-style format descriptor */
+        2,                                      /* Number of dimensions */
+        {chans, frames},                        /* Buffer dimensions */
+        {sizeof(float) * frames,                /* Strides (in bytes) for each index */
+         sizeof(float)});
+    py::array_t<float> output_audio{binfo};
+    NoiseGen gen;
+    gen.setSampleRate(sr);
+    const size_t blocksize = 8;
+    int framecount = 0;
+    float *writebuf = output_audio.mutable_data(0);
+    while (framecount < frames)
+    {
+        size_t framestoprocess = std::min<int>(blocksize, frames - framecount);
+        double tpos = framecount / sr;
+        gen.setFrequency(freqenv.getValueAtPosition(tpos));
+        gen.correlation = correnv.getValueAtPosition(tpos);
+        for (int i = 0; i < framestoprocess; ++i)
+        {
+            float sample = gen.step();
+            writebuf[framecount + i] = sample * 0.8;
+        }
+
+        framecount += blocksize;
+    }
+    return output_audio;
+}
+
 inline py::array_t<float> generate_fm(double carrierfreq, double modulationfreq, double modindex,
                                       double sr, double duration)
 {
@@ -774,6 +861,7 @@ void init_py4(py::module_ &m, py::module_ &m_const)
     m.def("generate_tone", &generate_tone, "tone_type"_a, "pitch"_a, "volume"_a, "samplerate"_a,
           "duration"_a);
     m.def("generate_fmtone", &generate_fm);
+    m.def("generate_corrnoise", &generate_corrnoise);
     m.def("tone_types", &osc_types);
     py::class_<ToneGranulator>(m, "ToneGranulator")
         .def(py::init<double, events_t, int, std::string, std::string, double>())
