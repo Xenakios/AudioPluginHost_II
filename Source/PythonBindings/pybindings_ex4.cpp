@@ -104,8 +104,8 @@ void init_filter_infos()
 
 struct FMOsc
 {
-
-    FMOsc() = default;
+    using SmoothingStrategy = sst::basic_blocks::dsp::LagSmoothingStrategy;
+    FMOsc() { SmoothingStrategy::setValueInstant(modIndex, 0.0); }
 
     void setSampleRate(double hz)
     {
@@ -115,15 +115,13 @@ struct FMOsc
     }
     float step()
     {
-        double modulatorOutput = modIndex * std::sin(modulatorPhase);
-
+        double modulatorOutput = SmoothingStrategy::getValue(modIndex) *
+                                 std::sin(modulatorPhase + modulatorFeedbackHistory);
+        modulatorFeedbackHistory = modulatorOutput * modulatorFeedbackAmount;
         double carrierPhaseInput = carrierPhase + modulatorOutput;
-
         double output = std::sin(carrierPhaseInput);
-
         carrierPhase += carrierPhaseInc;
         modulatorPhase += modulatorPhaseInc;
-
         if (carrierPhase >= PI_2)
         {
             carrierPhase -= PI_2;
@@ -132,7 +130,7 @@ struct FMOsc
         {
             modulatorPhase -= PI_2;
         }
-
+        SmoothingStrategy::process(modIndex);
         return output;
     }
 
@@ -158,7 +156,7 @@ struct FMOsc
     {
         if (index >= 0.0)
         {
-            modIndex = index;
+            SmoothingStrategy::setTarget(modIndex, index);
         }
     }
     void reset()
@@ -168,15 +166,20 @@ struct FMOsc
     }
     void setSyncRatio(double) {}
 
+    void setFeedbackAmount(double amt) { modulatorFeedbackAmount = std::clamp(amt, -1.0, 1.0); }
+
     static constexpr double PI_2 = 2.0 * M_PI;
-    double sampleRate;
+    double sampleRate = 0.0;
 
     double carrierFreq = 440.0;
     double modulatorFreq = 440.0;
-    double modIndex = 1.0;
+    sst::basic_blocks::dsp::LagSmoothingStrategy::smoothValue_t modIndex;
 
     double carrierPhase = 0.0;
     double modulatorPhase = 0.0;
+
+    double modulatorFeedbackAmount = 0.0;
+    double modulatorFeedbackHistory = 0.0;
 
     double carrierPhaseInc = 0.0;
     double modulatorPhaseInc = 0.0;
@@ -812,7 +815,9 @@ inline py::array_t<float> generate_corrnoise(xenakios::Envelope &freqenv,
     return output_audio;
 }
 
-inline py::array_t<float> generate_fm(double carrierfreq, double modulationfreq, double modindex,
+inline py::array_t<float> generate_fm(xenakios::Envelope &carrierpitchenv,
+                                      xenakios::Envelope &modulatorpitchenv,
+                                      xenakios::Envelope &modamtenv, xenakios::Envelope &fbenv,
                                       double sr, double duration)
 {
     int chans = 1;
@@ -832,15 +837,22 @@ inline py::array_t<float> generate_fm(double carrierfreq, double modulationfreq,
     float *writebuf = output_audio.mutable_data(0);
     FMOsc fmosc;
     fmosc.setSampleRate(sr);
-    fmosc.setFrequency(carrierfreq);
-    fmosc.setModulatorFreq(modulationfreq);
-    fmosc.setModIndex(modindex);
+
     double gain = 0.5;
     while (framecount < frames)
     {
         size_t framestoprocess = std::min<int>(blocksize, frames - framecount);
         double tpos = framecount / sr;
-
+        double carrierfreq =
+            440.0 * std::pow(2.0, (1.0 / 12) * (carrierpitchenv.getValueAtPosition(tpos) - 69.0));
+        fmosc.setFrequency(carrierfreq);
+        double modulationfreq =
+            440.0 * std::pow(2.0, (1.0 / 12) * (modulatorpitchenv.getValueAtPosition(tpos) - 69.0));
+        fmosc.setModulatorFreq(modulationfreq);
+        double modindex = modamtenv.getValueAtPosition(tpos);
+        fmosc.setModIndex(modindex);
+        double feedback = fbenv.getValueAtPosition(tpos);
+        fmosc.setFeedbackAmount(feedback);
         for (int i = 0; i < framestoprocess; ++i)
         {
             float sample = fmosc.step();
@@ -860,7 +872,8 @@ void init_py4(py::module_ &m, py::module_ &m_const)
     // m.def("vartest", &vartest);
     m.def("generate_tone", &generate_tone, "tone_type"_a, "pitch"_a, "volume"_a, "samplerate"_a,
           "duration"_a);
-    m.def("generate_fmtone", &generate_fm);
+    m.def("generate_fmtone", &generate_fm, "carrierfreq"_a, "modulatorfreq"_a, "modulationamont"_a,
+          "feedback"_a, "samplerate"_a, "duration"_a);
     m.def("generate_corrnoise", &generate_corrnoise);
     m.def("tone_types", &osc_types);
     py::class_<ToneGranulator>(m, "ToneGranulator")
