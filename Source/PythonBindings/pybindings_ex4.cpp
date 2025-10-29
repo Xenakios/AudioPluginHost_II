@@ -105,23 +105,31 @@ void init_filter_infos()
 struct FMOsc
 {
     using SmoothingStrategy = sst::basic_blocks::dsp::LagSmoothingStrategy;
-    FMOsc() { SmoothingStrategy::setValueInstant(modIndex, 0.0); }
+    FMOsc()
+    {
+        SmoothingStrategy::setValueInstant(modIndex, 0.0);
+        SmoothingStrategy::setValueInstant(carrierPhaseInc, 0.0);
+        SmoothingStrategy::setValueInstant(modulatorPhaseInc, 0.0);
+        SmoothingStrategy::setValueInstant(modulatorFeedbackAmount, 0.0);
+    }
 
     void setSampleRate(double hz)
     {
         sampleRate = hz;
-        carrierPhaseInc = calculatePhaseIncrement(carrierFreq);
-        modulatorPhaseInc = calculatePhaseIncrement(modulatorFreq);
+        // modulatorPhaseInc.setRateInMilliseconds(250.0, sampleRate, 1.0);
+        // carrierPhaseInc.setRateInMilliseconds(500.0, sampleRate, 1.0);
+        // carrierPhaseInc = calculatePhaseIncrement(carrierFreq);
+        // modulatorPhaseInc = calculatePhaseIncrement(modulatorFreq);
     }
     float step()
     {
         double modulatorOutput = SmoothingStrategy::getValue(modIndex) *
                                  std::sin(modulatorPhase + modulatorFeedbackHistory);
-        modulatorFeedbackHistory = modulatorOutput * modulatorFeedbackAmount;
+        modulatorFeedbackHistory = modulatorOutput * modulatorFeedbackAmount.getValue();
         double carrierPhaseInput = carrierPhase + modulatorOutput;
         double output = std::sin(carrierPhaseInput);
-        carrierPhase += carrierPhaseInc;
-        modulatorPhase += modulatorPhaseInc;
+        carrierPhase += carrierPhaseInc.getValue();
+        modulatorPhase += modulatorPhaseInc.getValue();
         if (carrierPhase >= PI_2)
         {
             carrierPhase -= PI_2;
@@ -131,6 +139,9 @@ struct FMOsc
             modulatorPhase -= PI_2;
         }
         SmoothingStrategy::process(modIndex);
+        SmoothingStrategy::process(carrierPhaseInc);
+        SmoothingStrategy::process(modulatorPhaseInc);
+        SmoothingStrategy::process(modulatorFeedbackAmount);
         return output;
     }
 
@@ -139,7 +150,7 @@ struct FMOsc
         if (freq > 0.0)
         {
             carrierFreq = freq;
-            carrierPhaseInc = calculatePhaseIncrement(freq);
+            carrierPhaseInc.setTarget(calculatePhaseIncrement(freq));
         }
     }
 
@@ -148,7 +159,7 @@ struct FMOsc
         if (freq > 0.0)
         {
             modulatorFreq = freq;
-            modulatorPhaseInc = calculatePhaseIncrement(freq);
+            modulatorPhaseInc.setTarget(calculatePhaseIncrement(freq));
         }
     }
 
@@ -166,7 +177,10 @@ struct FMOsc
     }
     void setSyncRatio(double) {}
 
-    void setFeedbackAmount(double amt) { modulatorFeedbackAmount = std::clamp(amt, -1.0, 1.0); }
+    void setFeedbackAmount(double amt) 
+    { 
+        SmoothingStrategy::setTarget(modulatorFeedbackAmount,std::clamp(amt, -1.0, 1.0)); 
+    }
 
     static constexpr double PI_2 = 2.0 * M_PI;
     double sampleRate = 0.0;
@@ -178,11 +192,11 @@ struct FMOsc
     double carrierPhase = 0.0;
     double modulatorPhase = 0.0;
 
-    double modulatorFeedbackAmount = 0.0;
+    sst::basic_blocks::dsp::LagSmoothingStrategy::smoothValue_t modulatorFeedbackAmount;
     double modulatorFeedbackHistory = 0.0;
 
-    double carrierPhaseInc = 0.0;
-    double modulatorPhaseInc = 0.0;
+    sst::basic_blocks::dsp::LagSmoothingStrategy::smoothValue_t carrierPhaseInc;
+    sst::basic_blocks::dsp::LagSmoothingStrategy::smoothValue_t modulatorPhaseInc;
 
     double calculatePhaseIncrement(double freq) const { return (PI_2 * freq) / sampleRate; }
 };
