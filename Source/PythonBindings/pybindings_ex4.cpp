@@ -249,8 +249,9 @@ class NoiseGen
         // correlation.setRateInMilliseconds(100.0, sr, 1.0);
         // phaseinc.setRateInMilliseconds(500.0, sr, 1.0);
     }
+    void setRandSeed(unsigned int s) { rng.seed(s); }
     void setSyncRatio(double) {}
-    alignas(16) std::minstd_rand0 rng{100};
+    alignas(16) std::minstd_rand0 rng;
     alignas(16) float history[2] = {0.0f, 0.0f};
     alignas(16) std::uniform_real_distribution<float> bpdist{-1.0, 1.0f};
     float heldvalue = 0.0;
@@ -291,7 +292,7 @@ class GranulatorVoice
     float auxsend1 = 0.0;
     int envtype = 0;
     double envshape = 0.5;
-
+    int grainid = 0;
     GranulatorVoice() {}
     void set_samplerate(double hz) { sr = hz; }
     void set_filter_type(size_t filtindex, const FilterInfo &finfo)
@@ -376,7 +377,7 @@ class GranulatorVoice
         auto fmfeedback = std::clamp(evpars[PAR_FMFEEDBACK], -1.0f, 1.0f);
         auto noisecorr = std::clamp(evpars[PAR_NOISECORR], -1.0f, 1.0f);
         std::visit(
-            [hz, syncratio, pw, fmhz, fmfeedback, fmmodamount, noisecorr](auto &q) {
+            [hz, syncratio, pw, fmhz, fmfeedback, fmmodamount, noisecorr, this](auto &q) {
                 q.reset();
                 q.setFrequency(hz);
                 q.setSyncRatio(syncratio);
@@ -393,6 +394,7 @@ class GranulatorVoice
                 }
                 if constexpr (std::is_same_v<decltype(q), NoiseGen &>)
                 {
+                    q.setRandSeed(grainid);
                     q.setCorrelation(noisecorr);
                 }
             },
@@ -534,8 +536,8 @@ class ToneGranulator
     const int numvoices = 32;
     double playpos = 0.0;
     double m_sr = 44100.0;
+    int graincount = 0;
     std::vector<std::unique_ptr<GranulatorVoice>> voices;
-
     events_t events;
 
     ToneGranulator(double sr, events_t evts, int filter_routing, std::string filtertype0,
@@ -578,6 +580,7 @@ class ToneGranulator
             v->set_filter_type(0, *filter0info);
             v->set_filter_type(1, *filter1info);
             v->filter_routing = (GranulatorVoice::FilterRouting)filter_routing;
+
             voices.push_back(std::move(v));
         }
     }
@@ -634,8 +637,10 @@ class ToneGranulator
                     if (!voices[j]->active)
                     {
                         // std::print("starting voice {} for event {}\n", j, evindex);
+                        voices[j]->grainid = graincount;
                         voices[j]->start(*ev);
                         wasfound = true;
+                        ++graincount;
                         break;
                     }
                 }
