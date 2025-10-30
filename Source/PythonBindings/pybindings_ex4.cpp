@@ -174,12 +174,17 @@ struct FMOsc
     {
         carrierPhase = 0.0;
         modulatorPhase = 0.0;
+        modulatorFeedbackHistory = 0.0;
+        SmoothingStrategy::resetFirstRun(carrierPhaseInc);
+        SmoothingStrategy::resetFirstRun(modulatorPhaseInc);
+        SmoothingStrategy::resetFirstRun(modIndex);
+        SmoothingStrategy::resetFirstRun(modulatorFeedbackAmount);
     }
     void setSyncRatio(double) {}
 
-    void setFeedbackAmount(double amt) 
-    { 
-        SmoothingStrategy::setTarget(modulatorFeedbackAmount,std::clamp(amt, -1.0, 1.0)); 
+    void setFeedbackAmount(double amt)
+    {
+        SmoothingStrategy::setTarget(modulatorFeedbackAmount, std::clamp(amt, -1.0, 1.0));
     }
 
     static constexpr double PI_2 = 2.0 * M_PI;
@@ -303,7 +308,8 @@ class GranulatorVoice
         PAR_FILT2EXT0,
         PAR_AUXSEND1,
         PAR_FMFREQ,
-        PAR_FMAMOUT,
+        PAR_FMAMOUNT,
+        PAR_FMFEEDBACK,
         NUM_PARS
     };
     /* ambisonics panning code from ATK toolkit js code
@@ -342,10 +348,11 @@ class GranulatorVoice
         auto syncratio = std::clamp(evpars[PAR_SYNCRATIO], 1.0f, 16.0f);
         auto pw = evpars[PAR_PULSEWIDTH]; // osc implementation clamps itself to 0..1
         auto fmhz = evpars[PAR_FMFREQ];
-        auto fmmodamount = std::clamp(evpars[PAR_FMAMOUT], 0.0f, 1.0f);
+        auto fmmodamount = std::clamp(evpars[PAR_FMAMOUNT], 0.0f, 1.0f);
         fmmodamount = std::pow(fmmodamount, 3.0f) * 128.0f;
+        auto fmfeedback = std::clamp(evpars[PAR_FMFEEDBACK], -1.0f, 1.0f);
         std::visit(
-            [hz, syncratio, pw, fmhz, fmmodamount](auto &q) {
+            [hz, syncratio, pw, fmhz, fmfeedback, fmmodamount](auto &q) {
                 q.reset();
                 q.setFrequency(hz);
                 q.setSyncRatio(syncratio);
@@ -358,6 +365,7 @@ class GranulatorVoice
                 {
                     q.setModulatorFreq(fmhz);
                     q.setModIndex(fmmodamount);
+                    q.setFeedbackAmount(fmfeedback);
                 }
             },
             theoscillator);
