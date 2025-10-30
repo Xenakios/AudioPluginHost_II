@@ -624,6 +624,7 @@ class ToneGranulator
         sst::basic_blocks::dsp::OnePoleLag<float, true> gainlag;
         gainlag.setRateInMilliseconds(1000.0, m_sr, 1.0);
         gainlag.setTarget(0.0);
+        int missedgrains = 0;
         while (framecount < frames - granul_block_size)
         {
             std::vector<float> *ev = nullptr;
@@ -646,7 +647,7 @@ class ToneGranulator
                 }
                 if (!wasfound)
                 {
-                    std::print("Could not find voice for event {}\n", evindex);
+                    ++missedgrains;
                 }
                 ++evindex;
                 if (evindex >= events.size())
@@ -728,6 +729,8 @@ class ToneGranulator
             framecount += granul_block_size;
         }
         const ms render_duration = clock::now() - start_time;
+        if (missedgrains > 0)
+            std::print("missed {} grains\n", missedgrains);
         double rtfactor = (frames / m_sr * 1000.0) / render_duration.count();
         std::print("render took {} milliseconds, {:.2f}x realtime\n", render_duration.count(),
                    rtfactor);
