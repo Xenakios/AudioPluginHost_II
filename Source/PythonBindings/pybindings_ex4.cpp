@@ -209,16 +209,23 @@ struct FMOsc
 class NoiseGen
 {
   public:
-    NoiseGen() {}
+    using SmoothingStrategy = sst::basic_blocks::dsp::LagSmoothingStrategy;
+    NoiseGen()
+    {
+        SmoothingStrategy::setValueInstant(phaseinc, 0.0);
+        SmoothingStrategy::setValueInstant(correlation, 0.0);
+    }
     float step()
     {
-        phase += 1.0 / sr * frequency;
+        phase += phaseinc.getValue();
         if (phase >= 1.0)
         {
             phase -= 1.0;
             heldvalue = sst::basic_blocks::dsp::correlated_noise_o2mk2_supplied_value(
-                history[0], history[1], correlation, bpdist(rng));
+                history[0], history[1], correlation.getValue(), bpdist(rng));
         }
+        SmoothingStrategy::process(phaseinc);
+        SmoothingStrategy::process(correlation);
         return heldvalue;
     }
     void reset()
@@ -227,9 +234,21 @@ class NoiseGen
         history[1] = 0.0f;
         phase = 0.0;
         heldvalue = 0.0;
+        SmoothingStrategy::resetFirstRun(phaseinc);
+        SmoothingStrategy::resetFirstRun(correlation);
     }
-    void setFrequency(double freq) { frequency = freq; };
-    void setSampleRate(double hz) { sr = hz; }
+    void setFrequency(double freq)
+    {
+        frequency = freq;
+        phaseinc.setTarget(1.0 / sr * freq);
+    }
+    void setCorrelation(double c) { correlation.setTarget(c); }
+    void setSampleRate(double hz)
+    {
+        sr = hz;
+        // correlation.setRateInMilliseconds(100.0, sr, 1.0);
+        // phaseinc.setRateInMilliseconds(500.0, sr, 1.0);
+    }
     void setSyncRatio(double) {}
     alignas(16) std::minstd_rand0 rng{100};
     alignas(16) float history[2] = {0.0f, 0.0f};
@@ -237,8 +256,9 @@ class NoiseGen
     float heldvalue = 0.0;
     double sr = 0.0;
     double frequency = 1.0;
-    double phase = 0.0;
-    float correlation = 0.5;
+    alignas(16) double phase = 0.0;
+    alignas(16) sst::basic_blocks::dsp::LagSmoothingStrategy::smoothValue_t phaseinc;
+    alignas(16) sst::basic_blocks::dsp::LagSmoothingStrategy::smoothValue_t correlation;
 };
 
 class GranulatorVoice
@@ -817,6 +837,7 @@ inline py::array_t<float> generate_corrnoise(xenakios::Envelope &freqenv,
     py::array_t<float> output_audio{binfo};
     NoiseGen gen;
     gen.setSampleRate(sr);
+    gen.reset();
     const size_t blocksize = 8;
     int framecount = 0;
     float *writebuf = output_audio.mutable_data(0);
@@ -825,7 +846,7 @@ inline py::array_t<float> generate_corrnoise(xenakios::Envelope &freqenv,
         size_t framestoprocess = std::min<int>(blocksize, frames - framecount);
         double tpos = framecount / sr;
         gen.setFrequency(freqenv.getValueAtPosition(tpos));
-        gen.correlation = correnv.getValueAtPosition(tpos);
+        gen.setCorrelation(correnv.getValueAtPosition(tpos));
         for (int i = 0; i < framestoprocess; ++i)
         {
             float sample = gen.step();
