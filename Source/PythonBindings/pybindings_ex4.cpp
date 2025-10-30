@@ -264,7 +264,7 @@ class NoiseGen
 class GranulatorVoice
 {
   public:
-    std::variant<FMOsc, sst::basic_blocks::dsp::EBApproxSin<>,
+    std::variant<NoiseGen, FMOsc, sst::basic_blocks::dsp::EBApproxSin<>,
                  sst::basic_blocks::dsp::EBApproxSemiSin<>, sst::basic_blocks::dsp::EBTri<>,
                  sst::basic_blocks::dsp::EBSaw<>, sst::basic_blocks::dsp::EBPulse<>>
         theoscillator;
@@ -330,6 +330,7 @@ class GranulatorVoice
         PAR_FMFREQ,
         PAR_FMAMOUNT,
         PAR_FMFEEDBACK,
+        PAR_NOISECORR,
         NUM_PARS
     };
     /* ambisonics panning code from ATK toolkit js code
@@ -346,7 +347,7 @@ class GranulatorVoice
     void start(std::vector<float> &evpars)
     {
         active = true;
-        int newosctype = std::clamp<int>(evpars[PAR_TONETYPE], 0.0, 5.0);
+        int newosctype = std::clamp<int>(evpars[PAR_TONETYPE], 0.0, 6.0);
         if (newosctype != prior_osc_type)
         {
             prior_osc_type = newosctype;
@@ -362,6 +363,8 @@ class GranulatorVoice
                 theoscillator = sst::basic_blocks::dsp::EBPulse<>();
             else if (newosctype == 5)
                 theoscillator = FMOsc();
+            else if (newosctype == 6)
+                theoscillator = NoiseGen();
             std::visit([this](auto &q) { q.setSampleRate(sr); }, theoscillator);
         }
         auto hz = std::clamp(evpars[PAR_FREQHZ], 1.0f, 22050.0f);
@@ -371,12 +374,13 @@ class GranulatorVoice
         auto fmmodamount = std::clamp(evpars[PAR_FMAMOUNT], 0.0f, 1.0f);
         fmmodamount = std::pow(fmmodamount, 3.0f) * 128.0f;
         auto fmfeedback = std::clamp(evpars[PAR_FMFEEDBACK], -1.0f, 1.0f);
+        auto noisecorr = std::clamp(evpars[PAR_NOISECORR], -1.0f, 1.0f);
         std::visit(
-            [hz, syncratio, pw, fmhz, fmfeedback, fmmodamount](auto &q) {
+            [hz, syncratio, pw, fmhz, fmfeedback, fmmodamount, noisecorr](auto &q) {
                 q.reset();
                 q.setFrequency(hz);
                 q.setSyncRatio(syncratio);
-                // setWidth is not available for all osc classes, so...
+                // handle extra parameters of osc types
                 if constexpr (std::is_same_v<decltype(q), sst::basic_blocks::dsp::EBPulse<> &>)
                 {
                     q.setWidth(pw);
@@ -386,6 +390,10 @@ class GranulatorVoice
                     q.setModulatorFreq(fmhz);
                     q.setModIndex(fmmodamount);
                     q.setFeedbackAmount(fmfeedback);
+                }
+                if constexpr (std::is_same_v<decltype(q), NoiseGen &>)
+                {
+                    q.setCorrelation(noisecorr);
                 }
             },
             theoscillator);
