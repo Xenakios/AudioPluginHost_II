@@ -10,6 +10,7 @@
 #include <random>
 #include <variant>
 #include "../Common/xap_breakpoint_envelope.h"
+#include <mutex>
 
 template <typename T> inline T degreesToRadians(T degrees) { return degrees * (M_PI / 180.0); }
 
@@ -537,11 +538,11 @@ class ToneGranulator
     int graincount = 0;
     std::vector<std::unique_ptr<GranulatorVoice>> voices;
     events_t events;
-
-    ToneGranulator(double sr, events_t evts, int filter_routing, std::string filtertype0,
-                   std::string filtertype1)
-        : m_sr(sr), events{evts}
+    std::mutex mutex;
+    ToneGranulator(double sr, int filter_routing, std::string filtertype0, std::string filtertype1)
+        : m_sr(sr)
     {
+        generateDecodeStereoMatrix(decodeToStereoMatrix, 0.0, 0.5);
         init_filter_infos();
         const FilterInfo *filter0info = nullptr;
         const FilterInfo *filter1info = nullptr;
@@ -586,9 +587,10 @@ class ToneGranulator
     int evindex = 0;
     int playposframes = 0;
     sst::basic_blocks::dsp::OnePoleLag<float, true> gainlag;
-    void prepare()
+    void prepare(events_t evlist)
     {
-
+        std::lock_guard<std::mutex> locker(mutex);
+        events = evlist;
         double stereoangle = 90.0;
         stereoangle = std::clamp(stereoangle, 0.0, 180.0);
         double stereopattern = 0.5;
@@ -602,6 +604,7 @@ class ToneGranulator
     }
     void process_block(float *outputbuffer, int nframes)
     {
+        std::lock_guard<std::mutex> locker(mutex);
         int bufframecount = 0;
         while (bufframecount < nframes)
         {
@@ -615,7 +618,7 @@ class ToneGranulator
                 {
                     if (!voices[j]->active)
                     {
-                        std::print("starting voice {} for event {}\n", j, evindex);
+                        // std::print("starting voice {} for event {}\n", j, evindex);
                         voices[j]->grainid = graincount;
                         voices[j]->start(*ev);
                         wasfound = true;

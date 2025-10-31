@@ -11,13 +11,10 @@ inline int audiocb(void *outputBuffer, void *inputBuffer, unsigned int nFrames, 
     return 0;
 }
 
-int main()
+inline events_t generate_events(double pulselen)
 {
-    double sr = 44100.0;
-    double phase = 0.0;
-    events_t events;
+    events_t result;
     double t = 0.0;
-    double pulselen = 0.25;
     std::vector<float> evt;
     evt.resize(GranulatorVoice::NUM_PARS);
     evt[GranulatorVoice::PAR_SYNCRATIO] = 1.0;
@@ -41,13 +38,22 @@ int main()
         evt[GranulatorVoice::PAR_DUR] = pulselen * 2.0;
         evt[GranulatorVoice::PAR_FREQHZ] =
             440.0 * std::pow(2.0, (1.0 / 12) * (pitches[count] - 69.0));
-        events.push_back(evt);
+        result.push_back(evt);
         t += pulselen;
         ++count;
         if (count == pitches.size())
             count = 0;
     }
-    auto granulator = std::make_unique<ToneGranulator>(sr, events, 0, "none", "none");
+    return result;
+}
+
+int main()
+{
+    double sr = 44100.0;
+    double phase = 0.0;
+    
+
+    auto granulator = std::make_unique<ToneGranulator>(sr, 0, "none", "none");
     auto rtaudio = std::make_unique<RtAudio>();
     RtAudio::StreamParameters spars;
     spars.firstChannel = 0;
@@ -59,9 +65,17 @@ int main()
                             granulator.get()) == RTAUDIO_NO_ERROR)
     {
         std::print("opened rtaudio with buffer size {}\n", bsize);
-        granulator->prepare();
+        
         rtaudio->startStream();
-        Sleep(5000);
+        while (true)
+        {
+            double plen = 0.0;
+            std::cin >> plen;
+            if (plen < 0.01)
+                break;
+            events_t events = generate_events(plen);
+            granulator->prepare(events);
+        }
         rtaudio->stopStream();
         rtaudio->closeStream();
     }
