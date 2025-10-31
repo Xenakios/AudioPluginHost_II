@@ -1,6 +1,7 @@
 #include "../Common/granularsynth.h"
 #include "RtAudio.h"
 #include "text/choc_Files.h"
+#include "platform/choc_FileWatcher.h"
 
 inline int audiocb(void *outputBuffer, void *inputBuffer, unsigned int nFrames, double streamTime,
                    RtAudioStreamStatus status, void *userData)
@@ -79,6 +80,8 @@ inline events_t load_events_file(std::string path)
                 evt[GranulatorVoice::PAR_TPOS] = std::stof(tokens[0]);
                 evt[GranulatorVoice::PAR_DUR] = std::stof(tokens[1]);
                 evt[GranulatorVoice::PAR_FREQHZ] = std::stof(tokens[2]);
+                evt[GranulatorVoice::PAR_VOLUME] = std::stof(tokens[3]);
+                evt[GranulatorVoice::PAR_HOR_ANGLE] = std::stof(tokens[4]);
                 result.push_back(evt);
             }
         }
@@ -103,6 +106,15 @@ int main()
     spars.deviceId = rtaudio->getDefaultOutputDevice();
     std::print("trying to open {}\n", rtaudio->getDeviceInfo(spars.deviceId).name);
     unsigned int bsize = 256;
+    std::string grainfile = R"(C:\MusicAudio\sourcesamples\test_signals\tones\grains.txt)";
+    choc::file::Watcher watcher{grainfile, [&](const choc::file::Watcher::Event &ev) {
+                                    // std::print("file was changed {}\n",ev.time);
+                                    auto evlist = load_events_file(grainfile);
+                                    if (evlist.size() > 0)
+                                    {
+                                        granulator->prepare(evlist);
+                                    }
+                                }};
     if (rtaudio->openStream(&spars, nullptr, RTAUDIO_FLOAT32, sr, &bsize, audiocb,
                             granulator.get()) == RTAUDIO_NO_ERROR)
     {
@@ -115,9 +127,8 @@ int main()
             std::cin >> cmd;
             if (cmd == 1)
                 break;
-            events_t events =
-                load_events_file(R"(C:\MusicAudio\sourcesamples\test_signals\tones\grains.txt)");
-            granulator->prepare(events);
+            //events_t events = load_events_file(grainfile);
+            //granulator->prepare(events);
         }
         rtaudio->stopStream();
         rtaudio->closeStream();
