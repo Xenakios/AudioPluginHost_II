@@ -3,18 +3,25 @@
 #include "text/choc_Files.h"
 #include "platform/choc_FileWatcher.h"
 
-std::atomic<float> g_cpuload;
+struct CallbackData
+{
+    ToneGranulator *granul = nullptr;
+    std::array<float, 512> cpuhistory;
+    int num_mes = 200;
+    int history_pos = 0;
+    std::atomic<float> avg_usage;
+};
 
 inline int audiocb(void *outputBuffer, void *inputBuffer, unsigned int nFrames, double streamTime,
                    RtAudioStreamStatus status, void *userData)
 {
-    ToneGranulator *gran = (ToneGranulator *)userData;
+    CallbackData *data = (CallbackData *)userData;
     float *obuf = (float *)outputBuffer;
-    double sr = gran->m_sr;
+    double sr = data->granul->m_sr;
     using clock = std::chrono::high_resolution_clock;
     using ns = std::chrono::duration<double, std::nano>;
     const auto start_time = clock::now();
-    gran->process_block(obuf, nFrames);
+    data->granul->process_block(obuf, nFrames);
     for (int i = 0; i < nFrames * 2; ++i)
     {
         obuf[i] = std::clamp(obuf[i], -1.0f, 1.0f);
@@ -23,7 +30,18 @@ inline int audiocb(void *outputBuffer, void *inputBuffer, unsigned int nFrames, 
     double maxelapsed = nFrames / sr * 1000000000.0;
     double curelapsed = render_duration.count();
     double cpuload = curelapsed / maxelapsed;
-    g_cpuload = cpuload;
+    data->cpuhistory[data->history_pos] = cpuload;
+    ++data->history_pos;
+    if (data->history_pos == data->num_mes)
+    {
+        double avg = 0.0;
+        for (int i = 0; i < data->num_mes; ++i)
+        {
+            avg += data->cpuhistory[i];
+        }
+        data->avg_usage = avg / data->num_mes;
+        data->history_pos = 0;
+    }
     return 0;
 }
 
@@ -139,8 +157,9 @@ int main()
     SetConsoleCtrlHandler(CtrlHandler, TRUE);
     double sr = 44100.0;
     double phase = 0.0;
-
+    CallbackData cbdata;
     auto granulator = std::make_unique<ToneGranulator>(sr, 0, "fast_svf/lowpass", "none");
+    cbdata.granul = granulator.get();
     granulator->maingain = 0.5;
     auto rtaudio = std::make_unique<RtAudio>();
     RtAudio::StreamParameters spars;
@@ -158,8 +177,8 @@ int main()
                                         granulator->prepare(evlist);
                                     }
                                 }};
-    if (rtaudio->openStream(&spars, nullptr, RTAUDIO_FLOAT32, sr, &bsize, audiocb,
-                            granulator.get()) == RTAUDIO_NO_ERROR)
+    if (rtaudio->openStream(&spars, nullptr, RTAUDIO_FLOAT32, sr, &bsize, audiocb, &cbdata) ==
+        RTAUDIO_NO_ERROR)
     {
         std::print("opened rtaudio with buffer size {}\n", bsize);
         rtaudio->startStream();
@@ -167,10 +186,10 @@ int main()
         {
             if (g_quit)
                 break;
-            // std::print("{:.1f}\n", g_cpuload.load() * 100.0);
+            std::print("{:.1f}\r", cbdata.avg_usage * 100.0);
             Sleep(100);
         }
-        std::print("quit server loop\n");
+        std::print("\nquit server loop\n");
         rtaudio->stopStream();
         rtaudio->closeStream();
     }
