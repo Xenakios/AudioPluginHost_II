@@ -3,16 +3,27 @@
 #include "text/choc_Files.h"
 #include "platform/choc_FileWatcher.h"
 
+std::atomic<float> g_cpuload;
+
 inline int audiocb(void *outputBuffer, void *inputBuffer, unsigned int nFrames, double streamTime,
                    RtAudioStreamStatus status, void *userData)
 {
     ToneGranulator *gran = (ToneGranulator *)userData;
     float *obuf = (float *)outputBuffer;
+    double sr = gran->m_sr;
+    using clock = std::chrono::high_resolution_clock;
+    using ns = std::chrono::duration<double, std::nano>;
+    const auto start_time = clock::now();
     gran->process_block(obuf, nFrames);
     for (int i = 0; i < nFrames * 2; ++i)
     {
         obuf[i] = std::clamp(obuf[i], -1.0f, 1.0f);
     }
+    const ns render_duration = clock::now() - start_time;
+    double maxelapsed = nFrames / sr * 1000000000.0;
+    double curelapsed = render_duration.count();
+    double cpuload = curelapsed / maxelapsed;
+    g_cpuload = cpuload;
     return 0;
 }
 
@@ -151,19 +162,13 @@ int main()
                             granulator.get()) == RTAUDIO_NO_ERROR)
     {
         std::print("opened rtaudio with buffer size {}\n", bsize);
-
         rtaudio->startStream();
         while (true)
         {
             if (g_quit)
                 break;
+            // std::print("{:.1f}\n", g_cpuload.load() * 100.0);
             Sleep(100);
-            // int cmd = 0;
-            // std::cin >> cmd;
-            // if (cmd == 1)
-            //    break;
-            // events_t events = load_events_file(grainfile);
-            // granulator->prepare(events);
         }
         std::print("quit server loop\n");
         rtaudio->stopStream();
