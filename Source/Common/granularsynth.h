@@ -536,6 +536,7 @@ class ToneGranulator
     // double playpos = 0.0;
     double m_sr = 0.0;
     int graincount = 0;
+    double maingain = 1.0;
     std::vector<std::unique_ptr<GranulatorVoice>> voices;
     events_t events;
     std::mutex mutex;
@@ -685,8 +686,8 @@ class ToneGranulator
                                  yIn * decodeToStereoMatrix[2] + zIn * decodeToStereoMatrix[3];
                     float spl1 = wIn * decodeToStereoMatrix[4] + xIn * decodeToStereoMatrix[5] +
                                  yIn * decodeToStereoMatrix[6] + zIn * decodeToStereoMatrix[7];
-                    outputbuffer[(bufframecount + k) * 2 + 0] = spl0;
-                    outputbuffer[(bufframecount + k) * 2 + 1] = spl1;
+                    outputbuffer[(bufframecount + k) * 2 + 0] = spl0 * maingain;
+                    outputbuffer[(bufframecount + k) * 2 + 1] = spl1 * maingain;
 
                     // if (chans == 3)
                     //     writebufs[2][framecount + k] = mixsum[4][k] * gain;

@@ -49,6 +49,26 @@ inline events_t generate_events(double pulselen, double transpose)
     return result;
 }
 
+std::atomic<bool> g_quit{false};
+
+BOOL WINAPI CtrlHandler(DWORD fdwCtrlType)
+{
+    switch (fdwCtrlType)
+    {
+        // Handle the CTRL-C signal.
+    case CTRL_C_EVENT:
+        printf("Ctrl-C event\n\n");
+        g_quit = true;
+        return TRUE;
+    case CTRL_BREAK_EVENT:
+        printf("Ctrl-Break event\n\n");
+        g_quit = true;
+        return TRUE;
+    default:
+        return FALSE;
+    }
+}
+
 inline events_t load_events_file(std::string path)
 {
     events_t result;
@@ -100,10 +120,12 @@ inline events_t load_events_file(std::string path)
 
 int main()
 {
+    SetConsoleCtrlHandler(CtrlHandler, TRUE);
     double sr = 44100.0;
     double phase = 0.0;
 
     auto granulator = std::make_unique<ToneGranulator>(sr, 0, "none", "none");
+    granulator->maingain = 0.5;
     auto rtaudio = std::make_unique<RtAudio>();
     RtAudio::StreamParameters spars;
     spars.firstChannel = 0;
@@ -128,10 +150,13 @@ int main()
         rtaudio->startStream();
         while (true)
         {
-            int cmd = 0;
-            std::cin >> cmd;
-            if (cmd == 1)
+            if (g_quit)
                 break;
+            Sleep(100);
+            // int cmd = 0;
+            // std::cin >> cmd;
+            // if (cmd == 1)
+            //    break;
             // events_t events = load_events_file(grainfile);
             // granulator->prepare(events);
         }
