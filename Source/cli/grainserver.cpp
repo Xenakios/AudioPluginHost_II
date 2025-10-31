@@ -1,5 +1,6 @@
 #include "../Common/granularsynth.h"
 #include "RtAudio.h"
+#include "text/choc_Files.h"
 
 inline int audiocb(void *outputBuffer, void *inputBuffer, unsigned int nFrames, double streamTime,
                    RtAudioStreamStatus status, void *userData)
@@ -47,6 +48,48 @@ inline events_t generate_events(double pulselen, double transpose)
     return result;
 }
 
+inline events_t load_events_file(std::string path)
+{
+    events_t result;
+    result.reserve(4096);
+    try
+    {
+        auto txt = choc::file::loadFileAsString(path);
+        auto lines = choc::text::splitIntoLines(txt, false);
+        std::vector<float> evt;
+        evt.resize(GranulatorVoice::NUM_PARS);
+        evt[GranulatorVoice::PAR_SYNCRATIO] = 1.0;
+        evt[GranulatorVoice::PAR_TONETYPE] = 3.0;
+        evt[GranulatorVoice::PAR_VOLUME] = 1.0;
+        evt[GranulatorVoice::PAR_ENVTYPE] = 0.0;
+        evt[GranulatorVoice::PAR_ENVSHAPE] = 0.5;
+        evt[GranulatorVoice::PAR_VER_ANGLE] = 0.0;
+        evt[GranulatorVoice::PAR_HOR_ANGLE] = 0.0;
+        evt[GranulatorVoice::PAR_FILTERFEEDBACKAMOUNT] = 0.0;
+        evt[GranulatorVoice::PAR_FILT1CUTOFF] = 120.0;
+        evt[GranulatorVoice::PAR_FILT1RESON] = 0.0;
+        evt[GranulatorVoice::PAR_FILT2CUTOFF] = 120.0;
+        evt[GranulatorVoice::PAR_FILT2RESON] = 0.0;
+        evt[GranulatorVoice::PAR_FILT2RESON] = 0.0;
+        for (const auto &line : lines)
+        {
+            auto tokens = choc::text::splitAtWhitespace(line);
+            if (tokens.size() > 0)
+            {
+                evt[GranulatorVoice::PAR_TPOS] = std::stof(tokens[0]);
+                evt[GranulatorVoice::PAR_DUR] = std::stof(tokens[1]);
+                evt[GranulatorVoice::PAR_FREQHZ] = std::stof(tokens[2]);
+                result.push_back(evt);
+            }
+        }
+    }
+    catch (std::exception &ex)
+    {
+        std::print("{}\n", ex.what());
+    }
+    return result;
+}
+
 int main()
 {
     double sr = 44100.0;
@@ -68,12 +111,12 @@ int main()
         rtaudio->startStream();
         while (true)
         {
-            double plen = 0.0;
-            double transpose = 0.0;
-            std::cin >> plen >> transpose;
-            if (plen < 0.01)
+            int cmd = 0;
+            std::cin >> cmd;
+            if (cmd == 1)
                 break;
-            events_t events = generate_events(plen, transpose);
+            events_t events =
+                load_events_file(R"(C:\MusicAudio\sourcesamples\test_signals\tones\grains.txt)");
             granulator->prepare(events);
         }
         rtaudio->stopStream();
