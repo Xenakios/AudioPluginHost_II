@@ -183,6 +183,13 @@ add_executable(ClapMiniHost
     )
 target_compile_definitions(ClapMiniHost PRIVATE _WIN64 NOJUCE=1 _USE_MATH_DEFINES=1 NOMINMAX __WINDOWS_WASAPI__ WIN32_LEAN_AND_MEAN _WINSOCK_DEPRECATED_NO_WARNINGS)
 
+add_executable(grainserver
+    Source/cli/grainserver.cpp 
+    libs/rtaudio/RtAudio.cpp  
+    )
+target_compile_definitions(grainserver PRIVATE _WIN64 NOJUCE=1 _USE_MATH_DEFINES=1 NOMINMAX __WINDOWS_WASAPI__ WIN32_LEAN_AND_MEAN _WINSOCK_DEPRECATED_NO_WARNINGS)
+target_compile_options(grainserver PRIVATE -Werror=return-type)
+
 # cmaj testing
 add_executable(CMajorTester 
     Source/Experimental/cmajtester.cpp 
