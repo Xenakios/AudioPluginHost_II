@@ -57,11 +57,11 @@ BOOL WINAPI CtrlHandler(DWORD fdwCtrlType)
     {
         // Handle the CTRL-C signal.
     case CTRL_C_EVENT:
-        printf("Ctrl-C event\n\n");
+        // printf("Ctrl-C event\n\n");
         g_quit = true;
         return TRUE;
     case CTRL_BREAK_EVENT:
-        printf("Ctrl-Break event\n\n");
+        // printf("Ctrl-Break event\n\n");
         g_quit = true;
         return TRUE;
     default:
@@ -96,7 +96,7 @@ inline events_t load_events_file(std::string path)
         for (const auto &line : lines)
         {
             auto tokens = choc::text::splitAtWhitespace(line);
-            if (tokens.size() >= 7)
+            if (tokens.size() >= 11)
             {
                 evt[GranulatorVoice::PAR_TPOS] = std::stof(tokens[0]);
                 evt[GranulatorVoice::PAR_DUR] = std::stof(tokens[1]);
@@ -107,6 +107,8 @@ inline events_t load_events_file(std::string path)
                 evt[GranulatorVoice::PAR_ENVTYPE] = std::stof(tokens[6]);
                 evt[GranulatorVoice::PAR_ENVSHAPE] = std::stof(tokens[7]);
                 evt[GranulatorVoice::PAR_SYNCRATIO] = std::stof(tokens[8]);
+                evt[GranulatorVoice::PAR_FILT1CUTOFF] = std::stof(tokens[9]);
+                evt[GranulatorVoice::PAR_FILT1RESON] = std::stof(tokens[10]);
                 result.push_back(evt);
             }
         }
@@ -124,7 +126,7 @@ int main()
     double sr = 44100.0;
     double phase = 0.0;
 
-    auto granulator = std::make_unique<ToneGranulator>(sr, 0, "none", "none");
+    auto granulator = std::make_unique<ToneGranulator>(sr, 0, "fast_svf/lowpass", "none");
     granulator->maingain = 0.5;
     auto rtaudio = std::make_unique<RtAudio>();
     RtAudio::StreamParameters spars;
@@ -160,6 +162,7 @@ int main()
             // events_t events = load_events_file(grainfile);
             // granulator->prepare(events);
         }
+        std::print("quit server loop\n");
         rtaudio->stopStream();
         rtaudio->closeStream();
     }
