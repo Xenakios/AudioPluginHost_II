@@ -60,9 +60,10 @@ inline events_t load_events_file(std::string path)
         std::vector<float> evt;
         evt.resize(GranulatorVoice::NUM_PARS);
         evt[GranulatorVoice::PAR_SYNCRATIO] = 1.0;
-        evt[GranulatorVoice::PAR_TONETYPE] = 3.0;
+        evt[GranulatorVoice::PAR_TONETYPE] = 4.0;
         evt[GranulatorVoice::PAR_VOLUME] = 1.0;
         evt[GranulatorVoice::PAR_ENVTYPE] = 0.0;
+        evt[GranulatorVoice::PAR_PULSEWIDTH] = 0.5;
         evt[GranulatorVoice::PAR_ENVSHAPE] = 0.5;
         evt[GranulatorVoice::PAR_VER_ANGLE] = 0.0;
         evt[GranulatorVoice::PAR_HOR_ANGLE] = 0.0;
@@ -75,13 +76,17 @@ inline events_t load_events_file(std::string path)
         for (const auto &line : lines)
         {
             auto tokens = choc::text::splitAtWhitespace(line);
-            if (tokens.size() > 0)
+            if (tokens.size() >= 7)
             {
                 evt[GranulatorVoice::PAR_TPOS] = std::stof(tokens[0]);
                 evt[GranulatorVoice::PAR_DUR] = std::stof(tokens[1]);
                 evt[GranulatorVoice::PAR_FREQHZ] = std::stof(tokens[2]);
                 evt[GranulatorVoice::PAR_VOLUME] = std::stof(tokens[3]);
                 evt[GranulatorVoice::PAR_HOR_ANGLE] = std::stof(tokens[4]);
+                evt[GranulatorVoice::PAR_VER_ANGLE] = std::stof(tokens[5]);
+                evt[GranulatorVoice::PAR_ENVTYPE] = std::stof(tokens[6]);
+                evt[GranulatorVoice::PAR_ENVSHAPE] = std::stof(tokens[7]);
+                evt[GranulatorVoice::PAR_SYNCRATIO] = std::stof(tokens[8]);
                 result.push_back(evt);
             }
         }
@@ -127,8 +132,8 @@ int main()
             std::cin >> cmd;
             if (cmd == 1)
                 break;
-            //events_t events = load_events_file(grainfile);
-            //granulator->prepare(events);
+            // events_t events = load_events_file(grainfile);
+            // granulator->prepare(events);
         }
         rtaudio->stopStream();
         rtaudio->closeStream();
