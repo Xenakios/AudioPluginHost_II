@@ -8,8 +8,11 @@ inline int audiocb(void *outputBuffer, void *inputBuffer, unsigned int nFrames, 
 {
     ToneGranulator *gran = (ToneGranulator *)userData;
     float *obuf = (float *)outputBuffer;
-
     gran->process_block(obuf, nFrames);
+    for (int i = 0; i < nFrames * 2; ++i)
+    {
+        obuf[i] = std::clamp(obuf[i], -1.0f, 1.0f);
+    }
     return 0;
 }
 
