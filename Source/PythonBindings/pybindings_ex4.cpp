@@ -204,19 +204,16 @@ inline py::array_t<float> render_granulator(ToneGranulator &gran, events_t evlis
                                             std::string outputmode, double stereoangle,
                                             double stereopattern)
 {
-    // std::print("render_granulator:data ptr of event list before move {}\n", (void
-    // *)evlist.data());
+    int frames = (evlist.back()[GranulatorVoice::PAR_TPOS] +
+                  evlist.back()[GranulatorVoice::PAR_DUR]) *
+                 gran.m_sr;
     gran.prepare(std::move(evlist), stereoangle, stereopattern);
-    // std::print("render_granulator:data ptr of event list after move {}\n", (void
-    // *)evlist.data());
     int chans = 0;
     if (outputmode == "stereo")
         chans = 2;
     if (outputmode == "ambisonics")
         chans = 4;
-    int frames = (gran.events.back()[GranulatorVoice::PAR_TPOS] +
-                  gran.events.back()[GranulatorVoice::PAR_DUR]) *
-                 gran.m_sr;
+    
 
     py::buffer_info binfo(
         nullptr,                                /* Pointer to buffer */
