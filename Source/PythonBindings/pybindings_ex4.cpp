@@ -14,7 +14,6 @@
 
 namespace py = pybind11;
 
-
 inline py::array_t<float> generate_tone(std::string tone_name, xenakios::Envelope &pitch_env,
                                         xenakios::Envelope &volume_env, double sr, double duration)
 {
@@ -201,6 +200,51 @@ inline py::array_t<float> generate_fm(xenakios::Envelope &carrierpitchenv,
     return output_audio;
 }
 
+inline py::array_t<float> render_granulator(ToneGranulator &gran, events_t evlist,
+                                            std::string outputmode, double stereoangle,
+                                            double stereopattern)
+{
+    gran.prepare(evlist, stereoangle, stereopattern);
+    int chans = 2;
+    int frames = (gran.events.back()[0] + gran.events.back()[1]) * gran.m_sr;
+    std::print("rendering {} frames\n", frames);
+    py::buffer_info binfo(
+        nullptr,                                /* Pointer to buffer */
+        sizeof(float),                          /* Size of one scalar */
+        py::format_descriptor<float>::format(), /* Python struct-style format descriptor */
+        2,                                      /* Number of dimensions */
+        {chans, frames},                        /* Buffer dimensions */
+        {sizeof(float) * frames,                /* Strides (in bytes) for each index */
+         sizeof(float)});
+    py::array_t<float> output_audio{binfo};
+    float *writebufs[4];
+    for (int i = 0; i < chans; ++i)
+        writebufs[i] = output_audio.mutable_data(i);
+    using clock = std::chrono::system_clock;
+    using ms = std::chrono::duration<double, std::milli>;
+    const auto start_time = clock::now();
+    int framecount = 0;
+    float procbuf[2 * granul_block_size];
+    for (int i = 0; i < 2 * granul_block_size; ++i)
+        procbuf[i] = 0.0f;
+    while (framecount < frames - granul_block_size)
+    {
+        gran.process_block(procbuf, granul_block_size);
+        for (int i = 0; i < granul_block_size; ++i)
+        {
+            int pos = framecount + i;
+            writebufs[0][pos] = procbuf[i * 2 + 0];
+            writebufs[1][pos] = procbuf[i * 2 + 1];
+        }
+        framecount += granul_block_size;
+    }
+    const ms render_duration = clock::now() - start_time;
+    double rtfactor = (frames / gran.m_sr * 1000.0) / render_duration.count();
+    std::print("render took {} milliseconds, {:.2f}x realtime\n", render_duration.count(),
+               rtfactor);
+    return output_audio;
+}
+
 void init_py4(py::module_ &m, py::module_ &m_const)
 {
 
@@ -213,7 +257,6 @@ void init_py4(py::module_ &m, py::module_ &m_const)
     m.def("generate_corrnoise", &generate_corrnoise);
     m.def("tone_types", &osc_types);
     py::class_<ToneGranulator>(m, "ToneGranulator")
-        .def(py::init<double, events_t, int, std::string, std::string, double>())
-        .def("generate", &ToneGranulator::generate, "omode"_a, "stereoangle"_a = 30.0,
-             "stereopattern"_a = 0.5);
+        .def(py::init<double, int, std::string, std::string>())
+        .def("render", render_granulator);
 }

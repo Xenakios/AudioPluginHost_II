@@ -533,13 +533,17 @@ class ToneGranulator
 {
   public:
     const int numvoices = 32;
-    // double playpos = 0.0;
     double m_sr = 0.0;
     int graincount = 0;
     double maingain = 1.0;
     std::vector<std::unique_ptr<GranulatorVoice>> voices;
     events_t events;
     std::mutex mutex;
+    alignas(16) float decodeToStereoMatrix[8];
+    int evindex = 0;
+    int playposframes = 0;
+    alignas(16) sst::basic_blocks::dsp::OnePoleLag<float, true> gainlag;
+
     ToneGranulator(double sr, int filter_routing, std::string filtertype0, std::string filtertype1)
         : m_sr(sr)
     {
@@ -570,9 +574,7 @@ class ToneGranulator
             throw std::runtime_error(std::format(
                 "could not find filter 1 \"{}\", ensure the name is correct", filtertype1));
         }
-        std::sort(events.begin(), events.end(), [](auto &lhs, auto &rhs) {
-            return lhs[GranulatorVoice::PAR_TPOS] < rhs[GranulatorVoice::PAR_TPOS];
-        });
+
         for (int i = 0; i < numvoices; ++i)
         {
             auto v = std::make_unique<GranulatorVoice>();
@@ -584,18 +586,16 @@ class ToneGranulator
             voices.push_back(std::move(v));
         }
     }
-    alignas(16) float decodeToStereoMatrix[8];
-    int evindex = 0;
-    int playposframes = 0;
-    sst::basic_blocks::dsp::OnePoleLag<float, true> gainlag;
-    void prepare(events_t evlist)
+
+    void prepare(events_t evlist, float stereoangle, float stereopattern)
     {
         std::lock_guard<std::mutex> locker(mutex);
         events = evlist;
-        double stereoangle = 90.0;
-        stereoangle = std::clamp(stereoangle, 0.0, 180.0);
-        double stereopattern = 0.5;
-        stereopattern = std::clamp(stereopattern, 0.0, 1.0);
+        std::sort(events.begin(), events.end(), [](auto &lhs, auto &rhs) {
+            return lhs[GranulatorVoice::PAR_TPOS] < rhs[GranulatorVoice::PAR_TPOS];
+        });
+        stereoangle = std::clamp(stereoangle, 0.0f, 180.0f);
+        stereopattern = std::clamp(stereopattern, 0.0f, 1.0f);
         generateDecodeStereoMatrix(decodeToStereoMatrix, degreesToRadians(stereoangle),
                                    stereopattern);
         evindex = 0;
@@ -612,7 +612,8 @@ class ToneGranulator
             std::vector<float> *ev = nullptr;
             if (evindex < events.size())
                 ev = &events[evindex];
-            while (ev && std::floor((*ev)[0] * m_sr) < playposframes + granul_block_size)
+            while (ev && std::floor((*ev)[GranulatorVoice::PAR_TPOS] * m_sr) <
+                             playposframes + granul_block_size)
             {
                 bool wasfound = false;
                 for (int j = 0; j < voices.size(); ++j)
@@ -697,158 +698,4 @@ class ToneGranulator
             playposframes += granul_block_size;
         }
     }
-#ifdef PYLLY
-    inline py::array_t<float> generate(std::string outputmode, double stereoangle,
-                                       double stereopattern)
-    {
-        int chans = 0;
-        if (outputmode == "mono")
-            chans = 1;
-        if (outputmode == "stereo")
-            chans = 2;
-        if (outputmode == "stereo+aux")
-            chans = 3;
-        if (outputmode == "ambisonics")
-            chans = 4;
-        if (chans == 0)
-            throw std::runtime_error("output mode must be mono, stereo or ambisonics");
-        int frames = (events.back()[0] + events.back()[1]) * m_sr;
-        py::buffer_info binfo(
-            nullptr,                                /* Pointer to buffer */
-            sizeof(float),                          /* Size of one scalar */
-            py::format_descriptor<float>::format(), /* Python struct-style format descriptor */
-            2,                                      /* Number of dimensions */
-            {chans, frames},                        /* Buffer dimensions */
-            {sizeof(float) * frames,                /* Strides (in bytes) for each index */
-             sizeof(float)});
-        py::array_t<float> output_audio{binfo};
-        float *writebufs[4];
-        for (int i = 0; i < chans; ++i)
-            writebufs[i] = output_audio.mutable_data(i);
-        alignas(16) float decodeToStereoMatrix[8];
-        stereoangle = std::clamp(stereoangle, 0.0, 180.0);
-        stereopattern = std::clamp(stereopattern, 0.0, 1.0);
-        generateDecodeStereoMatrix(decodeToStereoMatrix, degreesToRadians(stereoangle),
-                                   stereopattern);
-        int evindex = 0;
-        int framecount = 0;
-        using clock = std::chrono::system_clock;
-        using ms = std::chrono::duration<double, std::milli>;
-        const auto start_time = clock::now();
-        sst::basic_blocks::dsp::OnePoleLag<float, true> gainlag;
-        gainlag.setRateInMilliseconds(1000.0, m_sr, 1.0);
-        gainlag.setTarget(0.0);
-        int missedgrains = 0;
-        while (framecount < frames - granul_block_size)
-        {
-            std::vector<float> *ev = nullptr;
-            if (evindex < events.size())
-                ev = &events[evindex];
-            while (ev && std::floor((*ev)[0] * m_sr) < framecount + granul_block_size)
-            {
-                bool wasfound = false;
-                for (int j = 0; j < voices.size(); ++j)
-                {
-                    if (!voices[j]->active)
-                    {
-                        // std::print("starting voice {} for event {}\n", j, evindex);
-                        voices[j]->grainid = graincount;
-                        voices[j]->start(*ev);
-                        wasfound = true;
-                        ++graincount;
-                        break;
-                    }
-                }
-                if (!wasfound)
-                {
-                    ++missedgrains;
-                }
-                ++evindex;
-                if (evindex >= events.size())
-                    ev = nullptr;
-                else
-                    ev = &events[evindex];
-            }
-            alignas(16) double mixsum[5][granul_block_size];
-            for (int i = 0; i < 5; ++i)
-            {
-                for (int j = 0; j < granul_block_size; ++j)
-                {
-                    mixsum[i][j] = 0.0f;
-                }
-            }
-
-            int numactive = 0;
-
-            for (int j = 0; j < voices.size(); ++j)
-            {
-                if (voices[j]->active)
-                {
-                    ++numactive;
-                    alignas(16) float voiceout[5 * granul_block_size];
-                    float aux0 = 0.0f;
-                    voices[j]->process(voiceout, granul_block_size);
-                    for (int k = 0; k < granul_block_size; ++k)
-                    {
-                        mixsum[0][k] += voiceout[5 * k + 0];
-                        mixsum[1][k] += voiceout[5 * k + 1];
-                        mixsum[2][k] += voiceout[5 * k + 2];
-                        mixsum[3][k] += voiceout[5 * k + 3];
-                        mixsum[4][k] += voiceout[5 * k + 4];
-                    }
-                }
-            }
-            double compengain = 0.0;
-            if (numactive > 0)
-                compengain = 1.0 / std::sqrt(numactive);
-            gainlag.setTarget(compengain);
-            if (chans == 4)
-            {
-                for (int k = 0; k < granul_block_size; ++k)
-                {
-                    gainlag.process();
-                    float gain = gainlag.getValue();
-                    for (int j = 0; j < 4; ++j)
-                    {
-                        writebufs[j][framecount + k] = mixsum[j][k] * gain;
-                    }
-                }
-            }
-            else if (chans == 1)
-            {
-                for (int k = 0; k < granul_block_size; ++k)
-                    writebufs[0][framecount + k] = mixsum[0][k] * compengain;
-            }
-            else if (chans == 2 || chans == 3)
-            {
-                for (int k = 0; k < granul_block_size; ++k)
-                {
-                    gainlag.process();
-                    float gain = gainlag.getValue();
-                    float wIn = mixsum[0][k] * gain;
-                    float xIn = mixsum[1][k] * gain;
-                    float yIn = mixsum[2][k] * gain;
-                    float zIn = mixsum[3][k] * gain;
-
-                    float spl0 = wIn * decodeToStereoMatrix[0] + xIn * decodeToStereoMatrix[1] +
-                                 yIn * decodeToStereoMatrix[2] + zIn * decodeToStereoMatrix[3];
-                    float spl1 = wIn * decodeToStereoMatrix[4] + xIn * decodeToStereoMatrix[5] +
-                                 yIn * decodeToStereoMatrix[6] + zIn * decodeToStereoMatrix[7];
-                    writebufs[0][framecount + k] = spl0;
-                    writebufs[1][framecount + k] = spl1;
-                    if (chans == 3)
-                        writebufs[2][framecount + k] = mixsum[4][k] * gain;
-                }
-            }
-            framecount += granul_block_size;
-        }
-        const ms render_duration = clock::now() - start_time;
-        if (missedgrains > 0)
-            std::print("missed {} grains\n", missedgrains);
-        double rtfactor = (frames / m_sr * 1000.0) / render_duration.count();
-        std::print("render took {} milliseconds, {:.2f}x realtime\n", render_duration.count(),
-                   rtfactor);
-        return output_audio;
-    }
-#endif
 };
