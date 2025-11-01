@@ -204,10 +204,12 @@ inline py::array_t<float> render_granulator(ToneGranulator &gran, events_t evlis
                                             std::string outputmode, double stereoangle,
                                             double stereopattern)
 {
-    gran.prepare(evlist, stereoangle, stereopattern);
+    // std::print("render_granulator:data ptr of event list before move {}\n", (void *)evlist.data());
+    gran.prepare(std::move(evlist), stereoangle, stereopattern);
+    // std::print("render_granulator:data ptr of event list after move {}\n", (void *)evlist.data());
     int chans = 2;
     int frames = (gran.events.back()[0] + gran.events.back()[1]) * gran.m_sr;
-    std::print("rendering {} frames\n", frames);
+
     py::buffer_info binfo(
         nullptr,                                /* Pointer to buffer */
         sizeof(float),                          /* Size of one scalar */

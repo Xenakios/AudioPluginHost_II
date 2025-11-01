@@ -589,8 +589,10 @@ class ToneGranulator
 
     void prepare(events_t evlist, float stereoangle, float stereopattern)
     {
+        // std::print("prepare:data ptr of event list before move {}\n", (void *)evlist.data());
         std::lock_guard<std::mutex> locker(mutex);
-        events = evlist;
+        events = std::move(evlist);
+        // std::print("prepare:data ptr of event list after move {}\n", (void *)evlist.data());
         std::sort(events.begin(), events.end(), [](auto &lhs, auto &rhs) {
             return lhs[GranulatorVoice::PAR_TPOS] < rhs[GranulatorVoice::PAR_TPOS];
         });
