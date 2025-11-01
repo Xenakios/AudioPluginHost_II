@@ -21,7 +21,7 @@ inline int audiocb(void *outputBuffer, void *inputBuffer, unsigned int nFrames, 
     using clock = std::chrono::high_resolution_clock;
     using ns = std::chrono::duration<double, std::nano>;
     const auto start_time = clock::now();
-    data->granul->process_block(obuf, nFrames);
+    data->granul->process_block(obuf, nFrames, 2);
     for (int i = 0; i < nFrames * 2; ++i)
     {
         obuf[i] = std::clamp(obuf[i], -1.0f, 1.0f);
@@ -174,7 +174,7 @@ int main()
                                     auto evlist = load_events_file(grainfile);
                                     if (evlist.size() > 0)
                                     {
-                                        granulator->prepare(evlist);
+                                        granulator->prepare(evlist, 90.0, 0.5);
                                     }
                                 }};
     if (rtaudio->openStream(&spars, nullptr, RTAUDIO_FLOAT32, sr, &bsize, audiocb, &cbdata) ==

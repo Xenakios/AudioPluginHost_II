@@ -605,7 +605,7 @@ class ToneGranulator
         gainlag.setRateInMilliseconds(1000.0, m_sr, 1.0);
         gainlag.setTarget(0.0);
     }
-    void process_block(float *outputbuffer, int nframes)
+    void process_block(float *outputbuffer, int nframes, int chans)
     {
         std::lock_guard<std::mutex> locker(mutex);
         int bufframecount = 0;
@@ -673,7 +673,18 @@ class ToneGranulator
             if (numactive > 0)
                 compengain = 1.0 / std::sqrt(numactive);
             gainlag.setTarget(compengain);
-            int chans = 2;
+            if (chans == 4)
+            {
+                for (int k = 0; k < granul_block_size; ++k)
+                {
+                    gainlag.process();
+                    float gain = gainlag.getValue() * maingain;
+                    outputbuffer[(bufframecount + k) * 4 + 0] = mixsum[0][k] * gain;
+                    outputbuffer[(bufframecount + k) * 4 + 1] = mixsum[1][k] * gain;
+                    outputbuffer[(bufframecount + k) * 4 + 2] = mixsum[2][k] * gain;
+                    outputbuffer[(bufframecount + k) * 4 + 3] = mixsum[3][k] * gain;
+                }
+            }
             if (chans == 2 || chans == 3)
             {
                 for (int k = 0; k < granul_block_size; ++k)

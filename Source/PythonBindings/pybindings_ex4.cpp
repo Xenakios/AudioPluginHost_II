@@ -204,11 +204,19 @@ inline py::array_t<float> render_granulator(ToneGranulator &gran, events_t evlis
                                             std::string outputmode, double stereoangle,
                                             double stereopattern)
 {
-    // std::print("render_granulator:data ptr of event list before move {}\n", (void *)evlist.data());
+    // std::print("render_granulator:data ptr of event list before move {}\n", (void
+    // *)evlist.data());
     gran.prepare(std::move(evlist), stereoangle, stereopattern);
-    // std::print("render_granulator:data ptr of event list after move {}\n", (void *)evlist.data());
-    int chans = 2;
-    int frames = (gran.events.back()[0] + gran.events.back()[1]) * gran.m_sr;
+    // std::print("render_granulator:data ptr of event list after move {}\n", (void
+    // *)evlist.data());
+    int chans = 0;
+    if (outputmode == "stereo")
+        chans = 2;
+    if (outputmode == "ambisonics")
+        chans = 4;
+    int frames = (gran.events.back()[GranulatorVoice::PAR_TPOS] +
+                  gran.events.back()[GranulatorVoice::PAR_DUR]) *
+                 gran.m_sr;
 
     py::buffer_info binfo(
         nullptr,                                /* Pointer to buffer */
@@ -226,17 +234,19 @@ inline py::array_t<float> render_granulator(ToneGranulator &gran, events_t evlis
     using ms = std::chrono::duration<double, std::milli>;
     const auto start_time = clock::now();
     int framecount = 0;
-    float procbuf[2 * granul_block_size];
-    for (int i = 0; i < 2 * granul_block_size; ++i)
+    float procbuf[4 * granul_block_size];
+    for (int i = 0; i < 4 * granul_block_size; ++i)
         procbuf[i] = 0.0f;
     while (framecount < frames - granul_block_size)
     {
-        gran.process_block(procbuf, granul_block_size);
+        gran.process_block(procbuf, granul_block_size, chans);
         for (int i = 0; i < granul_block_size; ++i)
         {
             int pos = framecount + i;
-            writebufs[0][pos] = procbuf[i * 2 + 0];
-            writebufs[1][pos] = procbuf[i * 2 + 1];
+            for (int j = 0; j < chans; ++j)
+            {
+                writebufs[j][pos] = procbuf[i * chans + j];
+            }
         }
         framecount += granul_block_size;
     }
