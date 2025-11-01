@@ -538,7 +538,8 @@ class ToneGranulator
     double maingain = 1.0;
     std::vector<std::unique_ptr<GranulatorVoice>> voices;
     events_t events;
-    std::mutex mutex;
+    events_t events_to_switch;
+    std::atomic<int> thread_op{0};
     alignas(16) float decodeToStereoMatrix[8];
     int evindex = 0;
     int playposframes = 0;
@@ -586,28 +587,38 @@ class ToneGranulator
             voices.push_back(std::move(v));
         }
     }
-
+    float m_stereoangle = 0.0f;
+    float m_stereopattern = 0.5f;
     void prepare(events_t evlist, float stereoangle, float stereopattern)
     {
-        // std::print("prepare:data ptr of event list before move {}\n", (void *)evlist.data());
-        std::lock_guard<std::mutex> locker(mutex);
-        events = std::move(evlist);
-        // std::print("prepare:data ptr of event list after move {}\n", (void *)evlist.data());
-        std::sort(events.begin(), events.end(), [](auto &lhs, auto &rhs) {
+        if (thread_op == 1)
+        {
+            std::print("prepare called while audio thread should do state switch!\n");
+        }
+        events_to_switch = std::move(evlist);
+        std::sort(events_to_switch.begin(), events_to_switch.end(), [](auto &lhs, auto &rhs) {
             return lhs[GranulatorVoice::PAR_TPOS] < rhs[GranulatorVoice::PAR_TPOS];
         });
-        stereoangle = std::clamp(stereoangle, 0.0f, 180.0f);
-        stereopattern = std::clamp(stereopattern, 0.0f, 1.0f);
-        generateDecodeStereoMatrix(decodeToStereoMatrix, degreesToRadians(stereoangle),
-                                   stereopattern);
-        evindex = 0;
-        playposframes = 0;
-        gainlag.setRateInMilliseconds(1000.0, m_sr, 1.0);
-        gainlag.setTarget(0.0);
+        m_stereoangle = stereoangle;
+        m_stereopattern = stereopattern;
+        thread_op = 1;
     }
     void process_block(float *outputbuffer, int nframes, int chans)
     {
-        std::lock_guard<std::mutex> locker(mutex);
+        if (thread_op == 1)
+        {
+            std::swap(events_to_switch, events);
+
+            float stereoangle = std::clamp(m_stereoangle, 0.0f, 180.0f);
+            float stereopattern = std::clamp(m_stereopattern, 0.0f, 1.0f);
+            generateDecodeStereoMatrix(decodeToStereoMatrix, degreesToRadians(stereoangle),
+                                       stereopattern);
+            evindex = 0;
+            playposframes = 0;
+            gainlag.setRateInMilliseconds(1000.0, m_sr, 1.0);
+            gainlag.setTarget(0.0);
+            thread_op = 0;
+        }
         int bufframecount = 0;
         while (bufframecount < nframes)
         {

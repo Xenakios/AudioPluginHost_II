@@ -174,7 +174,7 @@ int main()
                                     auto evlist = load_events_file(grainfile);
                                     if (evlist.size() > 0)
                                     {
-                                        granulator->prepare(evlist, 90.0, 0.5);
+                                        granulator->prepare(std::move(evlist), 90.0, 0.5);
                                     }
                                 }};
     if (rtaudio->openStream(&spars, nullptr, RTAUDIO_FLOAT32, sr, &bsize, audiocb, &cbdata) ==
@@ -186,7 +186,7 @@ int main()
         {
             if (g_quit)
                 break;
-            std::print("{:.1f}\r", cbdata.avg_usage * 100.0);
+            // std::print("{:.1f}\r", cbdata.avg_usage * 100.0);
             Sleep(100);
         }
         std::print("\nquit server loop\n");
