@@ -285,6 +285,7 @@ class GranulatorVoice
     FilterRouting filter_routing = FR_SERIAL;
     std::array<double, 2> cutoffs = {0.0, 0.0};
     std::array<double, 2> resons = {0.0, 0.0};
+    std::array<double, 2> filtextpars = {0.0, 0.0};
     alignas(16) std::array<double, 2> feedbacksignals = {0.0, 0.0};
     float feedbackamt = 0.0f;
     float graingain = 0.0;
@@ -415,6 +416,7 @@ class GranulatorVoice
             filters[i].reset();
             cutoffs[i] = std::clamp(evpars[PAR_FILT1CUTOFF + 3 * i] - 69.0f, -45.0f, 60.0f);
             resons[i] = std::clamp(evpars[PAR_FILT1RESON + 3 * i], 0.0f, 1.0f);
+            filtextpars[i] = std::clamp(evpars[PAR_FILT1EXT0 + 3 * i], -1.0f, 1.0f);
         }
 
         graingain = std::clamp(evpars[PAR_VOLUME], 0.0f, 1.0f);
@@ -432,7 +434,7 @@ class GranulatorVoice
     {
         for (size_t i = 0; i < filters.size(); ++i)
         {
-            filters[i].makeCoefficients(0, cutoffs[i], resons[i]);
+            filters[i].makeCoefficients(0, cutoffs[i], resons[i], filtextpars[i]);
             filters[i].prepareBlock();
         }
 
