@@ -14,63 +14,42 @@
 
 namespace py = pybind11;
 
-using const_or_envelope = std::variant<double, xenakios::Envelope *>;
-
-inline void init_const_or_envelope(const_or_envelope coe)
+inline xenakios::Envelope envelope_from_pyob(py::object ob)
 {
-    std::visit(
-        [](auto v) {
-            if constexpr (std::is_same_v<decltype(v), xenakios::Envelope *>)
-            {
-                if (!v)
-                    throw std::runtime_error("volume must be either number or envelope");
-                v->sortPoints();
-                v->clearOutputBlock();
-            }
-        },
-        coe);
+    if (py::isinstance<py::float_>(ob) || py::isinstance<py::int_>(ob))
+    {
+        double value = ob.cast<double>();
+        // std::print("got constant with value {}\n", value);
+        xenakios::Envelope result;
+        result.addPoint({0.0, value});
+        result.sortPoints();
+        result.clearOutputBlock();
+        return result;
+    }
+    try
+    {
+        // Attempt to cast to the C++ type. If it fails, an exception is thrown.
+        auto &foo = ob.cast<xenakios::Envelope &>();
+        // std::print("got envelope with {} points\n", foo.getNumPoints());
+        foo.sortPoints();
+        foo.clearOutputBlock();
+        return foo;
+    }
+    catch (const py::cast_error &e)
+    {
+        throw std::runtime_error("invalid argument type");
+    }
+    return {};
 }
 
-template <size_t BufferSize>
-inline void process_into_buffer(const_or_envelope coe, double tpos, double sr, float *destbuf)
-{
-    std::visit(
-        [&](auto e) {
-            if constexpr (std::is_same_v<decltype(e), xenakios::Envelope *>)
-            {
-                e->processBlock(tpos, sr, 0, BufferSize);
-                for (size_t i = 0; i < BufferSize; ++i)
-                    destbuf[i] = e->outputBlock[i];
-            }
-            else
-            {
-                for (size_t i = 0; i < BufferSize; ++i)
-                    destbuf[i] = e;
-            }
-        },
-        coe);
-}
-
-inline double get_param_value(const_or_envelope par, double tpos)
-{
-    return std::visit(
-        [&](auto p) {
-            if constexpr (std::is_same_v<decltype(p), double>)
-                return p;
-            else
-                return p->getValueAtPosition(tpos);
-        },
-        par);
-}
-
-inline py::array_t<float> generate_tone(std::string tone_name, const_or_envelope pitch_param,
-                                        const_or_envelope volume_param, double sr, double duration)
+inline py::array_t<float> generate_tone(std::string tone_name, py::object pitch_param,
+                                        py::object volume_param, double sr, double duration)
 {
     auto tone_type = osc_name_to_index(tone_name);
     if (tone_type < 0 || tone_type > 6)
         throw std::runtime_error("Invalid tone type");
-    init_const_or_envelope(pitch_param);
-    init_const_or_envelope(volume_param);
+    auto pitch_env = envelope_from_pyob(pitch_param);
+    auto vol_env = envelope_from_pyob(volume_param);
     int chans = 1;
     int frames = duration * sr;
     py::buffer_info binfo(
@@ -115,15 +94,15 @@ inline py::array_t<float> generate_tone(std::string tone_name, const_or_envelope
     const size_t blocksize = 8;
     int framecount = 0;
     float *writebuf = output_audio.mutable_data(0);
-    float gainbuffer[blocksize];
     while (framecount < frames)
     {
         size_t framestoprocess = std::min<int>(blocksize, frames - framecount);
         double tpos = framecount / sr;
-        double pitch = get_param_value(pitch_param, tpos);
+        double pitch = pitch_env.getValueAtPosition(tpos);
         pitch = std::clamp(pitch, 0.0, 136.0);
         double hz = 440.0 * std::pow(2.0, 1.0 / 12 * (pitch - 69.0));
-        process_into_buffer<blocksize>(volume_param, tpos, sr, gainbuffer);
+        vol_env.processBlock(tpos, sr, 0, blocksize);
+
         std::visit(
             [&](auto &osc) {
                 if constexpr (std::is_same_v<decltype(osc),
@@ -141,7 +120,7 @@ inline py::array_t<float> generate_tone(std::string tone_name, const_or_envelope
                 for (int i = 0; i < framestoprocess; ++i)
                 {
                     float sample = osc.step();
-                    double gain = gainbuffer[i];
+                    double gain = vol_env.outputBlock[i];
                     gain = std::clamp(gain, 0.0, 1.0);
                     gain = gain * gain * gain;
                     writebuf[framecount + i] = sample * gain * 0.8;
@@ -316,7 +295,7 @@ void init_py4(py::module_ &m, py::module_ &m_const)
 {
 
     using namespace pybind11::literals;
-    // m.def("vartest", &vartest);
+
     m.def("generate_tone", &generate_tone, "tone_type"_a, "pitch"_a, "volume"_a, "samplerate"_a,
           "duration"_a);
     m.def("generate_fmtone", &generate_fm, "carrierfreq"_a, "modulatorfreq"_a, "modulationamont"_a,
