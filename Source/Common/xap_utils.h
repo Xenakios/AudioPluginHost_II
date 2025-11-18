@@ -20,7 +20,10 @@ struct xenakios_event_change_file
     char filepath[256];
 };
 
-template <std::integral T> inline clap_id to_clap_id(T x) { return static_cast<clap_id>(x); }
+template <std::unsigned_integral T> inline clap_id to_clap_id(T x)
+{
+    return static_cast<clap_id>(x);
+}
 
 namespace xenakios
 {
@@ -490,6 +493,7 @@ template <typename T, size_t Size> class SimpleRingBuffer
 // looks like this is broken...need to explore further
 template <typename T> inline T wrap_value(const T minval, const T val, const T maxval)
 {
+    assert(maxval > minval);
     T temp = val;
     while (temp < minval || temp > maxval)
     {
@@ -504,6 +508,7 @@ template <typename T> inline T wrap_value(const T minval, const T val, const T m
 // note that limits can't be the same and the loop may run for long!
 template <typename T> inline T reflect_value(const T minval, const T val, const T maxval)
 {
+    assert(maxval > minval);
     T temp = val;
     while (temp < minval || temp > maxval)
     {

@@ -601,6 +601,10 @@ class ToneGranulator
         std::sort(events_to_switch.begin(), events_to_switch.end(), [](auto &lhs, auto &rhs) {
             return lhs[GranulatorVoice::PAR_TPOS] < rhs[GranulatorVoice::PAR_TPOS];
         });
+        std::erase_if(events_to_switch, [](auto &e) {
+            return e[GranulatorVoice::PAR_TPOS] < 0.0 ||
+                   (e[GranulatorVoice::PAR_TPOS] + e[GranulatorVoice::PAR_DUR] > 60.0);
+        });
         m_stereoangle = stereoangle;
         m_stereopattern = stereopattern;
         thread_op = 1;

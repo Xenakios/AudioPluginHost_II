@@ -14,14 +14,63 @@
 
 namespace py = pybind11;
 
-inline py::array_t<float> generate_tone(std::string tone_name, xenakios::Envelope &pitch_env,
-                                        xenakios::Envelope &volume_env, double sr, double duration)
+using const_or_envelope = std::variant<double, xenakios::Envelope *>;
+
+inline void init_const_or_envelope(const_or_envelope coe)
+{
+    std::visit(
+        [](auto v) {
+            if constexpr (std::is_same_v<decltype(v), xenakios::Envelope *>)
+            {
+                if (!v)
+                    throw std::runtime_error("volume must be either number or envelope");
+                v->sortPoints();
+                v->clearOutputBlock();
+            }
+        },
+        coe);
+}
+
+template <size_t BufferSize>
+inline void process_into_buffer(const_or_envelope coe, double tpos, double sr, float *destbuf)
+{
+    std::visit(
+        [&](auto e) {
+            if constexpr (std::is_same_v<decltype(e), xenakios::Envelope *>)
+            {
+                e->processBlock(tpos, sr, 0, BufferSize);
+                for (size_t i = 0; i < BufferSize; ++i)
+                    destbuf[i] = e->outputBlock[i];
+            }
+            else
+            {
+                for (size_t i = 0; i < BufferSize; ++i)
+                    destbuf[i] = e;
+            }
+        },
+        coe);
+}
+
+inline double get_param_value(const_or_envelope par, double tpos)
+{
+    return std::visit(
+        [&](auto p) {
+            if constexpr (std::is_same_v<decltype(p), double>)
+                return p;
+            else
+                return p->getValueAtPosition(tpos);
+        },
+        par);
+}
+
+inline py::array_t<float> generate_tone(std::string tone_name, const_or_envelope pitch_param,
+                                        const_or_envelope volume_param, double sr, double duration)
 {
     auto tone_type = osc_name_to_index(tone_name);
     if (tone_type < 0 || tone_type > 6)
         throw std::runtime_error("Invalid tone type");
-    pitch_env.sortPoints();
-    volume_env.sortPoints();
+    init_const_or_envelope(pitch_param);
+    init_const_or_envelope(volume_param);
     int chans = 1;
     int frames = duration * sr;
     py::buffer_info binfo(
@@ -66,15 +115,15 @@ inline py::array_t<float> generate_tone(std::string tone_name, xenakios::Envelop
     const size_t blocksize = 8;
     int framecount = 0;
     float *writebuf = output_audio.mutable_data(0);
-    volume_env.clearOutputBlock();
+    float gainbuffer[blocksize];
     while (framecount < frames)
     {
         size_t framestoprocess = std::min<int>(blocksize, frames - framecount);
         double tpos = framecount / sr;
-        double pitch = pitch_env.getValueAtPosition(tpos);
+        double pitch = get_param_value(pitch_param, tpos);
         pitch = std::clamp(pitch, 0.0, 136.0);
         double hz = 440.0 * std::pow(2.0, 1.0 / 12 * (pitch - 69.0));
-        volume_env.processBlock(tpos, sr, 0, blocksize);
+        process_into_buffer<blocksize>(volume_param, tpos, sr, gainbuffer);
         std::visit(
             [&](auto &osc) {
                 if constexpr (std::is_same_v<decltype(osc),
@@ -92,7 +141,7 @@ inline py::array_t<float> generate_tone(std::string tone_name, xenakios::Envelop
                 for (int i = 0; i < framestoprocess; ++i)
                 {
                     float sample = osc.step();
-                    double gain = volume_env.outputBlock[i];
+                    double gain = gainbuffer[i];
                     gain = std::clamp(gain, 0.0, 1.0);
                     gain = gain * gain * gain;
                     writebuf[framecount + i] = sample * gain * 0.8;
@@ -211,16 +260,19 @@ inline py::array_t<float> render_granulator(ToneGranulator &gran, events_t evlis
                                             std::string outputmode, double stereoangle,
                                             double stereopattern)
 {
-    int frames =
-        (evlist.back()[GranulatorVoice::PAR_TPOS] + evlist.back()[GranulatorVoice::PAR_DUR]) *
-        gran.m_sr;
     gran.prepare(std::move(evlist), stereoangle, stereopattern);
+    if (gran.events_to_switch.empty())
+        throw std::runtime_error("grain event list empty after events were erased");
+    int frames = (gran.events_to_switch.back()[GranulatorVoice::PAR_TPOS] +
+                  gran.events_to_switch.back()[GranulatorVoice::PAR_DUR]) *
+                 gran.m_sr;
     int chans = 0;
     if (outputmode == "stereo")
         chans = 2;
     if (outputmode == "ambisonics")
         chans = 4;
-
+    if (chans == 0)
+        throw std::runtime_error("audio output mode must be stereo or ambisonics");
     py::buffer_info binfo(
         nullptr,                                /* Pointer to buffer */
         sizeof(float),                          /* Size of one scalar */
