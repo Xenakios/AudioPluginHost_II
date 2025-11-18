@@ -154,6 +154,10 @@ inline events_t load_events_file(std::string path)
 
 int main()
 {
+    auto a = xenakios::decibelsToGain(120.0f);
+    // auto a = to_clap_id(666);
+    // auto b = to_clap_id(666.0);
+    // return 0;
     SetConsoleCtrlHandler(CtrlHandler, TRUE);
     double sr = 44100.0;
     double phase = 0.0;

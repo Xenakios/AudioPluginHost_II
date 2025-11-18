@@ -4,7 +4,7 @@
 #include <clap/helpers/event-list.hh>
 #include "audio/choc_AudioFileFormat.h"
 #include "containers/choc_SingleReaderSingleWriterFIFO.h"
-
+#include <concepts>
 #include <algorithm>
 #include <cstdint>
 #include <limits>
@@ -20,7 +20,7 @@ struct xenakios_event_change_file
     char filepath[256];
 };
 
-template <typename T> inline clap_id to_clap_id(T x) { return static_cast<clap_id>(x); }
+template <std::integral T> inline clap_id to_clap_id(T x) { return static_cast<clap_id>(x); }
 
 namespace xenakios
 {
@@ -40,7 +40,7 @@ createWavWriter(std::string path, size_t num_channels, double samplerate,
 
 /* Remaps a value from a source range to a target range. Explodes if source range has zero size.
  */
-template <typename Type>
+template <std::convertible_to<double> Type>
 Type mapvalue(Type sourceValue, Type sourceRangeMin, Type sourceRangeMax, Type targetRangeMin,
               Type targetRangeMax)
 {
@@ -132,7 +132,7 @@ struct Xoroshiro128Plus
     }
 };
 
-template <typename Type>
+template <std::floating_point Type>
 static Type decibelsToGain(Type decibels, Type minusInfinityDb = Type(-100))
 {
     return decibels > minusInfinityDb ? std::pow(Type(10.0), decibels * Type(0.05)) : Type();
