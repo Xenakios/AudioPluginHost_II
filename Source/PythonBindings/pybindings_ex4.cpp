@@ -33,18 +33,36 @@ inline py::array_t<float> generate_tone(std::string tone_name, xenakios::Envelop
         {sizeof(float) * frames,                /* Strides (in bytes) for each index */
          sizeof(float)});
     py::array_t<float> output_audio{binfo};
-    sst::basic_blocks::dsp::EBApproxSin<> osc_sin;
-    sst::basic_blocks::dsp::EBApproxSemiSin<> osc_semisin;
-    sst::basic_blocks::dsp::EBTri<> osc_tri;
-    sst::basic_blocks::dsp::EBSaw<> osc_saw;
-    sst::basic_blocks::dsp::EBPulse<> osc_pulse;
-    sst::basic_blocks::dsp::DPWSawOscillator<> osc_saw_dpw;
-    sst::basic_blocks::dsp::DPWPulseOscillator<> osc_pulse_dpw;
-    osc_sin.setSampleRate(sr);
-    osc_semisin.setSampleRate(sr);
-    osc_tri.setSampleRate(sr);
-    osc_saw.setSampleRate(sr);
-    osc_pulse.setSampleRate(sr);
+    std::variant<sst::basic_blocks::dsp::EBApproxSin<>, sst::basic_blocks::dsp::EBApproxSemiSin<>,
+                 sst::basic_blocks::dsp::EBTri<>, sst::basic_blocks::dsp::EBSaw<>,
+                 sst::basic_blocks::dsp::EBPulse<>, sst::basic_blocks::dsp::DPWSawOscillator<>,
+                 sst::basic_blocks::dsp::DPWPulseOscillator<>>
+        voscillator;
+    if (tone_type == 0)
+        voscillator = sst::basic_blocks::dsp::EBApproxSin<>();
+    else if (tone_type == 1)
+        voscillator = sst::basic_blocks::dsp::EBApproxSemiSin<>();
+    else if (tone_type == 2)
+        voscillator = sst::basic_blocks::dsp::EBTri<>();
+    else if (tone_type == 3)
+        voscillator = sst::basic_blocks::dsp::EBSaw<>();
+    else if (tone_type == 4)
+        voscillator = sst::basic_blocks::dsp::EBPulse<>();
+    else if (tone_type == 5)
+        voscillator = sst::basic_blocks::dsp::DPWSawOscillator<>();
+    else if (tone_type == 6)
+        voscillator = sst::basic_blocks::dsp::DPWPulseOscillator<>();
+    std::visit(
+        [sr](auto &osc) {
+            if constexpr (!(std::is_same_v<decltype(osc),
+                                           sst::basic_blocks::dsp::DPWSawOscillator<> &> ||
+                            std::is_same_v<decltype(osc),
+                                           sst::basic_blocks::dsp::DPWPulseOscillator<> &>))
+            {
+                osc.setSampleRate(sr);
+            }
+        },
+        voscillator);
     const size_t blocksize = 8;
     int framecount = 0;
     float *writebuf = output_audio.mutable_data(0);
@@ -57,42 +75,31 @@ inline py::array_t<float> generate_tone(std::string tone_name, xenakios::Envelop
         pitch = std::clamp(pitch, 0.0, 136.0);
         double hz = 440.0 * std::pow(2.0, 1.0 / 12 * (pitch - 69.0));
         volume_env.processBlock(tpos, sr, 0, blocksize);
-        auto renderfunc = [&](auto &osc) {
-            if constexpr (std::is_same_v<decltype(osc),
-                                         sst::basic_blocks::dsp::DPWSawOscillator<> &> ||
-                          std::is_same_v<decltype(osc),
-                                         sst::basic_blocks::dsp::DPWPulseOscillator<> &>)
-            {
-                osc.setFrequency(hz, 1.0 / sr);
-            }
-            else
-            {
-                osc.setFrequency(hz);
-            }
+        std::visit(
+            [&](auto &osc) {
+                if constexpr (std::is_same_v<decltype(osc),
+                                             sst::basic_blocks::dsp::DPWSawOscillator<> &> ||
+                              std::is_same_v<decltype(osc),
+                                             sst::basic_blocks::dsp::DPWPulseOscillator<> &>)
+                {
+                    osc.setFrequency(hz, 1.0 / sr);
+                }
+                else
+                {
+                    osc.setFrequency(hz);
+                }
 
-            for (int i = 0; i < framestoprocess; ++i)
-            {
-                float sample = osc.step();
-                double gain = volume_env.outputBlock[i];
-                gain = std::clamp(gain, 0.0, 1.0);
-                gain = gain * gain * gain;
-                writebuf[framecount + i] = sample * gain * 0.8;
-            }
-        };
-        if (tone_type == 0)
-            renderfunc(osc_sin);
-        else if (tone_type == 1)
-            renderfunc(osc_semisin);
-        else if (tone_type == 2)
-            renderfunc(osc_tri);
-        else if (tone_type == 3)
-            renderfunc(osc_saw);
-        else if (tone_type == 4)
-            renderfunc(osc_pulse);
-        else if (tone_type == 5)
-            renderfunc(osc_saw_dpw);
-        else if (tone_type == 6)
-            renderfunc(osc_pulse_dpw);
+                for (int i = 0; i < framestoprocess; ++i)
+                {
+                    float sample = osc.step();
+                    double gain = volume_env.outputBlock[i];
+                    gain = std::clamp(gain, 0.0, 1.0);
+                    gain = gain * gain * gain;
+                    writebuf[framecount + i] = sample * gain * 0.8;
+                }
+            },
+            voscillator);
+
         framecount += blocksize;
     }
     return output_audio;
@@ -204,16 +211,15 @@ inline py::array_t<float> render_granulator(ToneGranulator &gran, events_t evlis
                                             std::string outputmode, double stereoangle,
                                             double stereopattern)
 {
-    int frames = (evlist.back()[GranulatorVoice::PAR_TPOS] +
-                  evlist.back()[GranulatorVoice::PAR_DUR]) *
-                 gran.m_sr;
+    int frames =
+        (evlist.back()[GranulatorVoice::PAR_TPOS] + evlist.back()[GranulatorVoice::PAR_DUR]) *
+        gran.m_sr;
     gran.prepare(std::move(evlist), stereoangle, stereopattern);
     int chans = 0;
     if (outputmode == "stereo")
         chans = 2;
     if (outputmode == "ambisonics")
         chans = 4;
-    
 
     py::buffer_info binfo(
         nullptr,                                /* Pointer to buffer */

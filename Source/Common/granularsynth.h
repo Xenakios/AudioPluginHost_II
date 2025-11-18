@@ -23,7 +23,7 @@ struct tone_info
 };
 
 tone_info osc_infos[7] = {{0, "EBSINE"},   {1, "EBSEMISINE"}, {2, "EBTRIANGLE"}, {3, "EBSAW"},
-                          {4, "EBSQUARE"}, {5, "DPWSAW"},     {6, "DPWSQUARE"}};
+                          {4, "EBSQUARE"}, {5, "DPWSAW"},     {6, "DPWPULSE"}};
 
 inline std::vector<std::string> osc_types()
 {
