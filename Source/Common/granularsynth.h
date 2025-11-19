@@ -12,6 +12,23 @@
 #include "../Common/xap_breakpoint_envelope.h"
 #include <mutex>
 
+struct GrainEvent
+{
+    double time_position = 0.0;
+    float duration = 0.0f;
+    float frequency_hz = 0.0f;
+    int generator_type = 0;
+    float volume = 0.0f;
+    int envelope_type = 0;
+    float envelope_shape = 0.0f;
+    float azimuth = 0.0f;
+    float elevation = 0.0f;
+    float sync_ratio = 1.0f;
+    float pulse_width = 0.5f;
+    float filter1params[3] = {0.0f, 0.0, 0.0f};
+    float filter2params[3] = {0.0f, 0.0, 0.0f};
+};
+
 template <typename T> inline T degreesToRadians(T degrees) { return degrees * (M_PI / 180.0); }
 
 const int granul_block_size = 8;
@@ -530,6 +547,7 @@ void generateDecodeStereoMatrix(float *aMatrix, float anAngle, float aPattern)
 }
 
 using events_t = std::vector<std::vector<float>>;
+using events_t_new = std::vector<GrainEvent>;
 
 class ToneGranulator
 {
@@ -539,6 +557,7 @@ class ToneGranulator
     int graincount = 0;
     double maingain = 1.0;
     std::vector<std::unique_ptr<GranulatorVoice>> voices;
+    events_t_new events_new;
     events_t events;
     events_t events_to_switch;
     std::atomic<int> thread_op{0};

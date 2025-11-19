@@ -345,6 +345,8 @@ void process_airwindows(int index)
     audioMasterCallback amc = 0;
     std::unique_ptr<AirwinConsolidatedBase> plugin;
     size_t numParams = 0;
+    // we will want to do this smarter if we expect to end up allowing lots of
+    // AirWindows plugins
     if (index == 0)
     {
         plugin = make_aw_safe<airwinconsolidated::BezEQ::BezEQ>(amc);
