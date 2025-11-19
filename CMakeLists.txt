@@ -34,9 +34,10 @@ include_directories(
     libs/simde
     libs/thread-pool/include
     C:/develop/cmajlang/cmajor/include
-    C:/develop/airwin2rack/src
     libs/sst-basic-blocks/libs
     libs/tracktion_engine/modules/tracktion_graph
+    libs/airwindows_limited
+    libs/airwindows_limited/plugins
 )
 
 # for "reasons", this is still a console app even though a GUI app is built from it
@@ -110,6 +111,11 @@ pybind11_add_module(xenakios
     libs/MTS-ESP/Master/libMTSMaster.cpp
     libs/MTS-ESP/Client/libMTSClient.cpp
     libs/rtaudio/RtAudio.cpp 
+    libs/airwindows_limited/airwin_consolidated_base.cpp
+    libs/airwindows_limited/plugins/BezEQ.cpp
+    libs/airwindows_limited/plugins/BezEQProc.cpp
+    libs/airwindows_limited/plugins/HipCrush.cpp
+    libs/airwindows_limited/plugins/HipCrushProc.cpp
 )
 # Source/Experimental/xaudiograph.cpp
 # target_link_libraries(xenakios PRIVATE juce::juce_core juce::juce_audio_utils)

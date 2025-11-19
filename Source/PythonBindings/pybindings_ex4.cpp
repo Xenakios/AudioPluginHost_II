@@ -12,6 +12,9 @@
 #include "sst/basic-blocks/dsp/SmoothingStrategies.h"
 #include <random>
 #include "../Common/granularsynth.h"
+#include "airwin_consolidated_base.h"
+#include "plugins/BezEQ.h"
+#include "plugins/HipCrush.h"
 
 namespace py = pybind11;
 
@@ -324,11 +327,60 @@ inline py::array_t<float> render_granulator(ToneGranulator &gran, events_t evlis
     return output_audio;
 }
 
+// Chris has sometimes forgot to initialize variables, so with this we will get at least
+// zeros for those in the hopes that avoids problems
+template <typename AWType>
+[[nodiscard]] inline std::unique_ptr<AirwinConsolidatedBase> make_aw_safe(audioMasterCallback cb)
+{
+    static_assert(std::derived_from<AWType, AirwinConsolidatedBase>,
+                  "class must inherit from AirwinConsolidatedBase");
+    char *objbuffer = new char[sizeof(AWType)];
+    std::fill(objbuffer, objbuffer + sizeof(AWType), 0);
+    AirwinConsolidatedBase *ob = new (objbuffer) AWType(cb);
+    return std::unique_ptr<AirwinConsolidatedBase>(ob);
+}
+
+void process_airwindows(int index)
+{
+    audioMasterCallback amc = 0;
+    std::unique_ptr<AirwinConsolidatedBase> plugin;
+    size_t numParams = 0;
+    if (index == 0)
+    {
+        plugin = make_aw_safe<airwinconsolidated::BezEQ::BezEQ>(amc);
+        numParams = airwinconsolidated::BezEQ::kNumParameters;
+    }
+    if (index == 1)
+    {
+        plugin = make_aw_safe<airwinconsolidated::HipCrush::HipCrush>(amc);
+        numParams = airwinconsolidated::HipCrush::kNumParameters;
+    }
+
+    if (!plugin)
+        throw std::runtime_error("invalid plugin index for creation");
+    char textbuffer[512];
+    memset(textbuffer, 0, 512);
+    if (plugin->getEffectName(textbuffer))
+    {
+        std::print("created AirWindows/{}\n", textbuffer);
+        std::print("{:3} parameters\n", numParams);
+        for (size_t i = 0; i < numParams; ++i)
+        {
+            plugin->getParameterName(i, textbuffer);
+            std::print("{:3} {}\n", i, textbuffer);
+        }
+    }
+    else
+    {
+        std::print("could not get effect name\n");
+    }
+}
+
 void init_py4(py::module_ &m, py::module_ &m_const)
 {
 
     using namespace pybind11::literals;
-
+    m.def("airwindows_test", &process_airwindows);
     m.def("generate_tone", &generate_tone, "tone_type"_a, "pitch"_a, "volume"_a, "samplerate"_a,
           "duration"_a);
     m.def("generate_fmtone", &generate_fm, "carrierfreq"_a, "modulatorfreq"_a, "modulationamont"_a,
