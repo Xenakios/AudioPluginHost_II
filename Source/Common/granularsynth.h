@@ -14,19 +14,29 @@
 
 struct GrainEvent
 {
+    GrainEvent(double tpos, float dur, float hz)
+        : time_position(tpos), duration(dur), frequency_hz(hz)
+    {
+    }
     double time_position = 0.0;
     float duration = 0.0f;
     float frequency_hz = 0.0f;
     int generator_type = 0;
     float volume = 0.0f;
+    float auxsend = 0.0f;
     int envelope_type = 0;
-    float envelope_shape = 0.0f;
+    float envelope_shape = 0.5f;
     float azimuth = 0.0f;
     float elevation = 0.0f;
     float sync_ratio = 1.0f;
     float pulse_width = 0.5f;
+    float fm_frequency_hz = 0.0f;
+    float fm_amount = 0.0f;
+    float fm_feedback = 0.0f;
+    float noisecorr = 0.0f;
     float filter1params[3] = {0.0f, 0.0, 0.0f};
     float filter2params[3] = {0.0f, 0.0, 0.0f};
+    float filterfeedback = 0.0f;
 };
 
 template <typename T> inline T degreesToRadians(T degrees) { return degrees * (M_PI / 180.0); }
@@ -362,10 +372,10 @@ class GranulatorVoice
   matrixNewDSP[3] =  mSinEle;
   */
 
-    void start(std::vector<float> &evpars)
+    void start(GrainEvent &evpars)
     {
         active = true;
-        int newosctype = std::clamp<int>(evpars[PAR_TONETYPE], 0.0, 6.0);
+        int newosctype = std::clamp<int>(evpars.generator_type, 0.0, 6.0);
         if (newosctype != prior_osc_type)
         {
             prior_osc_type = newosctype;
@@ -385,14 +395,14 @@ class GranulatorVoice
                 theoscillator = NoiseGen();
             std::visit([this](auto &q) { q.setSampleRate(sr); }, theoscillator);
         }
-        auto hz = std::clamp(evpars[PAR_FREQHZ], 1.0f, 22050.0f);
-        auto syncratio = std::clamp(evpars[PAR_SYNCRATIO], 1.0f, 16.0f);
-        auto pw = evpars[PAR_PULSEWIDTH]; // osc implementation clamps itself to 0..1
-        auto fmhz = evpars[PAR_FMFREQ];
-        auto fmmodamount = std::clamp(evpars[PAR_FMAMOUNT], 0.0f, 1.0f);
+        auto hz = std::clamp(evpars.frequency_hz, 1.0f, 22050.0f);
+        auto syncratio = std::clamp(evpars.sync_ratio, 1.0f, 16.0f);
+        auto pw = evpars.pulse_width; // osc implementation clamps itself to 0..1
+        auto fmhz = evpars.fm_frequency_hz;
+        auto fmmodamount = std::clamp(evpars.fm_amount, 0.0f, 1.0f);
         fmmodamount = std::pow(fmmodamount, 3.0f) * 128.0f;
-        auto fmfeedback = std::clamp(evpars[PAR_FMFEEDBACK], -1.0f, 1.0f);
-        auto noisecorr = std::clamp(evpars[PAR_NOISECORR], -1.0f, 1.0f);
+        auto fmfeedback = std::clamp(evpars.fm_feedback, -1.0f, 1.0f);
+        auto noisecorr = std::clamp(evpars.noisecorr, -1.0f, 1.0f);
         std::visit(
             [hz, syncratio, pw, fmhz, fmfeedback, fmmodamount, noisecorr, this](auto &q) {
                 q.reset();
@@ -416,8 +426,8 @@ class GranulatorVoice
                 }
             },
             theoscillator);
-        float horz_angle = std::clamp(evpars[PAR_HOR_ANGLE], -180.0f, 180.0f);
-        float vert_angle = std::clamp(evpars[PAR_VER_ANGLE], -180.0f, 180.0f);
+        float horz_angle = std::clamp(evpars.azimuth, -180.0f, 180.0f);
+        float vert_angle = std::clamp(evpars.elevation, -180.0f, 180.0f);
         horz_angle = degreesToRadians(horz_angle);
         vert_angle = degreesToRadians(vert_angle);
         ambcoeffs[0] = 1.0 / std::sqrt(2.0);
@@ -426,24 +436,24 @@ class GranulatorVoice
         ambcoeffs[3] = std::sin(vert_angle);
 
         phase = 0;
-        endphase = sr * std::clamp(evpars[PAR_DUR], 0.001f, 1.0f);
+        endphase = sr * std::clamp(evpars.duration, 0.001f, 1.0f);
 
         for (size_t i = 0; i < filters.size(); ++i)
         {
             filters[i].reset();
-            cutoffs[i] = std::clamp(evpars[PAR_FILT1CUTOFF + 3 * i] - 69.0f, -45.0f, 60.0f);
-            resons[i] = std::clamp(evpars[PAR_FILT1RESON + 3 * i], 0.0f, 1.0f);
-            filtextpars[i] = std::clamp(evpars[PAR_FILT1EXT0 + 3 * i], -1.0f, 1.0f);
+            // cutoffs[i] = std::clamp(evpars[PAR_FILT1CUTOFF + 3 * i] - 69.0f, -45.0f, 60.0f);
+            // resons[i] = std::clamp(evpars[PAR_FILT1RESON + 3 * i], 0.0f, 1.0f);
+            // filtextpars[i] = std::clamp(evpars[PAR_FILT1EXT0 + 3 * i], -1.0f, 1.0f);
         }
 
-        graingain = std::clamp(evpars[PAR_VOLUME], 0.0f, 1.0f);
+        graingain = std::clamp(evpars.volume, 0.0f, 1.0f);
         graingain = graingain * graingain * graingain;
-        auxsend1 = std::clamp(evpars[PAR_AUXSEND1], 0.0f, 1.0f);
+        auxsend1 = std::clamp(evpars.auxsend, 0.0f, 1.0f);
 
-        envtype = std::clamp<int>(evpars[PAR_ENVTYPE], 0, 1);
-        envshape = std::clamp(evpars[PAR_ENVSHAPE], 0.0f, 1.0f);
+        envtype = std::clamp<int>(evpars.envelope_type, 0, 1);
+        envshape = std::clamp(evpars.envelope_shape, 0.0f, 1.0f);
 
-        feedbackamt = std::clamp(evpars[PAR_FILTERFEEDBACKAMOUNT], -0.9999f, 0.9999f);
+        feedbackamt = std::clamp(evpars.filterfeedback, -0.9999f, 0.9999f);
         feedbacksignals[0] = 0.0;
         feedbacksignals[1] = 0.0;
     }
@@ -546,8 +556,7 @@ void generateDecodeStereoMatrix(float *aMatrix, float anAngle, float aPattern)
     aMatrix[7] = 0.0;
 }
 
-using events_t = std::vector<std::vector<float>>;
-using events_t_new = std::vector<GrainEvent>;
+using events_t = std::vector<GrainEvent>;
 
 class ToneGranulator
 {
@@ -557,7 +566,6 @@ class ToneGranulator
     int graincount = 0;
     double maingain = 1.0;
     std::vector<std::unique_ptr<GranulatorVoice>> voices;
-    events_t_new events_new;
     events_t events;
     events_t events_to_switch;
     std::atomic<int> thread_op{0};
@@ -617,12 +625,11 @@ class ToneGranulator
             std::print("prepare called while audio thread should do state switch!\n");
         }
         events_to_switch = std::move(evlist);
-        std::sort(events_to_switch.begin(), events_to_switch.end(), [](auto &lhs, auto &rhs) {
-            return lhs[GranulatorVoice::PAR_TPOS] < rhs[GranulatorVoice::PAR_TPOS];
-        });
-        std::erase_if(events_to_switch, [](auto &e) {
-            return e[GranulatorVoice::PAR_TPOS] < 0.0 ||
-                   (e[GranulatorVoice::PAR_TPOS] + e[GranulatorVoice::PAR_DUR] > 60.0);
+        std::sort(
+            events_to_switch.begin(), events_to_switch.end(),
+            [](GrainEvent &lhs, GrainEvent &rhs) { return lhs.time_position < rhs.time_position; });
+        std::erase_if(events_to_switch, [](GrainEvent &e) {
+            return e.time_position < 0.0 || (e.time_position + e.duration) > 60.0;
         });
         m_stereoangle = stereoangle;
         m_stereopattern = stereopattern;
@@ -647,11 +654,10 @@ class ToneGranulator
         int bufframecount = 0;
         while (bufframecount < nframes)
         {
-            std::vector<float> *ev = nullptr;
+            GrainEvent *ev = nullptr;
             if (evindex < events.size())
                 ev = &events[evindex];
-            while (ev && std::floor((*ev)[GranulatorVoice::PAR_TPOS] * m_sr) <
-                             playposframes + granul_block_size)
+            while (ev && std::floor(ev->time_position * m_sr) < playposframes + granul_block_size)
             {
                 bool wasfound = false;
                 for (int j = 0; j < voices.size(); ++j)

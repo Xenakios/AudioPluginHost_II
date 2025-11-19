@@ -278,9 +278,9 @@ inline py::array_t<float> render_granulator(ToneGranulator &gran, events_t evlis
     gran.prepare(std::move(evlist), stereoangle, stereopattern);
     if (gran.events_to_switch.empty())
         throw std::runtime_error("grain event list empty after events were erased");
-    int frames = (gran.events_to_switch.back()[GranulatorVoice::PAR_TPOS] +
-                  gran.events_to_switch.back()[GranulatorVoice::PAR_DUR]) *
-                 gran.m_sr;
+    int frames =
+        (gran.events_to_switch.back().time_position + gran.events_to_switch.back().duration) *
+        gran.m_sr;
     int chans = 0;
     if (outputmode == "stereo")
         chans = 2;
@@ -380,7 +380,6 @@ void process_airwindows(int index)
 
 void init_py4(py::module_ &m, py::module_ &m_const)
 {
-
     using namespace pybind11::literals;
     m.def("airwindows_test", &process_airwindows);
     m.def("generate_tone", &generate_tone, "tone_type"_a, "pitch"_a, "volume"_a, "samplerate"_a,
@@ -389,6 +388,9 @@ void init_py4(py::module_ &m, py::module_ &m_const)
           "feedback"_a, "samplerate"_a, "duration"_a);
     m.def("generate_corrnoise", &generate_corrnoise);
     m.def("tone_types", &osc_types);
+    py::class_<GrainEvent>(m, "GrainEvent")
+        .def(py::init<double, float, float>())
+        .def_readwrite("volume", &GrainEvent::volume);
     py::class_<ToneGranulator>(m, "ToneGranulator")
         .def(py::init<double, int, std::string, std::string>())
         .def("render", render_granulator);
