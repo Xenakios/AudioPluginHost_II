@@ -14,8 +14,8 @@
 
 struct GrainEvent
 {
-    GrainEvent(double tpos, float dur, float hz)
-        : time_position(tpos), duration(dur), frequency_hz(hz)
+    GrainEvent(double tpos, float dur, float hz, float vol)
+        : time_position(tpos), duration(dur), frequency_hz(hz), volume(vol)
     {
     }
     double time_position = 0.0;
@@ -437,13 +437,13 @@ class GranulatorVoice
 
         phase = 0;
         endphase = sr * std::clamp(evpars.duration, 0.001f, 1.0f);
-
+        float *filparams[2] = {evpars.filter1params, evpars.filter2params};
         for (size_t i = 0; i < filters.size(); ++i)
         {
             filters[i].reset();
-            // cutoffs[i] = std::clamp(evpars[PAR_FILT1CUTOFF + 3 * i] - 69.0f, -45.0f, 60.0f);
-            // resons[i] = std::clamp(evpars[PAR_FILT1RESON + 3 * i], 0.0f, 1.0f);
-            // filtextpars[i] = std::clamp(evpars[PAR_FILT1EXT0 + 3 * i], -1.0f, 1.0f);
+            cutoffs[i] = std::clamp(filparams[i][0] - 69.0f, -45.0f, 60.0f);
+            resons[i] = std::clamp(filparams[i][1], 0.0f, 1.0f);
+            filtextpars[i] = std::clamp(filparams[i][2], -1.0f, 1.0f);
         }
 
         graingain = std::clamp(evpars.volume, 0.0f, 1.0f);

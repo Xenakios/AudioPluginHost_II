@@ -388,9 +388,14 @@ void init_py4(py::module_ &m, py::module_ &m_const)
           "feedback"_a, "samplerate"_a, "duration"_a);
     m.def("generate_corrnoise", &generate_corrnoise);
     m.def("tone_types", &osc_types);
+
     py::class_<GrainEvent>(m, "GrainEvent")
-        .def(py::init<double, float, float>())
+        .def(py::init<double, float, float, float>(), "time_position"_a, "duration"_a,
+             "frequency_hz"_a, "volume"_a)
+        .def_readwrite("sync_ratio", &GrainEvent::sync_ratio)
+        .def_readwrite("azimuth", &GrainEvent::azimuth)
         .def_readwrite("volume", &GrainEvent::volume);
+
     py::class_<ToneGranulator>(m, "ToneGranulator")
         .def(py::init<double, int, std::string, std::string>())
         .def("render", render_granulator);
