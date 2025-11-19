@@ -2,6 +2,7 @@
 #include <pybind11/buffer_info.h>
 #include <pybind11/stl.h>
 #include <pybind11/numpy.h>
+#include <pybind11/functional.h>
 #include "../Common/xap_breakpoint_envelope.h"
 #include "sst/basic-blocks/dsp/CorrelatedNoise.h"
 #include "sst/basic-blocks/dsp/EllipticBlepOscillators.h"
@@ -26,9 +27,41 @@ inline xenakios::Envelope envelope_from_pyob(py::object ob)
         result.clearOutputBlock();
         return result;
     }
+    if (py::isinstance<py::list>(ob))
+    {
+        auto l = ob.cast<py::list>();
+        std::print("got list with {} elements\n", l.size());
+        xenakios::Envelope result;
+        for (auto &p : l)
+        {
+            if (py::isinstance<py::tuple>(p))
+            {
+                auto tup = p.cast<py::tuple>();
+                std::print("{} {}\n", tup[0].cast<double>(), tup[1].cast<double>());
+                result.addPoint({tup[0].cast<double>(), tup[1].cast<double>()});
+            }
+        }
+        return result;
+    }
+    if (py::isinstance<py::function>(ob))
+    {
+        auto f = ob.cast<py::function>();
+        std::print("got a callable\n");
+        xenakios::Envelope result;
+        for (double x = 0.0; x < 5.0; x += 0.05)
+        {
+            double y = f(x).cast<double>();
+            // std::print("{} {}\n", x, y);
+            result.addPoint({x, y});
+        }
+        result.sortPoints();
+        result.clearOutputBlock();
+        return result;
+    }
     try
     {
-        // Attempt to cast to the C++ type. If it fails, an exception is thrown.
+        // this isn't super efficient, we make a copy of the envelope that already exists
+        // but i guess this will have to do for now...
         auto &foo = ob.cast<xenakios::Envelope &>();
         // std::print("got envelope with {} points\n", foo.getNumPoints());
         foo.sortPoints();
