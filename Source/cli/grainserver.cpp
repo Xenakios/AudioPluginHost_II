@@ -120,15 +120,13 @@ inline events_t load_events_file(std::string path)
                 evt.duration = std::stof(tokens[1]);
                 evt.frequency_hz = std::stof(tokens[2]);
                 evt.volume = std::stof(tokens[3]);
-                /*
-                evt[GranulatorVoice::PAR_HOR_ANGLE] = std::stof(tokens[4]);
-                evt[GranulatorVoice::PAR_VER_ANGLE] = std::stof(tokens[5]);
-                evt[GranulatorVoice::PAR_ENVTYPE] = std::stof(tokens[6]);
-                evt[GranulatorVoice::PAR_ENVSHAPE] = std::stof(tokens[7]);
-                evt[GranulatorVoice::PAR_SYNCRATIO] = std::stof(tokens[8]);
-                evt[GranulatorVoice::PAR_FILT1CUTOFF] = std::stof(tokens[9]);
-                evt[GranulatorVoice::PAR_FILT1RESON] = std::stof(tokens[10]);
-                */
+                evt.azimuth = std::stof(tokens[4]);
+                evt.elevation = std::stof(tokens[5]);
+                evt.envelope_type = std::stof(tokens[6]);
+                evt.envelope_shape = std::stof(tokens[7]);
+                evt.sync_ratio = std::stof(tokens[8]);
+                evt.filter1params[0] = std::stof(tokens[9]);
+                evt.filter1params[1] = std::stof(tokens[10]);
                 result.push_back(evt);
             }
         }
