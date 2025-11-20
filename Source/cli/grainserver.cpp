@@ -44,7 +44,7 @@ inline int audiocb(void *outputBuffer, void *inputBuffer, unsigned int nFrames, 
     }
     return 0;
 }
-
+/*
 inline events_t generate_events(double pulselen, double transpose)
 {
     events_t result;
@@ -80,7 +80,7 @@ inline events_t generate_events(double pulselen, double transpose)
     }
     return result;
 }
-
+*/
 std::atomic<bool> g_quit{false};
 
 BOOL WINAPI CtrlHandler(DWORD fdwCtrlType)
@@ -109,31 +109,18 @@ inline events_t load_events_file(std::string path)
     {
         auto txt = choc::file::loadFileAsString(path);
         auto lines = choc::text::splitIntoLines(txt, false);
-        std::vector<float> evt;
-        evt.resize(GranulatorVoice::NUM_PARS);
-        evt[GranulatorVoice::PAR_SYNCRATIO] = 1.0;
-        evt[GranulatorVoice::PAR_TONETYPE] = 4.0;
-        evt[GranulatorVoice::PAR_VOLUME] = 1.0;
-        evt[GranulatorVoice::PAR_ENVTYPE] = 0.0;
-        evt[GranulatorVoice::PAR_PULSEWIDTH] = 0.5;
-        evt[GranulatorVoice::PAR_ENVSHAPE] = 0.5;
-        evt[GranulatorVoice::PAR_VER_ANGLE] = 0.0;
-        evt[GranulatorVoice::PAR_HOR_ANGLE] = 0.0;
-        evt[GranulatorVoice::PAR_FILTERFEEDBACKAMOUNT] = 0.0;
-        evt[GranulatorVoice::PAR_FILT1CUTOFF] = 120.0;
-        evt[GranulatorVoice::PAR_FILT1RESON] = 0.0;
-        evt[GranulatorVoice::PAR_FILT2CUTOFF] = 120.0;
-        evt[GranulatorVoice::PAR_FILT2RESON] = 0.0;
-        evt[GranulatorVoice::PAR_FILT2RESON] = 0.0;
+
         for (const auto &line : lines)
         {
             auto tokens = choc::text::splitAtWhitespace(line);
             if (tokens.size() >= 11)
             {
-                evt[GranulatorVoice::PAR_TPOS] = std::stof(tokens[0]);
-                evt[GranulatorVoice::PAR_DUR] = std::stof(tokens[1]);
-                evt[GranulatorVoice::PAR_FREQHZ] = std::stof(tokens[2]);
-                evt[GranulatorVoice::PAR_VOLUME] = std::stof(tokens[3]);
+                GrainEvent evt;
+                evt.time_position = std::stof(tokens[0]);
+                evt.duration = std::stof(tokens[1]);
+                evt.frequency_hz = std::stof(tokens[2]);
+                evt.volume = std::stof(tokens[3]);
+                /*
                 evt[GranulatorVoice::PAR_HOR_ANGLE] = std::stof(tokens[4]);
                 evt[GranulatorVoice::PAR_VER_ANGLE] = std::stof(tokens[5]);
                 evt[GranulatorVoice::PAR_ENVTYPE] = std::stof(tokens[6]);
@@ -141,6 +128,7 @@ inline events_t load_events_file(std::string path)
                 evt[GranulatorVoice::PAR_SYNCRATIO] = std::stof(tokens[8]);
                 evt[GranulatorVoice::PAR_FILT1CUTOFF] = std::stof(tokens[9]);
                 evt[GranulatorVoice::PAR_FILT1RESON] = std::stof(tokens[10]);
+                */
                 result.push_back(evt);
             }
         }

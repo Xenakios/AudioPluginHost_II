@@ -14,6 +14,7 @@
 
 struct GrainEvent
 {
+    GrainEvent() = default;
     GrainEvent(double tpos, float dur, float hz, float vol)
         : time_position(tpos), duration(dur), frequency_hz(hz), volume(vol)
     {
