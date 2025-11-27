@@ -392,8 +392,25 @@ void init_py4(py::module_ &m, py::module_ &m_const)
     py::class_<GrainEvent>(m, "GrainEvent")
         .def(py::init<double, float, float, float>(), "time_position"_a, "duration"_a,
              "frequency_hz"_a, "volume"_a)
+        .def(
+            "set_filter_param",
+            [](GrainEvent &ev, int which, double frequency, double resonance) {
+                float *fpars = nullptr;
+                if (which == 0)
+                    fpars = ev.filter1params;
+                if (which == 1)
+                    fpars = ev.filter2params;
+                if (!fpars)
+                    throw std::runtime_error("Filter index out of range");
+                fpars[0] = frequency;
+                fpars[1] = resonance;
+            },
+            "whichfilter"_a, "frequency"_a, "resonance"_a)
         .def_readwrite("sync_ratio", &GrainEvent::sync_ratio)
         .def_readwrite("azimuth", &GrainEvent::azimuth)
+        .def_readwrite("elevation", &GrainEvent::elevation)
+        .def_readwrite("envshape", &GrainEvent::envelope_shape)
+        .def_readwrite("wavetype", &GrainEvent::generator_type)
         .def_readwrite("volume", &GrainEvent::volume);
 
     py::class_<ToneGranulator>(m, "ToneGranulator")

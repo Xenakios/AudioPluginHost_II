@@ -35,8 +35,8 @@ struct GrainEvent
     float fm_amount = 0.0f;
     float fm_feedback = 0.0f;
     float noisecorr = 0.0f;
-    float filter1params[3] = {0.0f, 0.0, 0.0f};
-    float filter2params[3] = {0.0f, 0.0, 0.0f};
+    float filter1params[3] = {100.0f, 0.0, 0.0f};
+    float filter2params[3] = {100.0f, 0.0, 0.0f};
     float filterfeedback = 0.0f;
 };
 
