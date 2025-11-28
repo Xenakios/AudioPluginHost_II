@@ -136,7 +136,7 @@ inline py::array_t<float> generate_tone(std::string tone_name, py::object pitch_
         size_t framestoprocess = std::min<int>(blocksize, frames - framecount);
         double tpos = framecount / sr;
         double pitch = pitch_env.getValueAtPosition(tpos);
-        pitch = std::clamp(pitch, 0.0, 136.0);
+        pitch = std::clamp(pitch, -24.0, 136.0);
         double hz = 440.0 * std::pow(2.0, 1.0 / 12 * (pitch - 69.0));
         vol_env.processBlock(tpos, sr, 0, blocksize);
 
@@ -440,9 +440,10 @@ inline py::array_t<float> encode_to_ambisonics(const py::array_t<float> &input_a
         int framestoprocess = std::min(blocksize, frames - outcounter);
         for (int j = 0; j < numOutChans; ++j)
         {
+            double gainstep = (SH1[j] - SH0[j]) / blocksize;
             for (int i = 0; i < framestoprocess; ++i)
             {
-                float gain = SH0[j] + (SH1[j] - SH0[j]) / blocksize * i;
+                float gain = SH0[j] + gainstep * i;
                 writebufs[j][outcounter + i] = readbuf[outcounter + i] * gain;
             }
         }
