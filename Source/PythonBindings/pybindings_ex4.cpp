@@ -15,6 +15,7 @@
 #include "airwin_consolidated_base.h"
 #include "plugins/BezEQ.h"
 #include "plugins/HipCrush.h"
+#include "../Common/xen_ambisonics.h"
 
 namespace py = pybind11;
 
@@ -378,9 +379,87 @@ void process_airwindows(int index)
     }
 }
 
+inline py::array_t<float> encode_to_ambisonics(const py::array_t<float> &input_audio,
+                                               double sample_rate, int amb_order,
+                                               xenakios::Envelope &azimuth,
+                                               xenakios::Envelope &elevation)
+{
+    if (input_audio.ndim() != 2)
+        throw std::runtime_error(
+            std::format("array ndim {} incompatible, must be 2", input_audio.ndim()));
+    uint32_t numInChans = input_audio.shape(0);
+    if (numInChans != 1)
+        throw std::runtime_error("input audio must be mono");
+    int frames = input_audio.size();
+    auto numOutChans = 0;
+    if (amb_order == 1)
+        numOutChans = 4;
+    if (amb_order == 2)
+        numOutChans = 9;
+    if (amb_order == 3)
+        numOutChans = 16;
+    if (numOutChans == 0)
+        throw std::runtime_error("invalid ambisonics order");
+    py::buffer_info binfo(
+        nullptr,                                /* Pointer to buffer */
+        sizeof(float),                          /* Size of one scalar */
+        py::format_descriptor<float>::format(), /* Python struct-style format descriptor */
+        2,                                      /* Number of dimensions */
+        {numOutChans, frames},                  /* Buffer dimensions */
+        {sizeof(float) * frames,                /* Strides (in bytes) for each index */
+         sizeof(float)});
+    py::array_t<float> output_audio{binfo};
+    float *writebufs[16];
+    for (int i = 0; i < numOutChans; ++i)
+        writebufs[i] = output_audio.mutable_data(i);
+    const float *readbuf = input_audio.data(0);
+    float SH0[64];
+    float SH1[64];
+    memset(SH0, 0, sizeof(float) * 64);
+    memset(SH1, 0, sizeof(float) * 64);
+
+    int outcounter = 0;
+    const int blocksize = 32;
+    while (outcounter < frames)
+    {
+        double tpos = outcounter / sample_rate;
+        auto aziRads = degreesToRadians(azimuth.getValueAtPosition(tpos));
+        auto eleRads = degreesToRadians(elevation.getValueAtPosition(tpos));
+        double x = 0.0;
+        double y = 0.0;
+        double z = 0.0;
+        sphericalToCartesian(aziRads, eleRads, x, y, z);
+        if (amb_order == 1)
+            SHEval1(x, y, z, SH1);
+        else if (amb_order == 2)
+            SHEval2(x, y, z, SH1);
+        else if (amb_order == 3)
+            SHEval3(x, y, z, SH1);
+        for (int i = 0; i < numOutChans; ++i)
+            SH1[i] *= n3d2sn3d[i];
+        int framestoprocess = std::min(blocksize, frames - outcounter);
+        for (int j = 0; j < numOutChans; ++j)
+        {
+            for (int i = 0; i < framestoprocess; ++i)
+            {
+                float gain = SH0[j] + (SH1[j] - SH0[j]) / blocksize * i;
+                writebufs[j][outcounter + i] = readbuf[outcounter + i] * gain;
+            }
+        }
+        for (int j = 0; j < numOutChans; ++j)
+        {
+            SH0[j] = SH1[j];
+        }
+        outcounter += blocksize;
+    }
+    return output_audio;
+}
+
 void init_py4(py::module_ &m, py::module_ &m_const)
 {
     using namespace pybind11::literals;
+    m.def("encode_to_ambisonics", &encode_to_ambisonics, "input_audio"_a, "sample_rate"_a,
+          "ambisonics_order"_a, "azimuth"_a, "elevation"_a);
     m.def("airwindows_test", &process_airwindows);
     m.def("generate_tone", &generate_tone, "tone_type"_a, "pitch"_a, "volume"_a, "samplerate"_a,
           "duration"_a);
