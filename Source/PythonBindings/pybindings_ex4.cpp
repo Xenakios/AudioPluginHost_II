@@ -509,6 +509,10 @@ void init_py4(py::module_ &m, py::module_ &m_const)
         .def_readwrite("envshape", &GrainEvent::envelope_shape)
         .def_readwrite("wavetype", &GrainEvent::generator_type)
         .def_readwrite("duration", &GrainEvent::duration)
+        .def_readwrite("pulse_width", &GrainEvent::pulse_width)
+        .def_readwrite("fm_frequency", &GrainEvent::fm_frequency_hz)
+        .def_readwrite("fm_depth", &GrainEvent::fm_amount)
+        .def_readwrite("fm_feedback", &GrainEvent::fm_feedback)
         .def_readwrite("volume", &GrainEvent::volume);
 
     py::class_<ToneGranulator>(m, "ToneGranulator")

@@ -302,7 +302,7 @@ class GranulatorVoice
     int endphase = 0;
     double sr = 0.0;
     bool active = false;
-
+    float filters_tail = 0.0f;
     int prior_osc_type = -1;
     alignas(16) std::array<float, 16> ambcoeffs;
     enum FilterRouting
@@ -323,15 +323,27 @@ class GranulatorVoice
     int grainid = 0;
     int ambisonic_order = 1;
     int num_outputchans = 0;
-    GranulatorVoice() { std::fill(ambcoeffs.begin(), ambcoeffs.end(), 0.0f); }
+    std::vector<float> delaylinememory;
+    GranulatorVoice()
+    {
+        delaylinememory.resize(16384);
+        std::fill(ambcoeffs.begin(), ambcoeffs.end(), 0.0f);
+    }
     void set_samplerate(double hz) { sr = hz; }
     void set_filter_type(size_t filtindex, const FilterInfo &finfo)
     {
+        auto reqdelaysize =
+            sst::filtersplusplus::Filter::requiredDelayLinesSizes(finfo.model, finfo.modelconfig);
+        // std::print("filter {} requires {} samples of delay line\n", finfo.address, reqdelaysize);
+        if (reqdelaysize > 0)
+            filters_tail = 0.5f;
+        if (reqdelaysize > delaylinememory.size())
+            delaylinememory.resize(reqdelaysize);
         filters[filtindex].setFilterModel(finfo.model);
         filters[filtindex].setModelConfiguration(finfo.modelconfig);
-
         filters[filtindex].setSampleRateAndBlockSize(sr, granul_block_size);
         filters[filtindex].setMono();
+        filters[filtindex].provideDelayLine(0, delaylinememory.data());
         if (!filters[filtindex].prepareInstance())
         {
             std::print("could not prepare filter {}\n", filtindex);
@@ -445,12 +457,13 @@ class GranulatorVoice
         else if (ambisonic_order == 3)
             SHEval3(x, y, z, ambcoeffs.data());
         phase = 0;
-        endphase = sr * std::clamp(evpars.duration, 0.001f, 1.0f);
+        float actdur = std::clamp(evpars.duration, 0.001f, 1.0f);
+        endphase = sr * actdur;
         float *filparams[2] = {evpars.filter1params, evpars.filter2params};
         for (size_t i = 0; i < filters.size(); ++i)
         {
             filters[i].reset();
-            cutoffs[i] = std::clamp(filparams[i][0] - 69.0f, -45.0f, 60.0f);
+            cutoffs[i] = std::clamp(filparams[i][0] - 69.0f, -69.0f, 60.0f);
             resons[i] = std::clamp(filparams[i][1], 0.0f, 1.0f);
             filtextpars[i] = std::clamp(filparams[i][2], -1.0f, 1.0f);
         }
@@ -473,7 +486,7 @@ class GranulatorVoice
             filters[i].makeCoefficients(0, cutoffs[i], resons[i], filtextpars[i]);
             filters[i].prepareBlock();
         }
-
+        int endphasewithtail = endphase + filters_tail * sr;
         int envpeakpos = envshape * endphase;
         envpeakpos = std::clamp(envpeakpos, 16, endphase - 16);
         for (int i = 0; i < nframes; ++i)
@@ -502,8 +515,7 @@ class GranulatorVoice
                 envgain =
                     0.5f + 0.5f * std::sin(M_PI * 2 / endphase * phase * envfreq + (1.5f * M_PI));
             }
-            // ensure silence if we end up looping past the grain end
-            envgain = envgain * (float)active;
+            envgain = std::clamp(envgain, 0.0f, 1.0f);
             outsample *= envgain * graingain;
             if (filter_routing == FR_SERIAL)
             {
@@ -528,7 +540,7 @@ class GranulatorVoice
             }
 
             ++phase;
-            if (phase >= endphase)
+            if (phase >= endphasewithtail)
             {
                 active = false;
                 // std::print("ended voice {}\n", (void *)this);
