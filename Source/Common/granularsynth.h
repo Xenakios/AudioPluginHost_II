@@ -10,7 +10,7 @@
 #include <random>
 #include <variant>
 #include "../Common/xap_breakpoint_envelope.h"
-#include <mutex>
+#include "../Common/xen_ambisonics.h"
 
 struct GrainEvent
 {
@@ -304,7 +304,7 @@ class GranulatorVoice
     bool active = false;
 
     int prior_osc_type = -1;
-    alignas(16) std::array<float, 4> ambcoeffs = {0.0f, 0.0f, 0.0f, 0.0f};
+    alignas(16) std::array<float, 16> ambcoeffs;
     enum FilterRouting
     {
         FR_SERIAL,
@@ -321,7 +321,9 @@ class GranulatorVoice
     int envtype = 0;
     double envshape = 0.5;
     int grainid = 0;
-    GranulatorVoice() {}
+    int ambisonic_order = 1;
+    int num_outputchans = 0;
+    GranulatorVoice() { std::fill(ambcoeffs.begin(), ambcoeffs.end(), 0.0f); }
     void set_samplerate(double hz) { sr = hz; }
     void set_filter_type(size_t filtindex, const FilterInfo &finfo)
     {
@@ -427,14 +429,30 @@ class GranulatorVoice
                 }
             },
             theoscillator);
-        float horz_angle = std::clamp(evpars.azimuth, -180.0f, 180.0f);
-        float vert_angle = std::clamp(evpars.elevation, -180.0f, 180.0f);
-        horz_angle = degreesToRadians(horz_angle);
-        vert_angle = degreesToRadians(vert_angle);
-        ambcoeffs[0] = 1.0 / std::sqrt(2.0);
-        ambcoeffs[1] = std::cos(horz_angle) * std::cos(vert_angle);
-        ambcoeffs[2] = -std::sin(horz_angle) * std::cos(vert_angle);
-        ambcoeffs[3] = std::sin(vert_angle);
+        float azi = std::clamp(evpars.azimuth, -180.0f, 180.0f);
+        float ele = std::clamp(evpars.elevation, -180.0f, 180.0f);
+        azi = degreesToRadians(azi);
+        ele = degreesToRadians(ele);
+
+        float x = 0.0;
+        float y = 0.0;
+        float z = 0.0;
+        sphericalToCartesian(azi, ele, x, y, z);
+        if (ambisonic_order == 1)
+            SHEval1(x, y, z, ambcoeffs.data());
+        else if (ambisonic_order == 2)
+            SHEval2(x, y, z, ambcoeffs.data());
+        else if (ambisonic_order == 3)
+            SHEval3(x, y, z, ambcoeffs.data());
+        num_outputchans = 0;
+        if (ambisonic_order == 1)
+            num_outputchans = 4;
+        if (ambisonic_order == 2)
+            num_outputchans = 9;
+        if (ambisonic_order == 3)
+            num_outputchans = 16;
+        for (int i = 0; i < num_outputchans; ++i)
+            ambcoeffs[i] *= n3d2sn3d[i];
 
         phase = 0;
         endphase = sr * std::clamp(evpars.duration, 0.001f, 1.0f);
@@ -514,11 +532,11 @@ class GranulatorVoice
 
             float send1 = auxsend1 * outsample;
             outsample = (1.0f - auxsend1) * outsample;
-            outputs[i * 5 + 0] = outsample * ambcoeffs[0];
-            outputs[i * 5 + 1] = outsample * ambcoeffs[1];
-            outputs[i * 5 + 2] = outsample * ambcoeffs[2];
-            outputs[i * 5 + 3] = outsample * ambcoeffs[3];
-            outputs[i * 5 + 4] = send1;
+            for (int chan = 0; chan < num_outputchans; ++chan)
+            {
+                outputs[i * 16 + chan] = outsample * ambcoeffs[chan];
+            }
+
             ++phase;
             if (phase >= endphase)
             {
@@ -619,7 +637,8 @@ class ToneGranulator
     }
     float m_stereoangle = 0.0f;
     float m_stereopattern = 0.5f;
-    void prepare(events_t evlist, float stereoangle, float stereopattern)
+    int num_out_chans = 0;
+    void prepare(events_t evlist, int ambisonics_order)
     {
         if (thread_op == 1)
         {
@@ -632,11 +651,19 @@ class ToneGranulator
         std::erase_if(events_to_switch, [](GrainEvent &e) {
             return e.time_position < 0.0 || (e.time_position + e.duration) > 60.0;
         });
-        m_stereoangle = stereoangle;
-        m_stereopattern = stereopattern;
+        for (auto &v : voices)
+        {
+            v->ambisonic_order = ambisonics_order;
+        }
+        if (ambisonics_order == 1)
+            num_out_chans = 4;
+        if (ambisonics_order == 2)
+            num_out_chans = 9;
+        if (ambisonics_order == 3)
+            num_out_chans = 16;
         thread_op = 1;
     }
-    void process_block(float *outputbuffer, int nframes, int chans)
+    void process_block(float *outputbuffer, int nframes)
     {
         if (thread_op == 1)
         {
@@ -683,8 +710,8 @@ class ToneGranulator
                 else
                     ev = &events[evindex];
             }
-            alignas(16) double mixsum[5][granul_block_size];
-            for (int i = 0; i < 5; ++i)
+            alignas(16) double mixsum[16][granul_block_size];
+            for (int i = 0; i < 16; ++i)
             {
                 for (int j = 0; j < granul_block_size; ++j)
                 {
@@ -693,22 +720,21 @@ class ToneGranulator
             }
 
             int numactive = 0;
-
+            
             for (int j = 0; j < voices.size(); ++j)
             {
                 if (voices[j]->active)
                 {
                     ++numactive;
-                    alignas(16) float voiceout[5 * granul_block_size];
-                    float aux0 = 0.0f;
+                    alignas(16) float voiceout[16 * granul_block_size];
                     voices[j]->process(voiceout, granul_block_size);
+
                     for (int k = 0; k < granul_block_size; ++k)
                     {
-                        mixsum[0][k] += voiceout[5 * k + 0];
-                        mixsum[1][k] += voiceout[5 * k + 1];
-                        mixsum[2][k] += voiceout[5 * k + 2];
-                        mixsum[3][k] += voiceout[5 * k + 3];
-                        mixsum[4][k] += voiceout[5 * k + 4];
+                        for (int chan = 0; chan < num_out_chans; ++chan)
+                        {
+                            mixsum[chan][k] += voiceout[16 * k + chan];
+                        }
                     }
                 }
             }
@@ -716,6 +742,16 @@ class ToneGranulator
             if (numactive > 0)
                 compengain = 1.0 / std::sqrt(numactive);
             gainlag.setTarget(compengain);
+            for (int k = 0; k < granul_block_size; ++k)
+            {
+                gainlag.process();
+                float gain = gainlag.getValue() * maingain;
+                for (int chan = 0; chan < num_out_chans; ++chan)
+                {
+                    outputbuffer[(bufframecount + k) * num_out_chans + chan] = mixsum[chan][k] * gain;
+                }
+            }
+            /*
             if (chans == 4)
             {
                 for (int k = 0; k < granul_block_size; ++k)
@@ -750,6 +786,7 @@ class ToneGranulator
                     //     writebufs[2][framecount + k] = mixsum[4][k] * gain;
                 }
             }
+            */
             bufframecount += granul_block_size;
             playposframes += granul_block_size;
         }

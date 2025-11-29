@@ -276,19 +276,36 @@ inline py::array_t<float> render_granulator(ToneGranulator &gran, events_t evlis
                                             std::string outputmode, double stereoangle,
                                             double stereopattern)
 {
-    gran.prepare(std::move(evlist), stereoangle, stereopattern);
+    int chans = 0;
+    int ambiorder = 0;
+    if (outputmode == "ambisonics_1st_order")
+    {
+        chans = 4;
+        ambiorder = 1;
+    }
+    if (outputmode == "ambisonics_2nd_order")
+    {
+        chans = 9;
+        ambiorder = 2;
+    }
+    if (outputmode == "ambisonics_3rd_order")
+    {
+        chans = 16;
+        ambiorder = 3;
+    }
+
+    if (chans == 0)
+        throw std::runtime_error("invalid audio output mode");
+    gran.prepare(std::move(evlist), ambiorder);
     if (gran.events_to_switch.empty())
         throw std::runtime_error("grain event list empty after events were erased");
     int frames =
         (gran.events_to_switch.back().time_position + gran.events_to_switch.back().duration) *
         gran.m_sr;
-    int chans = 0;
-    if (outputmode == "stereo")
-        chans = 2;
-    if (outputmode == "ambisonics")
-        chans = 4;
-    if (chans == 0)
-        throw std::runtime_error("audio output mode must be stereo or ambisonics");
+
+    // if (outputmode == "stereo")
+    //     chans = 2;
+
     py::buffer_info binfo(
         nullptr,                                /* Pointer to buffer */
         sizeof(float),                          /* Size of one scalar */
@@ -298,19 +315,19 @@ inline py::array_t<float> render_granulator(ToneGranulator &gran, events_t evlis
         {sizeof(float) * frames,                /* Strides (in bytes) for each index */
          sizeof(float)});
     py::array_t<float> output_audio{binfo};
-    float *writebufs[4];
+    alignas(32) float *writebufs[16];
     for (int i = 0; i < chans; ++i)
         writebufs[i] = output_audio.mutable_data(i);
     using clock = std::chrono::system_clock;
     using ms = std::chrono::duration<double, std::milli>;
     const auto start_time = clock::now();
     int framecount = 0;
-    float procbuf[4 * granul_block_size];
-    for (int i = 0; i < 4 * granul_block_size; ++i)
+    float procbuf[16 * granul_block_size];
+    for (int i = 0; i < 16 * granul_block_size; ++i)
         procbuf[i] = 0.0f;
     while (framecount < frames - granul_block_size)
     {
-        gran.process_block(procbuf, granul_block_size, chans);
+        gran.process_block(procbuf, granul_block_size);
         for (int i = 0; i < granul_block_size; ++i)
         {
             int pos = framecount + i;
@@ -409,12 +426,12 @@ inline py::array_t<float> encode_to_ambisonics(const py::array_t<float> &input_a
         {sizeof(float) * frames,                /* Strides (in bytes) for each index */
          sizeof(float)});
     py::array_t<float> output_audio{binfo};
-    float *writebufs[16];
+    alignas(32) float *writebufs[16];
     for (int i = 0; i < numOutChans; ++i)
         writebufs[i] = output_audio.mutable_data(i);
     const float *readbuf = input_audio.data(0);
-    float SH0[64];
-    float SH1[64];
+    alignas(32) float SH0[64];
+    alignas(32) float SH1[64];
     memset(SH0, 0, sizeof(float) * 64);
     memset(SH1, 0, sizeof(float) * 64);
 
@@ -423,11 +440,11 @@ inline py::array_t<float> encode_to_ambisonics(const py::array_t<float> &input_a
     while (outcounter < frames)
     {
         double tpos = outcounter / sample_rate;
-        auto aziRads = degreesToRadians(azimuth.getValueAtPosition(tpos));
-        auto eleRads = degreesToRadians(elevation.getValueAtPosition(tpos));
-        double x = 0.0;
-        double y = 0.0;
-        double z = 0.0;
+        float aziRads = degreesToRadians(azimuth.getValueAtPosition(tpos));
+        float eleRads = degreesToRadians(elevation.getValueAtPosition(tpos));
+        float x = 0.0;
+        float y = 0.0;
+        float z = 0.0;
         sphericalToCartesian(aziRads, eleRads, x, y, z);
         if (amb_order == 1)
             SHEval1(x, y, z, SH1);
@@ -491,6 +508,7 @@ void init_py4(py::module_ &m, py::module_ &m_const)
         .def_readwrite("elevation", &GrainEvent::elevation)
         .def_readwrite("envshape", &GrainEvent::envelope_shape)
         .def_readwrite("wavetype", &GrainEvent::generator_type)
+        .def_readwrite("duration", &GrainEvent::duration)
         .def_readwrite("volume", &GrainEvent::volume);
 
     py::class_<ToneGranulator>(m, "ToneGranulator")
