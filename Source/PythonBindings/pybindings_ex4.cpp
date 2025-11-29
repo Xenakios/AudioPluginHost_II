@@ -300,7 +300,7 @@ inline py::array_t<float> render_granulator(ToneGranulator &gran, events_t evlis
     if (gran.events_to_switch.empty())
         throw std::runtime_error("grain event list empty after events were erased");
     int frames =
-        (gran.events_to_switch.back().time_position + gran.events_to_switch.back().duration) *
+        (gran.events_to_switch.back().time_position + gran.events_to_switch.back().duration + 0.5) *
         gran.m_sr;
 
     // if (outputmode == "stereo")
