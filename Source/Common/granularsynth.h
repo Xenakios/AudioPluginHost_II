@@ -444,16 +444,6 @@ class GranulatorVoice
             SHEval2(x, y, z, ambcoeffs.data());
         else if (ambisonic_order == 3)
             SHEval3(x, y, z, ambcoeffs.data());
-        num_outputchans = 0;
-        if (ambisonic_order == 1)
-            num_outputchans = 4;
-        if (ambisonic_order == 2)
-            num_outputchans = 9;
-        if (ambisonic_order == 3)
-            num_outputchans = 16;
-        for (int i = 0; i < num_outputchans; ++i)
-            ambcoeffs[i] *= n3d2sn3d[i];
-
         phase = 0;
         endphase = sr * std::clamp(evpars.duration, 0.001f, 1.0f);
         float *filparams[2] = {evpars.filter1params, evpars.filter2params};
@@ -651,16 +641,13 @@ class ToneGranulator
         std::erase_if(events_to_switch, [](GrainEvent &e) {
             return e.time_position < 0.0 || (e.time_position + e.duration) > 60.0;
         });
+        std::map<int, int> aotonumchans{{1, 4}, {2, 9}, {3, 16}};
         for (auto &v : voices)
         {
             v->ambisonic_order = ambisonics_order;
+            v->num_outputchans = aotonumchans[ambisonics_order];
         }
-        if (ambisonics_order == 1)
-            num_out_chans = 4;
-        if (ambisonics_order == 2)
-            num_out_chans = 9;
-        if (ambisonics_order == 3)
-            num_out_chans = 16;
+        num_out_chans = aotonumchans[ambisonics_order];
         thread_op = 1;
     }
     void process_block(float *outputbuffer, int nframes)
@@ -720,7 +707,7 @@ class ToneGranulator
             }
 
             int numactive = 0;
-            
+
             for (int j = 0; j < voices.size(); ++j)
             {
                 if (voices[j]->active)
@@ -748,7 +735,8 @@ class ToneGranulator
                 float gain = gainlag.getValue() * maingain;
                 for (int chan = 0; chan < num_out_chans; ++chan)
                 {
-                    outputbuffer[(bufframecount + k) * num_out_chans + chan] = mixsum[chan][k] * gain;
+                    outputbuffer[(bufframecount + k) * num_out_chans + chan] =
+                        mixsum[chan][k] * gain;
                 }
             }
             /*
