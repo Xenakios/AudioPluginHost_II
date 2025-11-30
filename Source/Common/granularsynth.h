@@ -302,7 +302,7 @@ class GranulatorVoice
     int endphase = 0;
     double sr = 0.0;
     bool active = false;
-    float filters_tail = 0.0f;
+    bool filters_have_tail = false;
     int prior_osc_type = -1;
     alignas(16) std::array<float, 16> ambcoeffs;
     enum FilterRouting
@@ -320,6 +320,7 @@ class GranulatorVoice
     float auxsend1 = 0.0;
     int envtype = 0;
     double envshape = 0.5;
+    int silence_counter = 0;
     int grainid = 0;
     int ambisonic_order = 1;
     int num_outputchans = 0;
@@ -336,7 +337,7 @@ class GranulatorVoice
             sst::filtersplusplus::Filter::requiredDelayLinesSizes(finfo.model, finfo.modelconfig);
         // std::print("filter {} requires {} samples of delay line\n", finfo.address, reqdelaysize);
         if (reqdelaysize > 0)
-            filters_tail = 0.5f;
+            filters_have_tail = true;
         if (reqdelaysize > delaylinememory.size())
             delaylinememory.resize(reqdelaysize);
         filters[filtindex].setFilterModel(finfo.model);
@@ -349,47 +350,10 @@ class GranulatorVoice
             std::print("could not prepare filter {}\n", filtindex);
         }
     }
-    enum PARS
-    {
-        PAR_TPOS,
-        PAR_DUR,
-        PAR_FREQHZ,
-        PAR_SYNCRATIO,
-        PAR_TONETYPE,
-        PAR_PULSEWIDTH,
-        PAR_VOLUME,
-        PAR_ENVTYPE,
-        PAR_ENVSHAPE,
-        PAR_HOR_ANGLE,
-        PAR_VER_ANGLE,
-        PAR_FILTERFEEDBACKAMOUNT,
-        PAR_FILT1CUTOFF,
-        PAR_FILT1RESON,
-        PAR_FILT1EXT0,
-        PAR_FILT2CUTOFF,
-        PAR_FILT2RESON,
-        PAR_FILT2EXT0,
-        PAR_AUXSEND1,
-        PAR_FMFREQ,
-        PAR_FMAMOUNT,
-        PAR_FMFEEDBACK,
-        PAR_NOISECORR,
-        NUM_PARS
-    };
-    /* ambisonics panning code from ATK toolkit js code
-        // W
-  matrixNewDSP[0] =  kInvSqrt2;
-  // X
-  matrixNewDSP[1] =  mCosAzi * mCosEle;
-  // Y
-  matrixNewDSP[2] = -mSinAzi * mCosEle;
-  // Z
-  matrixNewDSP[3] =  mSinEle;
-  */
-
     void start(GrainEvent &evpars)
     {
         active = true;
+        silence_counter = 0;
         int newosctype = std::clamp<int>(evpars.generator_type, 0.0, 6.0);
         if (newosctype != prior_osc_type)
         {
@@ -486,9 +450,10 @@ class GranulatorVoice
             filters[i].makeCoefficients(0, cutoffs[i], resons[i], filtextpars[i]);
             filters[i].prepareBlock();
         }
-        int endphasewithtail = endphase + filters_tail * sr;
+        // int endphasewithtail = endphase + filters_tail * sr;
         int envpeakpos = envshape * endphase;
         envpeakpos = std::clamp(envpeakpos, 16, endphase - 16);
+        int silence_tail_len = sr * 0.5f;
         for (int i = 0; i < nframes; ++i)
         {
             float outsample = 0.0f;
@@ -540,9 +505,30 @@ class GranulatorVoice
             }
 
             ++phase;
-            if (phase >= endphasewithtail)
+            if (phase >= endphase)
             {
-                active = false;
+                if (filters_have_tail)
+                {
+                    if (std::abs(outsample) < 0.001)
+                    {
+                        ++silence_counter;
+                        if (silence_counter >= silence_tail_len)
+                        {
+                            active = false;
+                            // std::print("grain {} with tail ended at {}\n", grainid, phase / sr);
+                        }
+                    }
+                    else
+                    {
+                        silence_counter = 0;
+                    }
+                }
+                else
+                {
+                    // if no tail, we end the grain immediately
+                    active = false;
+                }
+
                 // std::print("ended voice {}\n", (void *)this);
             }
         }
@@ -640,12 +626,14 @@ class ToneGranulator
     float m_stereoangle = 0.0f;
     float m_stereopattern = 0.5f;
     int num_out_chans = 0;
+    int missedgrains = 0;
     void prepare(events_t evlist, int ambisonics_order)
     {
         if (thread_op == 1)
         {
             std::print("prepare called while audio thread should do state switch!\n");
         }
+        missedgrains = 0;
         events_to_switch = std::move(evlist);
         std::sort(
             events_to_switch.begin(), events_to_switch.end(),
@@ -701,7 +689,7 @@ class ToneGranulator
                 }
                 if (!wasfound)
                 {
-                    // ++missedgrains;
+                    ++missedgrains;
                 }
                 ++evindex;
                 if (evindex >= events.size())

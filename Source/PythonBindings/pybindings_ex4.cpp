@@ -340,6 +340,7 @@ inline py::array_t<float> render_granulator(ToneGranulator &gran, events_t evlis
     }
     const ms render_duration = clock::now() - start_time;
     double rtfactor = (frames / gran.m_sr * 1000.0) / render_duration.count();
+    std::print("missed playing {} grains\n", gran.missedgrains);
     std::print("render took {} milliseconds, {:.2f}x realtime\n", render_duration.count(),
                rtfactor);
     return output_audio;
