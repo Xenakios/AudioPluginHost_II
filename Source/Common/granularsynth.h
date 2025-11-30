@@ -299,10 +299,11 @@ class GranulatorVoice
 
     alignas(16) std::array<sst::filtersplusplus::Filter, 2> filters;
     int phase = 0;
-    int endphase = 0;
+    int grain_end_phase = 0;
     double sr = 0.0;
     bool active = false;
     bool filters_have_tail = false;
+    int absolute_max_phase = 0;
     int prior_osc_type = -1;
     alignas(16) std::array<float, 16> ambcoeffs;
     enum FilterRouting
@@ -420,9 +421,12 @@ class GranulatorVoice
             SHEval2(x, y, z, ambcoeffs.data());
         else if (ambisonic_order == 3)
             SHEval3(x, y, z, ambcoeffs.data());
+
         phase = 0;
         float actdur = std::clamp(evpars.duration, 0.001f, 1.0f);
-        endphase = sr * actdur;
+        grain_end_phase = sr * actdur;
+        absolute_max_phase = sr * 5.0;
+
         float *filparams[2] = {evpars.filter1params, evpars.filter2params};
         for (size_t i = 0; i < filters.size(); ++i)
         {
@@ -451,37 +455,40 @@ class GranulatorVoice
             filters[i].prepareBlock();
         }
         // int endphasewithtail = endphase + filters_tail * sr;
-        int envpeakpos = envshape * endphase;
-        envpeakpos = std::clamp(envpeakpos, 16, endphase - 16);
+        int envpeakpos = envshape * grain_end_phase;
+        envpeakpos = std::clamp(envpeakpos, 16, grain_end_phase - 16);
         int silence_tail_len = sr * 0.5f;
         for (int i = 0; i < nframes; ++i)
         {
             float outsample = 0.0f;
-            outsample = std::visit([](auto &q) { return q.step(); }, theoscillator);
-
-            float envgain = 1.0f;
-            if (envtype == 0)
+            if (phase < grain_end_phase)
             {
-                if (phase < envpeakpos)
+                outsample = std::visit([](auto &q) { return q.step(); }, theoscillator);
+                float envgain = 1.0f;
+                if (envtype == 0)
                 {
-                    envgain = xenakios::mapvalue<float>(phase, 0.0, envpeakpos, 0.0f, 1.0f);
-                    envgain = 1.0f - envgain;
-                    envgain = 1.0f - (envgain * envgain * envgain);
+                    if (phase < envpeakpos)
+                    {
+                        envgain = xenakios::mapvalue<float>(phase, 0.0, envpeakpos, 0.0f, 1.0f);
+                        envgain = 1.0f - envgain;
+                        envgain = 1.0f - (envgain * envgain * envgain);
+                    }
+                    else if (phase >= envpeakpos)
+                    {
+                        envgain =
+                            xenakios::mapvalue<float>(phase, envpeakpos, grain_end_phase, 1.0f, 0.0f);
+                        envgain = envgain * envgain * envgain;
+                    }
                 }
-                else if (phase >= envpeakpos)
+                else if (envtype == 1)
                 {
-                    envgain = xenakios::mapvalue<float>(phase, envpeakpos, endphase, 1.0f, 0.0f);
-                    envgain = envgain * envgain * envgain;
+                    float envfreq = 1.0f + std::floor(15.0f * envshape);
+                    envgain = 0.5f + 0.5f * std::sin(M_PI * 2 / grain_end_phase * phase * envfreq +
+                                                     (1.5f * M_PI));
                 }
+                envgain = std::clamp(envgain, 0.0f, 1.0f);
+                outsample *= envgain * graingain;
             }
-            else if (envtype == 1)
-            {
-                float envfreq = 1.0f + std::floor(15.0f * envshape);
-                envgain =
-                    0.5f + 0.5f * std::sin(M_PI * 2 / endphase * phase * envfreq + (1.5f * M_PI));
-            }
-            envgain = std::clamp(envgain, 0.0f, 1.0f);
-            outsample *= envgain * graingain;
             if (filter_routing == FR_SERIAL)
             {
                 outsample = filters[0].processMonoSample(outsample + feedbacksignals[0]);
@@ -505,14 +512,14 @@ class GranulatorVoice
             }
 
             ++phase;
-            if (phase >= endphase)
+            if (phase >= grain_end_phase)
             {
                 if (filters_have_tail)
                 {
                     if (std::abs(outsample) < 0.001)
                     {
                         ++silence_counter;
-                        if (silence_counter >= silence_tail_len)
+                        if (silence_counter >= silence_tail_len || phase >= absolute_max_phase)
                         {
                             active = false;
                             // std::print("grain {} with tail ended at {}\n", grainid, phase / sr);

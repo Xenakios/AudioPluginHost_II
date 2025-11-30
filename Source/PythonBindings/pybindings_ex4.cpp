@@ -299,8 +299,11 @@ inline py::array_t<float> render_granulator(ToneGranulator &gran, events_t evlis
     gran.prepare(std::move(evlist), ambiorder);
     if (gran.events_to_switch.empty())
         throw std::runtime_error("grain event list empty after events were erased");
+    // we can't know the exact tail amount needed until processing...
+    // 1 second is hopefully enough to not cut off the render too abruptly in most cases, but
+    // maybe should make the tail length a user settable thing
     int frames =
-        (gran.events_to_switch.back().time_position + gran.events_to_switch.back().duration + 0.5) *
+        (gran.events_to_switch.back().time_position + gran.events_to_switch.back().duration + 1.0) *
         gran.m_sr;
 
     // if (outputmode == "stereo")
