@@ -475,8 +475,8 @@ class GranulatorVoice
                     }
                     else if (phase >= envpeakpos)
                     {
-                        envgain =
-                            xenakios::mapvalue<float>(phase, envpeakpos, grain_end_phase, 1.0f, 0.0f);
+                        envgain = xenakios::mapvalue<float>(phase, envpeakpos, grain_end_phase,
+                                                            1.0f, 0.0f);
                         envgain = envgain * envgain * envgain;
                     }
                 }
@@ -516,23 +516,34 @@ class GranulatorVoice
             {
                 if (filters_have_tail)
                 {
-                    if (std::abs(outsample) < 0.001)
+                    // we might have a filter/insert that never stops producing sound
+                    // so also have an absolute maximum sounding length
+                    if (phase >= absolute_max_phase)
                     {
-                        ++silence_counter;
-                        if (silence_counter >= silence_tail_len || phase >= absolute_max_phase)
-                        {
-                            active = false;
-                            // std::print("grain {} with tail ended at {}\n", grainid, phase / sr);
-                        }
+                        active = false;
+                        std::print("grain {} with tail reached absolute length limit\n", grainid);
                     }
                     else
                     {
-                        silence_counter = 0;
+                        if (std::abs(outsample) < 0.001)
+                        {
+                            ++silence_counter;
+                            if (silence_counter >= silence_tail_len)
+                            {
+                                active = false;
+                                // std::print("grain {} with tail ended at {}\n", grainid, phase /
+                                // sr);
+                            }
+                        }
+                        else
+                        {
+                            silence_counter = 0;
+                        }
                     }
                 }
                 else
                 {
-                    // if no tail, we end the grain immediately
+                    // if no tail, we end the grain immediately after main grain portion
                     active = false;
                 }
 
