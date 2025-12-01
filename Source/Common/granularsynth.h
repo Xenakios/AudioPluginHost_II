@@ -521,7 +521,8 @@ class GranulatorVoice
                     if (phase >= absolute_max_phase)
                     {
                         active = false;
-                        // std::print("grain {} with tail reached absolute length limit\n", grainid);
+                        // std::print("grain {} with tail reached absolute length limit\n",
+                        // grainid);
                     }
                     else
                     {
@@ -555,32 +556,6 @@ class GranulatorVoice
     }
 };
 
-/*
-from atk js code
-********************************************************************
-Matrix: Generate 2x4 matrix for stereo decoding
-********************************************************************
-*/
-void generateDecodeStereoMatrix(float *aMatrix, float anAngle, float aPattern)
-{
-    // calculate lG0, lG1, lG2 (scaled by pattern)
-    float lG0 = (1.0 - aPattern) * std::sqrt(2.0);
-    float lG1 = aPattern * cos(anAngle);
-    float lG2 = aPattern * sin(anAngle);
-
-    // Left
-    aMatrix[0] = lG0;
-    aMatrix[1] = lG1;
-    aMatrix[2] = lG2;
-    aMatrix[3] = 0.0;
-
-    // Right
-    aMatrix[4] = lG0;
-    aMatrix[5] = lG1;
-    aMatrix[6] = -lG2;
-    aMatrix[7] = 0.0;
-}
-
 using events_t = std::vector<GrainEvent>;
 
 class ToneGranulator
@@ -594,7 +569,7 @@ class ToneGranulator
     events_t events;
     events_t events_to_switch;
     std::atomic<int> thread_op{0};
-    alignas(16) float decodeToStereoMatrix[8];
+
     int evindex = 0;
     int playposframes = 0;
     alignas(16) sst::basic_blocks::dsp::OnePoleLag<float, true> gainlag;
@@ -602,7 +577,6 @@ class ToneGranulator
     ToneGranulator(double sr, int filter_routing, std::string filtertype0, std::string filtertype1)
         : m_sr(sr)
     {
-        generateDecodeStereoMatrix(decodeToStereoMatrix, 0.0, 0.5);
         init_filter_infos();
         const FilterInfo *filter0info = nullptr;
         const FilterInfo *filter1info = nullptr;
@@ -641,8 +615,7 @@ class ToneGranulator
             voices.push_back(std::move(v));
         }
     }
-    float m_stereoangle = 0.0f;
-    float m_stereopattern = 0.5f;
+
     int num_out_chans = 0;
     int missedgrains = 0;
     void prepare(events_t evlist, int ambisonics_order)
@@ -673,11 +646,6 @@ class ToneGranulator
         if (thread_op == 1)
         {
             std::swap(events_to_switch, events);
-
-            float stereoangle = std::clamp(m_stereoangle, 0.0f, 180.0f);
-            float stereopattern = std::clamp(m_stereopattern, 0.0f, 1.0f);
-            generateDecodeStereoMatrix(decodeToStereoMatrix, degreesToRadians(stereoangle),
-                                       stereopattern);
             evindex = 0;
             playposframes = 0;
             gainlag.setRateInMilliseconds(1000.0, m_sr, 1.0);
@@ -757,42 +725,6 @@ class ToneGranulator
                         mixsum[chan][k] * gain;
                 }
             }
-            /*
-            if (chans == 4)
-            {
-                for (int k = 0; k < granul_block_size; ++k)
-                {
-                    gainlag.process();
-                    float gain = gainlag.getValue() * maingain;
-                    outputbuffer[(bufframecount + k) * 4 + 0] = mixsum[0][k] * gain;
-                    outputbuffer[(bufframecount + k) * 4 + 1] = mixsum[1][k] * gain;
-                    outputbuffer[(bufframecount + k) * 4 + 2] = mixsum[2][k] * gain;
-                    outputbuffer[(bufframecount + k) * 4 + 3] = mixsum[3][k] * gain;
-                }
-            }
-            if (chans == 2 || chans == 3)
-            {
-                for (int k = 0; k < granul_block_size; ++k)
-                {
-                    gainlag.process();
-                    float gain = gainlag.getValue();
-                    float wIn = mixsum[0][k] * gain;
-                    float xIn = mixsum[1][k] * gain;
-                    float yIn = mixsum[2][k] * gain;
-                    float zIn = mixsum[3][k] * gain;
-
-                    float spl0 = wIn * decodeToStereoMatrix[0] + xIn * decodeToStereoMatrix[1] +
-                                 yIn * decodeToStereoMatrix[2] + zIn * decodeToStereoMatrix[3];
-                    float spl1 = wIn * decodeToStereoMatrix[4] + xIn * decodeToStereoMatrix[5] +
-                                 yIn * decodeToStereoMatrix[6] + zIn * decodeToStereoMatrix[7];
-                    outputbuffer[(bufframecount + k) * 2 + 0] = spl0 * maingain;
-                    outputbuffer[(bufframecount + k) * 2 + 1] = spl1 * maingain;
-
-                    // if (chans == 3)
-                    //     writebufs[2][framecount + k] = mixsum[4][k] * gain;
-                }
-            }
-            */
             bufframecount += granul_block_size;
             playposframes += granul_block_size;
         }

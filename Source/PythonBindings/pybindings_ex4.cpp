@@ -304,10 +304,6 @@ inline py::array_t<float> render_granulator(ToneGranulator &gran, events_t evlis
     int frames =
         (gran.events_to_switch.back().time_position + gran.events_to_switch.back().duration + 1.0) *
         gran.m_sr;
-
-    // if (outputmode == "stereo")
-    //     chans = 2;
-
     py::buffer_info binfo(
         nullptr,                                /* Pointer to buffer */
         sizeof(float),                          /* Size of one scalar */
@@ -323,22 +319,23 @@ inline py::array_t<float> render_granulator(ToneGranulator &gran, events_t evlis
     using clock = std::chrono::system_clock;
     using ms = std::chrono::duration<double, std::milli>;
     const auto start_time = clock::now();
-    int framecount = 0;
+    int outframecount = 0;
     float procbuf[16 * granul_block_size];
     for (int i = 0; i < 16 * granul_block_size; ++i)
         procbuf[i] = 0.0f;
-    while (framecount < frames - granul_block_size)
+    while (outframecount < frames)
     {
+        int framestoprocess = std::min(granul_block_size, frames - outframecount);
         gran.process_block(procbuf, granul_block_size);
-        for (int i = 0; i < granul_block_size; ++i)
+        for (int i = 0; i < framestoprocess; ++i)
         {
-            int pos = framecount + i;
+            int pos = outframecount + i;
             for (int j = 0; j < chans; ++j)
             {
                 writebufs[j][pos] = procbuf[i * chans + j];
             }
         }
-        framecount += granul_block_size;
+        outframecount += granul_block_size;
     }
     const ms render_duration = clock::now() - start_time;
     double rtfactor = (frames / gran.m_sr * 1000.0) / render_duration.count();
