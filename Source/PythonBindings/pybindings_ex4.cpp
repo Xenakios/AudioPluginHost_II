@@ -273,8 +273,7 @@ inline py::array_t<float> generate_fm(xenakios::Envelope &carrierpitchenv,
 }
 
 inline py::array_t<float> render_granulator(ToneGranulator &gran, events_t evlist,
-                                            std::string outputmode, double stereoangle,
-                                            double stereopattern)
+                                            std::string outputmode)
 {
     int chans = 0;
     int ambiorder = 0;
@@ -400,6 +399,42 @@ void process_airwindows(int index)
     }
 }
 
+inline py::array_t<float> decode_ambisonics_to_stereo(const py::array_t<float> &input_audio)
+{
+    if (input_audio.ndim() != 2)
+        throw std::runtime_error(
+            std::format("array ndim {} incompatible, must be 2", input_audio.ndim()));
+    uint32_t numInChans = input_audio.shape(0);
+    if (!(numInChans == 4 || numInChans == 9 || numInChans == 16))
+        throw std::runtime_error(
+            std::format("invalid input channel count {}, must be 4/9/16", numInChans));
+    int frames = input_audio.size() / numInChans;
+    auto numOutChans = 2;
+    py::buffer_info binfo(
+        nullptr,                                /* Pointer to buffer */
+        sizeof(float),                          /* Size of one scalar */
+        py::format_descriptor<float>::format(), /* Python struct-style format descriptor */
+        2,                                      /* Number of dimensions */
+        {numOutChans, frames},                  /* Buffer dimensions */
+        {sizeof(float) * frames,                /* Strides (in bytes) for each index */
+         sizeof(float)});
+    py::array_t<float> output_audio{binfo};
+    alignas(32) float *writebufs[2];
+    for (int i = 0; i < numOutChans; ++i)
+        writebufs[i] = output_audio.mutable_data(i);
+    alignas(32) float *readbufs[2];
+    for (int i = 0; i < 2; ++i)
+        readbufs[i] = (float *)input_audio.data(i);
+    for (int i = 0; i < frames; ++i)
+    {
+        float m = readbufs[0][i];
+        float s = readbufs[1][i];
+        writebufs[0][i] = m + s;
+        writebufs[1][i] = m - s;
+    }
+    return output_audio;
+}
+
 inline py::array_t<float> encode_to_ambisonics(const py::array_t<float> &input_audio,
                                                double sample_rate, int amb_order,
                                                xenakios::Envelope &azimuth,
@@ -482,6 +517,7 @@ void init_py4(py::module_ &m, py::module_ &m_const)
     using namespace pybind11::literals;
     m.def("encode_to_ambisonics", &encode_to_ambisonics, "input_audio"_a, "sample_rate"_a,
           "ambisonics_order"_a, "azimuth"_a, "elevation"_a);
+    m.def("decode_ambisonics_to_stereo", &decode_ambisonics_to_stereo, "input_audio"_a);
     m.def("airwindows_test", &process_airwindows);
     m.def("generate_tone", &generate_tone, "tone_type"_a, "pitch"_a, "volume"_a, "samplerate"_a,
           "duration"_a);
@@ -520,6 +556,7 @@ void init_py4(py::module_ &m, py::module_ &m_const)
         .def_readwrite("volume", &GrainEvent::volume);
 
     py::class_<ToneGranulator>(m, "ToneGranulator")
-        .def(py::init<double, int, std::string, std::string>())
+        .def(py::init<double, int, std::string, std::string>(), "sample_rate"_a, "filter_routing"_a,
+             "filter1type"_a, "filter2type"_a)
         .def("render", render_granulator);
 }
