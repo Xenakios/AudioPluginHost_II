@@ -337,7 +337,7 @@ class GranulatorVoice
         auto reqdelaysize =
             sst::filtersplusplus::Filter::requiredDelayLinesSizes(finfo.model, finfo.modelconfig);
         // std::print("filter {} requires {} samples of delay line\n", finfo.address, reqdelaysize);
-        if (reqdelaysize > 0)
+        // if (reqdelaysize > 0)
             filters_have_tail = true;
         if (reqdelaysize > delaylinememory.size())
             delaylinememory.resize(reqdelaysize);
@@ -630,7 +630,7 @@ class ToneGranulator
             events_to_switch.begin(), events_to_switch.end(),
             [](GrainEvent &lhs, GrainEvent &rhs) { return lhs.time_position < rhs.time_position; });
         std::erase_if(events_to_switch, [](GrainEvent &e) {
-            return e.time_position < 0.0 || (e.time_position + e.duration) > 60.0;
+            return e.time_position < 0.0 || (e.time_position + e.duration) > 120.0;
         });
         std::map<int, int> aotonumchans{{1, 4}, {2, 9}, {3, 16}};
         for (auto &v : voices)
