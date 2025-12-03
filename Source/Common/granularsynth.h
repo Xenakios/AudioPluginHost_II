@@ -302,8 +302,8 @@ class GranulatorVoice
     int grain_end_phase = 0;
     double sr = 0.0;
     bool active = false;
-    bool filters_have_tail = false;
-    int absolute_max_phase = 0;
+    double tail_len = 0.005;
+    double tail_fade_len = 0.005;
     int prior_osc_type = -1;
     alignas(16) std::array<float, 16> ambcoeffs;
     enum FilterRouting
@@ -321,7 +321,7 @@ class GranulatorVoice
     float auxsend1 = 0.0;
     int envtype = 0;
     double envshape = 0.5;
-    int silence_counter = 0;
+    
     int grainid = 0;
     int ambisonic_order = 1;
     int num_outputchans = 0;
@@ -337,8 +337,6 @@ class GranulatorVoice
         auto reqdelaysize =
             sst::filtersplusplus::Filter::requiredDelayLinesSizes(finfo.model, finfo.modelconfig);
         // std::print("filter {} requires {} samples of delay line\n", finfo.address, reqdelaysize);
-        // if (reqdelaysize > 0)
-            filters_have_tail = true;
         if (reqdelaysize > delaylinememory.size())
             delaylinememory.resize(reqdelaysize);
         filters[filtindex].setFilterModel(finfo.model);
@@ -354,7 +352,6 @@ class GranulatorVoice
     void start(GrainEvent &evpars)
     {
         active = true;
-        silence_counter = 0;
         int newosctype = std::clamp<int>(evpars.generator_type, 0.0, 6.0);
         if (newosctype != prior_osc_type)
         {
@@ -425,8 +422,7 @@ class GranulatorVoice
         phase = 0;
         float actdur = std::clamp(evpars.duration, 0.001f, 1.0f);
         grain_end_phase = sr * actdur;
-        absolute_max_phase = sr * 5.0;
-
+        
         float *filparams[2] = {evpars.filter1params, evpars.filter2params};
         for (size_t i = 0; i < filters.size(); ++i)
         {
@@ -457,7 +453,11 @@ class GranulatorVoice
         // int endphasewithtail = endphase + filters_tail * sr;
         int envpeakpos = envshape * grain_end_phase;
         envpeakpos = std::clamp(envpeakpos, 16, grain_end_phase - 16);
-        int silence_tail_len = sr * 0.5f;
+        
+        int tail_len_samples = tail_len * sr;
+        int tail_fade_samples = tail_fade_len * sr;
+        int tail_fade_start = grain_end_phase + tail_len_samples - tail_fade_samples;
+        int tail_fade_end = grain_end_phase + tail_len_samples;
         for (int i = 0; i < nframes; ++i)
         {
             float outsample = 0.0f;
@@ -506,49 +506,27 @@ class GranulatorVoice
 
             float send1 = auxsend1 * outsample;
             outsample = (1.0f - auxsend1) * outsample;
-            for (int chan = 0; chan < num_outputchans; ++chan)
-            {
-                outputs[i * 16 + chan] = outsample * ambcoeffs[chan];
-            }
 
             ++phase;
+            float fadegain = 1.0f;
             if (phase >= grain_end_phase)
             {
-                if (filters_have_tail)
+                if (phase >= tail_fade_end)
                 {
-                    // we might have a filter/insert that never stops producing sound
-                    // so also have an absolute maximum sounding length
-                    if (phase >= absolute_max_phase)
-                    {
-                        active = false;
-                        // std::print("grain {} with tail reached absolute length limit\n",
-                        // grainid);
-                    }
-                    else
-                    {
-                        if (std::abs(outsample) < 0.001)
-                        {
-                            ++silence_counter;
-                            if (silence_counter >= silence_tail_len)
-                            {
-                                active = false;
-                                // std::print("grain {} with tail ended at {}\n", grainid, phase /
-                                // sr);
-                            }
-                        }
-                        else
-                        {
-                            silence_counter = 0;
-                        }
-                    }
-                }
-                else
-                {
-                    // if no tail, we end the grain immediately after main grain portion
                     active = false;
+                    fadegain = 0.0f;
                 }
-
-                // std::print("ended voice {}\n", (void *)this);
+                else if (phase >= tail_fade_start)
+                {
+                    fadegain = xenakios::mapvalue<float>(phase, tail_fade_start, tail_fade_end,
+                                                         1.0f, 0.0f);
+                    if (fadegain < 0.0f)
+                        fadegain = 0.0f;
+                }
+            }
+            for (int chan = 0; chan < num_outputchans; ++chan)
+            {
+                outputs[i * 16 + chan] = outsample * ambcoeffs[chan] * fadegain;
             }
         }
         for (auto &f : filters)
