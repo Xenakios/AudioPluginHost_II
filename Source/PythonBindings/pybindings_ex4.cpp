@@ -553,7 +553,8 @@ void init_py4(py::module_ &m, py::module_ &m_const)
         .def_readwrite("volume", &GrainEvent::volume);
 
     py::class_<ToneGranulator>(m, "ToneGranulator")
-        .def(py::init<double, int, std::string, std::string>(), "sample_rate"_a, "filter_routing"_a,
-             "filter1type"_a, "filter2type"_a)
+        .def(py::init<double, int, std::string, std::string, float, float>(), "sample_rate"_a,
+             "filter_routing"_a, "filter1type"_a, "filter2type"_a, "grain_tail_len"_a = 0.005,
+             "grain_tail_fade_len"_a = 0.005)
         .def("render", render_granulator);
 }

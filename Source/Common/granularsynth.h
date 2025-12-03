@@ -302,8 +302,8 @@ class GranulatorVoice
     int grain_end_phase = 0;
     double sr = 0.0;
     bool active = false;
-    double tail_len = 0.005;
-    double tail_fade_len = 0.005;
+    float tail_len = 0.005;
+    float tail_fade_len = 0.005;
     int prior_osc_type = -1;
     alignas(16) std::array<float, 16> ambcoeffs;
     enum FilterRouting
@@ -321,7 +321,7 @@ class GranulatorVoice
     float auxsend1 = 0.0;
     int envtype = 0;
     double envshape = 0.5;
-    
+
     int grainid = 0;
     int ambisonic_order = 1;
     int num_outputchans = 0;
@@ -422,7 +422,7 @@ class GranulatorVoice
         phase = 0;
         float actdur = std::clamp(evpars.duration, 0.001f, 1.0f);
         grain_end_phase = sr * actdur;
-        
+
         float *filparams[2] = {evpars.filter1params, evpars.filter2params};
         for (size_t i = 0; i < filters.size(); ++i)
         {
@@ -453,7 +453,7 @@ class GranulatorVoice
         // int endphasewithtail = endphase + filters_tail * sr;
         int envpeakpos = envshape * grain_end_phase;
         envpeakpos = std::clamp(envpeakpos, 16, grain_end_phase - 16);
-        
+
         int tail_len_samples = tail_len * sr;
         int tail_fade_samples = tail_fade_len * sr;
         int tail_fade_start = grain_end_phase + tail_len_samples - tail_fade_samples;
@@ -552,7 +552,8 @@ class ToneGranulator
     int playposframes = 0;
     alignas(16) sst::basic_blocks::dsp::OnePoleLag<float, true> gainlag;
 
-    ToneGranulator(double sr, int filter_routing, std::string filtertype0, std::string filtertype1)
+    ToneGranulator(double sr, int filter_routing, std::string filtertype0, std::string filtertype1,
+                   float tail_len, float tail_fade_len)
         : m_sr(sr)
     {
         init_filter_infos();
@@ -589,7 +590,8 @@ class ToneGranulator
             v->set_filter_type(0, *filter0info);
             v->set_filter_type(1, *filter1info);
             v->filter_routing = (GranulatorVoice::FilterRouting)filter_routing;
-
+            v->tail_len = std::clamp(tail_len, 0.0f, 5.0f);
+            v->tail_fade_len = std::clamp(tail_fade_len, 0.0f, v->tail_len);
             voices.push_back(std::move(v));
         }
     }
