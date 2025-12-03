@@ -73,7 +73,6 @@ inline void writeArrayToFile(const py::array_t<double> &arr, double samplerate, 
     if (!metadata.empty())
         bext.setMember("codingHistory", metadata);
     mdob.addArrayElement(bext);
-    
 
     outfileprops.metadata = mdob;
     choc::audio::WAVAudioFileFormat<true> wavformat;
@@ -464,7 +463,7 @@ PYBIND11_MODULE(xenakios, m)
         .def("par0", &xenakios::EnvelopePoint::getPar0);
 
     py::class_<xenakios::Envelope>(m, "Envelope")
-        .def(py::init<>())
+        .def(py::init<std::optional<double>>(), "default_value"_a = std::optional<double>())
         .def(py::init<xenakios::Envelope>())
         .def(py::init<std::vector<xenakios::EnvelopePoint>>())
         .def(py::init([](const std::vector<py::tuple> &tups) { return env_from_tuple_vec(tups); }))
