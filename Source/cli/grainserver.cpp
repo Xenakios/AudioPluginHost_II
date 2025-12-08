@@ -50,43 +50,7 @@ inline int audiocb(void *outputBuffer, void *inputBuffer, unsigned int nFrames, 
     }
     return 0;
 }
-/*
-inline events_t generate_events(double pulselen, double transpose)
-{
-    events_t result;
-    double t = 0.0;
-    std::vector<float> evt;
-    evt.resize(GranulatorVoice::NUM_PARS);
-    evt[GranulatorVoice::PAR_SYNCRATIO] = 1.0;
-    evt[GranulatorVoice::PAR_TONETYPE] = 3.0;
-    evt[GranulatorVoice::PAR_VOLUME] = 1.0;
-    evt[GranulatorVoice::PAR_ENVTYPE] = 0.0;
-    evt[GranulatorVoice::PAR_ENVSHAPE] = 0.5;
-    evt[GranulatorVoice::PAR_VER_ANGLE] = 0.0;
-    evt[GranulatorVoice::PAR_HOR_ANGLE] = 0.0;
-    evt[GranulatorVoice::PAR_FILTERFEEDBACKAMOUNT] = 0.0;
-    evt[GranulatorVoice::PAR_FILT1CUTOFF] = 120.0;
-    evt[GranulatorVoice::PAR_FILT1RESON] = 0.0;
-    evt[GranulatorVoice::PAR_FILT2CUTOFF] = 120.0;
-    evt[GranulatorVoice::PAR_FILT2RESON] = 0.0;
-    evt[GranulatorVoice::PAR_FILT2RESON] = 0.0;
-    std::vector<float> pitches{24.0f, 36.0f, 48.0f, 60.0f};
-    int count = 0;
-    while (t < 10.0)
-    {
-        evt[GranulatorVoice::PAR_TPOS] = t;
-        evt[GranulatorVoice::PAR_DUR] = pulselen * 2.0;
-        double pitch = pitches[count] + transpose;
-        evt[GranulatorVoice::PAR_FREQHZ] = 440.0 * std::pow(2.0, (1.0 / 12) * (pitch - 69.0));
-        result.push_back(evt);
-        t += pulselen;
-        ++count;
-        if (count == pitches.size())
-            count = 0;
-    }
-    return result;
-}
-*/
+
 std::atomic<bool> g_quit{false};
 
 BOOL WINAPI CtrlHandler(DWORD fdwCtrlType)
@@ -119,26 +83,39 @@ inline events_t load_events_file(std::string path)
         for (const auto &line : lines)
         {
             auto tokens = choc::text::splitAtWhitespace(line);
-            if (tokens.size() >= 11)
-            {
-                GrainEvent evt;
+            if (tokens.size() == 0)
+                continue;
+            // std::print("{}\n", tokens);
+            GrainEvent evt;
+            if (tokens.size() >= 1)
                 evt.time_position = std::stof(tokens[0]);
+            if (tokens.size() >= 2)
                 evt.duration = std::stof(tokens[1]);
+            if (tokens.size() >= 3)
                 evt.frequency_hz = std::stof(tokens[2]);
+            if (tokens.size() >= 4)
                 evt.volume = std::stof(tokens[3]);
+            if (tokens.size() >= 5 && !tokens[4].empty())
                 evt.azimuth = std::stof(tokens[4]);
+            if (tokens.size() >= 6 && !tokens[5].empty())
                 evt.elevation = std::stof(tokens[5]);
+            if (tokens.size() >= 7 && !tokens[6].empty())
                 evt.envelope_type = std::stof(tokens[6]);
+            if (tokens.size() >= 8 && !tokens[7].empty())
                 evt.envelope_shape = std::stof(tokens[7]);
+            if (tokens.size() >= 9 && !tokens[8].empty())
                 evt.sync_ratio = std::stof(tokens[8]);
+            if (tokens.size() >= 10)
+            {
                 evt.filterparams[0][0] = std::stof(tokens[9]);
                 evt.filterparams[0][1] = std::stof(tokens[10]);
                 evt.filterparams[0][2] = std::stof(tokens[11]);
                 evt.filterparams[1][0] = std::stof(tokens[12]);
                 evt.filterparams[1][1] = std::stof(tokens[13]);
                 evt.filterparams[1][2] = std::stof(tokens[14]);
-                result.push_back(evt);
             }
+
+            result.push_back(evt);
         }
     }
     catch (std::exception &ex)
