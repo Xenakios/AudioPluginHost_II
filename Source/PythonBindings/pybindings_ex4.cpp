@@ -11,7 +11,7 @@
 #include <print>
 #include "sst/basic-blocks/dsp/SmoothingStrategies.h"
 #include <random>
-#include "../Common/granularsynth.h"
+#include "../granularsynth/granularsynth.h"
 #include "airwin_consolidated_base.h"
 #include "plugins/BezEQ.h"
 #include "plugins/HipCrush.h"

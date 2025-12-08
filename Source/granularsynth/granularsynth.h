@@ -2,8 +2,6 @@
 #include <vector>
 #include "sst/basic-blocks/dsp/CorrelatedNoise.h"
 #include "sst/basic-blocks/dsp/EllipticBlepOscillators.h"
-#include "sst/basic-blocks/dsp/DPWSawPulseOscillator.h"
-#include "sst/filters++.h"
 #include <print>
 #include "sst/basic-blocks/dsp/SmoothingStrategies.h"
 #include "text/choc_StringUtilities.h"
@@ -11,6 +9,7 @@
 #include <variant>
 #include "../Common/xap_breakpoint_envelope.h"
 #include "../Common/xen_ambisonics.h"
+#include "grainfx.h"
 
 struct GrainEvent
 {
@@ -67,66 +66,6 @@ inline int osc_name_to_index(std::string name)
         if (name == osc_infos[i].name)
             return osc_infos[i].index;
     return -1;
-}
-namespace sfpp = sst::filtersplusplus;
-struct FilterInfo
-{
-    std::string address;
-    sfpp::FilterModel model;
-    sfpp::FilterSubModel submodel;
-    sfpp::ModelConfig modelconfig;
-};
-
-std::vector<FilterInfo> g_filter_infos;
-
-void init_filter_infos()
-{
-    if (g_filter_infos.size() > 0)
-        return;
-    g_filter_infos.reserve(256);
-    auto models = sfpp::Filter::availableModels();
-    std::string address;
-    address.reserve(256);
-    FilterInfo ninfo;
-    ninfo.address = "none";
-    ninfo.model = sst::filtersplusplus::FilterModel::None;
-    ninfo.modelconfig = {};
-    g_filter_infos.push_back(ninfo);
-    for (auto &mod : models)
-    {
-        auto subm = sfpp::Filter::availableModelConfigurations(mod, true);
-        for (auto s : subm)
-        {
-            address = sfpp::toString(mod);
-            if (s == sfpp::ModelConfig())
-            {
-            }
-            auto [pt, st, dt, smt] = s;
-            if (pt != sfpp::Passband::UNSUPPORTED)
-            {
-                address += "/" + sfpp::toString(pt);
-            }
-            if (st != sfpp::Slope::UNSUPPORTED)
-            {
-                address += "/" + sfpp::toString(st);
-            }
-            if (dt != sfpp::DriveMode::UNSUPPORTED)
-            {
-                address += "/" + sfpp::toString(dt);
-            }
-            if (smt != sfpp::FilterSubModel::UNSUPPORTED)
-            {
-                address += "/" + sfpp::toString(smt);
-            }
-            address = choc::text::toLowerCase(address);
-            address = choc::text::replace(address, " ", "_", "&", "and", ",", "");
-            FilterInfo info;
-            info.address = address;
-            info.model = mod;
-            info.modelconfig = s;
-            g_filter_infos.push_back(info);
-        }
-    }
 }
 
 struct FMOsc
@@ -421,6 +360,8 @@ class GranulatorVoice
 
         phase = 0;
         float actdur = std::clamp(evpars.duration, 0.001f, 1.0f);
+        // actdur = std::pow(actdur, 2.0);
+        // actdur = 0.001 + 0.999 * actdur;
         grain_end_phase = sr * actdur;
 
         float *filparams[2] = {evpars.filter1params, evpars.filter2params};
