@@ -1,4 +1,4 @@
-#include "../Common/granularsynth.h"
+#include "../granularsynth/granularsynth.h"
 #include "RtAudio.h"
 #include "text/choc_Files.h"
 #include "platform/choc_FileWatcher.h"
@@ -6,6 +6,7 @@
 struct CallbackData
 {
     ToneGranulator *granul = nullptr;
+    std::vector<float> procbuffer;
     std::array<float, 512> cpuhistory;
     int num_mes = 200;
     int history_pos = 0;
@@ -21,10 +22,15 @@ inline int audiocb(void *outputBuffer, void *inputBuffer, unsigned int nFrames, 
     using clock = std::chrono::high_resolution_clock;
     using ns = std::chrono::duration<double, std::nano>;
     const auto start_time = clock::now();
-    data->granul->process_block(obuf, nFrames, 2);
-    for (int i = 0; i < nFrames * 2; ++i)
+    float *processbuf = data->procbuffer.data();
+    data->granul->process_block(processbuf, nFrames);
+    int procnumoutchs = data->granul->num_out_chans;
+    for (int i = 0; i < nFrames; ++i)
     {
-        obuf[i] = std::clamp(obuf[i], -1.0f, 1.0f);
+        float m = processbuf[i * procnumoutchs + 0];
+        float s = processbuf[i * procnumoutchs + 1];
+        obuf[i * 2 + 0] = std::clamp(m + s, -1.0f, 1.0f);
+        obuf[i * 2 + 1] = std::clamp(m - s, -1.0f, 1.0f);
     }
     const ns render_duration = clock::now() - start_time;
     double maxelapsed = nFrames / sr * 1000000000.0;
@@ -125,8 +131,12 @@ inline events_t load_events_file(std::string path)
                 evt.envelope_type = std::stof(tokens[6]);
                 evt.envelope_shape = std::stof(tokens[7]);
                 evt.sync_ratio = std::stof(tokens[8]);
-                evt.filter1params[0] = std::stof(tokens[9]);
-                evt.filter1params[1] = std::stof(tokens[10]);
+                evt.filterparams[0][0] = std::stof(tokens[9]);
+                evt.filterparams[0][1] = std::stof(tokens[10]);
+                evt.filterparams[0][2] = std::stof(tokens[11]);
+                evt.filterparams[1][0] = std::stof(tokens[12]);
+                evt.filterparams[1][1] = std::stof(tokens[13]);
+                evt.filterparams[1][2] = std::stof(tokens[14]);
                 result.push_back(evt);
             }
         }
@@ -148,7 +158,8 @@ int main()
     double sr = 44100.0;
     double phase = 0.0;
     CallbackData cbdata;
-    auto granulator = std::make_unique<ToneGranulator>(sr, 0, "fast_svf/lowpass", "none");
+    auto granulator =
+        std::make_unique<ToneGranulator>(sr, 0, "fast_svf/lowpass", "none", 0.002, 0.001);
     cbdata.granul = granulator.get();
     granulator->maingain = 0.5;
     auto rtaudio = std::make_unique<RtAudio>();
@@ -164,9 +175,10 @@ int main()
                                     auto evlist = load_events_file(grainfile);
                                     if (evlist.size() > 0)
                                     {
-                                        granulator->prepare(std::move(evlist), 90.0, 0.5);
+                                        granulator->prepare(std::move(evlist), 1);
                                     }
                                 }};
+    cbdata.procbuffer.resize(16 * 1024);
     if (rtaudio->openStream(&spars, nullptr, RTAUDIO_FLOAT32, sr, &bsize, audiocb, &cbdata) ==
         RTAUDIO_NO_ERROR)
     {
