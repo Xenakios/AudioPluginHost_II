@@ -528,18 +528,17 @@ void init_py4(py::module_ &m, py::module_ &m_const)
              "frequency_hz"_a, "volume"_a)
         .def(
             "set_filter_param",
-            [](GrainEvent &ev, int which, double frequency, double resonance) {
-                float *fpars = nullptr;
-                if (which == 0)
-                    fpars = ev.filter1params;
-                if (which == 1)
-                    fpars = ev.filter2params;
-                if (!fpars)
+            [](GrainEvent &ev, int which, double frequency, double resonance, double extpar0) {
+                if (which >= 0 && which < 2)
+                {
+                    ev.filterparams[which][0] = frequency;
+                    ev.filterparams[which][1] = resonance;
+                    ev.filterparams[which][2] = extpar0;
+                }
+                else
                     throw std::runtime_error("Filter index out of range");
-                fpars[0] = frequency;
-                fpars[1] = resonance;
             },
-            "whichfilter"_a, "frequency"_a, "resonance"_a)
+            "whichfilter"_a, "frequency"_a, "resonance"_a, "expar0"_a = 0.0)
         .def_readwrite("sync_ratio", &GrainEvent::sync_ratio)
         .def_readwrite("azimuth", &GrainEvent::azimuth)
         .def_readwrite("elevation", &GrainEvent::elevation)
