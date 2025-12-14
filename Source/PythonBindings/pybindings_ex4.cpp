@@ -552,6 +552,7 @@ void init_py4(py::module_ &m, py::module_ &m_const)
         .def_readwrite("fm_depth", &GrainEvent::fm_amount)
         .def_readwrite("fm_feedback", &GrainEvent::fm_feedback)
         .def_readwrite("moise_corr", &GrainEvent::noisecorr)
+        .def_readwrite("f0cmod", &GrainEvent::filter0cutoff_mod_amt)
         .def_readwrite("volume", &GrainEvent::volume);
 
     py::class_<ToneGranulator>(m, "ToneGranulator")
