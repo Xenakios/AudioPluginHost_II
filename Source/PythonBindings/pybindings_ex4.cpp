@@ -509,6 +509,15 @@ inline py::array_t<float> encode_to_ambisonics(const py::array_t<float> &input_a
     return output_audio;
 }
 
+void set_mod_amt(GrainEvent &ev, int dest, double amt)
+{
+    if (dest < 0 || dest >= GrainEvent::MD_NUMDESTS)
+        throw std::runtime_error(
+            std::format("mod destination {} index invalid, it has to be between 0 and {}", dest,
+                        GrainEvent::MD_NUMDESTS - 1));
+    ev.modamounts[dest] = amt;
+}
+
 void init_py4(py::module_ &m, py::module_ &m_const)
 {
     using namespace pybind11::literals;
@@ -526,6 +535,7 @@ void init_py4(py::module_ &m, py::module_ &m_const)
     py::class_<GrainEvent>(m, "GrainEvent")
         .def(py::init<double, float, float, float>(), "time_position"_a, "duration"_a,
              "frequency_hz"_a, "volume"_a)
+        .def("set_mod_amount", &set_mod_amt)
         .def(
             "set_filter_param",
             [](GrainEvent &ev, int which, double frequency, double resonance, double extpar0) {
@@ -552,7 +562,6 @@ void init_py4(py::module_ &m, py::module_ &m_const)
         .def_readwrite("fm_depth", &GrainEvent::fm_amount)
         .def_readwrite("fm_feedback", &GrainEvent::fm_feedback)
         .def_readwrite("moise_corr", &GrainEvent::noisecorr)
-        .def_readwrite("f0cmod", &GrainEvent::filter0cutoff_mod_amt)
         .def_readwrite("volume", &GrainEvent::volume);
 
     py::class_<ToneGranulator>(m, "ToneGranulator")

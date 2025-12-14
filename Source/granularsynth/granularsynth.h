@@ -13,10 +13,21 @@
 
 struct GrainEvent
 {
+    enum ModDest
+    {
+        MD_FIL0FREQ,
+        MD_FIL0RESO,
+        MD_PITCH,
+        MD_AZI,
+        MD_ELE,
+        MD_NUMDESTS
+    };
     GrainEvent() = default;
     GrainEvent(double tpos, float dur, float hz, float vol)
         : time_position(tpos), duration(dur), frequency_hz(hz), volume(vol)
     {
+        for (int i = 0; i < MD_NUMDESTS; ++i)
+            modamounts[i] = 0.0f;
     }
     double time_position = 0.0;
     float duration = 0.0f;
@@ -36,7 +47,7 @@ struct GrainEvent
     float noisecorr = 0.0f;
     float filterparams[2][3] = {{100.0f, 0.0, 0.0f}, {100.0f, 0.0, 0.0f}};
     float filterfeedback = 0.0f;
-    float filter0cutoff_mod_amt = 0.0f;
+    float modamounts[MD_NUMDESTS];
 };
 
 template <typename T> inline T degreesToRadians(T degrees) { return degrees * (M_PI / 180.0); }
@@ -273,7 +284,7 @@ class GranulatorVoice
     std::array<double, 2> filtextpars = {0.0, 0.0};
     alignas(16) std::array<double, 2> feedbacksignals = {0.0, 0.0};
     alignas(16) SimpleEnvelope aux_envelope;
-    float filt0cutoffmod_amt = 0.0f;
+    alignas(16) float modamounts[GrainEvent::MD_NUMDESTS];
     float feedbackamt = 0.0f;
     float graingain = 0.0;
     float auxsend1 = 0.0;
@@ -288,6 +299,8 @@ class GranulatorVoice
     {
         delaylinememory.resize(16384);
         std::fill(ambcoeffs.begin(), ambcoeffs.end(), 0.0f);
+        for (int i = 0; i < GrainEvent::MD_NUMDESTS; ++i)
+            modamounts[i] = 0.0f;
     }
     void set_samplerate(double hz) { sr = hz; }
     void set_filter_type(size_t filtindex, const FilterInfo &finfo)
@@ -392,7 +405,8 @@ class GranulatorVoice
             resons[i] = std::clamp(evpars.filterparams[i][1], 0.0f, 1.0f);
             filtextpars[i] = std::clamp(evpars.filterparams[i][2], -1.0f, 1.0f);
         }
-        filt0cutoffmod_amt = evpars.filter0cutoff_mod_amt;
+        for (int i = 0; i < GrainEvent::MD_NUMDESTS; ++i)
+            modamounts[i] = evpars.modamounts[i];
 
         graingain = std::clamp(evpars.volume, 0.0f, 1.0f);
         graingain = graingain * graingain * graingain;
@@ -414,7 +428,7 @@ class GranulatorVoice
         {
             float cutoffmod = 0.0f;
             if (i == 0)
-                cutoffmod = filt0cutoffmod_amt * aux_env_value;
+                cutoffmod = modamounts[GrainEvent::MD_FIL0FREQ] * aux_env_value;
             filters[i].makeCoefficients(0, cutoffs[i] + cutoffmod, resons[i], filtextpars[i]);
             filters[i].prepareBlock();
         }
