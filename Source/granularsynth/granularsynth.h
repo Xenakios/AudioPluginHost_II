@@ -67,6 +67,23 @@ inline int osc_name_to_index(std::string name)
     return -1;
 }
 
+struct SimpleEnvelope
+{
+    double curvalue = 0.0;
+    double increment = 0.0;
+    void start(double startvalue, double endvalue, int dursamples)
+    {
+        curvalue = startvalue;
+        increment = (endvalue - startvalue) / dursamples;
+    }
+    double step()
+    {
+        double result = curvalue;
+        curvalue += increment;
+        return result;
+    }
+};
+
 struct FMOsc
 {
     using SmoothingStrategy = sst::basic_blocks::dsp::LagSmoothingStrategy;

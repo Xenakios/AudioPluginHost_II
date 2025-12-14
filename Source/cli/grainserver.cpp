@@ -73,6 +73,11 @@ BOOL WINAPI CtrlHandler(DWORD fdwCtrlType)
 
 inline events_t load_events_file(std::string path)
 {
+    std::map<int, std::function<void(const std::string &, float &)>> parsemap;
+    parsemap[0] = [](const std::string &str, float &target) {
+        if (!str.empty())
+            target = std::stof(str);
+    };
     events_t result;
     result.reserve(4096);
     try
@@ -100,19 +105,21 @@ inline events_t load_events_file(std::string path)
             if (tokens.size() >= 6 && !tokens[5].empty())
                 evt.elevation = std::stof(tokens[5]);
             if (tokens.size() >= 7 && !tokens[6].empty())
-                evt.envelope_type = std::stof(tokens[6]);
+                evt.generator_type = std::stof(tokens[6]);
             if (tokens.size() >= 8 && !tokens[7].empty())
-                evt.envelope_shape = std::stof(tokens[7]);
+                evt.envelope_type = std::stof(tokens[7]);
             if (tokens.size() >= 9 && !tokens[8].empty())
-                evt.sync_ratio = std::stof(tokens[8]);
-            if (tokens.size() >= 10)
+                evt.envelope_shape = std::stof(tokens[8]);
+            if (tokens.size() >= 10 && !tokens[9].empty())
+                evt.sync_ratio = std::stof(tokens[9]);
+            if (tokens.size() >= 11)
             {
-                evt.filterparams[0][0] = std::stof(tokens[9]);
-                evt.filterparams[0][1] = std::stof(tokens[10]);
-                evt.filterparams[0][2] = std::stof(tokens[11]);
-                evt.filterparams[1][0] = std::stof(tokens[12]);
-                evt.filterparams[1][1] = std::stof(tokens[13]);
-                evt.filterparams[1][2] = std::stof(tokens[14]);
+                evt.filterparams[0][0] = std::stof(tokens[10]);
+                evt.filterparams[0][1] = std::stof(tokens[11]);
+                evt.filterparams[0][2] = std::stof(tokens[12]);
+                evt.filterparams[1][0] = std::stof(tokens[13]);
+                evt.filterparams[1][1] = std::stof(tokens[14]);
+                evt.filterparams[1][2] = std::stof(tokens[15]);
             }
 
             result.push_back(evt);
