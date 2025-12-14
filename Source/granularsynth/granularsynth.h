@@ -271,6 +271,7 @@ class GranulatorVoice
     std::array<double, 2> resons = {0.0, 0.0};
     std::array<double, 2> filtextpars = {0.0, 0.0};
     alignas(16) std::array<double, 2> feedbacksignals = {0.0, 0.0};
+    alignas(16) SimpleEnvelope aux_envelope;
     float feedbackamt = 0.0f;
     float graingain = 0.0;
     float auxsend1 = 0.0;
@@ -358,6 +359,7 @@ class GranulatorVoice
                 }
             },
             theoscillator);
+
         float azi = std::clamp(evpars.azimuth, -180.0f, 180.0f);
         float ele = std::clamp(evpars.elevation, -180.0f, 180.0f);
         azi = degreesToRadians(azi);
@@ -379,6 +381,7 @@ class GranulatorVoice
         // actdur = std::pow(actdur, 2.0);
         // actdur = 0.001 + 0.999 * actdur;
         grain_end_phase = sr * actdur;
+        aux_envelope.start(1.0, -1.0, grain_end_phase);
 
         for (size_t i = 0; i < filters.size(); ++i)
         {
@@ -401,9 +404,15 @@ class GranulatorVoice
     }
     void process(float *outputs, int nframes)
     {
+        float aux_env_value = aux_envelope.step();
+        for (int i = 1; i < nframes; ++i)
+            aux_envelope.step();
         for (size_t i = 0; i < filters.size(); ++i)
         {
-            filters[i].makeCoefficients(0, cutoffs[i], resons[i], filtextpars[i]);
+            float cutoffmod = 0.0f;
+            if (i == 0)
+                cutoffmod = 12.0 * aux_env_value;
+            filters[i].makeCoefficients(0, cutoffs[i] + cutoffmod, resons[i], filtextpars[i]);
             filters[i].prepareBlock();
         }
         // int endphasewithtail = endphase + filters_tail * sr;
