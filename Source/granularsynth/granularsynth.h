@@ -81,18 +81,45 @@ inline int osc_name_to_index(std::string name)
 
 struct SimpleEnvelope
 {
-    double curvalue = 0.0;
-    double increment = 0.0;
+    static constexpr int maxnumsteps = 5;
+    std::array<float, maxnumsteps> steps;
+    int curstep = 0;
+    double steplen = 0.0;
+    double phase = 0.0;
+    SimpleEnvelope()
+    {
+        steps[0] = 1.0f;
+        steps[1] = 0.5f;
+        steps[2] = 0.0f;
+        steps[3] = -0.5f;
+        steps[4] = -1.0f;
+    }
     void start(double startvalue, double endvalue, int dursamples)
     {
-        curvalue = startvalue;
-        increment = (endvalue - startvalue) / dursamples;
+        curstep = 0;
+        phase = 0.0;
+        steplen = (double)dursamples / (maxnumsteps - 1);
     }
     double step()
     {
-        double result = curvalue;
-        curvalue += increment;
-        return result;
+        double y0 = steps[curstep];
+        double y1 = 0.0;
+        if (curstep + 1 < maxnumsteps - 1)
+        {
+            y1 = steps[curstep + 1];
+        }
+        else
+        {
+            y1 = steps[maxnumsteps - 1];
+        }
+        double y2 = y0 + (y1 - y0) / steplen * phase;
+        phase += 1.0;
+        if (phase >= steplen)
+        {
+            phase = 0.0;
+            ++curstep;
+        }
+        return y2;
     }
 };
 
@@ -586,7 +613,13 @@ class ToneGranulator
             voices.push_back(std::move(v));
         }
     }
-
+    void set_voice_aux_envelope(std::array<float, SimpleEnvelope::maxnumsteps> env)
+    {
+        for (auto &v : voices)
+        {
+            v->aux_envelope.steps = env;
+        }
+    }
     int num_out_chans = 0;
     int missedgrains = 0;
     void prepare(events_t evlist, int ambisonics_order)
