@@ -23,15 +23,15 @@ struct GrainEvent
         MD_NUMDESTS
     };
     GrainEvent() = default;
-    GrainEvent(double tpos, float dur, float hz, float vol)
-        : time_position(tpos), duration(dur), frequency_hz(hz), volume(vol)
+    GrainEvent(double tpos, float dur, float pitch, float vol)
+        : time_position(tpos), duration(dur), pitch_semitones(pitch), volume(vol)
     {
         for (int i = 0; i < MD_NUMDESTS; ++i)
             modamounts[i] = 0.0f;
     }
     double time_position = 0.0;
     float duration = 0.0f;
-    float frequency_hz = 0.0f;
+    float pitch_semitones = 0.0f;
     int generator_type = 0;
     float volume = 0.0f;
     float auxsend = 0.0f;
@@ -285,6 +285,7 @@ class GranulatorVoice
     alignas(16) std::array<double, 2> feedbacksignals = {0.0, 0.0};
     alignas(16) SimpleEnvelope aux_envelope;
     alignas(16) float modamounts[GrainEvent::MD_NUMDESTS];
+    float pitch_base = 0.0f;
     float feedbackamt = 0.0f;
     float graingain = 0.0;
     float auxsend1 = 0.0;
@@ -343,7 +344,7 @@ class GranulatorVoice
                 theoscillator = NoiseGen();
             std::visit([this](auto &q) { q.setSampleRate(sr); }, theoscillator);
         }
-        auto hz = std::clamp(evpars.frequency_hz, 1.0f, 22050.0f);
+        pitch_base = std::clamp(evpars.pitch_semitones, -48.0f, 64.0f);
         auto syncratio = std::clamp(evpars.sync_ratio, 1.0f, 16.0f);
         auto pw = evpars.pulse_width; // osc implementation clamps itself to 0..1
         auto fmhz = evpars.fm_frequency_hz;
@@ -352,9 +353,8 @@ class GranulatorVoice
         auto fmfeedback = std::clamp(evpars.fm_feedback, -1.0f, 1.0f);
         auto noisecorr = std::clamp(evpars.noisecorr, -1.0f, 1.0f);
         std::visit(
-            [hz, syncratio, pw, fmhz, fmfeedback, fmmodamount, noisecorr, this](auto &q) {
+            [syncratio, pw, fmhz, fmfeedback, fmmodamount, noisecorr, this](auto &q) {
                 q.reset();
-                q.setFrequency(hz);
                 q.setSyncRatio(syncratio);
                 // handle extra parameters of osc types
                 if constexpr (std::is_same_v<decltype(q), sst::basic_blocks::dsp::EBPulse<> &>)
@@ -401,7 +401,7 @@ class GranulatorVoice
         for (size_t i = 0; i < filters.size(); ++i)
         {
             filters[i].reset();
-            cutoffs[i] = std::clamp(evpars.filterparams[i][0] - 69.0f, -69.0f, 60.0f);
+            cutoffs[i] = std::clamp(evpars.filterparams[i][0] - 9.0f, -48.0f, 64.0f);
             resons[i] = std::clamp(evpars.filterparams[i][1], 0.0f, 1.0f);
             filtextpars[i] = std::clamp(evpars.filterparams[i][2], -1.0f, 1.0f);
         }
@@ -423,7 +423,16 @@ class GranulatorVoice
     {
         float aux_env_value = aux_envelope.step();
         for (int i = 1; i < nframes; ++i)
+        {
             aux_envelope.step();
+        }
+        std::visit(
+            [this, aux_env_value](auto &q) {
+                double finalpitch = pitch_base + aux_env_value * modamounts[GrainEvent::MD_PITCH];
+                double hz = 440.0 * std::pow(2.0, 1.0 / 12.0 * (finalpitch - 9.0));
+                q.setFrequency(hz);
+            },
+            theoscillator);
         for (size_t i = 0; i < filters.size(); ++i)
         {
             float cutoffmod = 0.0f;

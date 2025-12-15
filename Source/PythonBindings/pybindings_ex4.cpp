@@ -534,7 +534,7 @@ void init_py4(py::module_ &m, py::module_ &m_const)
 
     py::class_<GrainEvent>(m, "GrainEvent")
         .def(py::init<double, float, float, float>(), "time_position"_a, "duration"_a,
-             "frequency_hz"_a, "volume"_a)
+             "pitch_semitones"_a, "volume"_a)
         .def("set_mod_amount", &set_mod_amt)
         .def(
             "set_filter_param",
@@ -556,7 +556,7 @@ void init_py4(py::module_ &m, py::module_ &m_const)
         .def_readwrite("wavetype", &GrainEvent::generator_type)
         .def_readwrite("duration", &GrainEvent::duration)
         .def_readwrite("timepos", &GrainEvent::time_position)
-        .def_readwrite("frequency", &GrainEvent::frequency_hz)
+        .def_readwrite("pitch_semitones", &GrainEvent::pitch_semitones)
         .def_readwrite("pulse_width", &GrainEvent::pulse_width)
         .def_readwrite("fm_frequency", &GrainEvent::fm_frequency_hz)
         .def_readwrite("fm_depth", &GrainEvent::fm_amount)
