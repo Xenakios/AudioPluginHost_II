@@ -83,9 +83,9 @@ struct SimpleEnvelope
 {
     static constexpr int maxnumsteps = 5;
     std::array<float, maxnumsteps> steps;
-    int curstep = 0;
-    double steplen = 0.0;
-    double phase = 0.0;
+    alignas(16) int curstep = 0;
+    alignas(16) double steplen = 0.0;
+    alignas(16) double phase = 0.0;
     SimpleEnvelope()
     {
         steps[0] = 1.0f;
@@ -468,7 +468,6 @@ class GranulatorVoice
             filters[i].makeCoefficients(0, cutoffs[i] + cutoffmod, resons[i], filtextpars[i]);
             filters[i].prepareBlock();
         }
-        // int endphasewithtail = endphase + filters_tail * sr;
         int envpeakpos = envshape * grain_end_phase;
         envpeakpos = std::clamp(envpeakpos, 16, grain_end_phase - 16);
 
@@ -483,22 +482,26 @@ class GranulatorVoice
             {
                 outsample = std::visit([](auto &q) { return q.step(); }, theoscillator);
                 float envgain = 1.0f;
-                if (envtype == 0)
+                if (envtype == 0 || envtype == 1)
                 {
                     if (phase < envpeakpos)
                     {
                         envgain = xenakios::mapvalue<float>(phase, 0.0, envpeakpos, 0.0f, 1.0f);
-                        envgain = 1.0f - envgain;
-                        envgain = 1.0f - (envgain * envgain * envgain);
+                        if (envtype == 1)
+                        {
+                            envgain = 1.0f - envgain;
+                            envgain = 1.0f - (envgain * envgain * envgain);
+                        }
                     }
                     else if (phase >= envpeakpos)
                     {
                         envgain = xenakios::mapvalue<float>(phase, envpeakpos, grain_end_phase,
                                                             1.0f, 0.0f);
-                        envgain = envgain * envgain * envgain;
+                        if (envtype == 1)
+                            envgain = envgain * envgain * envgain;
                     }
                 }
-                else if (envtype == 1)
+                else if (envtype == 2)
                 {
                     float envfreq = 1.0f + std::floor(15.0f * envshape);
                     envgain = 0.5f + 0.5f * std::sin(M_PI * 2 / grain_end_phase * phase * envfreq +
