@@ -569,5 +569,6 @@ void init_py4(py::module_ &m, py::module_ &m_const)
              "filter_routing"_a, "filter1type"_a, "filter2type"_a, "grain_tail_len"_a = 0.005,
              "grain_tail_fade_len"_a = 0.005)
         .def("set_voice_aux_envelope", &ToneGranulator::set_voice_aux_envelope)
+        .def("set_voice_gain_envelope", &ToneGranulator::set_voice_gain_envelope)
         .def("render", render_granulator);
 }

@@ -79,23 +79,27 @@ inline int osc_name_to_index(std::string name)
     return -1;
 }
 
-struct SimpleEnvelope
+template <bool TaperEnabled> struct SimpleEnvelope
 {
     static constexpr int maxnumsteps = 5;
     std::array<float, maxnumsteps> steps;
     alignas(16) int curstep = 0;
     alignas(16) double steplen = 0.0;
     alignas(16) double phase = 0.0;
+    alignas(16) int taper_phase = 0;
+    alignas(16) int taper_len = 0;
     SimpleEnvelope()
     {
         steps[0] = 1.0f;
-        steps[1] = 0.5f;
-        steps[2] = 0.0f;
-        steps[3] = -0.5f;
-        steps[4] = -1.0f;
+        steps[1] = 0.75f;
+        steps[2] = 0.5f;
+        steps[3] = 0.25f;
+        steps[4] = 0.25;
     }
-    void start(double startvalue, double endvalue, int dursamples)
+    void start(int dursamples)
     {
+        taper_phase = 0;
+        taper_len = dursamples;
         curstep = 0;
         phase = 0.0;
         steplen = (double)dursamples / (maxnumsteps - 1);
@@ -118,6 +122,18 @@ struct SimpleEnvelope
         {
             phase = 0.0;
             ++curstep;
+        }
+        if constexpr (TaperEnabled)
+        {
+            double tapergain = 1.0;
+            const int taperfadelen = 32;
+            if (taper_phase < taperfadelen)
+                tapergain = xenakios::mapvalue<double>(taper_phase, 0, taperfadelen, 0.0, 1.0);
+            else if (taper_phase >= taper_len - taperfadelen)
+                tapergain = xenakios::mapvalue<double>(taper_phase, taper_len - taperfadelen,
+                                                       taper_len, 1.0, 0.0);
+            ++taper_phase;
+            return y2 * tapergain;
         }
         return y2;
     }
@@ -310,7 +326,8 @@ class GranulatorVoice
     std::array<double, 2> resons = {0.0, 0.0};
     std::array<double, 2> filtextpars = {0.0, 0.0};
     alignas(16) std::array<double, 2> feedbacksignals = {0.0, 0.0};
-    alignas(16) SimpleEnvelope aux_envelope;
+    alignas(16) SimpleEnvelope<true> gain_envelope;
+    alignas(16) SimpleEnvelope<false> aux_envelope;
     alignas(16) float modamounts[GrainEvent::MD_NUMDESTS];
     float pitch_base = 0.0f;
     float feedbackamt = 0.0f;
@@ -423,7 +440,8 @@ class GranulatorVoice
         // actdur = std::pow(actdur, 2.0);
         // actdur = 0.001 + 0.999 * actdur;
         grain_end_phase = sr * actdur;
-        aux_envelope.start(1.0, -1.0, grain_end_phase);
+        gain_envelope.start(grain_end_phase);
+        aux_envelope.start(grain_end_phase);
 
         for (size_t i = 0; i < filters.size(); ++i)
         {
@@ -481,6 +499,8 @@ class GranulatorVoice
             if (phase < grain_end_phase)
             {
                 outsample = std::visit([](auto &q) { return q.step(); }, theoscillator);
+                float envgain = gain_envelope.step();
+                /*
                 float envgain = 1.0f;
                 if (envtype == 0 || envtype == 1)
                 {
@@ -508,6 +528,7 @@ class GranulatorVoice
                                                      (1.5f * M_PI));
                 }
                 envgain = std::clamp(envgain, 0.0f, 1.0f);
+                */
                 outsample *= envgain * graingain;
             }
             if (filter_routing == FR_SERIAL)
@@ -616,11 +637,18 @@ class ToneGranulator
             voices.push_back(std::move(v));
         }
     }
-    void set_voice_aux_envelope(std::array<float, SimpleEnvelope::maxnumsteps> env)
+    void set_voice_aux_envelope(std::array<float, SimpleEnvelope<false>::maxnumsteps> env)
     {
         for (auto &v : voices)
         {
             v->aux_envelope.steps = env;
+        }
+    }
+    void set_voice_gain_envelope(std::array<float, SimpleEnvelope<false>::maxnumsteps> env)
+    {
+        for (auto &v : voices)
+        {
+            v->gain_envelope.steps = env;
         }
     }
     int num_out_chans = 0;
