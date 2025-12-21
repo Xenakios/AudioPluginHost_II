@@ -147,7 +147,10 @@ struct Config
             LFO1,
             LFO2,
             LFO3,
-            ENV0
+            ENV0,
+            ENV1,
+            MIDICCSTART,
+            MIDICCEND = MIDICCSTART + 64
         } src{LFO0};
         int index0{0};
         int index1{0};
@@ -182,6 +185,21 @@ struct Config
 
     using RoutingExtraPayload = int;
 
+    static std::function<float(float)> getCurveOperator(CurveIdentifier id)
+    {
+        switch (id)
+        {
+        case 2:
+            return [](auto x) { return std::sin(x); };
+        case 1:
+            return [](auto x) { return x * x * x; };
+        case 3:
+            return [](auto x) { return std::round(x * 4.0) / 4.0; };
+        }
+
+        return [](auto x) { return x; };
+    }
+
     static constexpr bool IsFixedMatrix{true};
     static constexpr size_t FixedMatrixSize{16};
     static constexpr bool ProvidesNonZeroTargetBases{true};
@@ -214,8 +232,8 @@ class MyModMatrix
   public:
     FixedMatrix<Config> m;
     FixedMatrix<Config>::RoutingTable rt;
-    std::array<Config::SourceIdentifier, 5> sourceIds;
-    std::array<float, 5> sourceValues{0.0f, 0.0f, 0.0f, 0.0f, 0.0f};
+    std::array<Config::SourceIdentifier, 6> sourceIds;
+    std::array<float, 6> sourceValues{0.0f, 0.0f, 0.0f, 0.0f, 0.0f};
     std::array<Config::TargetIdentifier, 8> targetIds;
     std::array<float, 8> targetBaseValues;
     MyModMatrix()
@@ -225,11 +243,13 @@ class MyModMatrix
         sourceIds[2] = Config::SourceIdentifier{Config::SourceIdentifier::LFO2};
         sourceIds[3] = Config::SourceIdentifier{Config::SourceIdentifier::LFO3};
         sourceIds[4] = Config::SourceIdentifier{Config::SourceIdentifier::ENV0};
+        sourceIds[5] = Config::SourceIdentifier{Config::SourceIdentifier::ENV1};
         m.bindSourceValue(sourceIds[0], sourceValues[0]);
         m.bindSourceValue(sourceIds[1], sourceValues[1]);
         m.bindSourceValue(sourceIds[2], sourceValues[2]);
         m.bindSourceValue(sourceIds[3], sourceValues[3]);
         m.bindSourceValue(sourceIds[4], sourceValues[4]);
+        m.bindSourceValue(sourceIds[5], sourceValues[5]);
         for (size_t i = 0; i < targetIds.size(); ++i)
         {
             targetIds[i] = Config::TargetIdentifier{static_cast<int>(i)};
@@ -241,6 +261,10 @@ class MyModMatrix
 
         rt.updateRoutingAt(0, sourceIds[0], targetIds[0], 0.5);
         rt.updateRoutingAt(1, sourceIds[1], sourceIds[4], {}, targetIds[0], 0.5);
+        //rt.updateRoutingAt(2, sourceIds[1], targetIds[1], 0.95);
+        rt.updateRoutingAt(2, sourceIds[1], sourceIds[5], {}, targetIds[1], 0.5);
+        rt.routes[2].curve = 3;
+
         m.prepare(rt, sr, blocksize);
 
         choc::audio::AudioFileProperties props;
@@ -251,19 +275,23 @@ class MyModMatrix
         auto writer = format.createWriter(R"(C:\MusicAudio\Dome\mm_out_01.wav)", props);
         choc::buffer::ChannelArrayBuffer<float> outbuf{2, blocksize};
         outbuf.clear();
-        size_t outlen = 3.0 * sr;
+        size_t outlen = 10.0 * sr;
         size_t outcounter = 0;
-        xenakios::Envelope depth_envelope{{{0.0, 0.0}, {1.0, 1.0}, {2.0, 0.0}}};
+        xenakios::Envelope depth_envelope{
+            {{0.0, 0.0}, {1.0, 1.0}, {2.0, 0.0}, {5.5, 0.0}, {5.7, 1.0}, {5.9, 0.0}}};
+        xenakios::Envelope depth_envelope2{{{0.0, 0.0}, {10.0, 1.0}}};
         while (outcounter < outlen)
         {
             sourceValues[0] = std::sin(M_PI * 2 / sr * outcounter * 1.0);
             sourceValues[1] = std::sin(M_PI * 2 / sr * outcounter * 9.0);
+            sourceValues[2] = std::sin(M_PI * 2 / sr * outcounter * 13.27);
             sourceValues[4] = depth_envelope.getValueAtPosition(outcounter / sr);
+            sourceValues[5] = depth_envelope2.getValueAtPosition(outcounter / sr);
             m.process();
             for (size_t i = 0; i < blocksize; ++i)
             {
                 outbuf.getSample(0, i) = m.getTargetValue(targetIds[0]);
-                outbuf.getSample(1, i) = 0.0f;
+                outbuf.getSample(1, i) = m.getTargetValue(targetIds[1]);
             }
             writer->appendFrames(outbuf.getView());
             outcounter += blocksize;
