@@ -272,6 +272,18 @@ inline py::array_t<float> generate_fm(xenakios::Envelope &carrierpitchenv,
     return output_audio;
 }
 
+inline std::vector<std::string> get_sst_filter_types()
+{
+    init_filter_infos();
+    std::vector<std::string> result;
+    result.reserve(g_filter_infos.size());
+    for (auto &i : g_filter_infos)
+    {
+        result.push_back(i.address);
+    }
+    return result;
+}
+
 inline py::array_t<float> render_granulator(ToneGranulator &gran, events_t evlist,
                                             std::string outputmode)
 {
@@ -531,6 +543,7 @@ void init_py4(py::module_ &m, py::module_ &m_const)
           "feedback"_a, "samplerate"_a, "duration"_a);
     m.def("generate_corrnoise", &generate_corrnoise);
     m.def("tone_types", &osc_types);
+    m.def("get_sst_filter_types", &get_sst_filter_types);
 
     py::class_<GrainEvent>(m, "GrainEvent")
         .def(py::init<double, float, float, float>(), "time_position"_a, "duration"_a,
