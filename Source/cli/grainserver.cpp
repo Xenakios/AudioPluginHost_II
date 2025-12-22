@@ -2,7 +2,6 @@
 #include "RtAudio.h"
 #include "text/choc_Files.h"
 #include "platform/choc_FileWatcher.h"
-#include "sst/basic-blocks/mod-matrix/ModMatrix.h"
 #include "audio/choc_AudioFileFormat.h"
 #include "audio/choc_AudioFileFormat_WAV.h"
 
@@ -135,171 +134,43 @@ inline events_t load_events_file(std::string path)
     return result;
 }
 
-using namespace sst::basic_blocks::mod_matrix;
-
-struct Config
+inline void test_sst_modmatrix()
 {
-    struct SourceIdentifier
+    double sr = 44100.0;
+    const size_t blocksize = granul_block_size;
+    GranulatorModMatrix mm{sr};
+    choc::audio::AudioFileProperties props;
+    props.numChannels = 2;
+    props.sampleRate = sr;
+    props.bitDepth = choc::audio::BitDepth::float32;
+    choc::audio::WAVAudioFileFormat<true> format;
+    auto writer = format.createWriter(R"(C:\MusicAudio\Dome\mm_out_01.wav)", props);
+    choc::buffer::ChannelArrayBuffer<float> outbuf{2, blocksize};
+    outbuf.clear();
+    size_t outlen = 10.0 * sr;
+    size_t outcounter = 0;
+    xenakios::Envelope depth_envelope{
+        {{0.0, 0.0}, {1.0, 1.0}, {2.0, 0.0}, {5.5, 0.0}, {5.7, 1.0}, {5.9, 0.0}}};
+    xenakios::Envelope depth_envelope2{{{0.0, 0.0}, {10.0, 1.0}}};
+    while (outcounter < outlen)
     {
-        enum SI
+        for (size_t i = 0; i < mm.numLfos; ++i)
         {
-            LFO0,
-            LFO1,
-            LFO2,
-            LFO3,
-            ENV0,
-            ENV1,
-            MIDICCSTART,
-            MIDICCEND = MIDICCSTART + 64
-        } src{LFO0};
-        int index0{0};
-        int index1{0};
-
-        bool operator==(const SourceIdentifier &other) const
-        {
-            return src == other.src && index0 == other.index0 && index1 == other.index1;
+            mm.m_lfos[i]->process_block(mm.lfo_rates[i], 0.0, mm.lfo_shapes[i]);
+            mm.sourceValues[i] = mm.m_lfos[i]->outputBlock[0];
         }
-    };
-
-    struct TargetIdentifier
-    {
-        int baz{0};
-        uint32_t nm{};
-        int16_t depthPosition{-1};
-
-        bool operator==(const TargetIdentifier &other) const
+        mm.sourceValues[4] = depth_envelope.getValueAtPosition(outcounter / sr);
+        mm.sourceValues[5] = depth_envelope2.getValueAtPosition(outcounter / sr);
+        mm.m.process();
+        for (size_t i = 0; i < blocksize; ++i)
         {
-            return baz == other.baz && nm == other.nm && depthPosition == other.depthPosition;
+            outbuf.getSample(0, i) = mm.m.getTargetValue(mm.targetIds[0]);
+            outbuf.getSample(1, i) = mm.m.getTargetValue(mm.targetIds[1]);
         }
-    };
-
-    using CurveIdentifier = int;
-
-    static bool isTargetModMatrixDepth(const TargetIdentifier &t) { return t.depthPosition >= 0; }
-    static bool supportsLag(const SourceIdentifier &s) { return true; }
-    static size_t getTargetModMatrixElement(const TargetIdentifier &t)
-    {
-        assert(isTargetModMatrixDepth(t));
-        return (size_t)t.depthPosition;
+        writer->appendFrames(outbuf.getView());
+        outcounter += blocksize;
     }
-
-    using RoutingExtraPayload = int;
-
-    static std::function<float(float)> getCurveOperator(CurveIdentifier id)
-    {
-        switch (id)
-        {
-        case 2:
-            return [](auto x) { return std::sin(x); };
-        case 1:
-            return [](auto x) { return x * x * x; };
-        case 3:
-            return [](auto x) { return std::round(x * 4.0) / 4.0; };
-        }
-
-        return [](auto x) { return x; };
-    }
-
-    static constexpr bool IsFixedMatrix{true};
-    static constexpr size_t FixedMatrixSize{16};
-    static constexpr bool ProvidesNonZeroTargetBases{true};
-};
-
-template <> struct std::hash<Config::SourceIdentifier>
-{
-    std::size_t operator()(const Config::SourceIdentifier &s) const noexcept
-    {
-        auto h1 = std::hash<int>{}((int)s.src);
-        auto h2 = std::hash<int>{}((int)s.index0);
-        auto h3 = std::hash<int>{}((int)s.index1);
-        return h1 ^ (h2 << 1) ^ (h3 << 2);
-    }
-};
-
-template <> struct std::hash<Config::TargetIdentifier>
-{
-    std::size_t operator()(const Config::TargetIdentifier &s) const noexcept
-    {
-        auto h1 = std::hash<int>{}((int)s.baz);
-        auto h2 = std::hash<uint32_t>{}((int)s.nm);
-
-        return h1 ^ (h2 << 1);
-    }
-};
-
-class MyModMatrix
-{
-  public:
-    FixedMatrix<Config> m;
-    FixedMatrix<Config>::RoutingTable rt;
-    std::array<Config::SourceIdentifier, 6> sourceIds;
-    std::array<float, 6> sourceValues{0.0f, 0.0f, 0.0f, 0.0f, 0.0f};
-    std::array<Config::TargetIdentifier, 8> targetIds;
-    std::array<float, 8> targetBaseValues;
-    MyModMatrix()
-    {
-        sourceIds[0] = Config::SourceIdentifier{Config::SourceIdentifier::LFO0};
-        sourceIds[1] = Config::SourceIdentifier{Config::SourceIdentifier::LFO1};
-        sourceIds[2] = Config::SourceIdentifier{Config::SourceIdentifier::LFO2};
-        sourceIds[3] = Config::SourceIdentifier{Config::SourceIdentifier::LFO3};
-        sourceIds[4] = Config::SourceIdentifier{Config::SourceIdentifier::ENV0};
-        sourceIds[5] = Config::SourceIdentifier{Config::SourceIdentifier::ENV1};
-        m.bindSourceValue(sourceIds[0], sourceValues[0]);
-        m.bindSourceValue(sourceIds[1], sourceValues[1]);
-        m.bindSourceValue(sourceIds[2], sourceValues[2]);
-        m.bindSourceValue(sourceIds[3], sourceValues[3]);
-        m.bindSourceValue(sourceIds[4], sourceValues[4]);
-        m.bindSourceValue(sourceIds[5], sourceValues[5]);
-        for (size_t i = 0; i < targetIds.size(); ++i)
-        {
-            targetIds[i] = Config::TargetIdentifier{static_cast<int>(i)};
-            targetBaseValues[i] = 0.0f;
-            m.bindTargetBaseValue(targetIds[i], targetBaseValues[i]);
-        }
-        const double sr = 44100;
-        const size_t blocksize = 16;
-
-        rt.updateRoutingAt(0, sourceIds[0], targetIds[0], 0.5);
-        rt.updateRoutingAt(1, sourceIds[1], sourceIds[4], {}, targetIds[0], 0.5);
-        //rt.updateRoutingAt(2, sourceIds[1], targetIds[1], 0.95);
-        rt.updateRoutingAt(2, sourceIds[1], sourceIds[5], {}, targetIds[1], 0.5);
-        rt.routes[2].curve = 3;
-
-        m.prepare(rt, sr, blocksize);
-
-        choc::audio::AudioFileProperties props;
-        props.numChannels = 2;
-        props.sampleRate = sr;
-        props.bitDepth = choc::audio::BitDepth::float32;
-        choc::audio::WAVAudioFileFormat<true> format;
-        auto writer = format.createWriter(R"(C:\MusicAudio\Dome\mm_out_01.wav)", props);
-        choc::buffer::ChannelArrayBuffer<float> outbuf{2, blocksize};
-        outbuf.clear();
-        size_t outlen = 10.0 * sr;
-        size_t outcounter = 0;
-        xenakios::Envelope depth_envelope{
-            {{0.0, 0.0}, {1.0, 1.0}, {2.0, 0.0}, {5.5, 0.0}, {5.7, 1.0}, {5.9, 0.0}}};
-        xenakios::Envelope depth_envelope2{{{0.0, 0.0}, {10.0, 1.0}}};
-        while (outcounter < outlen)
-        {
-            sourceValues[0] = std::sin(M_PI * 2 / sr * outcounter * 1.0);
-            sourceValues[1] = std::sin(M_PI * 2 / sr * outcounter * 9.0);
-            sourceValues[2] = std::sin(M_PI * 2 / sr * outcounter * 13.27);
-            sourceValues[4] = depth_envelope.getValueAtPosition(outcounter / sr);
-            sourceValues[5] = depth_envelope2.getValueAtPosition(outcounter / sr);
-            m.process();
-            for (size_t i = 0; i < blocksize; ++i)
-            {
-                outbuf.getSample(0, i) = m.getTargetValue(targetIds[0]);
-                outbuf.getSample(1, i) = m.getTargetValue(targetIds[1]);
-            }
-            writer->appendFrames(outbuf.getView());
-            outcounter += blocksize;
-        }
-    }
-};
-
-inline void test_sst_modmatrix() { MyModMatrix mm; }
+}
 
 int main()
 {

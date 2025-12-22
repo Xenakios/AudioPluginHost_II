@@ -10,6 +10,191 @@
 #include "../Common/xap_breakpoint_envelope.h"
 #include "../Common/xen_ambisonics.h"
 #include "grainfx.h"
+#include "sst/basic-blocks/mod-matrix/ModMatrix.h"
+#include "sst/basic-blocks/modulators/SimpleLFO.h"
+
+using namespace sst::basic_blocks::mod_matrix;
+
+const int granul_block_size = 8;
+
+struct GranulatorModConfig
+{
+    struct SourceIdentifier
+    {
+        enum SI
+        {
+            LFO0,
+            LFO1,
+            LFO2,
+            LFO3,
+            LFO4,
+            LFO5,
+            LFO6,
+            LFO7,
+            ENV0,
+            ENV1,
+            MIDICCSTART,
+            MIDICCEND = MIDICCSTART + 64
+        } src{LFO0};
+
+        bool operator==(const SourceIdentifier &other) const { return src == other.src; }
+    };
+
+    struct TargetIdentifier
+    {
+        int baz{0};
+        uint32_t nm{};
+        int16_t depthPosition{-1};
+
+        bool operator==(const TargetIdentifier &other) const
+        {
+            return baz == other.baz && nm == other.nm && depthPosition == other.depthPosition;
+        }
+    };
+
+    using CurveIdentifier = int;
+
+    static bool isTargetModMatrixDepth(const TargetIdentifier &t) { return t.depthPosition >= 0; }
+    static bool supportsLag(const SourceIdentifier &s) { return true; }
+    static size_t getTargetModMatrixElement(const TargetIdentifier &t)
+    {
+        assert(isTargetModMatrixDepth(t));
+        return (size_t)t.depthPosition;
+    }
+
+    using RoutingExtraPayload = int;
+
+    static std::function<float(float)> getCurveOperator(CurveIdentifier id)
+    {
+        switch (id)
+        {
+        case 2:
+            return [](auto x) { return std::sin(x); };
+        case 1:
+            return [](auto x) { return x * x * x; };
+        case 3:
+            return [](auto x) { return std::round(x * 4.0) / 4.0; };
+        }
+
+        return [](auto x) { return x; };
+    }
+
+    static constexpr bool IsFixedMatrix{true};
+    static constexpr size_t FixedMatrixSize{16};
+    static constexpr bool ProvidesNonZeroTargetBases{true};
+};
+
+template <> struct std::hash<GranulatorModConfig::SourceIdentifier>
+{
+    std::size_t operator()(const GranulatorModConfig::SourceIdentifier &s) const noexcept
+    {
+        auto h1 = std::hash<int>{}((int)s.src);
+        return h1;
+        // auto h2 = std::hash<int>{}((int)s.index0);
+        // auto h3 = std::hash<int>{}((int)s.index1);
+        // return h1 ^ (h2 << 1) ^ (h3 << 2);
+    }
+};
+
+template <> struct std::hash<GranulatorModConfig::TargetIdentifier>
+{
+    std::size_t operator()(const GranulatorModConfig::TargetIdentifier &s) const noexcept
+    {
+        auto h1 = std::hash<int>{}((int)s.baz);
+        auto h2 = std::hash<uint32_t>{}((int)s.nm);
+
+        return h1 ^ (h2 << 1);
+    }
+};
+
+class GranulatorModMatrix
+{
+  public:
+    FixedMatrix<GranulatorModConfig> m;
+    FixedMatrix<GranulatorModConfig>::RoutingTable rt;
+    std::array<GranulatorModConfig::SourceIdentifier, 6> sourceIds;
+    std::array<float, 6> sourceValues{0.0f, 0.0f, 0.0f, 0.0f, 0.0f};
+    std::array<GranulatorModConfig::TargetIdentifier, 8> targetIds;
+    std::array<float, 8> targetBaseValues;
+    double samplerate = 0.0;
+    void initTables()
+    {
+        double dsamplerate_os = samplerate * 2;
+        for (int i = 0; i < 512; ++i)
+        {
+            double k =
+                dsamplerate_os * pow(2.0, (((double)i - 256.0) / 16.0)) / (double)BLOCK_SIZE_OS;
+            table_envrate_linear[i] = (float)(1.f / k);
+        }
+    }
+    float envelope_rate_linear_nowrap(float x)
+    {
+        x *= 16.f;
+        x += 256.f;
+        int e = std::clamp<int>((int)x, 0, 0x1ff - 1);
+
+        float a = x - (float)e;
+
+        return (1 - a) * table_envrate_linear[e & 0x1ff] +
+               a * table_envrate_linear[(e + 1) & 0x1ff];
+    }
+    static constexpr size_t BLOCKSIZE = granul_block_size;
+    static constexpr size_t BLOCK_SIZE_OS = BLOCKSIZE * 2;
+    static constexpr size_t numLfos = 4;
+    using lfo_t = sst::basic_blocks::modulators::SimpleLFO<GranulatorModMatrix, BLOCKSIZE>;
+    alignas(32) std::array<std::unique_ptr<lfo_t>, numLfos> m_lfos;
+    alignas(32) float table_envrate_linear[512];
+    alignas(32) std::array<sst::basic_blocks::dsp::RNG, numLfos> m_rngs;
+    std::array<int, numLfos> lfo_shapes{lfo_t::TRI, lfo_t::SINE, lfo_t::SINE, lfo_t::SINE};
+    std::array<float, 4> lfo_rates{0.0f, 1.0f, 2.0f, 3.0f};
+    GranulatorModMatrix(double sr) : samplerate(sr)
+    {
+        initTables();
+        for (size_t i = 0; i < numLfos; ++i)
+        {
+            auto lfo = std::make_unique<lfo_t>(this);
+            m_lfos[i] = std::move(lfo);
+            m_lfos[i]->attack(0);
+        }
+
+        sourceIds[0] =
+            GranulatorModConfig::SourceIdentifier{GranulatorModConfig::SourceIdentifier::LFO0};
+        sourceIds[1] =
+            GranulatorModConfig::SourceIdentifier{GranulatorModConfig::SourceIdentifier::LFO1};
+        sourceIds[2] =
+            GranulatorModConfig::SourceIdentifier{GranulatorModConfig::SourceIdentifier::LFO2};
+        sourceIds[3] =
+            GranulatorModConfig::SourceIdentifier{GranulatorModConfig::SourceIdentifier::LFO3};
+        sourceIds[4] =
+            GranulatorModConfig::SourceIdentifier{GranulatorModConfig::SourceIdentifier::ENV0};
+        sourceIds[5] =
+            GranulatorModConfig::SourceIdentifier{GranulatorModConfig::SourceIdentifier::ENV1};
+        m.bindSourceValue(sourceIds[0], sourceValues[0]);
+        m.bindSourceValue(sourceIds[1], sourceValues[1]);
+        m.bindSourceValue(sourceIds[2], sourceValues[2]);
+        m.bindSourceValue(sourceIds[3], sourceValues[3]);
+        m.bindSourceValue(sourceIds[4], sourceValues[4]);
+        m.bindSourceValue(sourceIds[5], sourceValues[5]);
+        for (size_t i = 0; i < targetIds.size(); ++i)
+        {
+            targetIds[i] = GranulatorModConfig::TargetIdentifier{static_cast<int>(i)};
+            targetBaseValues[i] = 0.0f;
+            m.bindTargetBaseValue(targetIds[i], targetBaseValues[i]);
+        }
+
+        const size_t blocksize = granul_block_size;
+
+        rt.updateRoutingAt(0, sourceIds[0], targetIds[0], 0.5);
+        rt.updateRoutingAt(1, sourceIds[1], sourceIds[4], {}, targetIds[0], 0.5);
+        // rt.updateRoutingAt(2, sourceIds[1], targetIds[1], 0.95);
+        rt.updateRoutingAt(2, sourceIds[1], sourceIds[5], {}, targetIds[1], 0.5);
+        rt.routes[2].curve = 3;
+
+        m.prepare(rt, sr, blocksize);
+
+        
+    }
+};
 
 struct GrainEvent
 {
@@ -51,8 +236,6 @@ struct GrainEvent
 };
 
 template <typename T> inline T degreesToRadians(T degrees) { return degrees * (M_PI / 180.0); }
-
-const int granul_block_size = 8;
 
 struct tone_info
 {
