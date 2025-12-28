@@ -191,8 +191,6 @@ class GranulatorModMatrix
         rt.routes[2].curve = 3;
 
         m.prepare(rt, sr, blocksize);
-
-        
     }
 };
 
@@ -775,8 +773,12 @@ class ToneGranulator
 
     int evindex = 0;
     int playposframes = 0;
+    int num_out_chans = 0;
+    int missedgrains = 0;
+    alignas(16) double graingen_phase = 0.0;
+    alignas(16) double graingen_phase_prior = 2.0;
     alignas(16) sst::basic_blocks::dsp::OnePoleLag<float, true> gainlag;
-
+    xenakios::Xoroshiro128Plus rng;
     ToneGranulator(double sr, int filter_routing, std::string filtertype0, std::string filtertype1,
                    float tail_len, float tail_fade_len)
         : m_sr(sr)
@@ -834,8 +836,7 @@ class ToneGranulator
             v->gain_envelope.steps = env;
         }
     }
-    int num_out_chans = 0;
-    int missedgrains = 0;
+
     void prepare(events_t evlist, int ambisonics_order)
     {
         if (thread_op == 1)
@@ -843,13 +844,18 @@ class ToneGranulator
             std::print("prepare called while audio thread should do state switch!\n");
         }
         missedgrains = 0;
-        events_to_switch = std::move(evlist);
-        std::sort(
-            events_to_switch.begin(), events_to_switch.end(),
-            [](GrainEvent &lhs, GrainEvent &rhs) { return lhs.time_position < rhs.time_position; });
-        std::erase_if(events_to_switch, [](GrainEvent &e) {
-            return e.time_position < 0.0 || (e.time_position + e.duration) > 120.0;
-        });
+        if (evlist.size() > 0)
+        {
+            events_to_switch = std::move(evlist);
+            std::sort(events_to_switch.begin(), events_to_switch.end(),
+                      [](GrainEvent &lhs, GrainEvent &rhs) {
+                          return lhs.time_position < rhs.time_position;
+                      });
+            std::erase_if(events_to_switch, [](GrainEvent &e) {
+                return e.time_position < 0.0 || (e.time_position + e.duration) > 120.0;
+            });
+        }
+
         std::map<int, int> aotonumchans{{1, 4}, {2, 9}, {3, 16}};
         for (auto &v : voices)
         {
@@ -869,37 +875,78 @@ class ToneGranulator
             gainlag.setRateInMilliseconds(1000.0, m_sr, 1.0);
             gainlag.setTarget(0.0);
             thread_op = 0;
+            graingen_phase = 0.0;
+            graingen_phase_prior = 2.0;
         }
+        bool self_generate = false;
+        if (events.size() == 0)
+            self_generate = true;
         int bufframecount = 0;
         while (bufframecount < nframes)
         {
-            GrainEvent *ev = nullptr;
-            if (evindex < events.size())
-                ev = &events[evindex];
-            while (ev && std::floor(ev->time_position * m_sr) < playposframes + granul_block_size)
+            if (!self_generate)
             {
-                bool wasfound = false;
-                for (int j = 0; j < voices.size(); ++j)
-                {
-                    if (!voices[j]->active)
-                    {
-                        // std::print("starting voice {} for event {}\n", j, evindex);
-                        voices[j]->grainid = graincount;
-                        voices[j]->start(*ev);
-                        wasfound = true;
-                        ++graincount;
-                        break;
-                    }
-                }
-                if (!wasfound)
-                {
-                    ++missedgrains;
-                }
-                ++evindex;
-                if (evindex >= events.size())
-                    ev = nullptr;
-                else
+                GrainEvent *ev = nullptr;
+                if (evindex < events.size())
                     ev = &events[evindex];
+                while (ev &&
+                       std::floor(ev->time_position * m_sr) < playposframes + granul_block_size)
+                {
+                    bool wasfound = false;
+                    for (int j = 0; j < voices.size(); ++j)
+                    {
+                        if (!voices[j]->active)
+                        {
+                            // std::print("starting voice {} for event {}\n", j, evindex);
+                            voices[j]->grainid = graincount;
+                            voices[j]->start(*ev);
+                            wasfound = true;
+                            ++graincount;
+                            break;
+                        }
+                    }
+                    if (!wasfound)
+                    {
+                        ++missedgrains;
+                    }
+                    ++evindex;
+                    if (evindex >= events.size())
+                        ev = nullptr;
+                    else
+                        ev = &events[evindex];
+                }
+            }
+            else
+            {
+                double grate = 0.5;
+                for (int i = 0; i < granul_block_size; ++i)
+                {
+                    if (graingen_phase_prior > graingen_phase)
+                    {
+                        GrainEvent genev{0.0, 0.5, rng.nextFloatInRange(-12.0, 12.0), 0.75};
+                        bool wasfound = false;
+                        for (int j = 0; j < voices.size(); ++j)
+                        {
+                            if (!voices[j]->active)
+                            {
+                                std::print("starting voice {} for autogenerated event\n", j);
+                                voices[j]->grainid = graincount;
+                                voices[j]->start(genev);
+                                wasfound = true;
+                                ++graincount;
+                                break;
+                            }
+                        }
+                        if (!wasfound)
+                        {
+                            ++missedgrains;
+                        }
+                    }
+                    graingen_phase_prior = graingen_phase;
+                    graingen_phase += 1.0 / m_sr / grate;
+                    if (graingen_phase >= 1.0)
+                        graingen_phase -= 1.0;
+                }
             }
             alignas(16) double mixsum[16][granul_block_size];
             for (int i = 0; i < 16; ++i)

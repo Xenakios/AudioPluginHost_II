@@ -172,10 +172,20 @@ inline void test_sst_modmatrix()
     }
 }
 
-int main()
+int main(int argc, char **argv)
 {
-    test_sst_modmatrix();
-    return 0;
+    // test_sst_modmatrix();
+    // return 0;
+    bool use_events_file = true;
+    if (argc >= 2)
+    {
+        if (atoi(argv[1]) == 1)
+        {
+            use_events_file = false;
+        }
+    }
+    if (!use_events_file)
+        std::print("autogenerating grain events\n");
     SetConsoleCtrlHandler(CtrlHandler, TRUE);
     double sr = 44100.0;
     double phase = 0.0;
@@ -192,14 +202,24 @@ int main()
     std::print("trying to open {}\n", rtaudio->getDeviceInfo(spars.deviceId).name);
     unsigned int bsize = 256;
     std::string grainfile = R"(C:\MusicAudio\sourcesamples\test_signals\tones\grains.txt)";
-    choc::file::Watcher watcher{grainfile, [&](const choc::file::Watcher::Event &ev) {
-                                    // std::print("file was changed {}\n",ev.time);
-                                    auto evlist = load_events_file(grainfile);
-                                    if (evlist.size() > 0)
-                                    {
-                                        granulator->prepare(std::move(evlist), 1);
-                                    }
-                                }};
+    std::unique_ptr<choc::file::Watcher> watcher;
+    if (use_events_file)
+    {
+        watcher = std::make_unique<choc::file::Watcher>(
+            grainfile, [&](const choc::file::Watcher::Event &ev) {
+                // std::print("file was changed {}\n",ev.time);
+                auto evlist = load_events_file(grainfile);
+                if (evlist.size() > 0)
+                {
+                    granulator->prepare(std::move(evlist), 1);
+                }
+            });
+    }
+    else
+    {
+        granulator->prepare({}, 1);
+    }
+
     cbdata.procbuffer.resize(16 * 1024);
     if (rtaudio->openStream(&spars, nullptr, RTAUDIO_FLOAT32, sr, &bsize, audiocb, &cbdata) ==
         RTAUDIO_NO_ERROR)
