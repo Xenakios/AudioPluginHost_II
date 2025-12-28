@@ -788,6 +788,9 @@ class ToneGranulator
     float azi_center = 0.0;
     float azi_spread = 0.0;
     float osc_sync = 0.0;
+    float filt_cut_off = 0.0;
+    float filt_reso = 0.0;
+    float grain_pitch_mod = 0.0;
     ToneGranulator(double sr, int filter_routing, std::string filtertype0, std::string filtertype1,
                    float tail_len, float tail_fade_len)
         : m_sr(sr)
@@ -887,7 +890,10 @@ class ToneGranulator
                 float azi = rng.nextFloatInRange(azi_center - azi_spread, azi_center + azi_spread);
                 genev.azimuth = azi;
                 genev.generator_type = 2;
-                genev.sync_ratio = std::pow(2.0,osc_sync);
+                genev.sync_ratio = std::pow(2.0, osc_sync);
+                genev.filterparams[0][0] = filt_cut_off;
+                genev.filterparams[0][1] = filt_reso;
+                genev.modamounts[GrainEvent::MD_PITCH] = grain_pitch_mod;
                 bool wasfound = false;
                 for (int j = 0; j < voices.size(); ++j)
                 {
