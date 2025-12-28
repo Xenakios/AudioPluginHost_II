@@ -303,6 +303,8 @@ template <bool TaperEnabled> struct SimpleEnvelope
         {
             phase = 0.0;
             ++curstep;
+            if (curstep >= maxnumsteps )
+                curstep = maxnumsteps - 1;
         }
         if constexpr (TaperEnabled)
         {
@@ -781,6 +783,8 @@ class ToneGranulator
     xenakios::Xoroshiro128Plus rng;
     float pitch_center = 0.0f;
     float pitch_spread = 0.0f;
+    float grain_dur = 0.5;
+    float grain_rate_oct = 0.0;
     ToneGranulator(double sr, int filter_routing, std::string filtertype0, std::string filtertype1,
                    float tail_len, float tail_fade_len)
         : m_sr(sr)
@@ -920,14 +924,14 @@ class ToneGranulator
             }
             else
             {
-                double grate = 0.10;
+                double grate = 1.0 / std::pow(2.0, grain_rate_oct);
                 for (int i = 0; i < granul_block_size; ++i)
                 {
                     if (graingen_phase_prior > graingen_phase)
                     {
                         float pitch = rng.nextFloatInRange(pitch_center - pitch_spread,
                                                            pitch_center + pitch_spread);
-                        GrainEvent genev{0.0, 0.5, pitch, 0.75};
+                        GrainEvent genev{0.0, grain_dur, pitch, 0.75};
                         genev.generator_type = 2;
                         bool wasfound = false;
                         for (int j = 0; j < voices.size(); ++j)

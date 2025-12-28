@@ -38,10 +38,19 @@ inline int audiocb(void *outputBuffer, void *inputBuffer, unsigned int nFrames, 
             data->granul->pitch_center =
                 xenakios::mapvalue<float>(msg.midiccval, 0, 127, -12.0, 12.0);
         }
-        if (msg.midicc == 22)
+        else if (msg.midicc == 22)
         {
             data->granul->pitch_spread =
                 xenakios::mapvalue<float>(msg.midiccval, 0, 127, 0.0, 12.0);
+        }
+        else if (msg.midicc == 23)
+        {
+            data->granul->grain_dur = xenakios::mapvalue<float>(msg.midiccval, 0, 127, 0.010, 1.0);
+        }
+        else if (msg.midicc == 24)
+        {
+            data->granul->grain_rate_oct =
+                xenakios::mapvalue<float>(msg.midiccval, 0, 127, 0.0, 6.0);
         }
     }
     float *obuf = (float *)outputBuffer;
