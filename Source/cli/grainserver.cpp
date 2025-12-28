@@ -50,7 +50,20 @@ inline int audiocb(void *outputBuffer, void *inputBuffer, unsigned int nFrames, 
         else if (msg.midicc == 24)
         {
             data->granul->grain_rate_oct =
-                xenakios::mapvalue<float>(msg.midiccval, 0, 127, 0.0, 6.0);
+                xenakios::mapvalue<float>(msg.midiccval, 0, 127, 2.0, 6.0);
+        }
+        else if (msg.midicc == 25)
+        {
+            data->granul->azi_center =
+                xenakios::mapvalue<float>(msg.midiccval, 0, 127, -180.0, 180.0);
+        }
+        else if (msg.midicc == 26)
+        {
+            data->granul->azi_spread = xenakios::mapvalue<float>(msg.midiccval, 0, 127, 0.0, 180.0);
+        }
+        else if (msg.midicc == 27)
+        {
+            data->granul->osc_sync = xenakios::mapvalue<float>(msg.midiccval, 0, 127, 0.0, 4.0);
         }
     }
     float *obuf = (float *)outputBuffer;
@@ -321,6 +334,7 @@ int main(int argc, char **argv)
         std::print("\nquit server loop\n");
         rtaudio->stopStream();
         rtaudio->closeStream();
+        std::print("{} missed grains\n", granulator->missedgrains);
     }
     else
     {
