@@ -76,7 +76,16 @@ inline int audiocb(void *outputBuffer, void *inputBuffer, unsigned int nFrames, 
         }
         else if (msg.midicc == 43)
         {
-            data->granul->grain_pitch_mod = xenakios::mapvalue<float>(msg.midiccval, 0, 127, -12.0, 12.0);
+            // data->granul->grain_pitch_mod =
+            //     xenakios::mapvalue<float>(msg.midiccval, 0, 127, -12.0, 12.0);
+        }
+        else if (msg.midicc == 44)
+        {
+            data->granul->fm_pitch = xenakios::mapvalue<float>(msg.midiccval, 0, 127, -36.0, 36.0);
+        }
+        else if (msg.midicc == 45)
+        {
+            data->granul->fm_depth = xenakios::mapvalue<float>(msg.midiccval, 0, 127, 0.0, 1.0);
         }
     }
     float *obuf = (float *)outputBuffer;
@@ -236,7 +245,9 @@ void mycallback(double deltatime, std::vector<unsigned char> *message, void *use
 {
     unsigned int nBytes = message->size();
     CallbackData *cb = (CallbackData *)userData;
-    if (nBytes == 3 && ((*message)[0] == 176 || (*message)[0] == 177))
+    //if (nBytes == 3)
+    //    std::print("{} {} {}\n", (int)message->at(0), (int)message->at(1), (int)message->at(2));
+    if (nBytes == 3 && ((*message)[0] >= 176 && (*message)[0] < 176 + 16))
     {
         MsgToAudio fifomsg;
         fifomsg.midicc = (*message)[1];

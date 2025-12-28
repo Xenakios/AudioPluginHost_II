@@ -791,6 +791,8 @@ class ToneGranulator
     float filt_cut_off = 0.0;
     float filt_reso = 0.0;
     float grain_pitch_mod = 0.0;
+    float fm_pitch = 0.0;
+    float fm_depth = 0.0;
     ToneGranulator(double sr, int filter_routing, std::string filtertype0, std::string filtertype1,
                    float tail_len, float tail_fade_len)
         : m_sr(sr)
@@ -889,7 +891,9 @@ class ToneGranulator
                 GrainEvent genev{0.0, grain_dur, pitch, 0.75};
                 float azi = rng.nextFloatInRange(azi_center - azi_spread, azi_center + azi_spread);
                 genev.azimuth = azi;
-                genev.generator_type = 2;
+                genev.generator_type = 5;
+                genev.fm_frequency_hz = 440.0 * std::pow(2.0, 1.0 / 12 * (fm_pitch - 9.0));
+                genev.fm_amount = fm_depth;
                 genev.sync_ratio = std::pow(2.0, osc_sync);
                 genev.filterparams[0][0] = filt_cut_off;
                 genev.filterparams[0][1] = filt_reso;
