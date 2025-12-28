@@ -23,6 +23,7 @@ include_directories(
     
     libs/sst-voicemanager/include
     libs/rtaudio
+    libs/rtmidi
     libs/MTS-ESP/Master
     libs/MTS-ESP/Client
     libs/mts_esp_wrapper
@@ -192,10 +193,11 @@ target_compile_definitions(ClapMiniHost PRIVATE _WIN64 NOJUCE=1 _USE_MATH_DEFINE
 add_executable(grainserver
     Source/cli/grainserver.cpp 
     libs/rtaudio/RtAudio.cpp  
+    libs/rtmidi/RtMidi.cpp
     )
-target_compile_definitions(grainserver PRIVATE _WIN64 NOJUCE=1 _USE_MATH_DEFINES=1 NOMINMAX __WINDOWS_WASAPI__ WIN32_LEAN_AND_MEAN _WINSOCK_DEPRECATED_NO_WARNINGS)
+target_compile_definitions(grainserver PRIVATE _WIN64 NOJUCE=1 _USE_MATH_DEFINES=1 NOMINMAX __WINDOWS_WASAPI__ __WINDOWS_MM__ WIN32_LEAN_AND_MEAN _WINSOCK_DEPRECATED_NO_WARNINGS)
 target_compile_options(grainserver PRIVATE -Werror=return-type)
-
+target_link_libraries(grainserver PRIVATE winmm.lib)
 # cmaj testing
 add_executable(CMajorTester 
     Source/Experimental/cmajtester.cpp 

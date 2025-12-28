@@ -1,9 +1,17 @@
 #include "../granularsynth/granularsynth.h"
 #include "RtAudio.h"
+#include "RtMidi.h"
 #include "text/choc_Files.h"
 #include "platform/choc_FileWatcher.h"
 #include "audio/choc_AudioFileFormat.h"
 #include "audio/choc_AudioFileFormat_WAV.h"
+#include "containers/choc_SingleReaderSingleWriterFIFO.h"
+
+struct MsgToAudio
+{
+    int midicc = 0;
+    int midiccval = 0;
+};
 
 struct CallbackData
 {
@@ -13,12 +21,29 @@ struct CallbackData
     int num_mes = 200;
     int history_pos = 0;
     std::atomic<float> avg_usage;
+    std::unique_ptr<RtMidiIn> midiin;
+    choc::fifo::SingleReaderSingleWriterFIFO<MsgToAudio> fifo;
 };
 
 inline int audiocb(void *outputBuffer, void *inputBuffer, unsigned int nFrames, double streamTime,
                    RtAudioStreamStatus status, void *userData)
 {
     CallbackData *data = (CallbackData *)userData;
+    MsgToAudio msg;
+    while (data->fifo.pop(msg))
+    {
+        // std::print("midi msg to audio thread : {} {}\n", msg.midicc, msg.midiccval);
+        if (msg.midicc == 21)
+        {
+            data->granul->pitch_center =
+                xenakios::mapvalue<float>(msg.midiccval, 0, 127, -12.0, 12.0);
+        }
+        if (msg.midicc == 22)
+        {
+            data->granul->pitch_spread =
+                xenakios::mapvalue<float>(msg.midiccval, 0, 127, 0.0, 12.0);
+        }
+    }
     float *obuf = (float *)outputBuffer;
     double sr = data->granul->m_sr;
     using clock = std::chrono::high_resolution_clock;
@@ -172,6 +197,55 @@ inline void test_sst_modmatrix()
     }
 }
 
+void mycallback(double deltatime, std::vector<unsigned char> *message, void *userData)
+{
+    unsigned int nBytes = message->size();
+    CallbackData *cb = (CallbackData *)userData;
+    if (nBytes == 3 && ((*message)[0] == 176 || (*message)[0] == 177))
+    {
+        MsgToAudio fifomsg;
+        fifomsg.midicc = (*message)[1];
+        fifomsg.midiccval = (*message)[2];
+        cb->fifo.push(fifomsg);
+    }
+}
+
+inline void open_rtmidi(CallbackData &d)
+{
+    try
+    {
+        d.midiin = std::make_unique<RtMidiIn>();
+    }
+    catch (RtMidiError &error)
+    {
+        error.printMessage();
+        return;
+    }
+
+    unsigned int nPorts = d.midiin->getPortCount();
+    std::print("\nThere are {} MIDI input sources available.\n", nPorts);
+    std::string portName;
+    for (unsigned int i = 0; i < nPorts; i++)
+    {
+        try
+        {
+            portName = d.midiin->getPortName(i);
+        }
+        catch (RtMidiError &error)
+        {
+            error.printMessage();
+            return;
+        }
+        std::print("Input Port #{} : {}\n", i + 1, portName);
+    }
+    // obviously this should be user settable...
+    d.midiin->openPort(1);
+
+    d.midiin->setCallback(&mycallback, &d);
+
+    d.midiin->ignoreTypes(true, true, true);
+}
+
 int main(int argc, char **argv)
 {
     // test_sst_modmatrix();
@@ -190,6 +264,8 @@ int main(int argc, char **argv)
     double sr = 44100.0;
     double phase = 0.0;
     CallbackData cbdata;
+    cbdata.fifo.reset(1024);
+    open_rtmidi(cbdata);
     auto granulator =
         std::make_unique<ToneGranulator>(sr, 0, "fast_svf/lowpass", "none", 0.002, 0.001);
     cbdata.granul = granulator.get();
