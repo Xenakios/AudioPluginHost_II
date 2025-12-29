@@ -163,10 +163,13 @@ class GranulatorModMatrix
                 {
                     auto entryob = routingarr[i];
                     int slot = entryob["slot"].get<int>();
-                    int src = entryob["src"].get<int>();
-                    int dest = entryob["dest"].get<int>();
-                    float d = entryob["depth"].get<float>();
-                    rt.updateRoutingAt(slot, sourceIds[src], targetIds[dest], d);
+                    if (slot >= 0 && slot < GranulatorModConfig::FixedMatrixSize)
+                    {
+                        int src = entryob["src"].get<int>();
+                        int dest = entryob["dest"].get<int>();
+                        float d = entryob["depth"].get<float>();
+                        rt.updateRoutingAt(slot, sourceIds[src], targetIds[dest], d);
+                    }
                 }
             }
             auto lfosarray = ob["lfos"];
@@ -190,7 +193,7 @@ class GranulatorModMatrix
         }
         catch (std::exception &ex)
         {
-            std::print("{}\n", ex.what());
+            std::print("error loading mod matrix json : {}\n", ex.what());
         }
     }
     GranulatorModMatrix(double sr) : samplerate(sr)
@@ -714,10 +717,12 @@ class GranulatorVoice
             if (phase < grain_end_phase)
             {
                 outsample = std::visit([](auto &q) { return q.step(); }, theoscillator);
-                float envgain = gain_envelope.step();
-                /*
-                float envgain = 1.0f;
-                if (envtype == 0 || envtype == 1)
+                float envgain = 0.0f;
+                if (envtype == 3)
+                {
+                    envgain = gain_envelope.step();
+                }
+                else if (envtype == 0 || envtype == 1)
                 {
                     if (phase < envpeakpos)
                     {
@@ -743,7 +748,6 @@ class GranulatorVoice
                                                      (1.5f * M_PI));
                 }
                 envgain = std::clamp(envgain, 0.0f, 1.0f);
-                */
                 outsample *= envgain * graingain;
             }
             if (filter_routing == FR_SERIAL)
@@ -829,6 +833,7 @@ class ToneGranulator
     float fm_feedback = 0.0;
     float pulse_width = 0.5;
     float noise_corr = 0.0;
+    float env_shape = 0.5;
     int osc_type = 4;
     ToneGranulator(double sr, int filter_routing, std::string filtertype0, std::string filtertype1,
                    float tail_len, float tail_fade_len)
@@ -930,6 +935,7 @@ class ToneGranulator
                 GrainEvent genev{0.0, grain_dur, pitch, 0.75};
                 // float azi = rng.nextFloatInRange(azi_center - azi_spread, azi_center +
                 // azi_spread);
+                genev.envelope_shape = env_shape;
                 float azi = modmatrix.m.getTargetValue(modmatrix.targetIds[1]);
                 genev.azimuth = azi;
                 genev.generator_type = osc_type;

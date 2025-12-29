@@ -8,7 +8,7 @@
             "index": 1,
             "shape": 5,
             "rate": 4.0,
-            "deform" : -0.99
+            "deform" : 0.95
         }
     ],
     "routings": [

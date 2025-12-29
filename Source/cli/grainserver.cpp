@@ -71,6 +71,10 @@ inline int audiocb(void *outputBuffer, void *inputBuffer, unsigned int nFrames, 
             {
                 data->granul->osc_sync = xenakios::mapvalue<float>(msg.midi[2], 0, 127, 0.0, 4.0);
             }
+            else if (msg.midi[1] == 28)
+            {
+                data->granul->env_shape = xenakios::mapvalue<float>(msg.midi[2], 0, 127, 0.0, 1.0);
+            }
             else if (msg.midi[1] == 41)
             {
                 data->granul->filt_cut_off =
