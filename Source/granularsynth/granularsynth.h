@@ -928,7 +928,9 @@ class ToneGranulator
                 //     pitch_spread);
                 float pitch = modmatrix.m.getTargetValue(modmatrix.targetIds[0]);
                 GrainEvent genev{0.0, grain_dur, pitch, 0.75};
-                float azi = rng.nextFloatInRange(azi_center - azi_spread, azi_center + azi_spread);
+                // float azi = rng.nextFloatInRange(azi_center - azi_spread, azi_center +
+                // azi_spread);
+                float azi = modmatrix.m.getTargetValue(modmatrix.targetIds[1]);
                 genev.azimuth = azi;
                 genev.generator_type = osc_type;
                 genev.fm_frequency_hz = 440.0 * std::pow(2.0, 1.0 / 12 * (fm_pitch - 9.0));
@@ -991,6 +993,7 @@ class ToneGranulator
             }
 
             modmatrix.targetBaseValues[0] = pitch_center;
+            modmatrix.targetBaseValues[1] = azi_center;
             modmatrix.m.process();
             if (!self_generate)
             {

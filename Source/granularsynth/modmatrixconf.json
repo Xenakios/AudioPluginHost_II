@@ -1,0 +1,28 @@
+{
+    "lfos": [
+        {
+            "index": 0,
+            "rate": -1.0
+        },
+        {
+            "index": 1,
+            "shape": 5,
+            "rate": 4.0,
+            "deform" : -0.99
+        }
+    ],
+    "routings": [
+        {
+            "slot": 0,
+            "src": 0,
+            "dest": 1,
+            "depth": 30.0
+        },
+        {
+            "slot": 1,
+            "src": 1,
+            "dest": 0,
+            "depth": 12.0
+        }
+    ]
+}
