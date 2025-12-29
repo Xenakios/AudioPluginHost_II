@@ -148,6 +148,7 @@ class GranulatorModMatrix
     alignas(32) std::array<sst::basic_blocks::dsp::RNG, numLfos> m_rngs;
     std::array<int, numLfos> lfo_shapes;
     std::array<float, numLfos> lfo_rates;
+    std::array<float, numLfos> lfo_deforms;
     void init_from_json_file()
     {
         try
@@ -168,6 +169,24 @@ class GranulatorModMatrix
                     rt.updateRoutingAt(slot, sourceIds[src], targetIds[dest], d);
                 }
             }
+            auto lfosarray = ob["lfos"];
+            if (lfosarray.isArray())
+            {
+                for (int i = 0; i < lfosarray.size(); ++i)
+                {
+                    auto entryob = lfosarray[i];
+                    int lfoindex = entryob["index"].get<int>();
+                    if (lfoindex >= 0 && lfoindex < numLfos)
+                    {
+                        float rate = entryob["rate"].getWithDefault(0.0f);
+                        float deform = entryob["deform"].getWithDefault(0.0f);
+                        int shape = entryob["shape"].getWithDefault(0);
+                        lfo_rates[lfoindex] = rate;
+                        lfo_deforms[lfoindex] = deform;
+                        lfo_shapes[lfoindex] = shape;
+                    }
+                }
+            }
         }
         catch (std::exception &ex)
         {
@@ -184,14 +203,13 @@ class GranulatorModMatrix
             m_lfos[i]->attack(0);
             lfo_shapes[i] = lfo_t::SINE;
             lfo_rates[i] = 0.0;
+            lfo_deforms[i] = 0.0;
             sourceIds[i] =
                 GranulatorModConfig::SourceIdentifier{(GranulatorModConfig::SourceIdentifier::SI)(
                     GranulatorModConfig::SourceIdentifier::LFO0 + i)};
             sourceValues[i] = 0.0f;
             m.bindSourceValue(sourceIds[i], sourceValues[i]);
         }
-        lfo_rates[1] = 1.9;
-        lfo_shapes[1] = lfo_t::PULSE;
         for (size_t i = 0; i < targetIds.size(); ++i)
         {
             targetIds[i] = GranulatorModConfig::TargetIdentifier{static_cast<int>(i)};
@@ -908,7 +926,7 @@ class ToneGranulator
                 // float pitch =
                 //     rng.nextFloatInRange(pitch_center - pitch_spread, pitch_center +
                 //     pitch_spread);
-                float pitch = 12.0 * modmatrix.m.getTargetValue(modmatrix.targetIds[0]);
+                float pitch = modmatrix.m.getTargetValue(modmatrix.targetIds[0]);
                 GrainEvent genev{0.0, grain_dur, pitch, 0.75};
                 float azi = rng.nextFloatInRange(azi_center - azi_spread, azi_center + azi_spread);
                 genev.azimuth = azi;
@@ -967,7 +985,7 @@ class ToneGranulator
         {
             for (size_t i = 0; i < modmatrix.numLfos; ++i)
             {
-                modmatrix.m_lfos[i]->process_block(modmatrix.lfo_rates[i], 0.0,
+                modmatrix.m_lfos[i]->process_block(modmatrix.lfo_rates[i], modmatrix.lfo_deforms[i],
                                                    modmatrix.lfo_shapes[i]);
                 modmatrix.sourceValues[i] = modmatrix.m_lfos[i]->outputBlock[0];
             }
