@@ -9,11 +9,11 @@
 
 struct MsgToAudio
 {
-    int midicc = 0;
-    int midiccval = 0;
+    int type = -1;
+    uint8_t midi[3]={0,0,0};
 };
 
-struct CallbackData
+struct GranulatorRTAudioWrapper
 {
     ToneGranulator *granul = nullptr;
     std::vector<float> procbuffer;
@@ -28,64 +28,71 @@ struct CallbackData
 inline int audiocb(void *outputBuffer, void *inputBuffer, unsigned int nFrames, double streamTime,
                    RtAudioStreamStatus status, void *userData)
 {
-    CallbackData *data = (CallbackData *)userData;
+    GranulatorRTAudioWrapper *data = (GranulatorRTAudioWrapper *)userData;
     MsgToAudio msg;
     while (data->fifo.pop(msg))
     {
-        // std::print("midi msg to audio thread : {} {}\n", msg.midicc, msg.midiccval);
-        if (msg.midicc == 21)
+        // std::print("midi msg to audio thread : {} {}\n", msg.midicc, msg.midi[2]);
+        if (msg.type == 0 && msg.midi[0] >= 176 && msg.midi[0] < 176 + 16)
         {
-            data->granul->pitch_center =
-                xenakios::mapvalue<float>(msg.midiccval, 0, 127, -12.0, 12.0);
-        }
-        else if (msg.midicc == 22)
-        {
-            data->granul->pitch_spread =
-                xenakios::mapvalue<float>(msg.midiccval, 0, 127, 0.0, 12.0);
-        }
-        else if (msg.midicc == 23)
-        {
-            data->granul->grain_dur = xenakios::mapvalue<float>(msg.midiccval, 0, 127, 0.010, 1.0);
-        }
-        else if (msg.midicc == 24)
-        {
-            data->granul->grain_rate_oct =
-                xenakios::mapvalue<float>(msg.midiccval, 0, 127, 2.0, 6.0);
-        }
-        else if (msg.midicc == 25)
-        {
-            data->granul->azi_center =
-                xenakios::mapvalue<float>(msg.midiccval, 0, 127, -180.0, 180.0);
-        }
-        else if (msg.midicc == 26)
-        {
-            data->granul->azi_spread = xenakios::mapvalue<float>(msg.midiccval, 0, 127, 0.0, 180.0);
-        }
-        else if (msg.midicc == 27)
-        {
-            data->granul->osc_sync = xenakios::mapvalue<float>(msg.midiccval, 0, 127, 0.0, 4.0);
-        }
-        else if (msg.midicc == 41)
-        {
-            data->granul->filt_cut_off =
-                xenakios::mapvalue<float>(msg.midiccval, 0, 127, -24.0, 48.0);
-        }
-        else if (msg.midicc == 42)
-        {
-            data->granul->filt_reso = xenakios::mapvalue<float>(msg.midiccval, 0, 127, 0.0, 1.0);
-        }
-        else if (msg.midicc == 43)
-        {
-            // data->granul->grain_pitch_mod =
-            //     xenakios::mapvalue<float>(msg.midiccval, 0, 127, -12.0, 12.0);
-        }
-        else if (msg.midicc == 44)
-        {
-            data->granul->fm_pitch = xenakios::mapvalue<float>(msg.midiccval, 0, 127, -36.0, 36.0);
-        }
-        else if (msg.midicc == 45)
-        {
-            data->granul->fm_depth = xenakios::mapvalue<float>(msg.midiccval, 0, 127, 0.0, 1.0);
+            if (msg.midi[1] == 21)
+            {
+                data->granul->pitch_center =
+                    xenakios::mapvalue<float>(msg.midi[2], 0, 127, -12.0, 12.0);
+            }
+            else if (msg.midi[1] == 22)
+            {
+                data->granul->pitch_spread =
+                    xenakios::mapvalue<float>(msg.midi[2], 0, 127, 0.0, 12.0);
+            }
+            else if (msg.midi[1] == 23)
+            {
+                data->granul->grain_dur =
+                    xenakios::mapvalue<float>(msg.midi[2], 0, 127, 0.010, 1.0);
+            }
+            else if (msg.midi[1] == 24)
+            {
+                data->granul->grain_rate_oct =
+                    xenakios::mapvalue<float>(msg.midi[2], 0, 127, 2.0, 6.0);
+            }
+            else if (msg.midi[1] == 25)
+            {
+                data->granul->azi_center =
+                    xenakios::mapvalue<float>(msg.midi[2], 0, 127, -180.0, 180.0);
+            }
+            else if (msg.midi[1] == 26)
+            {
+                data->granul->azi_spread =
+                    xenakios::mapvalue<float>(msg.midi[2], 0, 127, 0.0, 180.0);
+            }
+            else if (msg.midi[1] == 27)
+            {
+                data->granul->osc_sync = xenakios::mapvalue<float>(msg.midi[2], 0, 127, 0.0, 4.0);
+            }
+            else if (msg.midi[1] == 41)
+            {
+                data->granul->filt_cut_off =
+                    xenakios::mapvalue<float>(msg.midi[2], 0, 127, -24.0, 48.0);
+            }
+            else if (msg.midi[1] == 42)
+            {
+                data->granul->filt_reso =
+                    xenakios::mapvalue<float>(msg.midi[2], 0, 127, 0.0, 1.0);
+            }
+            else if (msg.midi[1] == 43)
+            {
+                // data->granul->grain_pitch_mod =
+                //     xenakios::mapvalue<float>(msg.midi[2], 0, 127, -12.0, 12.0);
+            }
+            else if (msg.midi[1] == 44)
+            {
+                data->granul->fm_pitch =
+                    xenakios::mapvalue<float>(msg.midi[2], 0, 127, -36.0, 36.0);
+            }
+            else if (msg.midi[1] == 45)
+            {
+                data->granul->fm_depth = xenakios::mapvalue<float>(msg.midi[2], 0, 127, 0.0, 1.0);
+            }
         }
     }
     float *obuf = (float *)outputBuffer;
@@ -241,22 +248,24 @@ inline void test_sst_modmatrix()
     }
 }
 
-void mycallback(double deltatime, std::vector<unsigned char> *message, void *userData)
+void midicallback(double deltatime, std::vector<unsigned char> *message, void *userData)
 {
     unsigned int nBytes = message->size();
-    CallbackData *cb = (CallbackData *)userData;
-    //if (nBytes == 3)
-    //    std::print("{} {} {}\n", (int)message->at(0), (int)message->at(1), (int)message->at(2));
-    if (nBytes == 3 && ((*message)[0] >= 176 && (*message)[0] < 176 + 16))
+    GranulatorRTAudioWrapper *cb = (GranulatorRTAudioWrapper *)userData;
+    // if (nBytes == 3)
+    //     std::print("{} {} {}\n", (int)message->at(0), (int)message->at(1), (int)message->at(2));
+    if (nBytes == 3)
     {
         MsgToAudio fifomsg;
-        fifomsg.midicc = (*message)[1];
-        fifomsg.midiccval = (*message)[2];
+        fifomsg.type = 0;
+        fifomsg.midi[0] = (*message)[0];
+        fifomsg.midi[1] = (*message)[1];
+        fifomsg.midi[2] = (*message)[2];
         cb->fifo.push(fifomsg);
     }
 }
 
-inline void open_rtmidi(CallbackData &d)
+inline void open_rtmidi(GranulatorRTAudioWrapper &d)
 {
     try
     {
@@ -287,7 +296,7 @@ inline void open_rtmidi(CallbackData &d)
     // obviously this should be user settable...
     d.midiin->openPort(1);
 
-    d.midiin->setCallback(&mycallback, &d);
+    d.midiin->setCallback(&midicallback, &d);
 
     d.midiin->ignoreTypes(true, true, true);
 }
@@ -309,7 +318,7 @@ int main(int argc, char **argv)
     SetConsoleCtrlHandler(CtrlHandler, TRUE);
     double sr = 44100.0;
     double phase = 0.0;
-    CallbackData cbdata;
+    GranulatorRTAudioWrapper cbdata;
     cbdata.fifo.reset(1024);
     open_rtmidi(cbdata);
     auto granulator =
