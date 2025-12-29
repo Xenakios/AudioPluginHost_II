@@ -10,7 +10,7 @@
 struct MsgToAudio
 {
     int type = -1;
-    uint8_t midi[3]={0,0,0};
+    uint8_t midi[3] = {0, 0, 0};
 };
 
 struct GranulatorRTAudioWrapper
@@ -48,7 +48,7 @@ inline int audiocb(void *outputBuffer, void *inputBuffer, unsigned int nFrames, 
             else if (msg.midi[1] == 23)
             {
                 data->granul->grain_dur =
-                    xenakios::mapvalue<float>(msg.midi[2], 0, 127, 0.010, 1.0);
+                    xenakios::mapvalue<float>(msg.midi[2], 0, 127, 0.002, 1.0);
             }
             else if (msg.midi[1] == 24)
             {
@@ -76,8 +76,7 @@ inline int audiocb(void *outputBuffer, void *inputBuffer, unsigned int nFrames, 
             }
             else if (msg.midi[1] == 42)
             {
-                data->granul->filt_reso =
-                    xenakios::mapvalue<float>(msg.midi[2], 0, 127, 0.0, 1.0);
+                data->granul->filt_reso = xenakios::mapvalue<float>(msg.midi[2], 0, 127, 0.0, 1.0);
             }
             else if (msg.midi[1] == 43)
             {
@@ -86,12 +85,30 @@ inline int audiocb(void *outputBuffer, void *inputBuffer, unsigned int nFrames, 
             }
             else if (msg.midi[1] == 44)
             {
-                data->granul->fm_pitch =
-                    xenakios::mapvalue<float>(msg.midi[2], 0, 127, -36.0, 36.0);
+                if (data->granul->osc_type == 5)
+                    data->granul->fm_pitch =
+                        xenakios::mapvalue<float>(msg.midi[2], 0, 127, -36.0, 36.0);
+                if (data->granul->osc_type >= 0 && data->granul->osc_type < 5)
+                    data->granul->osc_sync =
+                        xenakios::mapvalue<float>(msg.midi[2], 0, 127, 0.0, 4.0);
+                if (data->granul->osc_type == 6)
+                    data->granul->noise_corr =
+                        xenakios::mapvalue<float>(msg.midi[2], 0, 127, -1.0, 1.0);
             }
             else if (msg.midi[1] == 45)
             {
-                data->granul->fm_depth = xenakios::mapvalue<float>(msg.midi[2], 0, 127, 0.0, 1.0);
+                if (data->granul->osc_type == 5)
+                    data->granul->fm_depth =
+                        xenakios::mapvalue<float>(msg.midi[2], 0, 127, 0.0, 1.0);
+                if (data->granul->osc_type == 4)
+                    data->granul->pulse_width =
+                        xenakios::mapvalue<float>(msg.midi[2], 0, 127, 0.0, 1.0);
+            }
+            else if (msg.midi[1] == 46)
+            {
+                if (data->granul->osc_type == 5)
+                    data->granul->fm_feedback =
+                        xenakios::mapvalue<float>(msg.midi[2], 0, 127, -1.0, 1.0);
             }
         }
     }
