@@ -42,8 +42,10 @@ inline int audiocb(void *outputBuffer, void *inputBuffer, unsigned int nFrames, 
             }
             else if (msg.midi[1] == 22)
             {
-                data->granul->pitch_spread =
-                    xenakios::mapvalue<float>(msg.midi[2], 0, 127, 0.0, 12.0);
+                data->granul->modmatrix.rt.updateDepthAt(
+                    0, xenakios::mapvalue<float>(msg.midi[2], 0, 127, -12.0, 12.0));
+                // data->granul->pitch_spread =
+                //     xenakios::mapvalue<float>(msg.midi[2], 0, 127, 0.0, 12.0);
             }
             else if (msg.midi[1] == 23)
             {

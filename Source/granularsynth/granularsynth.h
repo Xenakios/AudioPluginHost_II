@@ -5,6 +5,7 @@
 #include <print>
 #include "sst/basic-blocks/dsp/SmoothingStrategies.h"
 #include "text/choc_StringUtilities.h"
+#include "text/choc_Files.h"
 #include <random>
 #include <variant>
 #include "../Common/xap_breakpoint_envelope.h"
@@ -112,8 +113,8 @@ class GranulatorModMatrix
   public:
     FixedMatrix<GranulatorModConfig> m;
     FixedMatrix<GranulatorModConfig>::RoutingTable rt;
-    std::array<GranulatorModConfig::SourceIdentifier, 6> sourceIds;
-    std::array<float, 6> sourceValues{0.0f, 0.0f, 0.0f, 0.0f, 0.0f};
+    std::array<GranulatorModConfig::SourceIdentifier, 8> sourceIds;
+    std::array<float, 8> sourceValues;
     std::array<GranulatorModConfig::TargetIdentifier, 8> targetIds;
     std::array<float, 8> targetBaseValues;
     double samplerate = 0.0;
@@ -140,13 +141,39 @@ class GranulatorModMatrix
     }
     static constexpr size_t BLOCKSIZE = granul_block_size;
     static constexpr size_t BLOCK_SIZE_OS = BLOCKSIZE * 2;
-    static constexpr size_t numLfos = 4;
+    static constexpr size_t numLfos = 8;
     using lfo_t = sst::basic_blocks::modulators::SimpleLFO<GranulatorModMatrix, BLOCKSIZE>;
     alignas(32) std::array<std::unique_ptr<lfo_t>, numLfos> m_lfos;
     alignas(32) float table_envrate_linear[512];
     alignas(32) std::array<sst::basic_blocks::dsp::RNG, numLfos> m_rngs;
-    std::array<int, numLfos> lfo_shapes{lfo_t::TRI, lfo_t::SINE, lfo_t::SINE, lfo_t::SINE};
-    std::array<float, 4> lfo_rates{0.0f, 1.0f, 2.0f, 3.0f};
+    std::array<int, numLfos> lfo_shapes;
+    std::array<float, numLfos> lfo_rates;
+    void init_from_json_file()
+    {
+        try
+        {
+            auto jsontxt = choc::file::loadFileAsString(
+                R"(C:\develop\AudioPluginHost_mk2\Source\granularsynth\modmatrixconf.json)");
+            auto ob = choc::json::parseValue(jsontxt);
+            auto routingarr = ob["routings"];
+            if (routingarr.isArray())
+            {
+                for (int i = 0; i < routingarr.size(); ++i)
+                {
+                    auto entryob = routingarr[i];
+                    int slot = entryob["slot"].get<int>();
+                    int src = entryob["src"].get<int>();
+                    int dest = entryob["dest"].get<int>();
+                    float d = entryob["depth"].get<float>();
+                    rt.updateRoutingAt(slot, sourceIds[src], targetIds[dest], d);
+                }
+            }
+        }
+        catch (std::exception &ex)
+        {
+            std::print("{}\n", ex.what());
+        }
+    }
     GranulatorModMatrix(double sr) : samplerate(sr)
     {
         initTables();
@@ -155,26 +182,16 @@ class GranulatorModMatrix
             auto lfo = std::make_unique<lfo_t>(this);
             m_lfos[i] = std::move(lfo);
             m_lfos[i]->attack(0);
+            lfo_shapes[i] = lfo_t::SINE;
+            lfo_rates[i] = 0.0;
+            sourceIds[i] =
+                GranulatorModConfig::SourceIdentifier{(GranulatorModConfig::SourceIdentifier::SI)(
+                    GranulatorModConfig::SourceIdentifier::LFO0 + i)};
+            sourceValues[i] = 0.0f;
+            m.bindSourceValue(sourceIds[i], sourceValues[i]);
         }
-
-        sourceIds[0] =
-            GranulatorModConfig::SourceIdentifier{GranulatorModConfig::SourceIdentifier::LFO0};
-        sourceIds[1] =
-            GranulatorModConfig::SourceIdentifier{GranulatorModConfig::SourceIdentifier::LFO1};
-        sourceIds[2] =
-            GranulatorModConfig::SourceIdentifier{GranulatorModConfig::SourceIdentifier::LFO2};
-        sourceIds[3] =
-            GranulatorModConfig::SourceIdentifier{GranulatorModConfig::SourceIdentifier::LFO3};
-        sourceIds[4] =
-            GranulatorModConfig::SourceIdentifier{GranulatorModConfig::SourceIdentifier::ENV0};
-        sourceIds[5] =
-            GranulatorModConfig::SourceIdentifier{GranulatorModConfig::SourceIdentifier::ENV1};
-        m.bindSourceValue(sourceIds[0], sourceValues[0]);
-        m.bindSourceValue(sourceIds[1], sourceValues[1]);
-        m.bindSourceValue(sourceIds[2], sourceValues[2]);
-        m.bindSourceValue(sourceIds[3], sourceValues[3]);
-        m.bindSourceValue(sourceIds[4], sourceValues[4]);
-        m.bindSourceValue(sourceIds[5], sourceValues[5]);
+        lfo_rates[1] = 1.9;
+        lfo_shapes[1] = lfo_t::PULSE;
         for (size_t i = 0; i < targetIds.size(); ++i)
         {
             targetIds[i] = GranulatorModConfig::TargetIdentifier{static_cast<int>(i)};
@@ -184,12 +201,9 @@ class GranulatorModMatrix
 
         const size_t blocksize = granul_block_size;
 
-        rt.updateRoutingAt(0, sourceIds[0], targetIds[0], 0.5);
-        rt.updateRoutingAt(1, sourceIds[1], sourceIds[4], {}, targetIds[0], 0.5);
-        // rt.updateRoutingAt(2, sourceIds[1], targetIds[1], 0.95);
-        rt.updateRoutingAt(2, sourceIds[1], sourceIds[5], {}, targetIds[1], 0.5);
-        rt.routes[2].curve = 3;
-
+        rt.updateRoutingAt(0, sourceIds[0], targetIds[0], 0.0);
+        rt.updateRoutingAt(1, sourceIds[1], targetIds[0], 2.0);
+        init_from_json_file();
         m.prepare(rt, sr, blocksize);
     }
 };
@@ -780,15 +794,16 @@ class ToneGranulator
     alignas(16) double graingen_phase = 0.0;
     alignas(16) double graingen_phase_prior = 2.0;
     alignas(16) sst::basic_blocks::dsp::OnePoleLag<float, true> gainlag;
-    xenakios::Xoroshiro128Plus rng;
+    alignas(16) xenakios::Xoroshiro128Plus rng;
+    alignas(32) GranulatorModMatrix modmatrix;
     float pitch_center = 0.0f;
     float pitch_spread = 0.0f;
-    float grain_dur = 0.5;
-    float grain_rate_oct = 0.0;
+    float grain_dur = 0.1;
+    float grain_rate_oct = 4.0;
     float azi_center = 0.0;
     float azi_spread = 0.0;
     float osc_sync = 0.0;
-    float filt_cut_off = 0.0;
+    float filt_cut_off = 36.0;
     float filt_reso = 0.0;
     float grain_pitch_mod = 0.0;
     float fm_pitch = 0.0;
@@ -799,7 +814,7 @@ class ToneGranulator
     int osc_type = 4;
     ToneGranulator(double sr, int filter_routing, std::string filtertype0, std::string filtertype1,
                    float tail_len, float tail_fade_len)
-        : m_sr(sr)
+        : m_sr(sr), modmatrix(sr)
     {
         init_filter_infos();
         const FilterInfo *filter0info = nullptr;
@@ -890,8 +905,10 @@ class ToneGranulator
         {
             if (graingen_phase_prior > graingen_phase)
             {
-                float pitch =
-                    rng.nextFloatInRange(pitch_center - pitch_spread, pitch_center + pitch_spread);
+                // float pitch =
+                //     rng.nextFloatInRange(pitch_center - pitch_spread, pitch_center +
+                //     pitch_spread);
+                float pitch = 12.0 * modmatrix.m.getTargetValue(modmatrix.targetIds[0]);
                 GrainEvent genev{0.0, grain_dur, pitch, 0.75};
                 float azi = rng.nextFloatInRange(azi_center - azi_spread, azi_center + azi_spread);
                 genev.azimuth = azi;
@@ -948,6 +965,15 @@ class ToneGranulator
         int bufframecount = 0;
         while (bufframecount < nframes)
         {
+            for (size_t i = 0; i < modmatrix.numLfos; ++i)
+            {
+                modmatrix.m_lfos[i]->process_block(modmatrix.lfo_rates[i], 0.0,
+                                                   modmatrix.lfo_shapes[i]);
+                modmatrix.sourceValues[i] = modmatrix.m_lfos[i]->outputBlock[0];
+            }
+
+            modmatrix.targetBaseValues[0] = pitch_center;
+            modmatrix.m.process();
             if (!self_generate)
             {
                 GrainEvent *ev = nullptr;
