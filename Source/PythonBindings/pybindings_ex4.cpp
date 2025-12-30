@@ -530,9 +530,61 @@ void set_mod_amt(GrainEvent &ev, int dest, double amt)
     ev.modamounts[dest] = amt;
 }
 
+struct testsrprovider
+{
+    double samplerate = 0.0;
+    alignas(32) float table_envrate_linear[512];
+    void initTables()
+    {
+        double dsamplerate_os = samplerate * 2;
+        for (int i = 0; i < 512; ++i)
+        {
+            double k =
+                dsamplerate_os * pow(2.0, (((double)i - 256.0) / 16.0)) / (double)BLOCK_SIZE_OS;
+            table_envrate_linear[i] = (float)(1.f / k);
+        }
+    }
+    float envelope_rate_linear_nowrap(float x)
+    {
+        x *= 16.f;
+        x += 256.f;
+        int e = std::clamp<int>((int)x, 0, 0x1ff - 1);
+
+        float a = x - (float)e;
+
+        return (1 - a) * table_envrate_linear[e & 0x1ff] +
+               a * table_envrate_linear[(e + 1) & 0x1ff];
+    }
+    static constexpr size_t BLOCKSIZE = 64;
+    static constexpr size_t BLOCK_SIZE_OS = BLOCKSIZE * 2;
+};
+
+inline std::vector<double> test_morph_random_lfo(xenakios::Envelope &deform_env)
+{
+    testsrprovider srprovider;
+    srprovider.samplerate = 44100.0;
+    srprovider.initTables();
+    using lfo_t = sst::basic_blocks::modulators::SimpleLFO<testsrprovider, 64>;
+    lfo_t lfo{&srprovider};
+    lfo.attack(lfo_t::SH_MORPHRND);
+    int outcounter = 0;
+    int blocksize = 64;
+    int outlen = 44100 * 10;
+    std::vector<double> result;
+    while (outcounter < outlen)
+    {
+        float deform = deform_env.getValueAtPosition(outcounter / 44100.0);
+        lfo.process_block(5, deform, lfo_t::SH_MORPHRND);
+        result.push_back(lfo.outputBlock[0]);
+        outcounter += blocksize;
+    }
+    return result;
+}
+
 void init_py4(py::module_ &m, py::module_ &m_const)
 {
     using namespace pybind11::literals;
+    m.def("test_morph_random", &test_morph_random_lfo);
     m.def("encode_to_ambisonics", &encode_to_ambisonics, "input_audio"_a, "sample_rate"_a,
           "ambisonics_order"_a, "azimuth"_a, "elevation"_a);
     m.def("decode_ambisonics_to_stereo", &decode_ambisonics_to_stereo, "input_audio"_a);
