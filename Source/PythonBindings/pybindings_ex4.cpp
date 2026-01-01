@@ -284,9 +284,21 @@ inline std::vector<std::string> get_sst_filter_types()
     return result;
 }
 
-inline py::array_t<float> render_granulator(ToneGranulator &gran, events_t evlist,
-                                            std::string outputmode)
+inline void set_granulator_params(ToneGranulator &gran, py::dict dict)
 {
+    if (dict.contains("rate"))
+        gran.grain_rate_oct = dict["rate"].cast<double>();
+    if (dict.contains("pitch_center"))
+        gran.pitch_center = dict["pitch_center"].cast<double>();
+}
+
+inline py::array_t<float> render_granulator(ToneGranulator &gran, events_t evlist,
+                                            std::string outputmode, double outputduration)
+{
+    if (evlist.empty() && (outputduration <= 0.0 || outputduration > 600.0))
+        throw std::runtime_error(std::format(
+            "output duration {} invalid (should be larger than 0 and less than 600 seconds)",
+            outputduration));
     int chans = 0;
     int ambiorder = 0;
     if (outputmode == "ambisonics_1st_order")
@@ -304,18 +316,25 @@ inline py::array_t<float> render_granulator(ToneGranulator &gran, events_t evlis
         chans = 16;
         ambiorder = 3;
     }
-
     if (chans == 0)
         throw std::runtime_error("invalid audio output mode");
     gran.prepare(std::move(evlist), ambiorder);
-    if (gran.events_to_switch.empty())
+    if (gran.events_to_switch.empty() && outputduration == 0.0)
         throw std::runtime_error("grain event list empty after events were erased");
     // we can't know the exact tail amount needed until processing...
     // 1 second is hopefully enough to not cut off the render too abruptly in most cases, but
     // maybe should make the tail length a user settable thing
-    int frames =
-        (gran.events_to_switch.back().time_position + gran.events_to_switch.back().duration + 1.0) *
-        gran.m_sr;
+    int frames = 0;
+    if (outputduration > 0.0 && gran.events_to_switch.empty())
+    {
+        frames = gran.m_sr * outputduration;
+    }
+    else
+    {
+        frames = (gran.events_to_switch.back().time_position +
+                  gran.events_to_switch.back().duration + 1.0) *
+                 gran.m_sr;
+    }
     py::buffer_info binfo(
         nullptr,                                /* Pointer to buffer */
         sizeof(float),                          /* Size of one scalar */
@@ -559,7 +578,7 @@ struct testsrprovider
     static constexpr size_t BLOCK_SIZE_OS = BLOCKSIZE * 2;
 };
 
-inline std::vector<double> test_morph_random_lfo(xenakios::Envelope &deform_env)
+inline std::vector<double> test_simple_lfo(xenakios::Envelope &deform_env)
 {
     testsrprovider srprovider;
     srprovider.samplerate = 44100.0;
@@ -581,10 +600,12 @@ inline std::vector<double> test_morph_random_lfo(xenakios::Envelope &deform_env)
     return result;
 }
 
+inline std::vector<double> test_morphing_random() { return {}; }
+
 void init_py4(py::module_ &m, py::module_ &m_const)
 {
     using namespace pybind11::literals;
-    m.def("test_morph_random", &test_morph_random_lfo);
+    m.def("test_simple_lfo", &test_simple_lfo);
     m.def("encode_to_ambisonics", &encode_to_ambisonics, "input_audio"_a, "sample_rate"_a,
           "ambisonics_order"_a, "azimuth"_a, "elevation"_a);
     m.def("decode_ambisonics_to_stereo", &decode_ambisonics_to_stereo, "input_audio"_a);
@@ -635,5 +656,6 @@ void init_py4(py::module_ &m, py::module_ &m_const)
              "grain_tail_fade_len"_a = 0.005)
         .def("set_voice_aux_envelope", &ToneGranulator::set_voice_aux_envelope)
         .def("set_voice_gain_envelope", &ToneGranulator::set_voice_gain_envelope)
-        .def("render", render_granulator);
+        .def("set_parameters", set_granulator_params)
+        .def("render", render_granulator, "event_list"_a, "outputmode"_a, "outputduration"_a = 0.0);
 }
