@@ -7,6 +7,7 @@
 #include "sst/basic-blocks/dsp/CorrelatedNoise.h"
 #include "sst/basic-blocks/dsp/EllipticBlepOscillators.h"
 #include "sst/basic-blocks/dsp/DPWSawPulseOscillator.h"
+#include "sst/basic-blocks/dsp/Interpolators.h"
 #include "sst/filters++.h"
 #include <print>
 #include "sst/basic-blocks/dsp/SmoothingStrategies.h"
@@ -602,9 +603,86 @@ inline std::vector<double> test_simple_lfo(xenakios::Envelope &deform_env)
 
 inline std::vector<double> test_morphing_random() { return {}; }
 
+struct Gendyn2026
+{
+    struct Node
+    {
+        float x0 = 0.0f;
+        float y0 = 0.0f;
+    };
+    alignas(16) std::array<Node, 256> nodes;
+    alignas(16) double phase = 0.0;
+    alignas(16) double phaseincrement = 0.0;
+    size_t numnodes = 5;
+    double sr = 0.0;
+    xenakios::Xoroshiro128Plus rng;
+    Gendyn2026()
+    {
+        nodes[0] = {64.0f, 0.0f};
+        nodes[1] = {64.0f, 0.0f};
+        nodes[2] = {64.0f, 0.0f};
+        nodes[3] = {64.0f, 0.0f};
+        nodes[4] = {64.0f, 0.0f};
+    }
+    void prepare(double samplerate)
+    {
+        sr = samplerate;
+        phaseincrement = 1.0 / nodes[0].x0;
+    }
+    float step()
+    {
+        float y0 = nodes[0].y0;
+        float y1 = nodes[1].y0;
+        float y2 = nodes[2].y0;
+        float y3 = nodes[3].y0;
+        float intery = sst::basic_blocks::dsp::cubic_ipol(y0, y1, y2, y3, phase);
+        // float intery = y0 + (y1 - y0) * phase;
+        phase += phaseincrement;
+        if (phase >= 1.0)
+        {
+            std::rotate(nodes.begin(), nodes.begin() + 1, nodes.begin() + numnodes);
+            float x = nodes[numnodes - 1].x0;
+            x += rng.nextHypCos(0.0, 4.0);
+            x = std::clamp(x, 2.0f, 65.0f);
+            nodes[numnodes - 1].x0 = x;
+            float y = nodes[numnodes - 1].y0;
+            y += rng.nextHypCos(0.0, 0.01);
+            y = std::clamp(y, -0.5f, 0.5f);
+            nodes[numnodes - 1].y0 = y;
+            phaseincrement = 1.0 / nodes[0].x0;
+            phase = 0.0;
+        }
+        return intery;
+    }
+    py::array_t<float> render(double sr, double outdur)
+    {
+        int numOutChans = 1;
+        int frames = outdur * sr;
+        py::buffer_info binfo(
+            nullptr,                                /* Pointer to buffer */
+            sizeof(float),                          /* Size of one scalar */
+            py::format_descriptor<float>::format(), /* Python struct-style format descriptor */
+            2,                                      /* Number of dimensions */
+            {numOutChans, frames},                  /* Buffer dimensions */
+            {sizeof(float) * frames,                /* Strides (in bytes) for each index */
+             sizeof(float)});
+        py::array_t<float> output_audio{binfo};
+        float *outdata = output_audio.mutable_data(0);
+        for (int i = 0; i < frames; ++i)
+        {
+            outdata[i] = step();
+        }
+        return output_audio;
+    }
+};
+
 void init_py4(py::module_ &m, py::module_ &m_const)
 {
     using namespace pybind11::literals;
+    py::class_<Gendyn2026>(m, "gendyn")
+        .def(py::init<>())
+        .def("prepare", &Gendyn2026::prepare)
+        .def("render", &Gendyn2026::render);
     m.def("test_simple_lfo", &test_simple_lfo);
     m.def("encode_to_ambisonics", &encode_to_ambisonics, "input_audio"_a, "sample_rate"_a,
           "ambisonics_order"_a, "azimuth"_a, "elevation"_a);
