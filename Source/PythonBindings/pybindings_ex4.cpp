@@ -17,6 +17,8 @@
 #include "plugins/BezEQ.h"
 #include "plugins/HipCrush.h"
 #include "../Common/xen_ambisonics.h"
+#include "gendyn.h"
+#include "../cli/xcli_utils.h"
 
 namespace py = pybind11;
 
@@ -603,78 +605,61 @@ inline std::vector<double> test_simple_lfo(xenakios::Envelope &deform_env)
 
 inline std::vector<double> test_morphing_random() { return {}; }
 
-struct Gendyn2026
+py::array_t<float> gendyn_render(Gendyn2026 &gendyn, double sr, double outdur, int rseed,
+                                 int numsegs_, int interpolationmode, int timedistribution,
+                                 int ampdistribution, xenakios::Envelope &timedistspread,
+                                 double pitchlow, double pitchhigh,
+                                 xenakios::Envelope &ampdistspread)
 {
-    struct Node
+    int numOutChans = 1;
+    int frames = outdur * sr;
+    py::buffer_info binfo(
+        nullptr,                                /* Pointer to buffer */
+        sizeof(float),                          /* Size of one scalar */
+        py::format_descriptor<float>::format(), /* Python struct-style format descriptor */
+        2,                                      /* Number of dimensions */
+        {numOutChans, frames},                  /* Buffer dimensions */
+        {sizeof(float) * frames,                /* Strides (in bytes) for each index */
+         sizeof(float)});
+    py::array_t<float> output_audio{binfo};
+    float *outdata = output_audio.mutable_data(0);
+    int outcounter = 0;
+    const size_t blocksize = 64;
+    constexpr size_t osfactor = 4;
+    dsp::Decimator<osfactor, 16> decimator;
+    decimator.reset();
+    gendyn.prepare(sr * osfactor);
+    float osbuffer[osfactor];
+    gendyn.timedist = (Gendyn2026::RANDOMDIST)timedistribution;
+    gendyn.ampdist = (Gendyn2026::RANDOMDIST)ampdistribution;
+    gendyn.numnodes = numsegs_;
+    gendyn.interpmode = (Gendyn2026::INTERPOLATION)interpolationmode;
+    gendyn.timehighvalue =
+        (sr * osfactor) / numsegs_ / (440.0 * std::pow(2.0, 1.0 / 12.0 * (pitchlow - 9.0)));
+    gendyn.timelowvalue =
+        (sr * osfactor) / numsegs_ / (440.0 * std::pow(2.0, 1.0 / 12.0 * (pitchhigh - 9.0)));
+    gendyn.rng.seed(rseed, 13);
+
+    while (outcounter < frames)
     {
-        float x0 = 0.0f;
-        float y0 = 0.0f;
-    };
-    alignas(16) std::array<Node, 256> nodes;
-    alignas(16) double phase = 0.0;
-    alignas(16) double phaseincrement = 0.0;
-    size_t numnodes = 5;
-    double sr = 0.0;
-    xenakios::Xoroshiro128Plus rng;
-    Gendyn2026()
-    {
-        nodes[0] = {64.0f, 0.0f};
-        nodes[1] = {64.0f, 0.0f};
-        nodes[2] = {64.0f, 0.0f};
-        nodes[3] = {64.0f, 0.0f};
-        nodes[4] = {64.0f, 0.0f};
-    }
-    void prepare(double samplerate)
-    {
-        sr = samplerate;
-        phaseincrement = 1.0 / nodes[0].x0;
-    }
-    float step()
-    {
-        float y0 = nodes[0].y0;
-        float y1 = nodes[1].y0;
-        float y2 = nodes[2].y0;
-        float y3 = nodes[3].y0;
-        float intery = sst::basic_blocks::dsp::cubic_ipol(y0, y1, y2, y3, phase);
-        // float intery = y0 + (y1 - y0) * phase;
-        phase += phaseincrement;
-        if (phase >= 1.0)
+        size_t torender = std::min(blocksize, (size_t)frames - outcounter);
+        double tpos = outcounter / sr;
+        gendyn.timespread = timedistspread.getValueAtPosition(tpos);
+        gendyn.ampspread = ampdistspread.getValueAtPosition(tpos);
+        for (int i = 0; i < torender; ++i)
         {
-            std::rotate(nodes.begin(), nodes.begin() + 1, nodes.begin() + numnodes);
-            float x = nodes[numnodes - 1].x0;
-            x += rng.nextHypCos(0.0, 4.0);
-            x = std::clamp(x, 2.0f, 65.0f);
-            nodes[numnodes - 1].x0 = x;
-            float y = nodes[numnodes - 1].y0;
-            y += rng.nextHypCos(0.0, 0.01);
-            y = std::clamp(y, -0.5f, 0.5f);
-            nodes[numnodes - 1].y0 = y;
-            phaseincrement = 1.0 / nodes[0].x0;
-            phase = 0.0;
+            for (int j = 0; j < osfactor; ++j)
+            {
+                osbuffer[j] = gendyn.step();
+            }
+            float decimsample = decimator.process(osbuffer);
+            outdata[outcounter + i] = decimsample;
         }
-        return intery;
+        outcounter += blocksize;
     }
-    py::array_t<float> render(double sr, double outdur)
-    {
-        int numOutChans = 1;
-        int frames = outdur * sr;
-        py::buffer_info binfo(
-            nullptr,                                /* Pointer to buffer */
-            sizeof(float),                          /* Size of one scalar */
-            py::format_descriptor<float>::format(), /* Python struct-style format descriptor */
-            2,                                      /* Number of dimensions */
-            {numOutChans, frames},                  /* Buffer dimensions */
-            {sizeof(float) * frames,                /* Strides (in bytes) for each index */
-             sizeof(float)});
-        py::array_t<float> output_audio{binfo};
-        float *outdata = output_audio.mutable_data(0);
-        for (int i = 0; i < frames; ++i)
-        {
-            outdata[i] = step();
-        }
-        return output_audio;
-    }
-};
+
+    return output_audio;
+}
 
 void init_py4(py::module_ &m, py::module_ &m_const)
 {
@@ -682,7 +667,7 @@ void init_py4(py::module_ &m, py::module_ &m_const)
     py::class_<Gendyn2026>(m, "gendyn")
         .def(py::init<>())
         .def("prepare", &Gendyn2026::prepare)
-        .def("render", &Gendyn2026::render);
+        .def("render", &gendyn_render);
     m.def("test_simple_lfo", &test_simple_lfo);
     m.def("encode_to_ambisonics", &encode_to_ambisonics, "input_audio"_a, "sample_rate"_a,
           "ambisonics_order"_a, "azimuth"_a, "elevation"_a);
