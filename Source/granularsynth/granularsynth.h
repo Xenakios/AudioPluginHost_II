@@ -44,12 +44,13 @@ struct GranulatorModConfig
     struct TargetIdentifier
     {
         int baz{0};
-        uint32_t nm{};
+        // uint32_t nm{};
         int16_t depthPosition{-1};
 
         bool operator==(const TargetIdentifier &other) const
         {
-            return baz == other.baz && nm == other.nm && depthPosition == other.depthPosition;
+            return baz == other.baz && depthPosition == other.depthPosition;
+            // return baz == other.baz && nm == other.nm && depthPosition == other.depthPosition;
         }
     };
 
@@ -102,9 +103,10 @@ template <> struct std::hash<GranulatorModConfig::TargetIdentifier>
     std::size_t operator()(const GranulatorModConfig::TargetIdentifier &s) const noexcept
     {
         auto h1 = std::hash<int>{}((int)s.baz);
-        auto h2 = std::hash<uint32_t>{}((int)s.nm);
+        return h1;
+        // auto h2 = std::hash<uint32_t>{}((int)s.nm);
 
-        return h1 ^ (h2 << 1);
+        // return h1 ^ (h2 << 1);
     }
 };
 
@@ -149,6 +151,7 @@ class GranulatorModMatrix
     std::array<int, numLfos> lfo_shapes;
     std::array<float, numLfos> lfo_rates;
     std::array<float, numLfos> lfo_deforms;
+    std::array<float, numLfos> lfo_shifts;
     void init_from_json_file(std::string path)
     {
         try
@@ -192,10 +195,12 @@ class GranulatorModMatrix
                     if (lfoindex >= 0 && lfoindex < numLfos)
                     {
                         float rate = entryob["rate"].getWithDefault(0.0f);
-                        float deform = entryob["deform"].getWithDefault(0.0f);
-                        int shape = entryob["shape"].getWithDefault(0);
                         lfo_rates[lfoindex] = rate;
+                        float deform = entryob["deform"].getWithDefault(0.0f);
                         lfo_deforms[lfoindex] = deform;
+                        float shift = entryob["deform"].getWithDefault(0.0f);
+                        lfo_shifts[lfoindex] = entryob["shift"].getWithDefault(0.5f);
+                        int shape = entryob["shape"].getWithDefault(0);
                         lfo_shapes[lfoindex] = shape;
                     }
                 }
@@ -217,6 +222,7 @@ class GranulatorModMatrix
             lfo_shapes[i] = lfo_t::SINE;
             lfo_rates[i] = 0.0;
             lfo_deforms[i] = 0.0;
+            lfo_shifts[i] = 0.5f;
             sourceIds[i] =
                 GranulatorModConfig::SourceIdentifier{(GranulatorModConfig::SourceIdentifier::SI)(
                     GranulatorModConfig::SourceIdentifier::LFO0 + i)};
@@ -934,20 +940,18 @@ class ToneGranulator
     }
     void generate_grain()
     {
-        double grate = 1.0 / std::pow(2.0, grain_rate_oct);
+        double actgrate = grain_rate_oct;
+        actgrate = modmatrix.m.getTargetValue(modmatrix.targetIds[0]);
+        actgrate = std::clamp(actgrate, -1.0, 7.0);
+        double grate = 1.0 / std::pow(2.0, actgrate);
         for (int i = 0; i < granul_block_size; ++i)
         {
             if (graingen_phase_prior > graingen_phase)
             {
-                // float pitch =
-                //     rng.nextFloatInRange(pitch_center - pitch_spread, pitch_center +
-                //     pitch_spread);
-                float pitch = modmatrix.m.getTargetValue(modmatrix.targetIds[0]);
+                float pitch = modmatrix.m.getTargetValue(modmatrix.targetIds[1]);
                 GrainEvent genev{0.0, grain_dur, pitch, 0.75};
-                // float azi = rng.nextFloatInRange(azi_center - azi_spread, azi_center +
-                // azi_spread);
                 genev.envelope_shape = env_shape;
-                float azi = modmatrix.m.getTargetValue(modmatrix.targetIds[1]);
+                float azi = modmatrix.m.getTargetValue(modmatrix.targetIds[2]);
                 genev.azimuth = azi;
                 genev.generator_type = osc_type;
                 genev.fm_frequency_hz = 440.0 * std::pow(2.0, 1.0 / 12 * (fm_pitch - 9.0));
@@ -1004,13 +1008,15 @@ class ToneGranulator
         {
             for (size_t i = 0; i < modmatrix.numLfos; ++i)
             {
+                modmatrix.m_lfos[i]->applyPhaseOffset(modmatrix.lfo_shifts[i]);
                 modmatrix.m_lfos[i]->process_block(modmatrix.lfo_rates[i], modmatrix.lfo_deforms[i],
                                                    modmatrix.lfo_shapes[i]);
                 modmatrix.sourceValues[i] = modmatrix.m_lfos[i]->outputBlock[0];
             }
 
-            modmatrix.targetBaseValues[0] = pitch_center;
-            modmatrix.targetBaseValues[1] = azi_center;
+            modmatrix.targetBaseValues[0] = grain_rate_oct;
+            modmatrix.targetBaseValues[1] = pitch_center;
+            modmatrix.targetBaseValues[2] = azi_center;
             modmatrix.m.process();
             if (!self_generate)
             {

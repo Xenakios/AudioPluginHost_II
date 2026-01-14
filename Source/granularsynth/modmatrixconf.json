@@ -9,13 +9,18 @@
     ],
     "lfos": [
         {
+            "index": 2,
+            "rate": -1.0,
+            "shape": 3
+        },
+        {
             "index": 0,
             "rate": -1.0
         },
         {
             "index": 1,
-            "shape": 4,
-            "rate": 2.0,
+            "shape": 3,
+            "rate": 1.1,
             "deform": 0.0
         }
     ],
@@ -23,14 +28,20 @@
         {
             "slot": 0,
             "src": 0,
-            "dest": 1,
-            "depth": 30.0
+            "dest": 2,
+            "depth": 0.0
         },
         {
             "slot": 1,
             "src": 1,
+            "dest": 1,
+            "depth": 3.5
+        },
+        {
+            "slot": 2,
+            "src": 2,
             "dest": 0,
-            "depth": 12.0
+            "depth": 2.0
         }
     ]
 }

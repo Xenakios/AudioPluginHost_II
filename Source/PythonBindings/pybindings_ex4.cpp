@@ -293,6 +293,10 @@ inline void set_granulator_params(ToneGranulator &gran, py::dict dict)
         gran.grain_rate_oct = dict["rate"].cast<double>();
     if (dict.contains("pitch_center"))
         gran.pitch_center = dict["pitch_center"].cast<double>();
+    if (dict.contains("duration"))
+        gran.grain_dur = dict["duration"].cast<double>();
+    if (dict.contains("osc_type"))
+        gran.osc_type = dict["osc_type"].cast<int>();
 }
 
 inline py::array_t<float> render_granulator(ToneGranulator &gran, events_t evlist,
