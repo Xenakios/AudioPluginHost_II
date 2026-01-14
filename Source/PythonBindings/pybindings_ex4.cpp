@@ -295,6 +295,10 @@ inline void set_granulator_params(ToneGranulator &gran, py::dict dict)
         gran.pitch_center = dict["pitch_center"].cast<double>();
     if (dict.contains("duration"))
         gran.grain_dur = dict["duration"].cast<double>();
+    if (dict.contains("fil0cutoff"))
+        gran.filt_cut_off = dict["fil0cutoff"].cast<double>();
+    if (dict.contains("fil0reson"))
+        gran.filt_reso = dict["fil0reson"].cast<double>();
     if (dict.contains("osc_type"))
         gran.osc_type = dict["osc_type"].cast<int>();
 }

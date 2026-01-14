@@ -942,7 +942,7 @@ class ToneGranulator
     {
         double actgrate = grain_rate_oct;
         actgrate = modmatrix.m.getTargetValue(modmatrix.targetIds[0]);
-        actgrate = std::clamp(actgrate, -1.0, 7.0);
+        actgrate = std::clamp(actgrate, -1.0, 8.0);
         double grate = 1.0 / std::pow(2.0, actgrate);
         for (int i = 0; i < granul_block_size; ++i)
         {
@@ -960,7 +960,8 @@ class ToneGranulator
                 genev.pulse_width = pulse_width;
                 genev.noisecorr = noise_corr;
                 genev.sync_ratio = std::pow(2.0, osc_sync);
-                genev.filterparams[0][0] = filt_cut_off;
+                float f0co = modmatrix.m.getTargetValue(modmatrix.targetIds[3]);
+                genev.filterparams[0][0] = f0co;
                 genev.filterparams[0][1] = filt_reso;
                 genev.modamounts[GrainEvent::MD_PITCH] = grain_pitch_mod;
                 bool wasfound = false;
@@ -1017,6 +1018,7 @@ class ToneGranulator
             modmatrix.targetBaseValues[0] = grain_rate_oct;
             modmatrix.targetBaseValues[1] = pitch_center;
             modmatrix.targetBaseValues[2] = azi_center;
+            modmatrix.targetBaseValues[3] = filt_cut_off;
             modmatrix.m.process();
             if (!self_generate)
             {

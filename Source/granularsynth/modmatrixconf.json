@@ -20,7 +20,7 @@
         {
             "index": 1,
             "shape": 3,
-            "rate": 1.1,
+            "rate": -2.13,
             "deform": 0.0
         }
     ],
@@ -32,16 +32,22 @@
             "depth": 0.0
         },
         {
+            "slot": 3,
+            "src": 1,
+            "dest": 3,
+            "depth": -24.0
+        },
+        {
             "slot": 1,
             "src": 1,
             "dest": 1,
-            "depth": 3.5
+            "depth": 6.0
         },
         {
             "slot": 2,
             "src": 2,
             "dest": 0,
-            "depth": 2.0
+            "depth": 0.5
         }
     ]
 }
