@@ -42,6 +42,8 @@ class AudioPluginAudioProcessor final : public juce::AudioProcessor
     juce::AudioParameterFloat* parGrainRate = nullptr;
     juce::AudioParameterFloat* parGrainDuration = nullptr;
     juce::AudioParameterFloat* parGrainCenterPitch = nullptr;
+    juce::AudioParameterFloat* parGrainCenterAzimuth = nullptr;
+    juce::AudioParameterFloat* parGrainCenterElevation = nullptr;
     //==============================================================================
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(AudioPluginAudioProcessor)
 };

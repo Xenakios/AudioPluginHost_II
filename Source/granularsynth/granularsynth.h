@@ -842,6 +842,7 @@ class ToneGranulator
     float grain_rate_oct = 4.0;
     float azi_center = 0.0;
     float azi_spread = 0.0;
+    float ele_center = 0.0;
     float osc_sync = 0.0;
     float filt_cut_off = 36.0;
     float filt_reso = 0.0;
@@ -954,6 +955,7 @@ class ToneGranulator
                 genev.envelope_shape = env_shape;
                 float azi = modmatrix.m.getTargetValue(modmatrix.targetIds[2]);
                 genev.azimuth = azi;
+                genev.elevation = ele_center;
                 genev.generator_type = osc_type;
                 genev.fm_frequency_hz = 440.0 * std::pow(2.0, 1.0 / 12 * (fm_pitch - 9.0));
                 genev.fm_amount = fm_depth;

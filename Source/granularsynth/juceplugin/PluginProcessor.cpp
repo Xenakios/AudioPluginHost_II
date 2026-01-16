@@ -8,7 +8,9 @@ AudioPluginAudioProcessor::AudioPluginAudioProcessor()
 #if !JucePlugin_IsSynth
                          .withInput("Input", juce::AudioChannelSet::stereo(), true)
 #endif
-                         .withOutput("Output", juce::AudioChannelSet::stereo(), true)
+                         .withOutput("Stereo Output", juce::AudioChannelSet::stereo(), true)
+                         .withOutput("Amb 3rd OOutput",
+                                     juce::AudioChannelSet::discreteChannels(16), false)
 #endif
       )
 {
@@ -18,6 +20,10 @@ AudioPluginAudioProcessor::AudioPluginAudioProcessor()
                                                                   0.002f, 0.5f, 0.05f));
     addParameter(parGrainCenterPitch = new juce::AudioParameterFloat(
                      {"GPITCH", 1}, "Grain Center Pitch", -36.0f, 36.0f, 0.0f));
+    addParameter(parGrainCenterAzimuth = new juce::AudioParameterFloat(
+                     {"GAZI", 1}, "Grain Center Azimth", -180.0f, 180.0f, 0.0f));
+    addParameter(parGrainCenterElevation = new juce::AudioParameterFloat(
+                     {"GELEV", 1}, "Grain Center Elevation", -180.0f, 180.0f, 0.0f));
 }
 
 AudioPluginAudioProcessor::~AudioPluginAudioProcessor() {}
@@ -79,34 +85,26 @@ void AudioPluginAudioProcessor::changeProgramName(int index, const juce::String 
 void AudioPluginAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 {
     juce::ignoreUnused(sampleRate, samplesPerBlock);
-    workBuffer.resize(samplesPerBlock * 16);
-    granulator.prepare({}, 1);
+    workBuffer.resize(samplesPerBlock * 32);
+    granulator.prepare({}, 3);
 }
 
 void AudioPluginAudioProcessor::releaseResources() {}
 
 bool AudioPluginAudioProcessor::isBusesLayoutSupported(const BusesLayout &layouts) const
 {
-#if JucePlugin_IsMidiEffect
-    juce::ignoreUnused(layouts);
-    return true;
-#else
     // This is the place where you check if the layout is supported.
     // In this template code we only support mono or stereo.
     // Some plugin hosts, such as certain GarageBand versions, will only
     // load plugins that support stereo bus layouts.
     if (layouts.getMainOutputChannelSet() != juce::AudioChannelSet::mono() &&
-        layouts.getMainOutputChannelSet() != juce::AudioChannelSet::stereo())
+        layouts.getMainOutputChannelSet() != juce::AudioChannelSet::stereo() &&
+        layouts.getMainOutputChannelSet() != juce::AudioChannelSet::discreteChannels(16))
         return false;
 
-        // This checks if the input layout matches the output layout
-#if !JucePlugin_IsSynth
-    if (layouts.getMainOutputChannelSet() != layouts.getMainInputChannelSet())
-        return false;
-#endif
+    // This checks if the input layout matches the output layout
 
     return true;
-#endif
 }
 
 void AudioPluginAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
@@ -120,7 +118,7 @@ void AudioPluginAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
 
     for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
         buffer.clear(i, 0, buffer.getNumSamples());
-
+    /*
     for (const auto mm : midiMessages)
     {
         const auto msg = mm.getMessage();
@@ -135,19 +133,36 @@ void AudioPluginAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
                     juce::jmap<float>(msg.getControllerValue(), 0, 127, -36.0, 36.0);
         }
     }
+    */
     granulator.grain_rate_oct = parGrainRate->get();
     granulator.pitch_center = parGrainCenterPitch->get();
     granulator.grain_dur = parGrainDuration->get();
+    granulator.azi_center = parGrainCenterAzimuth->get();
+    granulator.ele_center = parGrainCenterElevation->get();
     granulator.process_block(workBuffer.data(), buffer.getNumSamples());
 
     int procnumoutchs = granulator.num_out_chans;
     auto channelDatas = buffer.getArrayOfWritePointers();
-    for (int j = 0; j < buffer.getNumSamples(); ++j)
+    if (totalNumOutputChannels == 2)
     {
-        float m = workBuffer[j * procnumoutchs + 0];
-        float s = workBuffer[j * procnumoutchs + 1];
-        channelDatas[0][j] = std::clamp(m + s, -1.0f, 1.0f);
-        channelDatas[1][j] = std::clamp(m - s, -1.0f, 1.0f);
+        for (int j = 0; j < buffer.getNumSamples(); ++j)
+        {
+            float m = workBuffer[j * procnumoutchs + 0];
+            float s = workBuffer[j * procnumoutchs + 1];
+            channelDatas[0][j] = std::clamp(m + s, -1.0f, 1.0f);
+            channelDatas[1][j] = std::clamp(m - s, -1.0f, 1.0f);
+        }
+    }
+    if (totalNumOutputChannels == 16)
+    {
+        for (int i = 0; i < 16; ++i)
+        {
+            for (int j = 0; j < buffer.getNumSamples(); ++j)
+            {
+                float s = workBuffer[j * procnumoutchs + i];
+                channelDatas[i][j] = std::clamp(s, -1.0f, 1.0f);
+            }
+        }
     }
 }
 
