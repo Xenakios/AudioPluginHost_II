@@ -39,6 +39,9 @@ class AudioPluginAudioProcessor final : public juce::AudioProcessor
   private:
     ToneGranulator granulator{44100.0, 0, "none", "none", 0.001f, 0.001f};
     std::vector<float> workBuffer;
+    juce::AudioParameterFloat* parGrainRate = nullptr;
+    juce::AudioParameterFloat* parGrainDuration = nullptr;
+    juce::AudioParameterFloat* parGrainCenterPitch = nullptr;
     //==============================================================================
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(AudioPluginAudioProcessor)
 };

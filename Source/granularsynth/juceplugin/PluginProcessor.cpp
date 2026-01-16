@@ -12,6 +12,12 @@ AudioPluginAudioProcessor::AudioPluginAudioProcessor()
 #endif
       )
 {
+    addParameter(parGrainRate =
+                     new juce::AudioParameterFloat({"GRATE", 1}, "Grain Rate", 0.0f, 6.0f, 4.0f));
+    addParameter(parGrainDuration = new juce::AudioParameterFloat({"GDUR", 1}, "Grain Duration",
+                                                                  0.002f, 0.5f, 0.05f));
+    addParameter(parGrainCenterPitch = new juce::AudioParameterFloat(
+                     {"GPITCH", 1}, "Grain Center Pitch", -36.0f, 36.0f, 0.0f));
 }
 
 AudioPluginAudioProcessor::~AudioPluginAudioProcessor() {}
@@ -72,18 +78,12 @@ void AudioPluginAudioProcessor::changeProgramName(int index, const juce::String 
 //==============================================================================
 void AudioPluginAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 {
-    // Use this method as the place to do any pre-playback
-    // initialisation that you need..
     juce::ignoreUnused(sampleRate, samplesPerBlock);
     workBuffer.resize(samplesPerBlock * 16);
     granulator.prepare({}, 1);
 }
 
-void AudioPluginAudioProcessor::releaseResources()
-{
-    // When playback stops, you can use this as an opportunity to free up any
-    // spare memory, etc.
-}
+void AudioPluginAudioProcessor::releaseResources() {}
 
 bool AudioPluginAudioProcessor::isBusesLayoutSupported(const BusesLayout &layouts) const
 {
@@ -121,9 +121,12 @@ void AudioPluginAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
     for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
         buffer.clear(i, 0, buffer.getNumSamples());
 
+    granulator.grain_rate_oct = parGrainRate->get();
+    granulator.pitch_center = parGrainCenterPitch->get();
+    granulator.grain_dur = parGrainDuration->get();
     granulator.process_block(workBuffer.data(), buffer.getNumSamples());
+
     int procnumoutchs = granulator.num_out_chans;
-    granulator.grain_rate_oct = 0.0;
     auto channelDatas = buffer.getArrayOfWritePointers();
     for (int j = 0; j < buffer.getNumSamples(); ++j)
     {
@@ -142,6 +145,7 @@ bool AudioPluginAudioProcessor::hasEditor() const
 
 juce::AudioProcessorEditor *AudioPluginAudioProcessor::createEditor()
 {
+    return new juce::GenericAudioProcessorEditor(*this);
     return new AudioPluginAudioProcessorEditor(*this);
 }
 
