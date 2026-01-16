@@ -299,6 +299,8 @@ inline void set_granulator_params(ToneGranulator &gran, py::dict dict)
         gran.filt_cut_off = dict["fil0cutoff"].cast<double>();
     if (dict.contains("fil0reson"))
         gran.filt_reso = dict["fil0reson"].cast<double>();
+    if (dict.contains("env_shape"))
+        gran.env_shape = dict["env_shape"].cast<double>();
     if (dict.contains("osc_type"))
         gran.osc_type = dict["osc_type"].cast<int>();
 }
