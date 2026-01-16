@@ -121,6 +121,20 @@ void AudioPluginAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
     for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
         buffer.clear(i, 0, buffer.getNumSamples());
 
+    for (const auto mm : midiMessages)
+    {
+        const auto msg = mm.getMessage();
+        if (msg.isController())
+        {
+            if (msg.getControllerNumber() == 21)
+                *parGrainRate = juce::jmap<float>(msg.getControllerValue(), 0, 127, 0.0, 6.0);
+            if (msg.getControllerNumber() == 22)
+                *parGrainDuration = juce::jmap<float>(msg.getControllerValue(), 0, 127, 0.002, 0.2);
+            if (msg.getControllerNumber() == 23)
+                *parGrainCenterPitch =
+                    juce::jmap<float>(msg.getControllerValue(), 0, 127, -36.0, 36.0);
+        }
+    }
     granulator.grain_rate_oct = parGrainRate->get();
     granulator.pitch_center = parGrainCenterPitch->get();
     granulator.grain_dur = parGrainDuration->get();
