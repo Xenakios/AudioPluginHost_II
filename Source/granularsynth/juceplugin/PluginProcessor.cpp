@@ -15,16 +15,27 @@ AudioPluginAudioProcessor::AudioPluginAudioProcessor()
 {
     addParameter(parAmbiOrder = new juce::AudioParameterChoice({"AMBO", 1}, "Ambisonics Order",
                                                                {"STEREO", "1ST", "2ND", "3RD"}, 0));
+    addParameter(parOscType = new juce::AudioParameterChoice(
+                     {"OSCTY", 1}, "Oscillator Type",
+                     {"SINE", "SEMISINE", "TRIANGLE", "SAW", "SQUARE", "FM", "NOISE"}, 0));
     addParameter(parGrainRate =
                      new juce::AudioParameterFloat({"GRATE", 1}, "Grain Rate", 0.0f, 6.0f, 4.0f));
     addParameter(parGrainDuration = new juce::AudioParameterFloat({"GDUR", 1}, "Grain Duration",
                                                                   0.002f, 0.5f, 0.05f));
     addParameter(parGrainCenterPitch = new juce::AudioParameterFloat(
                      {"GPITCH", 1}, "Grain Center Pitch", -36.0f, 36.0f, 0.0f));
+    addParameter(parGrainFMPitch = new juce::AudioParameterFloat({"GFMPITCH", 1}, "Grain FM Pitch",
+                                                                 -48.0f, 48.0f, 0.0f));
+    addParameter(parGrainFMDepth = new juce::AudioParameterFloat({"GFMDEPTH", 1}, "Grain FM Depth",
+                                                                 0.0f, 1.0f, 0.0f));
     addParameter(parGrainCenterAzimuth = new juce::AudioParameterFloat(
                      {"GAZI", 1}, "Grain Center Azimuth", -180.0f, 180.0f, 0.0f));
     addParameter(parGrainCenterElevation = new juce::AudioParameterFloat(
                      {"GELEV", 1}, "Grain Center Elevation", -180.0f, 180.0f, 0.0f));
+    addParameter(parGrainFilter0Cutoff = new juce::AudioParameterFloat(
+                     {"GF0C", 1}, "Filter 1 Cutoff", -36.0, 48.0, 48.0f));
+    addParameter(parGrainFilter0Reson = new juce::AudioParameterFloat(
+                     {"GF0R", 1}, "Filter 1 Resonance", 0.0, 1.0, 0.0f));
 }
 
 AudioPluginAudioProcessor::~AudioPluginAudioProcessor() {}
@@ -136,6 +147,13 @@ void AudioPluginAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
         }
     }
     */
+    if (settingsLoadRequested.load())
+    {
+        // obviously can't leave it like this, this reads from a file and parses json etc
+        granulator.modmatrix.init_from_json_file(
+            R"(C:\develop\AudioPluginHost_mk2\Source\granularsynth\modmatrixconf.json)");
+        settingsLoadRequested.store(false);
+    }
     if (prior_ambi_order != parAmbiOrder->getIndex())
     {
         /*
@@ -151,6 +169,11 @@ void AudioPluginAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
     granulator.grain_dur = parGrainDuration->get();
     granulator.azi_center = parGrainCenterAzimuth->get();
     granulator.ele_center = parGrainCenterElevation->get();
+    granulator.filt_cut_off = parGrainFilter0Cutoff->get();
+    granulator.filt_reso = parGrainFilter0Reson->get();
+    granulator.osc_type = parOscType->getIndex();
+    granulator.fm_pitch = parGrainFMPitch->get();
+    granulator.fm_depth = parGrainFMDepth->get();
     granulator.process_block(workBuffer.data(), buffer.getNumSamples());
 
     int procnumoutchs = granulator.num_out_chans;

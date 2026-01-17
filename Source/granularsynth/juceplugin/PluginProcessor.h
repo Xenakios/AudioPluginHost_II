@@ -35,17 +35,22 @@ class AudioPluginAudioProcessor final : public juce::AudioProcessor
 
     void getStateInformation(juce::MemoryBlock &destData) override;
     void setStateInformation(const void *data, int sizeInBytes) override;
-
+    std::atomic<bool> settingsLoadRequested{false};
   private:
-    ToneGranulator granulator{44100.0, 0, "none", "none", 0.001f, 0.001f};
+    ToneGranulator granulator{44100.0, 0, "fast_svf/lowpass", "none", 0.001f, 0.001f};
     std::vector<float> workBuffer;
     juce::AudioParameterChoice* parAmbiOrder = nullptr;
     int prior_ambi_order = -1;
+    juce::AudioParameterChoice* parOscType = nullptr;
     juce::AudioParameterFloat* parGrainRate = nullptr;
     juce::AudioParameterFloat* parGrainDuration = nullptr;
     juce::AudioParameterFloat* parGrainCenterPitch = nullptr;
     juce::AudioParameterFloat* parGrainCenterAzimuth = nullptr;
     juce::AudioParameterFloat* parGrainCenterElevation = nullptr;
+    juce::AudioParameterFloat* parGrainFilter0Cutoff = nullptr;
+    juce::AudioParameterFloat* parGrainFilter0Reson = nullptr;
+    juce::AudioParameterFloat* parGrainFMPitch = nullptr;
+    juce::AudioParameterFloat* parGrainFMDepth = nullptr;
     //==============================================================================
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(AudioPluginAudioProcessor)
 };

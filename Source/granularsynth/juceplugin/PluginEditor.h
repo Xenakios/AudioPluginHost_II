@@ -9,7 +9,6 @@ struct GUIParam
     std::unique_ptr<juce::ComboBox> combo;
     std::unique_ptr<juce::SliderParameterAttachment> slidAttach;
     std::unique_ptr<juce::ComboBoxParameterAttachment> choiceAttach;
-    
 };
 
 //==============================================================================
@@ -28,5 +27,6 @@ class AudioPluginAudioProcessorEditor final : public juce::AudioProcessorEditor
     // access the processor object that created it.
     AudioPluginAudioProcessor &processorRef;
     std::vector<std::unique_ptr<GUIParam>> paramEntries;
+    juce::TextButton loadModulationSettingsBut;
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(AudioPluginAudioProcessorEditor)
 };
