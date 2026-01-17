@@ -39,6 +39,8 @@ class AudioPluginAudioProcessor final : public juce::AudioProcessor
   private:
     ToneGranulator granulator{44100.0, 0, "none", "none", 0.001f, 0.001f};
     std::vector<float> workBuffer;
+    juce::AudioParameterChoice* parAmbiOrder = nullptr;
+    int prior_ambi_order = -1;
     juce::AudioParameterFloat* parGrainRate = nullptr;
     juce::AudioParameterFloat* parGrainDuration = nullptr;
     juce::AudioParameterFloat* parGrainCenterPitch = nullptr;

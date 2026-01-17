@@ -591,7 +591,9 @@ struct testsrprovider
     static constexpr size_t BLOCK_SIZE_OS = BLOCKSIZE * 2;
 };
 
-inline std::vector<double> test_simple_lfo(xenakios::Envelope &deform_env)
+inline std::vector<double> test_simple_lfo(int sh, xenakios::Envelope &rate_env,
+                                           xenakios::Envelope &deform_env,
+                                           xenakios::Envelope &phasewarp_env)
 {
     testsrprovider srprovider;
     srprovider.samplerate = 44100.0;
@@ -600,13 +602,16 @@ inline std::vector<double> test_simple_lfo(xenakios::Envelope &deform_env)
     lfo_t lfo{&srprovider};
     lfo.attack(lfo_t::SH_MORPHRND);
     int outcounter = 0;
-    int blocksize = 64;
+    int blocksize = 512;
     int outlen = 44100 * 10;
     std::vector<double> result;
     while (outcounter < outlen)
     {
-        float deform = deform_env.getValueAtPosition(outcounter / 44100.0);
-        lfo.process_block(5, deform, lfo_t::SH_MORPHRND);
+        double tpos = outcounter / 44100.0;
+        float rate = rate_env.getValueAtPosition(tpos);
+        float deform = deform_env.getValueAtPosition(tpos);
+        float pwarp = phasewarp_env.getValueAtPosition(tpos);
+        lfo.process_block(rate, deform, sh, false, 1.0, pwarp);
         result.push_back(lfo.outputBlock[0]);
         outcounter += blocksize;
     }

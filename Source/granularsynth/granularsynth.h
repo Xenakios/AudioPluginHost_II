@@ -930,15 +930,18 @@ class ToneGranulator
                 return e.time_position < 0.0 || (e.time_position + e.duration) > 120.0;
             });
         }
-
-        std::map<int, int> aotonumchans{{1, 4}, {2, 9}, {3, 16}};
+        set_ambisonics_order(ambisonics_order);
+        thread_op = 1;
+    }
+    std::map<int, int> aotonumchans{{1, 4}, {2, 9}, {3, 16}};
+    void set_ambisonics_order(int order)
+    {
         for (auto &v : voices)
         {
-            v->ambisonic_order = ambisonics_order;
-            v->num_outputchans = aotonumchans[ambisonics_order];
+            v->ambisonic_order = order;
+            v->num_outputchans = aotonumchans[order];
         }
-        num_out_chans = aotonumchans[ambisonics_order];
-        thread_op = 1;
+        num_out_chans = aotonumchans[order];
     }
     void generate_grain()
     {

@@ -8,12 +8,13 @@ AudioPluginAudioProcessor::AudioPluginAudioProcessor()
 #if !JucePlugin_IsSynth
                          .withInput("Input", juce::AudioChannelSet::stereo(), true)
 #endif
-                         .withOutput("Stereo Output", juce::AudioChannelSet::stereo(), true)
-                         .withOutput("Amb 3rd OOutput",
-                                     juce::AudioChannelSet::discreteChannels(16), false)
+                         .withOutput("Output", juce::AudioChannelSet::ambisonic(3), true)
+
 #endif
       )
 {
+    addParameter(parAmbiOrder = new juce::AudioParameterChoice({"AMBO", 1}, "Ambisonics Order",
+                                                               {"STEREO", "1ST", "2ND", "3RD"}, 0));
     addParameter(parGrainRate =
                      new juce::AudioParameterFloat({"GRATE", 1}, "Grain Rate", 0.0f, 6.0f, 4.0f));
     addParameter(parGrainDuration = new juce::AudioParameterFloat({"GDUR", 1}, "Grain Duration",
@@ -21,7 +22,7 @@ AudioPluginAudioProcessor::AudioPluginAudioProcessor()
     addParameter(parGrainCenterPitch = new juce::AudioParameterFloat(
                      {"GPITCH", 1}, "Grain Center Pitch", -36.0f, 36.0f, 0.0f));
     addParameter(parGrainCenterAzimuth = new juce::AudioParameterFloat(
-                     {"GAZI", 1}, "Grain Center Azimth", -180.0f, 180.0f, 0.0f));
+                     {"GAZI", 1}, "Grain Center Azimuth", -180.0f, 180.0f, 0.0f));
     addParameter(parGrainCenterElevation = new juce::AudioParameterFloat(
                      {"GELEV", 1}, "Grain Center Elevation", -180.0f, 180.0f, 0.0f));
 }
@@ -93,6 +94,7 @@ void AudioPluginAudioProcessor::releaseResources() {}
 
 bool AudioPluginAudioProcessor::isBusesLayoutSupported(const BusesLayout &layouts) const
 {
+    return true;
     // This is the place where you check if the layout is supported.
     // In this template code we only support mono or stereo.
     // Some plugin hosts, such as certain GarageBand versions, will only
@@ -134,6 +136,16 @@ void AudioPluginAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
         }
     }
     */
+    if (prior_ambi_order != parAmbiOrder->getIndex())
+    {
+        /*
+        prior_ambi_order = parAmbiOrder->getIndex();
+        if (prior_ambi_order >= 1)
+            granulator.set_ambisonics_order(prior_ambi_order);
+        if (prior_ambi_order == 0)
+            granulator.set_ambisonics_order(1);
+        */
+    }
     granulator.grain_rate_oct = parGrainRate->get();
     granulator.pitch_center = parGrainCenterPitch->get();
     granulator.grain_dur = parGrainDuration->get();
@@ -174,7 +186,7 @@ bool AudioPluginAudioProcessor::hasEditor() const
 
 juce::AudioProcessorEditor *AudioPluginAudioProcessor::createEditor()
 {
-    return new juce::GenericAudioProcessorEditor(*this);
+    // return new juce::GenericAudioProcessorEditor(*this);
     return new AudioPluginAudioProcessorEditor(*this);
 }
 
