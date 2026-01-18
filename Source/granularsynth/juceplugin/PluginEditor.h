@@ -11,6 +11,36 @@ struct GUIParam
     std::unique_ptr<juce::ComboBoxParameterAttachment> choiceAttach;
 };
 
+struct LFOComponent : public juce::Component
+{
+    LFOComponent()
+    {
+        auto upfunc = [this]() {
+            stateChangedCallback(lfoindex, shapeCombo.getSelectedId() - 1, rateSlider.getValue());
+        };
+        addAndMakeVisible(shapeCombo);
+        shapeCombo.addItem("SINE", 1);
+        shapeCombo.addItem("RAMP", 2);
+        shapeCombo.addItem("TRIANGLE", 4);
+        shapeCombo.addItem("SQUARE", 5);
+        shapeCombo.onChange = upfunc;
+        addAndMakeVisible(rateSlider);
+        rateSlider.setRange(-3.0, 5.0);
+        rateSlider.setNumDecimalPlacesToDisplay(2);
+        rateSlider.setTextBoxStyle(juce::Slider::TextEntryBoxPosition::TextBoxRight, false, 50, 20);
+        rateSlider.onValueChange = upfunc;
+    }
+    void resized()
+    {
+        shapeCombo.setBounds(0, 0, 100, 25);
+        rateSlider.setBounds(0, shapeCombo.getBottom(), 200, 25);
+    }
+    int lfoindex = -1;
+    std::function<void(int, int, float)> stateChangedCallback;
+    juce::ComboBox shapeCombo;
+    juce::Slider rateSlider;
+};
+
 struct ModulationRowComponent : public juce::Component
 {
     ModulationRowComponent()
@@ -29,7 +59,6 @@ struct ModulationRowComponent : public juce::Component
         sourceCombo.onChange = updatfunc;
         depthSlider.setRange(-1.0, 1.0);
         depthSlider.setNumDecimalPlacesToDisplay(2);
-
         depthSlider.onValueChange = updatfunc;
         depthSlider.setTextBoxStyle(juce::Slider::TextEntryBoxPosition::TextBoxRight, false, 50,
                                     20);
@@ -71,5 +100,6 @@ class AudioPluginAudioProcessorEditor final : public juce::AudioProcessorEditor
     std::vector<std::unique_ptr<GUIParam>> paramEntries;
     juce::TextButton loadModulationSettingsBut;
     std::vector<std::unique_ptr<ModulationRowComponent>> modRowComps;
+    LFOComponent lfocomp;
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(AudioPluginAudioProcessorEditor)
 };

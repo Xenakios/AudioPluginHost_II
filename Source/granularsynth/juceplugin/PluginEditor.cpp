@@ -66,6 +66,16 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor(AudioPluginAudi
         addAndMakeVisible(*modcomp);
         modRowComps.push_back(std::move(modcomp));
     }
+    addAndMakeVisible(lfocomp);
+    lfocomp.lfoindex = 0;
+    lfocomp.stateChangedCallback = [this](int lfoindex, int shape, float val) {
+        ThreadMessage msg;
+        msg.opcode = 2;
+        msg.lfoindex = lfoindex;
+        msg.lfoshape = shape;
+        msg.lforate = val;
+        processorRef.from_gui_fifo.push(msg);
+    };
     setSize(800, 550);
 }
 
@@ -88,7 +98,8 @@ void AudioPluginAudioProcessorEditor::resized()
         if (paramEntries[i]->combo)
             paramEntries[i]->combo->setBounds(182, 1 * i * 25, getWidth() - 184, 24);
     }
-    int yoffs = paramEntries.back()->parLabel->getBottom() + 1;
+    lfocomp.setBounds(0, paramEntries.back()->parLabel->getBottom() + 1, 300, 50);
+    int yoffs = lfocomp.getBottom() + 1;
     for (int i = 0; i < modRowComps.size(); ++i)
     {
         modRowComps[i]->setBounds(1, yoffs + i * 26, getWidth() - 2, 25);

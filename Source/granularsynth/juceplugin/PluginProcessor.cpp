@@ -151,6 +151,11 @@ void AudioPluginAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
     ThreadMessage msg;
     while (from_gui_fifo.pop(msg))
     {
+        if (msg.opcode == 2 && msg.lfoindex >= 0)
+        {
+            granulator.modmatrix.lfo_shapes[msg.lfoindex] = msg.lfoshape;
+            granulator.modmatrix.lfo_rates[msg.lfoindex] = msg.lforate;
+        }
         if (msg.opcode == 1)
         {
             auto &mm = granulator.modmatrix;
