@@ -14,6 +14,7 @@ struct ThreadMessage
     int lfoindex = -1;
     int lfoshape = -1;
     float lforate = 0.0f;
+    float lfodeform = 0.0f;
 };
 
 class AudioPluginAudioProcessor final : public juce::AudioProcessor

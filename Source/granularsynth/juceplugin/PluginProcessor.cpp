@@ -20,7 +20,7 @@ AudioPluginAudioProcessor::AudioPluginAudioProcessor()
                      {"OSCTY", 1}, "Oscillator Type",
                      {"SINE", "SEMISINE", "TRIANGLE", "SAW", "SQUARE", "FM", "NOISE"}, 0));
     addParameter(parGrainRate =
-                     new juce::AudioParameterFloat({"GRATE", 1}, "Grain Rate", 0.0f, 6.0f, 4.0f));
+                     new juce::AudioParameterFloat({"GRATE", 1}, "Grain Rate", 0.0f, 7.0f, 4.0f));
     addParameter(parGrainDuration = new juce::AudioParameterFloat({"GDUR", 1}, "Grain Duration",
                                                                   0.002f, 0.5f, 0.05f));
     addParameter(parGrainCenterPitch = new juce::AudioParameterFloat(
@@ -155,6 +155,7 @@ void AudioPluginAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
         {
             granulator.modmatrix.lfo_shapes[msg.lfoindex] = msg.lfoshape;
             granulator.modmatrix.lfo_rates[msg.lfoindex] = msg.lforate;
+            granulator.modmatrix.lfo_deforms[msg.lfoindex] = msg.lfodeform;
         }
         if (msg.opcode == 1)
         {

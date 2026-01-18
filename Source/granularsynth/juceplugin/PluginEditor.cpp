@@ -3,7 +3,8 @@
 
 //==============================================================================
 AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor(AudioPluginAudioProcessor &p)
-    : AudioProcessorEditor(&p), processorRef(p)
+    : AudioProcessorEditor(&p), processorRef(p),
+      lfoTabs(juce::TabbedButtonBar::Orientation::TabsAtTop)
 {
     addAndMakeVisible(loadModulationSettingsBut);
     loadModulationSettingsBut.setButtonText("LOAD MOD");
@@ -66,17 +67,27 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor(AudioPluginAudi
         addAndMakeVisible(*modcomp);
         modRowComps.push_back(std::move(modcomp));
     }
-    addAndMakeVisible(lfocomp);
-    lfocomp.lfoindex = 0;
-    lfocomp.stateChangedCallback = [this](int lfoindex, int shape, float val) {
-        ThreadMessage msg;
-        msg.opcode = 2;
-        msg.lfoindex = lfoindex;
-        msg.lfoshape = shape;
-        msg.lforate = val;
-        processorRef.from_gui_fifo.push(msg);
-    };
-    setSize(800, 550);
+    addAndMakeVisible(lfoTabs);
+    for (int i = 0; i < 8; ++i)
+    {
+        auto lfoc = std::make_unique<LFOComponent>();
+        //addAndMakeVisible(*lfoc);
+        lfoc->lfoindex = i;
+        lfoc->stateChangedCallback = [this](int lfoindex, int shape, float rateval,
+                                            float deformval) {
+            ThreadMessage msg;
+            msg.opcode = 2;
+            msg.lfoindex = lfoindex;
+            msg.lfoshape = shape;
+            msg.lforate = rateval;
+            msg.lfodeform = deformval;
+            processorRef.from_gui_fifo.push(msg);
+        };
+        lfoTabs.addTab(juce::String(i + 1), juce::Colours::grey, lfoc.get(), false);
+        lfocomps.push_back(std::move(lfoc));
+    }
+    lfoTabs.setCurrentTabIndex(0);
+    setSize(800, 650);
 }
 
 AudioPluginAudioProcessorEditor::~AudioPluginAudioProcessorEditor() {}
@@ -98,8 +109,11 @@ void AudioPluginAudioProcessorEditor::resized()
         if (paramEntries[i]->combo)
             paramEntries[i]->combo->setBounds(182, 1 * i * 25, getWidth() - 184, 24);
     }
-    lfocomp.setBounds(0, paramEntries.back()->parLabel->getBottom() + 1, 300, 50);
-    int yoffs = lfocomp.getBottom() + 1;
+    lfoTabs.setBounds(0, paramEntries.back()->parLabel->getBottom() + 1, 400, 110);
+    for (auto &c : lfocomps)
+        c->setBounds(0, 25, 300, 75);
+
+    int yoffs = lfoTabs.getBottom() + 1;
     for (int i = 0; i < modRowComps.size(); ++i)
     {
         modRowComps[i]->setBounds(1, yoffs + i * 26, getWidth() - 2, 25);
