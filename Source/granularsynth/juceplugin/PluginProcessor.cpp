@@ -246,17 +246,40 @@ juce::AudioProcessorEditor *AudioPluginAudioProcessor::createEditor()
 //==============================================================================
 void AudioPluginAudioProcessor::getStateInformation(juce::MemoryBlock &destData)
 {
-    // You should use this method to store your parameters in the memory block.
-    // You could do that either as raw data, or use the XML or ValueTree classes
-    // as intermediaries to make it easy to save and load complex data.
-    juce::ignoreUnused(destData);
+    auto state = choc::value::createObject("state");
+    auto mainparams = choc::value::createObject("params");
+    auto &pars = getParameters();
+    for (int i = 0; i < pars.size(); ++i)
+    {
+        auto p = dynamic_cast<juce::RangedAudioParameter *>(pars[i]);
+        std::string id = p->getParameterID().toStdString();
+        mainparams.setMember(id, p->convertFrom0to1(p->getValue()));
+    }
+    state.setMember("params", mainparams);
+    auto json = choc::json::toString(state);
+    destData.append(json.data(), json.size());
+    DBG(json);
 }
 
 void AudioPluginAudioProcessor::setStateInformation(const void *data, int sizeInBytes)
 {
-    // You should use this method to restore your parameters from this memory block,
-    // whose contents will have been created by the getStateInformation() call.
-    juce::ignoreUnused(data, sizeInBytes);
+    std::string json((char *)data, (char *)data + sizeInBytes);
+    DBG(json);
+    auto state = choc::json::parse(json);
+    if (state.hasObjectMember("params"))
+    {
+        auto params = state["params"];
+        auto &pars = getParameters();
+        for (int i = 0; i < pars.size(); ++i)
+        {
+            auto p = dynamic_cast<juce::RangedAudioParameter *>(pars[i]);
+            std::string id = p->getParameterID().toStdString();
+            if (params.hasObjectMember(id))
+            {
+                p->setValue(p->convertTo0to1(params[id].get<float>()));
+            }
+        }
+    }
 }
 
 //==============================================================================
