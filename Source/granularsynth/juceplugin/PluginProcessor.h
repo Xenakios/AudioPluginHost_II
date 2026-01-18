@@ -2,6 +2,16 @@
 
 #include <juce_audio_processors/juce_audio_processors.h>
 #include "../granularsynth.h"
+#include "containers/choc_SingleReaderSingleWriterFIFO.h"
+
+struct ThreadMessage
+{
+    int opcode = 0;
+    int modslot = -1;
+    int modsource = -1;
+    float depth = 0.0f;
+    int moddest = -1;
+};
 
 class AudioPluginAudioProcessor final : public juce::AudioProcessor
 {
@@ -35,22 +45,23 @@ class AudioPluginAudioProcessor final : public juce::AudioProcessor
 
     void getStateInformation(juce::MemoryBlock &destData) override;
     void setStateInformation(const void *data, int sizeInBytes) override;
-    std::atomic<bool> settingsLoadRequested{false};
-  private:
     ToneGranulator granulator{44100.0, 0, "fast_svf/lowpass", "none", 0.001f, 0.001f};
+    choc::fifo::SingleReaderSingleWriterFIFO<ThreadMessage> from_gui_fifo;
+
+  private:
     std::vector<float> workBuffer;
-    juce::AudioParameterChoice* parAmbiOrder = nullptr;
+    juce::AudioParameterChoice *parAmbiOrder = nullptr;
     int prior_ambi_order = -1;
-    juce::AudioParameterChoice* parOscType = nullptr;
-    juce::AudioParameterFloat* parGrainRate = nullptr;
-    juce::AudioParameterFloat* parGrainDuration = nullptr;
-    juce::AudioParameterFloat* parGrainCenterPitch = nullptr;
-    juce::AudioParameterFloat* parGrainCenterAzimuth = nullptr;
-    juce::AudioParameterFloat* parGrainCenterElevation = nullptr;
-    juce::AudioParameterFloat* parGrainFilter0Cutoff = nullptr;
-    juce::AudioParameterFloat* parGrainFilter0Reson = nullptr;
-    juce::AudioParameterFloat* parGrainFMPitch = nullptr;
-    juce::AudioParameterFloat* parGrainFMDepth = nullptr;
+    juce::AudioParameterChoice *parOscType = nullptr;
+    juce::AudioParameterFloat *parGrainRate = nullptr;
+    juce::AudioParameterFloat *parGrainDuration = nullptr;
+    juce::AudioParameterFloat *parGrainCenterPitch = nullptr;
+    juce::AudioParameterFloat *parGrainCenterAzimuth = nullptr;
+    juce::AudioParameterFloat *parGrainCenterElevation = nullptr;
+    juce::AudioParameterFloat *parGrainFilter0Cutoff = nullptr;
+    juce::AudioParameterFloat *parGrainFilter0Reson = nullptr;
+    juce::AudioParameterFloat *parGrainFMPitch = nullptr;
+    juce::AudioParameterFloat *parGrainFMDepth = nullptr;
     //==============================================================================
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(AudioPluginAudioProcessor)
 };

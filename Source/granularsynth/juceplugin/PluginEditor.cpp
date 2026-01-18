@@ -8,7 +8,10 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor(AudioPluginAudi
     addAndMakeVisible(loadModulationSettingsBut);
     loadModulationSettingsBut.setButtonText("LOAD MOD");
     loadModulationSettingsBut.onClick = [this]() {
-        processorRef.settingsLoadRequested.store(true);
+        processorRef.suspendProcessing(true);
+        processorRef.granulator.modmatrix.init_from_json_file(
+            R"(C:\develop\AudioPluginHost_mk2\Source\granularsynth\modmatrixconf.json)");
+        processorRef.suspendProcessing(false);
     };
 
     auto &params = p.getParameters();
@@ -44,7 +47,26 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor(AudioPluginAudi
         }
         paramEntries.push_back(std::move(pare));
     }
-    setSize(500, 500);
+    for (int i = 0; i < 8; ++i)
+    {
+        auto modcomp = std::make_unique<ModulationRowComponent>();
+        modcomp->modslotindex = i;
+        modcomp->stateChangedCallback = [this](int slot, int src, float val, int dest) {
+            if (slot >= 0 && src >= 0 && dest >= 0)
+            {
+                ThreadMessage msg;
+                msg.opcode = 1;
+                msg.modslot = slot;
+                msg.modsource = src;
+                msg.depth = val;
+                msg.moddest = dest;
+                processorRef.from_gui_fifo.push(msg);
+            }
+        };
+        addAndMakeVisible(*modcomp);
+        modRowComps.push_back(std::move(modcomp));
+    }
+    setSize(800, 550);
 }
 
 AudioPluginAudioProcessorEditor::~AudioPluginAudioProcessorEditor() {}
@@ -65,6 +87,11 @@ void AudioPluginAudioProcessorEditor::resized()
             paramEntries[i]->slider->setBounds(182, 1 * i * 25, getWidth() - 184, 24);
         if (paramEntries[i]->combo)
             paramEntries[i]->combo->setBounds(182, 1 * i * 25, getWidth() - 184, 24);
+    }
+    int yoffs = paramEntries.back()->parLabel->getBottom() + 1;
+    for (int i = 0; i < modRowComps.size(); ++i)
+    {
+        modRowComps[i]->setBounds(1, yoffs + i * 26, getWidth() - 2, 25);
     }
     loadModulationSettingsBut.setBounds(1, getHeight() - 25, 100, 24);
 }

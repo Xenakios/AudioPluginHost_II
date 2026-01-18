@@ -238,10 +238,10 @@ class GranulatorModMatrix
 
         const size_t blocksize = granul_block_size;
 
-        rt.updateRoutingAt(0, sourceIds[0], targetIds[0], 0.0);
-        rt.updateRoutingAt(1, sourceIds[1], targetIds[0], 2.0);
-        init_from_json_file(
-            R"(C:\develop\AudioPluginHost_mk2\Source\granularsynth\modmatrixconf.json)");
+        //rt.updateRoutingAt(0, sourceIds[0], targetIds[0], 0.0);
+        //rt.updateRoutingAt(1, sourceIds[1], targetIds[0], 2.0);
+        //init_from_json_file(
+        //    R"(C:\develop\AudioPluginHost_mk2\Source\granularsynth\modmatrixconf.json)");
         m.prepare(rt, sr, blocksize);
     }
 };

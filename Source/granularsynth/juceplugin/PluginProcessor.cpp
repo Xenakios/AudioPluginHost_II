@@ -13,6 +13,7 @@ AudioPluginAudioProcessor::AudioPluginAudioProcessor()
 #endif
       )
 {
+    from_gui_fifo.reset(1024);
     addParameter(parAmbiOrder = new juce::AudioParameterChoice({"AMBO", 1}, "Ambisonics Order",
                                                                {"STEREO", "1ST", "2ND", "3RD"}, 0));
     addParameter(parOscType = new juce::AudioParameterChoice(
@@ -147,12 +148,35 @@ void AudioPluginAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
         }
     }
     */
-    if (settingsLoadRequested.load())
+    ThreadMessage msg;
+    while (from_gui_fifo.pop(msg))
     {
-        // obviously can't leave it like this, this reads from a file and parses json etc
-        granulator.modmatrix.init_from_json_file(
-            R"(C:\develop\AudioPluginHost_mk2\Source\granularsynth\modmatrixconf.json)");
-        settingsLoadRequested.store(false);
+        if (msg.opcode == 1)
+        {
+            auto &mm = granulator.modmatrix;
+            if (msg.moddest >= 1)
+            {
+                msg.moddest -= 1;
+                if (msg.moddest == 1)
+                    msg.depth *= 24.0f;
+                if (msg.moddest == 2)
+                    msg.depth *= 30.0f;
+                if (msg.moddest == 3)
+                    msg.depth *= 24.0f;
+                mm.rt.updateActiveAt(msg.modslot, true);
+                // DBG(msg.modslot << " " << msg.modsource << " " << msg.depth << " " <<
+                // msg.moddest);
+                mm.rt.updateRoutingAt(msg.modslot, mm.sourceIds[msg.modsource],
+                                      mm.targetIds[msg.moddest], msg.depth);
+                mm.m.prepare(mm.rt, granulator.m_sr, granul_block_size);
+            }
+            else
+            {
+                // DBG("deactivated slot " << msg.modslot);
+                mm.rt.updateActiveAt(msg.modslot, false);
+                mm.m.prepare(mm.rt, granulator.m_sr, granul_block_size);
+            }
+        }
     }
     if (prior_ambi_order != parAmbiOrder->getIndex())
     {
