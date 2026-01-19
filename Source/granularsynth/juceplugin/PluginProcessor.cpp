@@ -14,6 +14,7 @@ AudioPluginAudioProcessor::AudioPluginAudioProcessor()
       )
 {
     from_gui_fifo.reset(1024);
+    to_gui_fifo.reset(1024);
     addParameter(parAmbiOrder = new juce::AudioParameterChoice({"AMBO", 1}, "Ambisonics Order",
                                                                {"STEREO", "1ST", "2ND", "3RD"}, 0));
     addParameter(parOscType = new juce::AudioParameterChoice(
@@ -239,6 +240,7 @@ bool AudioPluginAudioProcessor::hasEditor() const
 
 juce::AudioProcessorEditor *AudioPluginAudioProcessor::createEditor()
 {
+    sendLFOStatesToGUI();
     // return new juce::GenericAudioProcessorEditor(*this);
     return new AudioPluginAudioProcessorEditor(*this);
 }
@@ -319,6 +321,7 @@ void AudioPluginAudioProcessor::setStateInformation(const void *data, int sizeIn
                 granulator.modmatrix.lfo_deforms[i] = lfostate["deform"].get<float>();
             }
         }
+        sendLFOStatesToGUI();
     }
     if (state.hasObjectMember("modroutings"))
     {
@@ -335,12 +338,39 @@ void AudioPluginAudioProcessor::setStateInformation(const void *data, int sizeIn
                 int src = rstate["source"].get<int>();
                 float d = rstate["depth"].get<float>();
                 int dest = rstate["dest"].get<int>();
+                ThreadMessage msg;
+                msg.opcode = 1;
+                msg.modslot = slot;
+                msg.modsource = src;
+                msg.depth = d;
+                msg.moddest = dest;
+                if (msg.moddest == 1)
+                    msg.depth /= 24.0f;
+                if (msg.moddest == 2)
+                    msg.depth /= 30.0f;
+                if (msg.moddest == 3)
+                    msg.depth /= 24.0f;
+                to_gui_fifo.push(msg);
                 mm.rt.updateRoutingAt(slot, mm.sourceIds[src], mm.targetIds[dest], d);
             }
         }
         mm.m.prepare(mm.rt, granulator.m_sr, granul_block_size);
     }
     suspendProcessing(false);
+}
+
+void AudioPluginAudioProcessor::sendLFOStatesToGUI()
+{
+    for (int i = 0; i < granulator.modmatrix.numLfos; ++i)
+    {
+        ThreadMessage msg;
+        msg.opcode = 2;
+        msg.lfoindex = i;
+        msg.lforate = granulator.modmatrix.lfo_rates[i];
+        msg.lfoshape = granulator.modmatrix.lfo_shapes[i];
+        msg.lfodeform = granulator.modmatrix.lfo_deforms[i];
+        to_gui_fifo.push(msg);
+    }
 }
 
 //==============================================================================

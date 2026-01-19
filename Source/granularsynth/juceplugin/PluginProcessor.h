@@ -51,7 +51,7 @@ class AudioPluginAudioProcessor final : public juce::AudioProcessor
     void setStateInformation(const void *data, int sizeInBytes) override;
     ToneGranulator granulator{44100.0, 0, "fast_svf/lowpass", "none", 0.001f, 0.001f};
     choc::fifo::SingleReaderSingleWriterFIFO<ThreadMessage> from_gui_fifo;
-
+    choc::fifo::SingleReaderSingleWriterFIFO<ThreadMessage> to_gui_fifo;
   private:
     std::vector<float> workBuffer;
     juce::AudioParameterChoice *parAmbiOrder = nullptr;
@@ -66,6 +66,7 @@ class AudioPluginAudioProcessor final : public juce::AudioProcessor
     juce::AudioParameterFloat *parGrainFilter0Reson = nullptr;
     juce::AudioParameterFloat *parGrainFMPitch = nullptr;
     juce::AudioParameterFloat *parGrainFMDepth = nullptr;
+    void sendLFOStatesToGUI();
     //==============================================================================
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(AudioPluginAudioProcessor)
 };

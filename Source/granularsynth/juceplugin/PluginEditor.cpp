@@ -71,7 +71,7 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor(AudioPluginAudi
     for (int i = 0; i < 8; ++i)
     {
         auto lfoc = std::make_unique<LFOComponent>();
-        //addAndMakeVisible(*lfoc);
+        // addAndMakeVisible(*lfoc);
         lfoc->lfoindex = i;
         lfoc->stateChangedCallback = [this](int lfoindex, int shape, float rateval,
                                             float deformval) {
@@ -88,9 +88,35 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor(AudioPluginAudi
     }
     lfoTabs.setCurrentTabIndex(0);
     setSize(800, 650);
+    startTimer(100);
 }
 
 AudioPluginAudioProcessorEditor::~AudioPluginAudioProcessorEditor() {}
+
+void AudioPluginAudioProcessorEditor::timerCallback()
+{
+    ThreadMessage msg;
+    while (processorRef.to_gui_fifo.pop(msg))
+    {
+        if (msg.opcode == 2 && msg.lfoindex < lfocomps.size())
+        {
+            lfocomps[msg.lfoindex]->rateSlider.setValue(msg.lforate, juce::dontSendNotification);
+            lfocomps[msg.lfoindex]->deformSlider.setValue(msg.lfodeform,
+                                                          juce::dontSendNotification);
+
+            lfocomps[msg.lfoindex]->shapeCombo.setSelectedId(msg.lfoshape + 1,
+                                                             juce::dontSendNotification);
+        }
+        if (msg.opcode == 1 && msg.modslot < modRowComps.size())
+        {
+            modRowComps[msg.modslot]->sourceCombo.setSelectedItemIndex(msg.modsource,
+                                                                       juce::dontSendNotification);
+            modRowComps[msg.modslot]->depthSlider.setValue(msg.depth, juce::dontSendNotification);
+            modRowComps[msg.modslot]->destCombo.setSelectedItemIndex(msg.moddest + 1,
+                                                                     juce::dontSendNotification);
+        }
+    }
+}
 
 //==============================================================================
 void AudioPluginAudioProcessorEditor::paint(juce::Graphics &g)

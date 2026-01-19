@@ -96,12 +96,12 @@ struct ModulationRowComponent : public juce::Component
 };
 
 //==============================================================================
-class AudioPluginAudioProcessorEditor final : public juce::AudioProcessorEditor
+class AudioPluginAudioProcessorEditor final : public juce::AudioProcessorEditor, public juce::Timer
 {
   public:
     explicit AudioPluginAudioProcessorEditor(AudioPluginAudioProcessor &);
     ~AudioPluginAudioProcessorEditor() override;
-
+    void timerCallback() override;
     //==============================================================================
     void paint(juce::Graphics &) override;
     void resized() override;
