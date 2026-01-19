@@ -256,6 +256,31 @@ void AudioPluginAudioProcessor::getStateInformation(juce::MemoryBlock &destData)
         mainparams.setMember(id, p->convertFrom0to1(p->getValue()));
     }
     state.setMember("params", mainparams);
+    auto lfostates = choc::value::createEmptyArray();
+    for (int i = 0; i < GranulatorModMatrix::numLfos; ++i)
+    {
+        auto lfostate = choc::value::createObject("lfostate");
+        lfostate.setMember("shape", granulator.modmatrix.lfo_shapes[i]);
+        lfostate.setMember("rate", granulator.modmatrix.lfo_rates[i]);
+        lfostate.setMember("deform", granulator.modmatrix.lfo_deforms[i]);
+        lfostates.addArrayElement(lfostate);
+    }
+    state.setMember("lfostates", lfostates);
+    auto modroutings = choc::value::createEmptyArray();
+    auto &mm = granulator.modmatrix;
+    for (int i = 0; i < GranulatorModConfig::FixedMatrixSize; ++i)
+    {
+        if (mm.rt.routes[i].active && mm.rt.routes[i].source && mm.rt.routes[i].target)
+        {
+            auto routingstate = choc::value::createObject("routing");
+            routingstate.setMember("slot", i);
+            routingstate.setMember("source", (int)(mm.rt.routes[i].source->src));
+            routingstate.setMember("depth", mm.rt.routes[i].depth);
+            routingstate.setMember("dest", (int)(mm.rt.routes[i].target->baz));
+            modroutings.addArrayElement(routingstate);
+        }
+    }
+    state.setMember("modroutings", modroutings);
     auto json = choc::json::toString(state);
     destData.append(json.data(), json.size());
     DBG(json);
@@ -280,6 +305,42 @@ void AudioPluginAudioProcessor::setStateInformation(const void *data, int sizeIn
             }
         }
     }
+    suspendProcessing(true);
+    if (state.hasObjectMember("lfostates"))
+    {
+        auto lfostates = state["lfostates"];
+        for (int i = 0; i < lfostates.size(); ++i)
+        {
+            auto lfostate = lfostates[i];
+            if (i < granulator.modmatrix.numLfos)
+            {
+                granulator.modmatrix.lfo_shapes[i] = lfostate["shape"].get<int>();
+                granulator.modmatrix.lfo_rates[i] = lfostate["rate"].get<float>();
+                granulator.modmatrix.lfo_deforms[i] = lfostate["deform"].get<float>();
+            }
+        }
+    }
+    if (state.hasObjectMember("modroutings"))
+    {
+        auto routings = state["modroutings"];
+        auto &mm = granulator.modmatrix;
+        for (int i = 0; i < routings.size(); ++i)
+        {
+            mm.rt.updateActiveAt(i, false);
+            auto rstate = routings[i];
+            int slot = rstate["slot"].get<int>();
+            if (slot >= 0 && slot < GranulatorModConfig::FixedMatrixSize)
+            {
+                mm.rt.updateActiveAt(slot, true);
+                int src = rstate["source"].get<int>();
+                float d = rstate["depth"].get<float>();
+                int dest = rstate["dest"].get<int>();
+                mm.rt.updateRoutingAt(slot, mm.sourceIds[src], mm.targetIds[dest], d);
+            }
+        }
+        mm.m.prepare(mm.rt, granulator.m_sr, granul_block_size);
+    }
+    suspendProcessing(false);
 }
 
 //==============================================================================
