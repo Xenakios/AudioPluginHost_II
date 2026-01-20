@@ -240,7 +240,7 @@ bool AudioPluginAudioProcessor::hasEditor() const
 
 juce::AudioProcessorEditor *AudioPluginAudioProcessor::createEditor()
 {
-    sendLFOStatesToGUI();
+    sendExtraStatesToGUI();
     // return new juce::GenericAudioProcessorEditor(*this);
     return new AudioPluginAudioProcessorEditor(*this);
 }
@@ -321,15 +321,17 @@ void AudioPluginAudioProcessor::setStateInformation(const void *data, int sizeIn
                 granulator.modmatrix.lfo_deforms[i] = lfostate["deform"].get<float>();
             }
         }
-        sendLFOStatesToGUI();
     }
     if (state.hasObjectMember("modroutings"))
     {
         auto routings = state["modroutings"];
         auto &mm = granulator.modmatrix;
-        for (int i = 0; i < routings.size(); ++i)
+        for (int i = 0; i < GranulatorModConfig::FixedMatrixSize; ++i)
         {
             mm.rt.updateActiveAt(i, false);
+        }
+        for (int i = 0; i < routings.size(); ++i)
+        {
             auto rstate = routings[i];
             int slot = rstate["slot"].get<int>();
             if (slot >= 0 && slot < GranulatorModConfig::FixedMatrixSize)
@@ -338,28 +340,17 @@ void AudioPluginAudioProcessor::setStateInformation(const void *data, int sizeIn
                 int src = rstate["source"].get<int>();
                 float d = rstate["depth"].get<float>();
                 int dest = rstate["dest"].get<int>();
-                ThreadMessage msg;
-                msg.opcode = 1;
-                msg.modslot = slot;
-                msg.modsource = src;
-                msg.depth = d;
-                msg.moddest = dest;
-                if (msg.moddest == 1)
-                    msg.depth /= 24.0f;
-                if (msg.moddest == 2)
-                    msg.depth /= 30.0f;
-                if (msg.moddest == 3)
-                    msg.depth /= 24.0f;
-                to_gui_fifo.push(msg);
+
                 mm.rt.updateRoutingAt(slot, mm.sourceIds[src], mm.targetIds[dest], d);
             }
         }
         mm.m.prepare(mm.rt, granulator.m_sr, granul_block_size);
     }
     suspendProcessing(false);
+    sendExtraStatesToGUI();
 }
 
-void AudioPluginAudioProcessor::sendLFOStatesToGUI()
+void AudioPluginAudioProcessor::sendExtraStatesToGUI()
 {
     for (int i = 0; i < granulator.modmatrix.numLfos; ++i)
     {
@@ -370,6 +361,26 @@ void AudioPluginAudioProcessor::sendLFOStatesToGUI()
         msg.lfoshape = granulator.modmatrix.lfo_shapes[i];
         msg.lfodeform = granulator.modmatrix.lfo_deforms[i];
         to_gui_fifo.push(msg);
+    }
+    auto &mm = granulator.modmatrix;
+    for (int i = 0; i < GranulatorModConfig::FixedMatrixSize; ++i)
+    {
+        if (mm.rt.routes[i].source && mm.rt.routes[i].target)
+        {
+            ThreadMessage msg;
+            msg.opcode = 1;
+            msg.modslot = i;
+            msg.modsource = mm.rt.routes[i].source->src;
+            msg.depth = mm.rt.routes[i].depth;
+            msg.moddest = mm.rt.routes[i].target->baz;
+            if (msg.moddest == 1)
+                msg.depth /= 24.0f;
+            if (msg.moddest == 2)
+                msg.depth /= 30.0f;
+            if (msg.moddest == 3)
+                msg.depth /= 24.0f;
+            to_gui_fifo.push(msg);
+        }
     }
 }
 
