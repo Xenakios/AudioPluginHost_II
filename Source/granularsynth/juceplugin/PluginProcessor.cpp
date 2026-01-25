@@ -159,6 +159,10 @@ void AudioPluginAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
     ThreadMessage msg;
     while (from_gui_fifo.pop(msg))
     {
+        if (msg.opcode == 100 && msg.filterindex >= 0 && msg.filterindex < 2)
+        {
+            granulator.set_filter(msg.filterindex, msg.filtermodel, msg.filterconfig);
+        }
         if (msg.opcode == 2 && msg.lfoindex >= 0)
         {
             granulator.modmatrix.lfo_shapes[msg.lfoindex] = msg.lfoshape;

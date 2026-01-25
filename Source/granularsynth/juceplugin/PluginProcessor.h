@@ -6,15 +6,18 @@
 
 struct ThreadMessage
 {
-    int opcode = 0;
-    int modslot = -1;
+    int16_t opcode = 0;
+    int16_t modslot = -1;
     int modsource = -1;
     float depth = 0.0f;
     int moddest = -1;
-    int lfoindex = -1;
+    int16_t lfoindex = -1;
     int lfoshape = -1;
     float lforate = 0.0f;
     float lfodeform = 0.0f;
+    int16_t filterindex = -1;
+    sfpp::FilterModel filtermodel;
+    sfpp::ModelConfig filterconfig;
 };
 
 class AudioPluginAudioProcessor final : public juce::AudioProcessor

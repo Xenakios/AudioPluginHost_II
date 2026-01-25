@@ -105,29 +105,49 @@ void AudioPluginAudioProcessorEditor::showFilterMenu(int whichfilter)
     {
         juce::PopupMenu submenu;
         auto subm = sfpp::Filter::availableModelConfigurations(mod, true);
-        for (auto s : subm)
+        if (subm.size() > 0)
         {
-            std::string address;
-            auto [pt, st, dt, smt] = s;
-            if (pt != sfpp::Passband::UNSUPPORTED)
+            for (auto s : subm)
             {
-                address += "/" + sfpp::toString(pt);
+                std::string address;
+                auto [pt, st, dt, smt] = s;
+                if (pt != sfpp::Passband::UNSUPPORTED)
+                {
+                    address += "/" + sfpp::toString(pt);
+                }
+                if (st != sfpp::Slope::UNSUPPORTED)
+                {
+                    address += "/" + sfpp::toString(st);
+                }
+                if (dt != sfpp::DriveMode::UNSUPPORTED)
+                {
+                    address += "/" + sfpp::toString(dt);
+                }
+                if (smt != sfpp::FilterSubModel::UNSUPPORTED)
+                {
+                    address += "/" + sfpp::toString(smt);
+                }
+                submenu.addItem(address, [this, mod, s, whichfilter]() {
+                    ThreadMessage msg;
+                    msg.opcode = 100;
+                    msg.filterindex = whichfilter;
+                    msg.filtermodel = mod;
+                    msg.filterconfig = s;
+                    processorRef.from_gui_fifo.push(msg);
+                });
             }
-            if (st != sfpp::Slope::UNSUPPORTED)
-            {
-                address += "/" + sfpp::toString(st);
-            }
-            if (dt != sfpp::DriveMode::UNSUPPORTED)
-            {
-                address += "/" + sfpp::toString(dt);
-            }
-            if (smt != sfpp::FilterSubModel::UNSUPPORTED)
-            {
-                address += "/" + sfpp::toString(smt);
-            }
-            submenu.addItem(address, []() {});
+            menu.addSubMenu(sfpp::toString(mod), submenu);
         }
-        menu.addSubMenu(sfpp::toString(mod), submenu);
+        else
+        {
+            menu.addItem(sfpp::toString(mod), [this, mod, whichfilter]() {
+                ThreadMessage msg;
+                msg.opcode = 100;
+                msg.filterindex = whichfilter;
+                msg.filtermodel = mod;
+                processorRef.from_gui_fifo.push(msg);
+            });
+        }
     }
     menu.showMenuAsync(juce::PopupMenu::Options{});
 }

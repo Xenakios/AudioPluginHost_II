@@ -854,6 +854,18 @@ class ToneGranulator
     float noise_corr = 0.0;
     float env_shape = 0.5;
     int osc_type = 4;
+    void set_filter(int which, sfpp::FilterModel mo, sfpp::ModelConfig conf)
+    {
+        FilterInfo finfo;
+        finfo.model = mo;
+        finfo.modelconfig = conf;
+        for (int i = 0; i < numvoices; ++i)
+        {
+            auto &v = voices[i];
+            // v->set_samplerate(sr);
+            v->set_filter_type(which, finfo);
+        }
+    }
     void initFilter(double sr, int filter_routing, std::string filttype0, std::string filttype1,
                     float taillen, float tailfadelen)
     {
@@ -885,7 +897,7 @@ class ToneGranulator
 
         for (int i = 0; i < numvoices; ++i)
         {
-            auto& v = voices[i];
+            auto &v = voices[i];
             v->set_samplerate(sr);
             v->set_filter_type(0, *filter0info);
             v->set_filter_type(1, *filter1info);
