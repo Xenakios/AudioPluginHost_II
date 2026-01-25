@@ -49,7 +49,7 @@ class AudioPluginAudioProcessor final : public juce::AudioProcessor
 
     void getStateInformation(juce::MemoryBlock &destData) override;
     void setStateInformation(const void *data, int sizeInBytes) override;
-    ToneGranulator granulator{44100.0, 0, "fast_svf/lowpass", "none", 0.001f, 0.001f};
+    ToneGranulator granulator;
     choc::fifo::SingleReaderSingleWriterFIFO<ThreadMessage> from_gui_fifo;
     choc::fifo::SingleReaderSingleWriterFIFO<ThreadMessage> to_gui_fifo;
   private:

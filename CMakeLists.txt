@@ -243,7 +243,7 @@ target_sources(ToneGranulatorPlugin
         Source/granularsynth/juceplugin/PluginEditor.cpp
 )
 
-target_compile_options(ToneGranulatorPlugin PRIVATE -Werror=return-type)
+target_compile_options(ToneGranulatorPlugin PRIVATE -Werror=return-type "$<$<COMPILE_LANGUAGE:CXX>:-fno-char8_t>")
 target_compile_definitions(ToneGranulatorPlugin
     PUBLIC
         # JUCE_WEB_BROWSER and JUCE_USE_CURL would be on by default, but you might not need them.
@@ -262,3 +262,8 @@ target_link_libraries(ToneGranulatorPlugin
         # juce::juce_recommended_lto_flags
         juce::juce_recommended_warning_flags)
 
+if(CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
+    # target_compile_options(ToneGranulatorPlugin INTERFACE "$<$<COMPILE_LANGUAGE:CXX>:/Zc:__cplusplus;/Zc:char8_t->")
+elseif(CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "GNU")
+    # target_compile_options(ToneGranulatorPlugin INTERFACE "$<$<COMPILE_LANGUAGE:CXX>:-fno-char8_t>")
+endif()

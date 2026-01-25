@@ -1,6 +1,6 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
-
+#include "Tunings.h"
 //==============================================================================
 AudioPluginAudioProcessor::AudioPluginAudioProcessor()
     : AudioProcessor(BusesProperties()
@@ -13,6 +13,7 @@ AudioPluginAudioProcessor::AudioPluginAudioProcessor()
 #endif
       )
 {
+    auto foo = Tunings::evenDivisionOfCentsByM(1200, 12);
     from_gui_fifo.reset(1024);
     to_gui_fifo.reset(1024);
     addParameter(parAmbiOrder = new juce::AudioParameterChoice({"AMBO", 1}, "Ambisonics Order",
@@ -20,8 +21,14 @@ AudioPluginAudioProcessor::AudioPluginAudioProcessor()
     addParameter(parOscType = new juce::AudioParameterChoice(
                      {"OSCTY", 1}, "Oscillator Type",
                      {"SINE", "SEMISINE", "TRIANGLE", "SAW", "SQUARE", "FM", "NOISE"}, 0));
-    addParameter(parGrainRate =
-                     new juce::AudioParameterFloat({"GRATE", 1}, "Grain Rate", 0.0f, 7.0f, 4.0f));
+    juce::NormalisableRange<float> range;
+
+    addParameter(parGrainRate = new juce::AudioParameterFloat(
+                     {"GRATE", 1}, "Grain Rate", {0.0f, 7.0f}, 4.0f, "Hz",
+                     juce::AudioProcessorParameter::genericParameter, [](double x, int nd) {
+                         double hz = std::pow(2.0, x);
+                         return juce::String(hz, 2);
+                     }));
     addParameter(parGrainDuration = new juce::AudioParameterFloat({"GDUR", 1}, "Grain Duration",
                                                                   0.002f, 0.5f, 0.05f));
     addParameter(parGrainCenterPitch = new juce::AudioParameterFloat(
@@ -100,7 +107,7 @@ void AudioPluginAudioProcessor::prepareToPlay(double sampleRate, int samplesPerB
 {
     juce::ignoreUnused(sampleRate, samplesPerBlock);
     workBuffer.resize(samplesPerBlock * 32);
-    granulator.prepare({}, 3);
+    granulator.prepare(sampleRate, {}, 3, 0, "fast_svf/lowpass", "none", 0.001f, 0.001f);
 }
 
 void AudioPluginAudioProcessor::releaseResources() {}

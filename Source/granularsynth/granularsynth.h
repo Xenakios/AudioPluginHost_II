@@ -238,10 +238,10 @@ class GranulatorModMatrix
 
         const size_t blocksize = granul_block_size;
 
-        //rt.updateRoutingAt(0, sourceIds[0], targetIds[0], 0.0);
-        //rt.updateRoutingAt(1, sourceIds[1], targetIds[0], 2.0);
-        //init_from_json_file(
-        //    R"(C:\develop\AudioPluginHost_mk2\Source\granularsynth\modmatrixconf.json)");
+        // rt.updateRoutingAt(0, sourceIds[0], targetIds[0], 0.0);
+        // rt.updateRoutingAt(1, sourceIds[1], targetIds[0], 2.0);
+        // init_from_json_file(
+        //     R"(C:\develop\AudioPluginHost_mk2\Source\granularsynth\modmatrixconf.json)");
         m.prepare(rt, sr, blocksize);
     }
 };
@@ -854,21 +854,19 @@ class ToneGranulator
     float noise_corr = 0.0;
     float env_shape = 0.5;
     int osc_type = 4;
-    ToneGranulator(double sr, int filter_routing, std::string filtertype0, std::string filtertype1,
-                   float tail_len, float tail_fade_len)
-        : m_sr(sr), modmatrix(sr)
+    void initFilter(double sr, int filter_routing, std::string filttype0, std::string filttype1,
+                    float taillen, float tailfadelen)
     {
-        init_filter_infos();
         const FilterInfo *filter0info = nullptr;
         const FilterInfo *filter1info = nullptr;
         for (const auto &finfo : g_filter_infos)
         {
-            if (finfo.address == filtertype0)
+            if (finfo.address == filttype0)
             {
                 filter0info = &finfo;
                 std::print("filter 0 is {}\n", finfo.address);
             }
-            if (finfo.address == filtertype1)
+            if (finfo.address == filttype1)
             {
                 filter1info = &finfo;
                 std::print("filter 1 is {}\n", finfo.address);
@@ -877,25 +875,33 @@ class ToneGranulator
         if (!filter0info)
         {
             throw std::runtime_error(std::format(
-                "could not find filter 0 \"{}\", ensure the name is correct", filtertype0));
+                "could not find filter 0 \"{}\", ensure the name is correct", filttype0));
         }
         if (!filter1info)
         {
             throw std::runtime_error(std::format(
-                "could not find filter 1 \"{}\", ensure the name is correct", filtertype1));
+                "could not find filter 1 \"{}\", ensure the name is correct", filttype1));
         }
 
         for (int i = 0; i < numvoices; ++i)
         {
-            auto v = std::make_unique<GranulatorVoice>();
+            auto& v = voices[i];
             v->set_samplerate(sr);
             v->set_filter_type(0, *filter0info);
             v->set_filter_type(1, *filter1info);
             v->filter_routing = (GranulatorVoice::FilterRouting)filter_routing;
-            v->tail_len = std::clamp(tail_len, 0.0f, 5.0f);
-            v->tail_fade_len = std::clamp(tail_fade_len, 0.0f, v->tail_len);
+            v->tail_len = std::clamp(taillen, 0.0f, 5.0f);
+            v->tail_fade_len = std::clamp(tailfadelen, 0.0f, v->tail_len);
+        }
+    }
+    ToneGranulator() : m_sr(44100.0), modmatrix(44100.0)
+    {
+        for (int i = 0; i < numvoices; ++i)
+        {
+            auto v = std::make_unique<GranulatorVoice>();
             voices.push_back(std::move(v));
         }
+        init_filter_infos();
     }
     void set_voice_aux_envelope(std::array<float, SimpleEnvelope<false>::maxnumsteps> env)
     {
@@ -911,8 +917,15 @@ class ToneGranulator
             v->gain_envelope.steps = env;
         }
     }
-
-    void prepare(events_t evlist, int ambisonics_order)
+    float next_samplerate = 0.0f;
+    int next_filter_routing = -1;
+    int next_ambisonics_order = -1;
+    std::string next_filt0type;
+    std::string next_filt1type;
+    float next_tail_len = 0.0f;
+    float next_tail_fade_len = 0.0f;
+    void prepare(float samplerate, events_t evlist, int ambisonics_order, int filter_routing,
+                 std::string filt0type, std::string filt1type, float tail_len, float tail_fade_len)
     {
         if (thread_op == 1)
         {
@@ -930,10 +943,18 @@ class ToneGranulator
                 return e.time_position < 0.0 || (e.time_position + e.duration) > 120.0;
             });
         }
-        set_ambisonics_order(ambisonics_order);
+        next_samplerate = samplerate;
+        next_ambisonics_order = ambisonics_order;
+        next_filt0type = filt0type;
+        next_filt1type = filt1type;
+        next_filter_routing = filter_routing;
+        next_tail_len = tail_len;
+        next_tail_fade_len = tail_fade_len;
+        // set_ambisonics_order(ambisonics_order);
         thread_op = 1;
     }
     std::map<int, int> aotonumchans{{1, 4}, {2, 9}, {3, 16}};
+    std::atomic<bool> is_prepared{false};
     void set_ambisonics_order(int order)
     {
         for (auto &v : voices)
@@ -1001,11 +1022,15 @@ class ToneGranulator
             std::swap(events_to_switch, events);
             evindex = 0;
             playposframes = 0;
+            m_sr = next_samplerate;
+            set_ambisonics_order(next_ambisonics_order);
+            initFilter(m_sr, next_filter_routing, next_filt0type, next_filt1type, next_tail_len,
+                       next_tail_fade_len);
             gainlag.setRateInMilliseconds(1000.0, m_sr, 1.0);
             gainlag.setTarget(0.0);
-            thread_op = 0;
             graingen_phase = 0.0;
             graingen_phase_prior = 2.0;
+            thread_op = 0;
         }
         bool self_generate = false;
         if (events.size() == 0)
