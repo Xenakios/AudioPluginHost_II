@@ -12,7 +12,7 @@ struct FilterInfo
     sfpp::ModelConfig modelconfig;
 };
 
-static std::vector<FilterInfo> g_filter_infos;
+inline std::vector<FilterInfo> g_filter_infos;
 
 static void init_filter_infos()
 {

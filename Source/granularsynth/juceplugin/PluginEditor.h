@@ -112,8 +112,11 @@ class AudioPluginAudioProcessorEditor final : public juce::AudioProcessorEditor,
     AudioPluginAudioProcessor &processorRef;
     std::vector<std::unique_ptr<GUIParam>> paramEntries;
     juce::TextButton loadModulationSettingsBut;
+    juce::TextButton filter0But;
+    juce::TextButton filter1But;
     std::vector<std::unique_ptr<ModulationRowComponent>> modRowComps;
     std::vector<std::unique_ptr<LFOComponent>> lfocomps;
     juce::TabbedComponent lfoTabs;
+    void showFilterMenu(int whichfilter);
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(AudioPluginAudioProcessorEditor)
 };

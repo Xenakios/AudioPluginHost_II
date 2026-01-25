@@ -14,7 +14,10 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor(AudioPluginAudi
             R"(C:\develop\AudioPluginHost_mk2\Source\granularsynth\modmatrixconf.json)");
         processorRef.suspendProcessing(false);
     };
-
+    addAndMakeVisible(filter0But);
+    filter0But.setButtonText("...");
+    filter0But.onClick = [this]() { showFilterMenu(0); };
+    addAndMakeVisible(filter1But);
     auto &params = p.getParameters();
     for (int i = 0; i < params.size(); ++i)
     {
@@ -93,6 +96,42 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor(AudioPluginAudi
 
 AudioPluginAudioProcessorEditor::~AudioPluginAudioProcessorEditor() {}
 
+void AudioPluginAudioProcessorEditor::showFilterMenu(int whichfilter)
+{
+    juce::PopupMenu menu;
+    // menu.addItem("No filter", [this]() {});
+    auto models = sfpp::Filter::availableModels();
+    for (auto &mod : models)
+    {
+        juce::PopupMenu submenu;
+        auto subm = sfpp::Filter::availableModelConfigurations(mod, true);
+        for (auto s : subm)
+        {
+            std::string address;
+            auto [pt, st, dt, smt] = s;
+            if (pt != sfpp::Passband::UNSUPPORTED)
+            {
+                address += "/" + sfpp::toString(pt);
+            }
+            if (st != sfpp::Slope::UNSUPPORTED)
+            {
+                address += "/" + sfpp::toString(st);
+            }
+            if (dt != sfpp::DriveMode::UNSUPPORTED)
+            {
+                address += "/" + sfpp::toString(dt);
+            }
+            if (smt != sfpp::FilterSubModel::UNSUPPORTED)
+            {
+                address += "/" + sfpp::toString(smt);
+            }
+            submenu.addItem(address, []() {});
+        }
+        menu.addSubMenu(sfpp::toString(mod), submenu);
+    }
+    menu.showMenuAsync(juce::PopupMenu::Options{});
+}
+
 void AudioPluginAudioProcessorEditor::timerCallback()
 {
     ThreadMessage msg;
@@ -138,7 +177,7 @@ void AudioPluginAudioProcessorEditor::resized()
     lfoTabs.setBounds(0, paramEntries.back()->parLabel->getBottom() + 1, 400, 110);
     for (auto &c : lfocomps)
         c->setBounds(0, 25, 300, 75);
-
+    filter0But.setBounds(lfoTabs.getRight() + 1, lfoTabs.getY(), 60, 25);
     int yoffs = lfoTabs.getBottom() + 1;
     for (int i = 0; i < modRowComps.size(); ++i)
     {
