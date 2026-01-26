@@ -937,7 +937,7 @@ class ToneGranulator
     float next_tail_len = 0.0f;
     float next_tail_fade_len = 0.0f;
     void prepare(float samplerate, events_t evlist, int ambisonics_order, int filter_routing,
-                 std::string filt0type, std::string filt1type, float tail_len, float tail_fade_len)
+                 float tail_len, float tail_fade_len)
     {
         if (thread_op == 1)
         {
@@ -955,14 +955,27 @@ class ToneGranulator
                 return e.time_position < 0.0 || (e.time_position + e.duration) > 120.0;
             });
         }
+        FilterInfo finfo;
+        finfo.model = sfpp::FilterModel::None;
+        finfo.modelconfig = sfpp::ModelConfig{};
+        for (int i = 0; i < numvoices; ++i)
+        {
+            auto &v = voices[i];
+            v->set_samplerate(samplerate);
+            v->filter_routing = (GranulatorVoice::FilterRouting)filter_routing;
+            v->tail_len = tail_len;
+            v->tail_fade_len = tail_fade_len;
+            v->set_filter_type(0, finfo);
+            v->set_filter_type(1, finfo);
+        }
         next_samplerate = samplerate;
         next_ambisonics_order = ambisonics_order;
-        next_filt0type = filt0type;
-        next_filt1type = filt1type;
-        next_filter_routing = filter_routing;
-        next_tail_len = tail_len;
-        next_tail_fade_len = tail_fade_len;
-        // set_ambisonics_order(ambisonics_order);
+        // next_filt0type = filt0type;
+        // next_filt1type = filt1type;
+        // next_filter_routing = filter_routing;
+        // next_tail_len = tail_len;
+        // next_tail_fade_len = tail_fade_len;
+        //  set_ambisonics_order(ambisonics_order);
         thread_op = 1;
     }
     std::map<int, int> aotonumchans{{1, 4}, {2, 9}, {3, 16}};
@@ -1036,8 +1049,8 @@ class ToneGranulator
             playposframes = 0;
             m_sr = next_samplerate;
             set_ambisonics_order(next_ambisonics_order);
-            initFilter(m_sr, next_filter_routing, next_filt0type, next_filt1type, next_tail_len,
-                       next_tail_fade_len);
+            // initFilter(m_sr, next_filter_routing, next_filt0type, next_filt1type, next_tail_len,
+            //            next_tail_fade_len);
             gainlag.setRateInMilliseconds(1000.0, m_sr, 1.0);
             gainlag.setTarget(0.0);
             graingen_phase = 0.0;

@@ -107,7 +107,12 @@ void AudioPluginAudioProcessor::prepareToPlay(double sampleRate, int samplesPerB
 {
     juce::ignoreUnused(sampleRate, samplesPerBlock);
     workBuffer.resize(samplesPerBlock * 32);
-    granulator.prepare(sampleRate, {}, 3, 0, "fast_svf/lowpass", "none", 0.001f, 0.001f);
+    granulator.prepare(sampleRate, {}, 3, 0, 0.001f, 0.001f);
+    ThreadMessage msg;
+    msg.opcode = 100;
+    msg.filterindex = 0;
+    msg.filtermodel = sfpp::FilterModel::CytomicSVF;
+    
 }
 
 void AudioPluginAudioProcessor::releaseResources() {}
@@ -302,7 +307,7 @@ void AudioPluginAudioProcessor::getStateInformation(juce::MemoryBlock &destData)
 void AudioPluginAudioProcessor::setStateInformation(const void *data, int sizeInBytes)
 {
     std::string json((char *)data, (char *)data + sizeInBytes);
-    DBG(json);
+    // DBG(json);
     auto state = choc::json::parse(json);
     if (state.hasObjectMember("params"))
     {
