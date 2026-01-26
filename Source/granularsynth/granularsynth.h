@@ -116,8 +116,8 @@ class GranulatorModMatrix
   public:
     FixedMatrix<GranulatorModConfig> m;
     FixedMatrix<GranulatorModConfig>::RoutingTable rt;
-    std::array<GranulatorModConfig::SourceIdentifier, 9> sourceIds;
-    std::array<float, 9> sourceValues;
+    std::array<GranulatorModConfig::SourceIdentifier, 32> sourceIds;
+    std::array<float, 32> sourceValues;
     std::array<GranulatorModConfig::TargetIdentifier, 8> targetIds;
     std::array<float, 8> targetBaseValues;
     double samplerate = 0.0;
@@ -215,10 +215,10 @@ class GranulatorModMatrix
     GranulatorModMatrix(double sr) : samplerate(sr)
     {
         initTables();
-        sourceValues[0] = 0.0f;
+        for (auto &v : sourceValues)
+            v = 0.0f;
         sourceIds[0] =
             GranulatorModConfig::SourceIdentifier{GranulatorModConfig::SourceIdentifier::NOSOURCE};
-        m.bindSourceValue(sourceIds[0], sourceValues[0]);
         for (size_t i = 0; i < numLfos; ++i)
         {
             auto lfo = std::make_unique<lfo_t>(this);
@@ -233,6 +233,16 @@ class GranulatorModMatrix
                     GranulatorModConfig::SourceIdentifier::LFO0 + i)};
             sourceValues[i + 1] = 0.0f;
             m.bindSourceValue(sourceIds[i + 1], sourceValues[i + 1]);
+        }
+        for (int i = 0; i < 8; ++i)
+        {
+            sourceIds[i + 9] =
+                GranulatorModConfig::SourceIdentifier{(GranulatorModConfig::SourceIdentifier::SI)(
+                    GranulatorModConfig::SourceIdentifier::MIDICCSTART + i)};
+        }
+        for (int i = 0; i < 17; ++i)
+        {
+            m.bindSourceValue(sourceIds[i], sourceValues[i]);
         }
         for (size_t i = 0; i < targetIds.size(); ++i)
         {
