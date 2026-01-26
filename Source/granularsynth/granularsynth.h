@@ -231,8 +231,6 @@ class GranulatorModMatrix
             sourceIds[i + 1] =
                 GranulatorModConfig::SourceIdentifier{(GranulatorModConfig::SourceIdentifier::SI)(
                     GranulatorModConfig::SourceIdentifier::LFO0 + i)};
-            sourceValues[i + 1] = 0.0f;
-            m.bindSourceValue(sourceIds[i + 1], sourceValues[i + 1]);
         }
         for (int i = 0; i < 8; ++i)
         {
