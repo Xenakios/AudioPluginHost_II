@@ -108,11 +108,6 @@ void AudioPluginAudioProcessor::prepareToPlay(double sampleRate, int samplesPerB
     juce::ignoreUnused(sampleRate, samplesPerBlock);
     workBuffer.resize(samplesPerBlock * 32);
     granulator.prepare(sampleRate, {}, 3, 0, 0.001f, 0.001f);
-    ThreadMessage msg;
-    msg.opcode = 100;
-    msg.filterindex = 0;
-    msg.filtermodel = sfpp::FilterModel::CytomicSVF;
-    
 }
 
 void AudioPluginAudioProcessor::releaseResources() {}
@@ -190,7 +185,12 @@ void AudioPluginAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
                 // DBG(msg.modslot << " " << msg.modsource << " " << msg.depth << " " <<
                 // msg.moddest);
                 mm.rt.updateRoutingAt(msg.modslot, mm.sourceIds[msg.modsource],
-                                      mm.targetIds[msg.moddest], msg.depth);
+                                      mm.sourceIds[msg.modvia], {}, mm.targetIds[msg.moddest],
+                                      msg.depth);
+                if (msg.modvia == 0)
+                {
+                    mm.rt.routes[msg.modslot].sourceVia = std::nullopt;
+                }
                 mm.m.prepare(mm.rt, granulator.m_sr, granul_block_size);
             }
             else
@@ -242,7 +242,7 @@ void AudioPluginAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
             for (int j = 0; j < buffer.getNumSamples(); ++j)
             {
                 float s = workBuffer[j * procnumoutchs + i];
-                channelDatas[i][j] = std::clamp(s, -1.0f, 1.0f);
+                channelDatas[i][j] = 0.25 * std::clamp(s, -1.0f, 1.0f);
             }
         }
     }

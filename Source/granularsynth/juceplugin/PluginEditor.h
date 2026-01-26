@@ -59,17 +59,26 @@ struct ModulationRowComponent : public juce::Component
     ModulationRowComponent()
     {
         addAndMakeVisible(sourceCombo);
+        addAndMakeVisible(viaCombo);
         addAndMakeVisible(depthSlider);
         addAndMakeVisible(destCombo);
         auto updatfunc = [this]() {
             stateChangedCallback(modslotindex, sourceCombo.getSelectedItemIndex(),
-                                 depthSlider.getValue(), destCombo.getSelectedItemIndex());
+                                 viaCombo.getSelectedItemIndex(), depthSlider.getValue(),
+                                 destCombo.getSelectedItemIndex());
         };
+        sourceCombo.addItem("Off", 1);
+        viaCombo.addItem("Off", 1);
         for (int i = 0; i < 8; ++i)
         {
-            sourceCombo.addItem("LFO " + juce::String(i + 1), i + 1);
+            sourceCombo.addItem("LFO " + juce::String(i + 1), i + 2);
+            viaCombo.addItem("LFO " + juce::String(i), i + 2);
         }
+        sourceCombo.setSelectedItemIndex(0, juce::dontSendNotification);
+        viaCombo.setSelectedItemIndex(0, juce::dontSendNotification);
         sourceCombo.onChange = updatfunc;
+        viaCombo.onChange = updatfunc;
+
         depthSlider.setRange(-1.0, 1.0);
         depthSlider.setNumDecimalPlacesToDisplay(2);
         depthSlider.onValueChange = updatfunc;
@@ -84,13 +93,20 @@ struct ModulationRowComponent : public juce::Component
     }
     void resized() override
     {
-        sourceCombo.setBounds(0, 0, 150, 25);
-        depthSlider.setBounds(sourceCombo.getRight() + 1, 0, 250, 25);
-        destCombo.setBounds(depthSlider.getRight() + 1, 0, 150, 25);
+        auto layout = juce::FlexBox(juce::FlexBox::Direction::row, juce::FlexBox::Wrap::noWrap,
+                                    juce::FlexBox::AlignContent::spaceAround,
+                                    juce::FlexBox::AlignItems::stretch,
+                                    juce::FlexBox::JustifyContent::flexStart);
+        layout.items.add(juce::FlexItem(sourceCombo).withFlex(1.0));
+        layout.items.add(juce::FlexItem(viaCombo).withFlex(1.0));
+        layout.items.add(juce::FlexItem(depthSlider).withFlex(2.0));
+        layout.items.add(juce::FlexItem(destCombo).withFlex(1.0));
+        layout.performLayout(juce::Rectangle<int>{0, 0, getWidth(), getHeight()});
     }
-    std::function<void(int, int, float, int)> stateChangedCallback;
+    std::function<void(int, int, int, float, int)> stateChangedCallback;
     int modslotindex = -1;
     juce::ComboBox sourceCombo;
+    juce::ComboBox viaCombo;
     juce::Slider depthSlider;
     juce::ComboBox destCombo;
 };

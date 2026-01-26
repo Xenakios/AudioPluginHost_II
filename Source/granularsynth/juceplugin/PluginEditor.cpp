@@ -55,13 +55,14 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor(AudioPluginAudi
     {
         auto modcomp = std::make_unique<ModulationRowComponent>();
         modcomp->modslotindex = i;
-        modcomp->stateChangedCallback = [this](int slot, int src, float val, int dest) {
+        modcomp->stateChangedCallback = [this](int slot, int src, int via, float val, int dest) {
             if (slot >= 0 && src >= 0 && dest >= 0)
             {
                 ThreadMessage msg;
                 msg.opcode = 1;
                 msg.modslot = slot;
                 msg.modsource = src;
+                msg.modvia = via;
                 msg.depth = val;
                 msg.moddest = dest;
                 processorRef.from_gui_fifo.push(msg);
@@ -89,6 +90,7 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor(AudioPluginAudi
         lfoTabs.addTab(juce::String(i + 1), juce::Colours::grey, lfoc.get(), false);
         lfocomps.push_back(std::move(lfoc));
     }
+    //lfoTabs.getTabbedButtonBar().
     lfoTabs.setCurrentTabIndex(0);
     setSize(800, 650);
     startTimer(100);

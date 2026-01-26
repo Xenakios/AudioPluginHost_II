@@ -9,6 +9,7 @@ struct ThreadMessage
     int16_t opcode = 0;
     int16_t modslot = -1;
     int modsource = -1;
+    int modvia = 0;
     float depth = 0.0f;
     int moddest = -1;
     int16_t lfoindex = -1;

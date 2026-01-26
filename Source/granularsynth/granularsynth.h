@@ -24,6 +24,7 @@ struct GranulatorModConfig
     {
         enum SI
         {
+            NOSOURCE,
             LFO0,
             LFO1,
             LFO2,
@@ -115,8 +116,8 @@ class GranulatorModMatrix
   public:
     FixedMatrix<GranulatorModConfig> m;
     FixedMatrix<GranulatorModConfig>::RoutingTable rt;
-    std::array<GranulatorModConfig::SourceIdentifier, 8> sourceIds;
-    std::array<float, 8> sourceValues;
+    std::array<GranulatorModConfig::SourceIdentifier, 9> sourceIds;
+    std::array<float, 9> sourceValues;
     std::array<GranulatorModConfig::TargetIdentifier, 8> targetIds;
     std::array<float, 8> targetBaseValues;
     double samplerate = 0.0;
@@ -214,6 +215,10 @@ class GranulatorModMatrix
     GranulatorModMatrix(double sr) : samplerate(sr)
     {
         initTables();
+        sourceValues[0] = 0.0f;
+        sourceIds[0] =
+            GranulatorModConfig::SourceIdentifier{GranulatorModConfig::SourceIdentifier::NOSOURCE};
+        m.bindSourceValue(sourceIds[0], sourceValues[0]);
         for (size_t i = 0; i < numLfos; ++i)
         {
             auto lfo = std::make_unique<lfo_t>(this);
@@ -223,11 +228,11 @@ class GranulatorModMatrix
             lfo_rates[i] = 0.0;
             lfo_deforms[i] = 0.0;
             lfo_shifts[i] = 0.5f;
-            sourceIds[i] =
+            sourceIds[i + 1] =
                 GranulatorModConfig::SourceIdentifier{(GranulatorModConfig::SourceIdentifier::SI)(
                     GranulatorModConfig::SourceIdentifier::LFO0 + i)};
-            sourceValues[i] = 0.0f;
-            m.bindSourceValue(sourceIds[i], sourceValues[i]);
+            sourceValues[i + 1] = 0.0f;
+            m.bindSourceValue(sourceIds[i + 1], sourceValues[i + 1]);
         }
         for (size_t i = 0; i < targetIds.size(); ++i)
         {
@@ -1068,7 +1073,7 @@ class ToneGranulator
                 modmatrix.m_lfos[i]->applyPhaseOffset(modmatrix.lfo_shifts[i]);
                 modmatrix.m_lfos[i]->process_block(modmatrix.lfo_rates[i], modmatrix.lfo_deforms[i],
                                                    modmatrix.lfo_shapes[i]);
-                modmatrix.sourceValues[i] = modmatrix.m_lfos[i]->outputBlock[0];
+                modmatrix.sourceValues[i + 1] = modmatrix.m_lfos[i]->outputBlock[0];
             }
 
             modmatrix.targetBaseValues[0] = grain_rate_oct;
