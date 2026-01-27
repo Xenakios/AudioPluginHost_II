@@ -22,8 +22,9 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor(AudioPluginAudi
     for (int i = 0; i < params.size(); ++i)
     {
         auto pare = std::make_unique<GUIParam>();
+        addAndMakeVisible(*pare);
         pare->parLabel = std::make_unique<juce::Label>();
-        addAndMakeVisible(pare->parLabel.get());
+        pare->addAndMakeVisible(pare->parLabel.get());
         auto pa = static_cast<juce::RangedAudioParameter *>(params[i]);
         pare->parLabel->setText(pa->getName(100), juce::dontSendNotification);
         if (!pa->isDiscrete())
@@ -33,7 +34,7 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor(AudioPluginAudi
                                           50, 20);
             pare->slidAttach =
                 std::make_unique<juce::SliderParameterAttachment>(*pa, *pare->slider, nullptr);
-            addAndMakeVisible(pare->slider.get());
+            pare->addAndMakeVisible(pare->slider.get());
         }
         else
         {
@@ -47,7 +48,7 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor(AudioPluginAudi
             }
             pare->choiceAttach =
                 std::make_unique<juce::ComboBoxParameterAttachment>(*pa, *pare->combo, nullptr);
-            addAndMakeVisible(pare->combo.get());
+            pare->addAndMakeVisible(pare->combo.get());
         }
         paramEntries.push_back(std::move(pare));
     }
@@ -90,7 +91,7 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor(AudioPluginAudi
         lfoTabs.addTab(juce::String(i + 1), juce::Colours::grey, lfoc.get(), false);
         lfocomps.push_back(std::move(lfoc));
     }
-    //lfoTabs.getTabbedButtonBar().
+    // lfoTabs.getTabbedButtonBar().
     lfoTabs.setCurrentTabIndex(0);
     setSize(800, 650);
     startTimer(100);
@@ -188,15 +189,26 @@ void AudioPluginAudioProcessorEditor::paint(juce::Graphics &g)
 
 void AudioPluginAudioProcessorEditor::resized()
 {
+    /*
+    auto layout =
+        juce::FlexBox(juce::FlexBox::Direction::column, juce::FlexBox::Wrap::wrap,
+                      juce::FlexBox::AlignContent::spaceAround, juce::FlexBox::AlignItems::stretch,
+                      juce::FlexBox::JustifyContent::flexStart);
+                      */
+    juce::FlexBox layout;
+    layout.flexDirection = juce::FlexBox::Direction::column;
+    layout.flexWrap = juce::FlexBox::Wrap::wrap;
     for (int i = 0; i < paramEntries.size(); ++i)
     {
-        paramEntries[i]->parLabel->setBounds(1, 1 + i * 25, 180, 24);
-        if (paramEntries[i]->slider)
-            paramEntries[i]->slider->setBounds(182, 1 * i * 25, getWidth() - 184, 24);
-        if (paramEntries[i]->combo)
-            paramEntries[i]->combo->setBounds(182, 1 * i * 25, getWidth() - 184, 24);
+        layout.items.add(juce::FlexItem(*paramEntries[i])
+                             .withFlex(1.0)
+                             .withMinHeight(25)
+                             .withMinWidth(50)
+                             .withMaxWidth(getWidth() / 2));
+        // paramEntries[i]->setBounds(1, 1 + i * 25, getWidth(), 25);
     }
-    lfoTabs.setBounds(0, paramEntries.back()->parLabel->getBottom() + 1, 400, 110);
+    layout.performLayout(juce::Rectangle<int>(0, 0, getWidth(), 200));
+    lfoTabs.setBounds(0, paramEntries.back()->getBottom() + 1, 400, 110);
     for (auto &c : lfocomps)
         c->setBounds(0, 25, 300, 75);
     filter0But.setBounds(lfoTabs.getRight() + 1, lfoTabs.getY(), 60, 25);
