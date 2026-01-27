@@ -37,6 +37,8 @@ AudioPluginAudioProcessor::AudioPluginAudioProcessor()
                                                                  -48.0f, 48.0f, 0.0f));
     addParameter(parGrainFMDepth = new juce::AudioParameterFloat({"GFMDEPTH", 1}, "Grain FM Depth",
                                                                  0.0f, 1.0f, 0.0f));
+    addParameter(parGrainFMFeedback = new juce::AudioParameterFloat(
+                     {"GFMFEEDBACK", 1}, "Grain FM Feedback", -1.0f, 1.0f, 0.0f));
     addParameter(parGrainCenterAzimuth = new juce::AudioParameterFloat(
                      {"GAZI", 1}, "Grain Center Azimuth", -180.0f, 180.0f, 0.0f));
     addParameter(parGrainCenterElevation = new juce::AudioParameterFloat(
@@ -232,6 +234,7 @@ void AudioPluginAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
     granulator.osc_type = parOscType->getIndex();
     granulator.fm_pitch = parGrainFMPitch->get();
     granulator.fm_depth = parGrainFMDepth->get();
+    granulator.fm_feedback = parGrainFMFeedback->get();
     granulator.process_block(workBuffer.data(), buffer.getNumSamples());
 
     int procnumoutchs = granulator.num_out_chans;

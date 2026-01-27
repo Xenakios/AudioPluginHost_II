@@ -70,6 +70,7 @@ class AudioPluginAudioProcessor final : public juce::AudioProcessor
     juce::AudioParameterFloat *parGrainFilter0Reson = nullptr;
     juce::AudioParameterFloat *parGrainFMPitch = nullptr;
     juce::AudioParameterFloat *parGrainFMDepth = nullptr;
+    juce::AudioParameterFloat *parGrainFMFeedback = nullptr;
     void sendExtraStatesToGUI();
     //==============================================================================
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(AudioPluginAudioProcessor)

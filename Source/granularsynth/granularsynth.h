@@ -118,8 +118,8 @@ class GranulatorModMatrix
     FixedMatrix<GranulatorModConfig>::RoutingTable rt;
     std::array<GranulatorModConfig::SourceIdentifier, 32> sourceIds;
     std::array<float, 32> sourceValues;
-    std::array<GranulatorModConfig::TargetIdentifier, 8> targetIds;
-    std::array<float, 8> targetBaseValues;
+    std::array<GranulatorModConfig::TargetIdentifier, 32> targetIds;
+    std::array<float, 32> targetBaseValues;
     double samplerate = 0.0;
     void initTables()
     {
@@ -1025,9 +1025,8 @@ class ToneGranulator
                 genev.pulse_width = pulse_width;
                 genev.noisecorr = noise_corr;
                 genev.sync_ratio = std::pow(2.0, osc_sync);
-                float f0co = modmatrix.m.getTargetValue(modmatrix.targetIds[3]);
-                genev.filterparams[0][0] = f0co;
-                genev.filterparams[0][1] = filt_reso;
+                genev.filterparams[0][0] = modmatrix.m.getTargetValue(modmatrix.targetIds[3]);
+                genev.filterparams[0][1] = modmatrix.m.getTargetValue(modmatrix.targetIds[4]);
                 genev.modamounts[GrainEvent::MD_PITCH] = grain_pitch_mod;
                 bool wasfound = false;
                 for (int j = 0; j < voices.size(); ++j)
@@ -1088,6 +1087,7 @@ class ToneGranulator
             modmatrix.targetBaseValues[1] = pitch_center;
             modmatrix.targetBaseValues[2] = azi_center;
             modmatrix.targetBaseValues[3] = filt_cut_off;
+            modmatrix.targetBaseValues[4] = filt_reso;
             modmatrix.m.process();
             if (!self_generate)
             {

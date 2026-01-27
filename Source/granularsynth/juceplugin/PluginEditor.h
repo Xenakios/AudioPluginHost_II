@@ -109,6 +109,7 @@ struct ModulationRowComponent : public juce::Component
         destCombo.addItem("Pitch", 3);
         destCombo.addItem("Azimuth", 4);
         destCombo.addItem("Filter 1 Cutoff", 5);
+        destCombo.addItem("Filter 1 Reson", 6);
         destCombo.onChange = updatfunc;
     }
     void resized() override
