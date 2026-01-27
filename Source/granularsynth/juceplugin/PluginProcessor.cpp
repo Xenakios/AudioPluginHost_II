@@ -16,23 +16,40 @@ AudioPluginAudioProcessor::AudioPluginAudioProcessor()
     auto foo = Tunings::evenDivisionOfCentsByM(1200, 12);
     from_gui_fifo.reset(1024);
     to_gui_fifo.reset(1024);
+    /*
     addParameter(parAmbiOrder = new juce::AudioParameterChoice({"AMBO", 1}, "Ambisonics Order",
                                                                {"STEREO", "1ST", "2ND", "3RD"}, 0));
     addParameter(parOscType = new juce::AudioParameterChoice(
                      {"OSCTY", 1}, "Oscillator Type",
                      {"SINE", "SEMISINE", "TRIANGLE", "SAW", "SQUARE", "FM", "NOISE"}, 0));
-    juce::NormalisableRange<float> range;
+    */
+    for (int i = 0; i < granulator.parmetadatas.size(); ++i)
+    {
+        const auto &pmd = granulator.parmetadatas[i];
+        juce::String id(pmd.id);
+        if (pmd.type == ToneGranulator::pmd::FLOAT)
+        {
+            auto par = new juce::AudioParameterFloat({id, 1}, pmd.name, pmd.minVal, pmd.maxVal,
+                                                     pmd.defaultVal);
+            addParameter(par);
+            jucepartoindex[(juce::AudioProcessorParameter *)par] = pmd.id;
+        }
+        if (pmd.type == ToneGranulator::pmd::INT && pmd.discreteValues.size())
+        {
+            juce::StringArray choices;
+            for (auto &e : pmd.discreteValues)
+            {
+                choices.add(e.second);
+            }
+            auto par = new juce::AudioParameterChoice({id, 1}, pmd.name, choices, 0);
+            addParameter(par);
+            jucepartoindex[(juce::AudioProcessorParameter *)par] = pmd.id;
+        }
+    }
 
-    addParameter(parGrainRate = new juce::AudioParameterFloat(
-                     {"GRATE", 1}, "Grain Rate", {0.0f, 7.0f}, 4.0f, "Hz",
-                     juce::AudioProcessorParameter::genericParameter, [](double x, int nd) {
-                         double hz = std::pow(2.0, x);
-                         return juce::String(hz, 2);
-                     }));
     addParameter(parGrainDuration = new juce::AudioParameterFloat({"GDUR", 1}, "Grain Duration",
                                                                   0.002f, 0.5f, 0.05f));
-    addParameter(parGrainCenterPitch = new juce::AudioParameterFloat(
-                     {"GPITCH", 1}, "Grain Center Pitch", -36.0f, 36.0f, 0.0f));
+
     addParameter(parGrainFMPitch = new juce::AudioParameterFloat({"GFMPITCH", 1}, "Grain FM Pitch",
                                                                  -48.0f, 48.0f, 0.0f));
     addParameter(parGrainFMDepth = new juce::AudioParameterFloat({"GFMDEPTH", 1}, "Grain FM Depth",
@@ -187,8 +204,8 @@ void AudioPluginAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
             auto &mm = granulator.modmatrix;
             if (msg.moddest >= 1)
             {
-                msg.moddest -= 1;
-                if (msg.moddest == 1)
+                // msg.moddest -= 1;
+                if (msg.moddest == ToneGranulator::PAR_PITCH)
                     msg.depth *= 24.0f;
                 if (msg.moddest == 2)
                     msg.depth *= 30.0f;
@@ -197,9 +214,9 @@ void AudioPluginAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
                 mm.rt.updateActiveAt(msg.modslot, true);
                 // DBG(msg.modslot << " " << msg.modsource << " " << msg.depth << " " <<
                 // msg.moddest);
-                mm.rt.updateRoutingAt(msg.modslot, mm.sourceIds[msg.modsource],
-                                      mm.sourceIds[msg.modvia], {}, mm.targetIds[msg.moddest],
-                                      msg.depth);
+                mm.rt.updateRoutingAt(
+                    msg.modslot, mm.sourceIds[msg.modsource], mm.sourceIds[msg.modvia], {},
+                    GranulatorModConfig::TargetIdentifier{msg.moddest}, msg.depth);
                 if (msg.modvia == 0)
                 {
                     mm.rt.routes[msg.modslot].sourceVia = std::nullopt;
@@ -214,7 +231,7 @@ void AudioPluginAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
             }
         }
     }
-    if (prior_ambi_order != parAmbiOrder->getIndex())
+    // if (prior_ambi_order != parAmbiOrder->getIndex())
     {
         /*
         prior_ambi_order = parAmbiOrder->getIndex();
@@ -224,19 +241,32 @@ void AudioPluginAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
             granulator.set_ambisonics_order(1);
         */
     }
-    granulator.grain_rate_oct = parGrainRate->get();
-    granulator.pitch_center = parGrainCenterPitch->get();
+    const auto &pars = getParameters();
+    for (auto &p : pars)
+    {
+        auto it = jucepartoindex.find(p);
+        if (it != jucepartoindex.end())
+        {
+            int parid = it->second;
+            auto rpar = dynamic_cast<juce::RangedAudioParameter *>(p);
+            jassert(rpar);
+            *granulator.idtoparvalptr[parid] = rpar->convertFrom0to1(rpar->getValue());
+        }
+    }
+    granulator.grain_rate_oct = *granulator.idtoparvalptr[ToneGranulator::PAR_DENSITY];
+
     granulator.grain_dur = parGrainDuration->get();
     granulator.azi_center = parGrainCenterAzimuth->get();
     granulator.ele_center = parGrainCenterElevation->get();
     granulator.filt_cut_off = parGrainFilter0Cutoff->get();
     granulator.filt_reso = parGrainFilter0Reson->get();
-    granulator.osc_type = parOscType->getIndex();
+    granulator.osc_type = *granulator.idtoparvalptr[ToneGranulator::PAR_OSCTYPE];
     granulator.fm_pitch = parGrainFMPitch->get();
     granulator.fm_depth = parGrainFMDepth->get();
     granulator.fm_feedback = parGrainFMFeedback->get();
     granulator.process_block(workBuffer.data(), buffer.getNumSamples());
-
+    float maingain = *granulator.idtoparvalptr[ToneGranulator::PAR_MAINVOLUME];
+    maingain = juce::Decibels::decibelsToGain(maingain);
     int procnumoutchs = granulator.num_out_chans;
     auto channelDatas = buffer.getArrayOfWritePointers();
     if (totalNumOutputChannels == 2)
@@ -245,8 +275,8 @@ void AudioPluginAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
         {
             float m = workBuffer[j * procnumoutchs + 0];
             float s = workBuffer[j * procnumoutchs + 1];
-            channelDatas[0][j] = std::clamp(m + s, -1.0f, 1.0f);
-            channelDatas[1][j] = std::clamp(m - s, -1.0f, 1.0f);
+            channelDatas[0][j] = maingain * std::clamp(m + s, -1.0f, 1.0f);
+            channelDatas[1][j] = maingain * std::clamp(m - s, -1.0f, 1.0f);
         }
     }
     if (totalNumOutputChannels == 16)
@@ -256,7 +286,7 @@ void AudioPluginAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
             for (int j = 0; j < buffer.getNumSamples(); ++j)
             {
                 float s = workBuffer[j * procnumoutchs + i];
-                channelDatas[i][j] = 0.25 * std::clamp(s, -1.0f, 1.0f);
+                channelDatas[i][j] = maingain * std::clamp(s, -1.0f, 1.0f);
             }
         }
     }

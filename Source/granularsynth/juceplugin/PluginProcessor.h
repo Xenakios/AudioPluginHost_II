@@ -56,14 +56,13 @@ class AudioPluginAudioProcessor final : public juce::AudioProcessor
     ToneGranulator granulator;
     choc::fifo::SingleReaderSingleWriterFIFO<ThreadMessage> from_gui_fifo;
     choc::fifo::SingleReaderSingleWriterFIFO<ThreadMessage> to_gui_fifo;
+
   private:
     std::vector<float> workBuffer;
-    juce::AudioParameterChoice *parAmbiOrder = nullptr;
+    // juce::AudioParameterChoice *parAmbiOrder = nullptr;
     int prior_ambi_order = -1;
-    juce::AudioParameterChoice *parOscType = nullptr;
-    juce::AudioParameterFloat *parGrainRate = nullptr;
+
     juce::AudioParameterFloat *parGrainDuration = nullptr;
-    juce::AudioParameterFloat *parGrainCenterPitch = nullptr;
     juce::AudioParameterFloat *parGrainCenterAzimuth = nullptr;
     juce::AudioParameterFloat *parGrainCenterElevation = nullptr;
     juce::AudioParameterFloat *parGrainFilter0Cutoff = nullptr;
@@ -71,6 +70,7 @@ class AudioPluginAudioProcessor final : public juce::AudioProcessor
     juce::AudioParameterFloat *parGrainFMPitch = nullptr;
     juce::AudioParameterFloat *parGrainFMDepth = nullptr;
     juce::AudioParameterFloat *parGrainFMFeedback = nullptr;
+    std::unordered_map<juce::AudioProcessorParameter *, int> jucepartoindex;
     void sendExtraStatesToGUI();
     //==============================================================================
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(AudioPluginAudioProcessor)

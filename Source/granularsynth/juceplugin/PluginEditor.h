@@ -79,7 +79,7 @@ struct ModulationRowComponent : public juce::Component
         auto updatfunc = [this]() {
             stateChangedCallback(modslotindex, sourceCombo.getSelectedItemIndex(),
                                  viaCombo.getSelectedItemIndex(), depthSlider.getValue(),
-                                 destCombo.getSelectedItemIndex());
+                                 destCombo.getSelectedId());
         };
         sourceCombo.addItem("Off", 1);
         viaCombo.addItem("Off", 1);
@@ -106,7 +106,7 @@ struct ModulationRowComponent : public juce::Component
                                     20);
         destCombo.addItem("No target", 1);
         destCombo.addItem("Density", 2);
-        destCombo.addItem("Pitch", 3);
+        destCombo.addItem("Pitch", ToneGranulator::PAR_PITCH);
         destCombo.addItem("Azimuth", 4);
         destCombo.addItem("Filter 1 Cutoff", 5);
         destCombo.addItem("Filter 1 Reson", 6);
