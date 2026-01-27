@@ -70,7 +70,7 @@ struct LFOComponent : public juce::Component
 
 struct ModulationRowComponent : public juce::Component
 {
-    ModulationRowComponent()
+    ModulationRowComponent(ToneGranulator *g)
     {
         addAndMakeVisible(sourceCombo);
         addAndMakeVisible(viaCombo);
@@ -105,11 +105,14 @@ struct ModulationRowComponent : public juce::Component
         depthSlider.setTextBoxStyle(juce::Slider::TextEntryBoxPosition::TextBoxRight, false, 50,
                                     20);
         destCombo.addItem("No target", 1);
-        destCombo.addItem("Density", 2);
-        destCombo.addItem("Pitch", ToneGranulator::PAR_PITCH);
-        destCombo.addItem("Azimuth", 4);
-        destCombo.addItem("Filter 1 Cutoff", 5);
-        destCombo.addItem("Filter 1 Reson", 6);
+        for (auto &pmd : g->parmetadatas)
+        {
+            if (pmd.flags == 1)
+            {
+                destCombo.addItem(pmd.name, pmd.id);
+            }
+        }
+        destCombo.setSelectedItemIndex(0, juce::dontSendNotification);
         destCombo.onChange = updatfunc;
     }
     void resized() override

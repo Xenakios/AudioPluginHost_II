@@ -54,7 +54,7 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor(AudioPluginAudi
     }
     for (int i = 0; i < 8; ++i)
     {
-        auto modcomp = std::make_unique<ModulationRowComponent>();
+        auto modcomp = std::make_unique<ModulationRowComponent>(&processorRef.granulator);
         modcomp->modslotindex = i;
         modcomp->stateChangedCallback = [this](int slot, int src, int via, float val, int dest) {
             if (slot >= 0 && src >= 0 && dest >= 0)

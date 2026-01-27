@@ -119,8 +119,7 @@ class GranulatorModMatrix
     FixedMatrix<GranulatorModConfig>::RoutingTable rt;
     std::array<GranulatorModConfig::SourceIdentifier, 32> sourceIds;
     std::array<float, 32> sourceValues;
-    std::array<GranulatorModConfig::TargetIdentifier, 32> targetIds;
-    std::array<float, 32> targetBaseValues;
+
     double samplerate = 0.0;
 
     static constexpr size_t BLOCKSIZE = granul_block_size;
@@ -203,7 +202,7 @@ class GranulatorModMatrix
                         int src = entryob["src"].get<int>();
                         int dest = entryob["dest"].get<int>();
                         float d = entryob["depth"].get<float>();
-                        rt.updateRoutingAt(slot, sourceIds[src], targetIds[dest], d);
+                        // rt.updateRoutingAt(slot, sourceIds[src], targetIds[dest], d);
                     }
                 }
             }
@@ -852,14 +851,7 @@ class ToneGranulator
     std::unordered_map<uint32_t, float *> idtoparvalptr;
     // float pitch_center = 0.0f;
 
-    float grain_dur = 0.1f;
-    float grain_rate_oct = 4.0;
-    float azi_center = 0.0;
-    float azi_spread = 0.0;
-    float ele_center = 0.0;
     float osc_sync = 0.0;
-    float filt_cut_off = 36.0;
-    float filt_reso = 0.0;
     float grain_pitch_mod = 0.0;
     float fm_pitch = 0.0;
     float fm_depth = 0.0;
@@ -926,8 +918,18 @@ class ToneGranulator
         PAR_AMBORDER = 200,
         PAR_OSCTYPE = 300,
         PAR_DENSITY = 400,
-        PAR_PITCH = 500
+        PAR_PITCH = 500,
+        PAR_AZIMUTH = 600,
+        PAR_ELEVATION = 700,
+        PAR_DURATION = 800,
+        PAR_F0CO = 900,
+        PAR_F0RE = 1000,
+        PAR_F0EX = 1100,
+        PAR_F1CO = 1200,
+        PAR_F1RE = 1300,
+        PAR_F1EX = 1400
     };
+    float dummyTargetValue = 0.0f;
     ToneGranulator() : m_sr(44100.0), modmatrix(44100.0)
     {
         parmetadatas.reserve(64);
@@ -935,6 +937,7 @@ class ToneGranulator
                                    .withRange(-24.0, 0.0)
                                    .withDefault(-6.0)
                                    .withName("Main volume")
+                                   .withFlags(0)
                                    .withID(PAR_MAINVOLUME));
         parmetadatas.push_back(
             pmd()
@@ -948,13 +951,47 @@ class ToneGranulator
                 .withDefault(0)
                 .withName("Oscillator type")
                 .withID(PAR_OSCTYPE));
-        parmetadatas.push_back(
-            pmd().withRange(0.0f, 7.0f).withDefault(4.0).withName("Density").withID(PAR_DENSITY));
+        parmetadatas.push_back(pmd()
+                                   .withRange(0.0f, 7.0f)
+                                   .withDefault(4.0)
+                                   .withName("Density")
+                                   .withID(PAR_DENSITY)
+                                   .withFlags(1));
+        parmetadatas.push_back(pmd()
+                                   .withRange(0.002f, 0.5f)
+                                   .withDefault(0.05)
+                                   .withName("Duration")
+                                   .withID(PAR_DURATION)
+                                   .withFlags(1));
         parmetadatas.push_back(pmd()
                                    .withRange(-48.0, 48.0)
                                    .withDefault(0.0)
                                    .withName("Pitch")
                                    .withID(PAR_PITCH)
+                                   .withFlags(1));
+        parmetadatas.push_back(pmd()
+                                   .withRange(-48.0, 48.0)
+                                   .withDefault(0.0)
+                                   .withName("Filter 1 Frequency")
+                                   .withID(PAR_F0CO)
+                                   .withFlags(1));
+        parmetadatas.push_back(pmd()
+                                   .withRange(0.0, 1.0)
+                                   .withDefault(0.0)
+                                   .withName("Filter 1 Resonance")
+                                   .withID(PAR_F0RE)
+                                   .withFlags(1));
+        parmetadatas.push_back(pmd()
+                                   .withRange(-180.0, 180.0)
+                                   .withDefault(0.0)
+                                   .withName("Azimuth")
+                                   .withID(PAR_AZIMUTH)
+                                   .withFlags(1));
+        parmetadatas.push_back(pmd()
+                                   .withRange(-180.0, 180.0)
+                                   .withDefault(0.0)
+                                   .withName("Elevation")
+                                   .withID(PAR_ELEVATION)
                                    .withFlags(1));
         paramvalues.resize(parmetadatas.size());
         for (int i = 0; i < parmetadatas.size(); ++i)
@@ -973,13 +1010,13 @@ class ToneGranulator
             const auto &md = parmetadatas[i];
             if (md.flags == 1)
             {
-                modmatrix.targetIds[j] = GranulatorModConfig::TargetIdentifier{(int)md.id};
-                modmatrix.targetBaseValues[j] = md.defaultVal;
                 modmatrix.m.bindTargetBaseValue(GranulatorModConfig::TargetIdentifier{(int)md.id},
                                                 *idtoparvalptr[md.id]);
                 ++j;
             }
         }
+        modmatrix.m.bindTargetBaseValue(GranulatorModConfig::TargetIdentifier{(int)1},
+                                        dummyTargetValue);
         init_filter_infos();
     }
     void set_voice_aux_envelope(std::array<float, SimpleEnvelope<false>::maxnumsteps> env)
@@ -1059,9 +1096,9 @@ class ToneGranulator
     }
     void generate_grain()
     {
-        double actgrate = grain_rate_oct;
-        // actgrate = modmatrix.m.getTargetValue(modmatrix.targetIds[0]);
-        // actgrate = std::clamp(actgrate, -1.0, 8.0);
+        double actgrate =
+            modmatrix.m.getTargetValue(GranulatorModConfig::TargetIdentifier{PAR_DENSITY});
+        actgrate = std::clamp(actgrate, -1.0, 8.0);
         double grate = 1.0 / std::pow(2.0, actgrate);
         for (int i = 0; i < granul_block_size; ++i)
         {
@@ -1069,11 +1106,14 @@ class ToneGranulator
             {
                 float pitch =
                     modmatrix.m.getTargetValue(GranulatorModConfig::TargetIdentifier{PAR_PITCH});
-                GrainEvent genev{0.0, grain_dur, pitch, 0.75};
+                float gdur =
+                    modmatrix.m.getTargetValue(GranulatorModConfig::TargetIdentifier{PAR_DURATION});
+                GrainEvent genev{0.0, gdur, pitch, 0.75};
                 genev.envelope_shape = env_shape;
-                float azi = 0.0; // modmatrix.m.getTargetValue(modmatrix.targetIds[2]);
-                genev.azimuth = azi;
-                genev.elevation = ele_center;
+                genev.azimuth =
+                    modmatrix.m.getTargetValue(GranulatorModConfig::TargetIdentifier{PAR_AZIMUTH});
+                genev.elevation = modmatrix.m.getTargetValue(
+                    GranulatorModConfig::TargetIdentifier{PAR_ELEVATION});
                 genev.generator_type = osc_type;
                 genev.fm_frequency_hz = 440.0 * std::pow(2.0, 1.0 / 12 * (fm_pitch - 9.0));
                 genev.fm_amount = fm_depth;
@@ -1082,9 +1122,9 @@ class ToneGranulator
                 genev.noisecorr = noise_corr;
                 genev.sync_ratio = std::pow(2.0, osc_sync);
                 genev.filterparams[0][0] =
-                    48.0; // modmatrix.m.getTargetValue(modmatrix.targetIds[3]);
+                    modmatrix.m.getTargetValue(GranulatorModConfig::TargetIdentifier{PAR_F0CO});
                 genev.filterparams[0][1] =
-                    0.0; // modmatrix.m.getTargetValue(modmatrix.targetIds[4]);
+                    modmatrix.m.getTargetValue(GranulatorModConfig::TargetIdentifier{PAR_F0RE});
                 genev.modamounts[GrainEvent::MD_PITCH] = grain_pitch_mod;
                 bool wasfound = false;
                 for (int j = 0; j < voices.size(); ++j)
@@ -1141,11 +1181,6 @@ class ToneGranulator
                 modmatrix.sourceValues[i + 1] = modmatrix.m_lfos[i]->outputBlock[0];
             }
 
-            modmatrix.targetBaseValues[0] = grain_rate_oct;
-            // modmatrix.targetBaseValues[1] = *idtoparvalptr[PAR_PITCH];
-            modmatrix.targetBaseValues[2] = azi_center;
-            modmatrix.targetBaseValues[3] = filt_cut_off;
-            modmatrix.targetBaseValues[4] = filt_reso;
             modmatrix.m.process();
             if (!self_generate)
             {

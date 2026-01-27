@@ -59,17 +59,8 @@ class AudioPluginAudioProcessor final : public juce::AudioProcessor
 
   private:
     std::vector<float> workBuffer;
-    // juce::AudioParameterChoice *parAmbiOrder = nullptr;
     int prior_ambi_order = -1;
 
-    juce::AudioParameterFloat *parGrainDuration = nullptr;
-    juce::AudioParameterFloat *parGrainCenterAzimuth = nullptr;
-    juce::AudioParameterFloat *parGrainCenterElevation = nullptr;
-    juce::AudioParameterFloat *parGrainFilter0Cutoff = nullptr;
-    juce::AudioParameterFloat *parGrainFilter0Reson = nullptr;
-    juce::AudioParameterFloat *parGrainFMPitch = nullptr;
-    juce::AudioParameterFloat *parGrainFMDepth = nullptr;
-    juce::AudioParameterFloat *parGrainFMFeedback = nullptr;
     std::unordered_map<juce::AudioProcessorParameter *, int> jucepartoindex;
     void sendExtraStatesToGUI();
     //==============================================================================

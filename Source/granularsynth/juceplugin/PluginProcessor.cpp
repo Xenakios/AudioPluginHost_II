@@ -16,13 +16,6 @@ AudioPluginAudioProcessor::AudioPluginAudioProcessor()
     auto foo = Tunings::evenDivisionOfCentsByM(1200, 12);
     from_gui_fifo.reset(1024);
     to_gui_fifo.reset(1024);
-    /*
-    addParameter(parAmbiOrder = new juce::AudioParameterChoice({"AMBO", 1}, "Ambisonics Order",
-                                                               {"STEREO", "1ST", "2ND", "3RD"}, 0));
-    addParameter(parOscType = new juce::AudioParameterChoice(
-                     {"OSCTY", 1}, "Oscillator Type",
-                     {"SINE", "SEMISINE", "TRIANGLE", "SAW", "SQUARE", "FM", "NOISE"}, 0));
-    */
     for (int i = 0; i < granulator.parmetadatas.size(); ++i)
     {
         const auto &pmd = granulator.parmetadatas[i];
@@ -46,24 +39,6 @@ AudioPluginAudioProcessor::AudioPluginAudioProcessor()
             jucepartoindex[(juce::AudioProcessorParameter *)par] = pmd.id;
         }
     }
-
-    addParameter(parGrainDuration = new juce::AudioParameterFloat({"GDUR", 1}, "Grain Duration",
-                                                                  0.002f, 0.5f, 0.05f));
-
-    addParameter(parGrainFMPitch = new juce::AudioParameterFloat({"GFMPITCH", 1}, "Grain FM Pitch",
-                                                                 -48.0f, 48.0f, 0.0f));
-    addParameter(parGrainFMDepth = new juce::AudioParameterFloat({"GFMDEPTH", 1}, "Grain FM Depth",
-                                                                 0.0f, 1.0f, 0.0f));
-    addParameter(parGrainFMFeedback = new juce::AudioParameterFloat(
-                     {"GFMFEEDBACK", 1}, "Grain FM Feedback", -1.0f, 1.0f, 0.0f));
-    addParameter(parGrainCenterAzimuth = new juce::AudioParameterFloat(
-                     {"GAZI", 1}, "Grain Center Azimuth", -180.0f, 180.0f, 0.0f));
-    addParameter(parGrainCenterElevation = new juce::AudioParameterFloat(
-                     {"GELEV", 1}, "Grain Center Elevation", -180.0f, 180.0f, 0.0f));
-    addParameter(parGrainFilter0Cutoff = new juce::AudioParameterFloat(
-                     {"GF0C", 1}, "Filter 1 Cutoff", -36.0, 48.0, 48.0f));
-    addParameter(parGrainFilter0Reson = new juce::AudioParameterFloat(
-                     {"GF0R", 1}, "Filter 1 Resonance", 0.0, 1.0, 0.0f));
 }
 
 AudioPluginAudioProcessor::~AudioPluginAudioProcessor() {}
@@ -207,7 +182,7 @@ void AudioPluginAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
                 // msg.moddest -= 1;
                 if (msg.moddest == ToneGranulator::PAR_PITCH)
                     msg.depth *= 24.0f;
-                if (msg.moddest == 2)
+                if (msg.moddest == ToneGranulator::PAR_AZIMUTH)
                     msg.depth *= 30.0f;
                 if (msg.moddest == 3)
                     msg.depth *= 24.0f;
@@ -253,17 +228,8 @@ void AudioPluginAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
             *granulator.idtoparvalptr[parid] = rpar->convertFrom0to1(rpar->getValue());
         }
     }
-    granulator.grain_rate_oct = *granulator.idtoparvalptr[ToneGranulator::PAR_DENSITY];
-
-    granulator.grain_dur = parGrainDuration->get();
-    granulator.azi_center = parGrainCenterAzimuth->get();
-    granulator.ele_center = parGrainCenterElevation->get();
-    granulator.filt_cut_off = parGrainFilter0Cutoff->get();
-    granulator.filt_reso = parGrainFilter0Reson->get();
     granulator.osc_type = *granulator.idtoparvalptr[ToneGranulator::PAR_OSCTYPE];
-    granulator.fm_pitch = parGrainFMPitch->get();
-    granulator.fm_depth = parGrainFMDepth->get();
-    granulator.fm_feedback = parGrainFMFeedback->get();
+    
     granulator.process_block(workBuffer.data(), buffer.getNumSamples());
     float maingain = *granulator.idtoparvalptr[ToneGranulator::PAR_MAINVOLUME];
     maingain = juce::Decibels::decibelsToGain(maingain);
@@ -350,6 +316,7 @@ void AudioPluginAudioProcessor::getStateInformation(juce::MemoryBlock &destData)
 
 void AudioPluginAudioProcessor::setStateInformation(const void *data, int sizeInBytes)
 {
+    return;
     std::string json((char *)data, (char *)data + sizeInBytes);
     // DBG(json);
     auto state = choc::json::parse(json);
@@ -401,7 +368,7 @@ void AudioPluginAudioProcessor::setStateInformation(const void *data, int sizeIn
                 float d = rstate["depth"].get<float>();
                 int dest = rstate["dest"].get<int>();
 
-                mm.rt.updateRoutingAt(slot, mm.sourceIds[src], mm.targetIds[dest], d);
+                // mm.rt.updateRoutingAt(slot, mm.sourceIds[src], mm.targetIds[dest], d);
             }
         }
         mm.m.prepare(mm.rt, granulator.m_sr, granul_block_size);
