@@ -830,7 +830,7 @@ class ToneGranulator
     const int numvoices = 32;
     double m_sr = 0.0;
     int graincount = 0;
-    double maingain = 1.0;
+
     std::vector<std::unique_ptr<GranulatorVoice>> voices;
     events_t events;
     events_t events_to_switch;
@@ -849,13 +849,8 @@ class ToneGranulator
     std::vector<pmd> parmetadatas;
     std::vector<float> paramvalues;
     std::unordered_map<uint32_t, float *> idtoparvalptr;
-    // float pitch_center = 0.0f;
-
     float osc_sync = 0.0;
     float grain_pitch_mod = 0.0;
-    float fm_pitch = 0.0;
-    float fm_depth = 0.0;
-    float fm_feedback = 0.0;
     float pulse_width = 0.5;
     float noise_corr = 0.0;
     float env_shape = 0.5;
@@ -927,7 +922,10 @@ class ToneGranulator
         PAR_F0EX = 1100,
         PAR_F1CO = 1200,
         PAR_F1RE = 1300,
-        PAR_F1EX = 1400
+        PAR_F1EX = 1400,
+        PAR_FMPITCH = 1500,
+        PAR_FMDEPTH = 1600,
+        PAR_FMFEEDBACK = 1700
     };
     float dummyTargetValue = 0.0f;
     ToneGranulator() : m_sr(44100.0), modmatrix(44100.0)
@@ -937,7 +935,7 @@ class ToneGranulator
                                    .withRange(-24.0, 0.0)
                                    .withDefault(-6.0)
                                    .withName("Main volume")
-                                   .withFlags(0)
+                                   .withFlags(1)
                                    .withID(PAR_MAINVOLUME));
         parmetadatas.push_back(
             pmd()
@@ -945,12 +943,18 @@ class ToneGranulator
                 .withDefault(2)
                 .withName("Ambisonic order")
                 .withID(PAR_AMBORDER));
-        parmetadatas.push_back(
-            pmd()
-                .withUnorderedMapFormatting({{0, "SINE"}, {1, "SEMISINE"}, {2, "TRIANGLE"}}, true)
-                .withDefault(0)
-                .withName("Oscillator type")
-                .withID(PAR_OSCTYPE));
+        parmetadatas.push_back(pmd()
+                                   .withUnorderedMapFormatting({{0, "SINE"},
+                                                                {1, "SEMISINE"},
+                                                                {2, "TRIANGLE"},
+                                                                {3, "SAW"},
+                                                                {4, "SQUARE"},
+                                                                {5, "FM"},
+                                                                {6, "NOISE"}},
+                                                               true)
+                                   .withDefault(0)
+                                   .withName("Oscillator type")
+                                   .withID(PAR_OSCTYPE));
         parmetadatas.push_back(pmd()
                                    .withRange(0.0f, 7.0f)
                                    .withDefault(4.0)
@@ -968,6 +972,24 @@ class ToneGranulator
                                    .withDefault(0.0)
                                    .withName("Pitch")
                                    .withID(PAR_PITCH)
+                                   .withFlags(1));
+        parmetadatas.push_back(pmd()
+                                   .withRange(-48.0, 48.0)
+                                   .withDefault(0.0)
+                                   .withName("FM Pitch")
+                                   .withID(PAR_FMPITCH)
+                                   .withFlags(1));
+        parmetadatas.push_back(pmd()
+                                   .withRange(0.0, 1.0)
+                                   .withDefault(0.0)
+                                   .withName("FM Depth")
+                                   .withID(PAR_FMDEPTH)
+                                   .withFlags(1));
+        parmetadatas.push_back(pmd()
+                                   .withRange(-1.0, 1.0)
+                                   .withDefault(0.0)
+                                   .withName("FM Feedback")
+                                   .withID(PAR_FMFEEDBACK)
                                    .withFlags(1));
         parmetadatas.push_back(pmd()
                                    .withRange(-48.0, 48.0)
@@ -1115,9 +1137,13 @@ class ToneGranulator
                 genev.elevation = modmatrix.m.getTargetValue(
                     GranulatorModConfig::TargetIdentifier{PAR_ELEVATION});
                 genev.generator_type = osc_type;
+                float fm_pitch =
+                    modmatrix.m.getTargetValue(GranulatorModConfig::TargetIdentifier{PAR_FMPITCH});
                 genev.fm_frequency_hz = 440.0 * std::pow(2.0, 1.0 / 12 * (fm_pitch - 9.0));
-                genev.fm_amount = fm_depth;
-                genev.fm_feedback = fm_feedback;
+                genev.fm_amount =
+                    modmatrix.m.getTargetValue(GranulatorModConfig::TargetIdentifier{PAR_FMDEPTH});
+                genev.fm_feedback = modmatrix.m.getTargetValue(
+                    GranulatorModConfig::TargetIdentifier{PAR_FMFEEDBACK});
                 genev.pulse_width = pulse_width;
                 genev.noisecorr = noise_corr;
                 genev.sync_ratio = std::pow(2.0, osc_sync);
@@ -1249,11 +1275,15 @@ class ToneGranulator
             double compengain = 0.0;
             if (numactive > 0)
                 compengain = 1.0 / std::sqrt(numactive);
-            gainlag.setTarget(compengain);
+            float maingain =
+                modmatrix.m.getTargetValue(GranulatorModConfig::TargetIdentifier{PAR_MAINVOLUME});
+            maingain = std::clamp(maingain, -96.0f, 0.0f);
+            maingain = xenakios::decibelsToGain(maingain);
+            gainlag.setTarget(compengain * maingain);
             for (int k = 0; k < granul_block_size; ++k)
             {
                 gainlag.process();
-                float gain = gainlag.getValue() * maingain;
+                float gain = gainlag.getValue();
                 for (int chan = 0; chan < num_out_chans; ++chan)
                 {
                     outputbuffer[(bufframecount + k) * num_out_chans + chan] =

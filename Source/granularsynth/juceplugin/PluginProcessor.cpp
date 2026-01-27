@@ -179,13 +179,15 @@ void AudioPluginAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
             auto &mm = granulator.modmatrix;
             if (msg.moddest >= 1)
             {
-                // msg.moddest -= 1;
-                if (msg.moddest == ToneGranulator::PAR_PITCH)
+                if (msg.moddest == ToneGranulator::PAR_PITCH ||
+                    msg.moddest == ToneGranulator::PAR_FMPITCH ||
+                    msg.moddest == ToneGranulator::PAR_F0CO)
                     msg.depth *= 24.0f;
-                if (msg.moddest == ToneGranulator::PAR_AZIMUTH)
+                if (msg.moddest == ToneGranulator::PAR_AZIMUTH ||
+                    msg.moddest == ToneGranulator::PAR_ELEVATION)
                     msg.depth *= 30.0f;
-                if (msg.moddest == 3)
-                    msg.depth *= 24.0f;
+                if (msg.moddest == ToneGranulator::PAR_MAINVOLUME)
+                    msg.depth *= 12.0f;
                 mm.rt.updateActiveAt(msg.modslot, true);
                 // DBG(msg.modslot << " " << msg.modsource << " " << msg.depth << " " <<
                 // msg.moddest);
@@ -229,10 +231,8 @@ void AudioPluginAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
         }
     }
     granulator.osc_type = *granulator.idtoparvalptr[ToneGranulator::PAR_OSCTYPE];
-    
+
     granulator.process_block(workBuffer.data(), buffer.getNumSamples());
-    float maingain = *granulator.idtoparvalptr[ToneGranulator::PAR_MAINVOLUME];
-    maingain = juce::Decibels::decibelsToGain(maingain);
     int procnumoutchs = granulator.num_out_chans;
     auto channelDatas = buffer.getArrayOfWritePointers();
     if (totalNumOutputChannels == 2)
@@ -241,8 +241,8 @@ void AudioPluginAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
         {
             float m = workBuffer[j * procnumoutchs + 0];
             float s = workBuffer[j * procnumoutchs + 1];
-            channelDatas[0][j] = maingain * std::clamp(m + s, -1.0f, 1.0f);
-            channelDatas[1][j] = maingain * std::clamp(m - s, -1.0f, 1.0f);
+            channelDatas[0][j] = std::clamp(m + s, -1.0f, 1.0f);
+            channelDatas[1][j] = std::clamp(m - s, -1.0f, 1.0f);
         }
     }
     if (totalNumOutputChannels == 16)
@@ -252,7 +252,7 @@ void AudioPluginAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
             for (int j = 0; j < buffer.getNumSamples(); ++j)
             {
                 float s = workBuffer[j * procnumoutchs + i];
-                channelDatas[i][j] = maingain * std::clamp(s, -1.0f, 1.0f);
+                channelDatas[i][j] = std::clamp(s, -1.0f, 1.0f);
             }
         }
     }
