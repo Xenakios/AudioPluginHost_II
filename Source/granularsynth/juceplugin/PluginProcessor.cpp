@@ -316,62 +316,69 @@ void AudioPluginAudioProcessor::getStateInformation(juce::MemoryBlock &destData)
 
 void AudioPluginAudioProcessor::setStateInformation(const void *data, int sizeInBytes)
 {
-    return;
-    std::string json((char *)data, (char *)data + sizeInBytes);
-    // DBG(json);
-    auto state = choc::json::parse(json);
-    if (state.hasObjectMember("params"))
+    try
     {
-        auto params = state["params"];
-        auto &pars = getParameters();
-        for (int i = 0; i < pars.size(); ++i)
+        std::string json((char *)data, (char *)data + sizeInBytes);
+        // DBG(json);
+        auto state = choc::json::parse(json);
+        if (state.hasObjectMember("params"))
         {
-            auto p = dynamic_cast<juce::RangedAudioParameter *>(pars[i]);
-            std::string id = p->getParameterID().toStdString();
-            if (params.hasObjectMember(id))
+            auto params = state["params"];
+            auto &pars = getParameters();
+            for (int i = 0; i < pars.size(); ++i)
             {
-                p->setValue(p->convertTo0to1(params[id].get<float>()));
+                auto p = dynamic_cast<juce::RangedAudioParameter *>(pars[i]);
+                std::string id = p->getParameterID().toStdString();
+                if (params.hasObjectMember(id))
+                {
+                    p->setValue(p->convertTo0to1(params[id].get<float>()));
+                }
             }
+        }
+        suspendProcessing(true);
+        if (state.hasObjectMember("lfostates"))
+        {
+            auto lfostates = state["lfostates"];
+            for (int i = 0; i < lfostates.size(); ++i)
+            {
+                auto lfostate = lfostates[i];
+                if (i < granulator.modmatrix.numLfos)
+                {
+                    granulator.modmatrix.lfo_shapes[i] = lfostate["shape"].get<int>();
+                    granulator.modmatrix.lfo_rates[i] = lfostate["rate"].get<float>();
+                    granulator.modmatrix.lfo_deforms[i] = lfostate["deform"].get<float>();
+                }
+            }
+        }
+        if (state.hasObjectMember("modroutings"))
+        {
+            auto routings = state["modroutings"];
+            auto &mm = granulator.modmatrix;
+            for (int i = 0; i < GranulatorModConfig::FixedMatrixSize; ++i)
+            {
+                mm.rt.updateActiveAt(i, false);
+            }
+            for (int i = 0; i < routings.size(); ++i)
+            {
+                auto rstate = routings[i];
+                int slot = rstate["slot"].get<int>();
+                if (slot >= 0 && slot < GranulatorModConfig::FixedMatrixSize)
+                {
+                    mm.rt.updateActiveAt(slot, true);
+                    int src = rstate["source"].get<int>();
+                    float d = rstate["depth"].get<float>();
+                    int dest = rstate["dest"].get<int>();
+                    mm.rt.updateRoutingAt(slot, mm.sourceIds[src],
+                                          GranulatorModConfig::TargetIdentifier{dest},
+                                          d);
+                }
+            }
+            mm.m.prepare(mm.rt, granulator.m_sr, granul_block_size);
         }
     }
-    suspendProcessing(true);
-    if (state.hasObjectMember("lfostates"))
+    catch (std::exception &ex)
     {
-        auto lfostates = state["lfostates"];
-        for (int i = 0; i < lfostates.size(); ++i)
-        {
-            auto lfostate = lfostates[i];
-            if (i < granulator.modmatrix.numLfos)
-            {
-                granulator.modmatrix.lfo_shapes[i] = lfostate["shape"].get<int>();
-                granulator.modmatrix.lfo_rates[i] = lfostate["rate"].get<float>();
-                granulator.modmatrix.lfo_deforms[i] = lfostate["deform"].get<float>();
-            }
-        }
-    }
-    if (state.hasObjectMember("modroutings"))
-    {
-        auto routings = state["modroutings"];
-        auto &mm = granulator.modmatrix;
-        for (int i = 0; i < GranulatorModConfig::FixedMatrixSize; ++i)
-        {
-            mm.rt.updateActiveAt(i, false);
-        }
-        for (int i = 0; i < routings.size(); ++i)
-        {
-            auto rstate = routings[i];
-            int slot = rstate["slot"].get<int>();
-            if (slot >= 0 && slot < GranulatorModConfig::FixedMatrixSize)
-            {
-                mm.rt.updateActiveAt(slot, true);
-                int src = rstate["source"].get<int>();
-                float d = rstate["depth"].get<float>();
-                int dest = rstate["dest"].get<int>();
-
-                // mm.rt.updateRoutingAt(slot, mm.sourceIds[src], mm.targetIds[dest], d);
-            }
-        }
-        mm.m.prepare(mm.rt, granulator.m_sr, granul_block_size);
+        DBG(ex.what());
     }
     suspendProcessing(false);
     sendExtraStatesToGUI();

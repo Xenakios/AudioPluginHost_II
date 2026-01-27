@@ -849,7 +849,6 @@ class ToneGranulator
     std::vector<pmd> parmetadatas;
     std::vector<float> paramvalues;
     std::unordered_map<uint32_t, float *> idtoparvalptr;
-    float osc_sync = 0.0;
     float grain_pitch_mod = 0.0;
     float pulse_width = 0.5;
     float noise_corr = 0.0;
@@ -925,7 +924,8 @@ class ToneGranulator
         PAR_F1EX = 1400,
         PAR_FMPITCH = 1500,
         PAR_FMDEPTH = 1600,
-        PAR_FMFEEDBACK = 1700
+        PAR_FMFEEDBACK = 1700,
+        PAR_OSC_SYNC = 1800
     };
     float dummyTargetValue = 0.0f;
     ToneGranulator() : m_sr(44100.0), modmatrix(44100.0)
@@ -972,6 +972,12 @@ class ToneGranulator
                                    .withDefault(0.0)
                                    .withName("Pitch")
                                    .withID(PAR_PITCH)
+                                   .withFlags(1));
+        parmetadatas.push_back(pmd()
+                                   .withRange(0.0, 4.0)
+                                   .withDefault(0.0)
+                                   .withName("OSC Sync")
+                                   .withID(PAR_OSC_SYNC)
                                    .withFlags(1));
         parmetadatas.push_back(pmd()
                                    .withRange(-48.0, 48.0)
@@ -1026,7 +1032,6 @@ class ToneGranulator
             auto v = std::make_unique<GranulatorVoice>();
             voices.push_back(std::move(v));
         }
-        int j = 0;
         for (size_t i = 0; i < parmetadatas.size(); ++i)
         {
             const auto &md = parmetadatas[i];
@@ -1034,7 +1039,6 @@ class ToneGranulator
             {
                 modmatrix.m.bindTargetBaseValue(GranulatorModConfig::TargetIdentifier{(int)md.id},
                                                 *idtoparvalptr[md.id]);
-                ++j;
             }
         }
         modmatrix.m.bindTargetBaseValue(GranulatorModConfig::TargetIdentifier{(int)1},
@@ -1146,7 +1150,8 @@ class ToneGranulator
                     GranulatorModConfig::TargetIdentifier{PAR_FMFEEDBACK});
                 genev.pulse_width = pulse_width;
                 genev.noisecorr = noise_corr;
-                genev.sync_ratio = std::pow(2.0, osc_sync);
+                genev.sync_ratio =
+                    std::pow(2.0, modmatrix.m.getTargetValue(GranulatorModConfig::TargetIdentifier{PAR_OSC_SYNC}));
                 genev.filterparams[0][0] =
                     modmatrix.m.getTargetValue(GranulatorModConfig::TargetIdentifier{PAR_F0CO});
                 genev.filterparams[0][1] =
