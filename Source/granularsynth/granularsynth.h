@@ -815,7 +815,7 @@ class ToneGranulator
     float grain_pitch_mod = 0.0;
     float pulse_width = 0.5;
     float noise_corr = 0.0;
-    float env_shape = 0.5;
+
     int osc_type = 4;
     enum PARAMS
     {
@@ -836,7 +836,8 @@ class ToneGranulator
         PAR_FMPITCH = 1500,
         PAR_FMDEPTH = 1600,
         PAR_FMFEEDBACK = 1700,
-        PAR_OSC_SYNC = 1800
+        PAR_OSC_SYNC = 1800,
+        PAR_ENVMORPH = 1900
     };
     enum SI
     {
@@ -904,9 +905,15 @@ class ToneGranulator
                                    .withFlags(CLAP_PARAM_IS_MODULATABLE));
         parmetadatas.push_back(pmd()
                                    .withRange(0.002f, 0.5f)
-                                   .withDefault(0.05)
+                                   .withDefault(0.05f)
                                    .withName("Duration")
                                    .withID(PAR_DURATION)
+                                   .withFlags(CLAP_PARAM_IS_MODULATABLE));
+        parmetadatas.push_back(pmd()
+                                   .withRange(0.0f, 1.0f)
+                                   .withDefault(0.5f)
+                                   .withName("Env Morph")
+                                   .withID(PAR_ENVMORPH)
                                    .withFlags(CLAP_PARAM_IS_MODULATABLE));
         parmetadatas.push_back(pmd()
                                    .withRange(-48.0, 48.0)
@@ -1003,8 +1010,8 @@ class ToneGranulator
             modSources.emplace_back(std::format("LFO {}", i + 1),
                                     GranulatorModConfig::SourceIdentifier{i + 1});
         }
-        modSources.emplace_back("Envelope 1", GranulatorModConfig::SourceIdentifier{ENV0});
-        modSources.emplace_back("Envelope 2", GranulatorModConfig::SourceIdentifier{ENV1});
+        modSources.emplace_back("NOT IMPLEMENTED 1", GranulatorModConfig::SourceIdentifier{ENV0});
+        modSources.emplace_back("NOT IMPLEMENTED 2", GranulatorModConfig::SourceIdentifier{ENV1});
         modSources.emplace_back("Alternating", GranulatorModConfig::SourceIdentifier{ALTERNATING0});
         modSources.emplace_back("UniRnd", GranulatorModConfig::SourceIdentifier{UNIFBIRAND0});
         for (uint32_t i = 0; i < 8; ++i)
@@ -1163,7 +1170,8 @@ class ToneGranulator
                 float gdur =
                     modmatrix.m.getTargetValue(GranulatorModConfig::TargetIdentifier{PAR_DURATION});
                 GrainEvent genev{0.0, gdur, pitch, 0.75};
-                genev.envelope_shape = env_shape;
+                genev.envelope_shape =
+                    modmatrix.m.getTargetValue(GranulatorModConfig::TargetIdentifier{PAR_ENVMORPH});
                 genev.azimuth =
                     modmatrix.m.getTargetValue(GranulatorModConfig::TargetIdentifier{PAR_AZIMUTH});
                 genev.elevation = modmatrix.m.getTargetValue(

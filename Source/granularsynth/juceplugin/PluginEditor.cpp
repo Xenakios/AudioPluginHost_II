@@ -209,7 +209,7 @@ void AudioPluginAudioProcessorEditor::resized()
                              .withMinWidth(50)
                              .withMaxWidth(getWidth() / 2));
     }
-    layout.performLayout(juce::Rectangle<int>(0, 0, getWidth(), 200));
+    layout.performLayout(juce::Rectangle<int>(0, 0, getWidth(), 230));
     lfoTabs.setBounds(0, paramEntries.back()->getBottom() + 1, 400, 110);
     filter0But.setBounds(lfoTabs.getRight() + 1, lfoTabs.getY(), 60, 25);
     filter1But.setBounds(filter0But.getRight() + 1, lfoTabs.getY(), 60, 25);
