@@ -876,7 +876,7 @@ class ToneGranulator
                                    .withRange(-24.0, 0.0)
                                    .withDefault(-6.0)
                                    .withName("Main volume")
-                                   .withFlags(1)
+                                   .withFlags(CLAP_PARAM_IS_MODULATABLE)
                                    .withID(PAR_MAINVOLUME));
         parmetadatas.push_back(
             pmd()
@@ -901,79 +901,79 @@ class ToneGranulator
                                    .withDefault(4.0)
                                    .withName("Density")
                                    .withID(PAR_DENSITY)
-                                   .withFlags(1));
+                                   .withFlags(CLAP_PARAM_IS_MODULATABLE));
         parmetadatas.push_back(pmd()
                                    .withRange(0.002f, 0.5f)
                                    .withDefault(0.05)
                                    .withName("Duration")
                                    .withID(PAR_DURATION)
-                                   .withFlags(1));
+                                   .withFlags(CLAP_PARAM_IS_MODULATABLE));
         parmetadatas.push_back(pmd()
                                    .withRange(-48.0, 48.0)
                                    .withDefault(0.0)
                                    .withName("Pitch")
                                    .withID(PAR_PITCH)
-                                   .withFlags(1));
+                                   .withFlags(CLAP_PARAM_IS_MODULATABLE));
         parmetadatas.push_back(pmd()
                                    .withRange(0.0, 4.0)
                                    .withDefault(0.0)
                                    .withName("OSC Sync")
                                    .withID(PAR_OSC_SYNC)
-                                   .withFlags(1));
+                                   .withFlags(CLAP_PARAM_IS_MODULATABLE));
         parmetadatas.push_back(pmd()
                                    .withRange(-48.0, 48.0)
                                    .withDefault(0.0)
                                    .withName("FM Pitch")
                                    .withID(PAR_FMPITCH)
-                                   .withFlags(1));
+                                   .withFlags(CLAP_PARAM_IS_MODULATABLE));
         parmetadatas.push_back(pmd()
                                    .withRange(0.0, 1.0)
                                    .withDefault(0.0)
                                    .withName("FM Depth")
                                    .withID(PAR_FMDEPTH)
-                                   .withFlags(1));
+                                   .withFlags(CLAP_PARAM_IS_MODULATABLE));
         parmetadatas.push_back(pmd()
                                    .withRange(-1.0, 1.0)
                                    .withDefault(0.0)
                                    .withName("FM Feedback")
                                    .withID(PAR_FMFEEDBACK)
-                                   .withFlags(1));
+                                   .withFlags(CLAP_PARAM_IS_MODULATABLE));
         parmetadatas.push_back(pmd()
                                    .withRange(-48.0, 48.0)
                                    .withDefault(0.0)
                                    .withName("Filter 1 Frequency")
                                    .withID(PAR_F0CO)
-                                   .withFlags(1));
+                                   .withFlags(CLAP_PARAM_IS_MODULATABLE));
         parmetadatas.push_back(pmd()
                                    .withRange(0.0, 1.0)
                                    .withDefault(0.0)
                                    .withName("Filter 1 Resonance")
                                    .withID(PAR_F0RE)
-                                   .withFlags(1));
+                                   .withFlags(CLAP_PARAM_IS_MODULATABLE));
         parmetadatas.push_back(pmd()
                                    .withRange(-48.0, 48.0)
                                    .withDefault(0.0)
                                    .withName("Filter 2 Frequency")
                                    .withID(PAR_F1CO)
-                                   .withFlags(1));
+                                   .withFlags(CLAP_PARAM_IS_MODULATABLE));
         parmetadatas.push_back(pmd()
                                    .withRange(0.0, 1.0)
                                    .withDefault(0.0)
                                    .withName("Filter 2 Resonance")
                                    .withID(PAR_F1RE)
-                                   .withFlags(1));
+                                   .withFlags(CLAP_PARAM_IS_MODULATABLE));
         parmetadatas.push_back(pmd()
                                    .withRange(-180.0, 180.0)
                                    .withDefault(0.0)
                                    .withName("Azimuth")
                                    .withID(PAR_AZIMUTH)
-                                   .withFlags(1));
+                                   .withFlags(CLAP_PARAM_IS_MODULATABLE));
         parmetadatas.push_back(pmd()
                                    .withRange(-180.0, 180.0)
                                    .withDefault(0.0)
                                    .withName("Elevation")
                                    .withID(PAR_ELEVATION)
-                                   .withFlags(1));
+                                   .withFlags(CLAP_PARAM_IS_MODULATABLE));
         paramvalues.resize(parmetadatas.size());
         for (int i = 0; i < parmetadatas.size(); ++i)
         {
@@ -988,7 +988,7 @@ class ToneGranulator
         for (size_t i = 0; i < parmetadatas.size(); ++i)
         {
             const auto &md = parmetadatas[i];
-            if (md.flags == 1)
+            if (md.flags & CLAP_PARAM_IS_MODULATABLE)
             {
                 modmatrix.m.bindTargetBaseValue(GranulatorModConfig::TargetIdentifier{(int)md.id},
                                                 *idtoparvalptr[md.id]);

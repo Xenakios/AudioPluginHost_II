@@ -126,7 +126,7 @@ struct ModulationRowComponent : public juce::Component
         destCombo.addItem("No target", 1);
         for (auto &pmd : g->parmetadatas)
         {
-            if (pmd.flags == 1)
+            if (pmd.flags & CLAP_PARAM_IS_MODULATABLE)
             {
                 destCombo.addItem(pmd.name, pmd.id);
             }
