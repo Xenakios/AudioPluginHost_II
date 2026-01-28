@@ -31,7 +31,8 @@ struct LFOComponent : public juce::Component
     {
         auto upfunc = [this]() {
             stateChangedCallback(lfoindex, shapeCombo.getSelectedId() - 1, rateSlider.getValue(),
-                                 deformSlider.getValue());
+                                 deformSlider.getValue(), shiftSlider.getValue(), warpSlider.getValue(),
+                                 unipolarButton.getToggleState());
         };
         addAndMakeVisible(shapeCombo);
         shapeCombo.addItem("SINE", 1);
@@ -54,18 +55,42 @@ struct LFOComponent : public juce::Component
         deformSlider.setTextBoxStyle(juce::Slider::TextEntryBoxPosition::TextBoxRight, false, 50,
                                      20);
         deformSlider.onValueChange = upfunc;
+
+        addAndMakeVisible(shiftSlider);
+        shiftSlider.setRange(-1.0, 1.0);
+        shiftSlider.setNumDecimalPlacesToDisplay(2);
+        shiftSlider.setTextBoxStyle(juce::Slider::TextEntryBoxPosition::TextBoxRight, false, 50,
+                                    20);
+        shiftSlider.onValueChange = upfunc;
+
+        addAndMakeVisible(warpSlider);
+        warpSlider.setRange(-1.0, 1.0);
+        warpSlider.setNumDecimalPlacesToDisplay(2);
+        warpSlider.setTextBoxStyle(juce::Slider::TextEntryBoxPosition::TextBoxRight, false, 50,
+                                    20);
+        warpSlider.onValueChange = upfunc;
+
+        addAndMakeVisible(unipolarButton);
+        unipolarButton.setButtonText("Unipolar");
+        unipolarButton.onClick = upfunc;
     }
     void resized()
     {
         shapeCombo.setBounds(0, 0, 100, 25);
+        unipolarButton.setBounds(shapeCombo.getRight() + 1, 0, 100, 25);
         rateSlider.setBounds(0, shapeCombo.getBottom() + 1, 200, 25);
         deformSlider.setBounds(0, rateSlider.getBottom() + 1, 200, 25);
+        shiftSlider.setBounds(rateSlider.getRight() + 1, shapeCombo.getBottom() + 1, 200, 25);
+        warpSlider.setBounds(rateSlider.getRight() + 1, shiftSlider.getBottom() + 1, 200, 25);
     }
     int lfoindex = -1;
-    std::function<void(int, int, float, float)> stateChangedCallback;
+    std::function<void(int, int, float, float, float, float, bool)> stateChangedCallback;
     juce::ComboBox shapeCombo;
     juce::Slider rateSlider;
     juce::Slider deformSlider;
+    juce::Slider shiftSlider;
+    juce::Slider warpSlider;
+    juce::ToggleButton unipolarButton;
 };
 
 struct ModulationRowComponent : public juce::Component

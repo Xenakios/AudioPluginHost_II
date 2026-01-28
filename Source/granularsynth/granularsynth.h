@@ -112,11 +112,12 @@ class GranulatorModMatrix
     alignas(32) std::array<std::unique_ptr<lfo_t>, numLfos> m_lfos;
     alignas(32) float table_envrate_linear[512];
     alignas(32) std::array<sst::basic_blocks::dsp::RNG, numLfos> m_rngs;
-    std::array<int, numLfos> lfo_shapes;
-    std::array<float, numLfos> lfo_rates;
-    std::array<float, numLfos> lfo_deforms;
-    std::array<float, numLfos> lfo_shifts;
-
+    alignas(32) std::array<int, numLfos> lfo_shapes;
+    alignas(32) std::array<float, numLfos> lfo_rates;
+    alignas(32) std::array<float, numLfos> lfo_deforms;
+    alignas(32) std::array<float, numLfos> lfo_shifts;
+    alignas(32) std::array<float, numLfos> lfo_warps;
+    alignas(32) std::array<bool, numLfos> lfo_unipolars;
     GranulatorModMatrix(double sr) : samplerate(sr)
     {
         initTables();
@@ -131,25 +132,8 @@ class GranulatorModMatrix
             lfo_rates[i] = 0.0;
             lfo_deforms[i] = 0.0;
             lfo_shifts[i] = 0.5f;
-            // sourceIds[i + 1] =
-            //     GranulatorModConfig::SourceIdentifier{(GranulatorModConfig::SourceIdentifier::SI)(
-            //         GranulatorModConfig::SourceIdentifier::LFO0 + i)};
-        }
-        for (int i = 0; i < 8; ++i)
-        {
-            // sourceIds[i + 9] =
-            //     GranulatorModConfig::SourceIdentifier{(GranulatorModConfig::SourceIdentifier::SI)(
-            //         GranulatorModConfig::SourceIdentifier::MIDICCSTART + i)};
-        }
-        // sourceIds[17] =
-        //     GranulatorModConfig::SourceIdentifier{(GranulatorModConfig::SourceIdentifier::SI)(
-        //         GranulatorModConfig::SourceIdentifier::ALTERNATING0)};
-        // sourceIds[18] =
-        //     GranulatorModConfig::SourceIdentifier{(GranulatorModConfig::SourceIdentifier::SI)(
-        //         GranulatorModConfig::SourceIdentifier::UNIFBIRAND0)};
-        for (int i = 0; i < 19; ++i)
-        {
-            // m.bindSourceValue(sourceIds[i], sourceValues[i]);
+            lfo_warps[i] = 0.0f;
+            lfo_unipolars[i] = false;
         }
     }
     void init_from_json_file(std::string path)
@@ -1247,8 +1231,12 @@ class ToneGranulator
             {
                 modmatrix.m_lfos[i]->applyPhaseOffset(modmatrix.lfo_shifts[i]);
                 modmatrix.m_lfos[i]->process_block(modmatrix.lfo_rates[i], modmatrix.lfo_deforms[i],
-                                                   modmatrix.lfo_shapes[i]);
-                modSourceValues[LFO0 + i] = modmatrix.m_lfos[i]->outputBlock[0];
+                                                   modmatrix.lfo_shapes[i], false, 1.0f,
+                                                   modmatrix.lfo_warps[i]);
+                if (!modmatrix.lfo_unipolars[i])
+                    modSourceValues[LFO0 + i] = modmatrix.m_lfos[i]->outputBlock[0];
+                else
+                    modSourceValues[LFO0 + i] = (modmatrix.m_lfos[i]->outputBlock[0] + 1.0f) * 0.5f;
             }
             modSourceValues[ALTERNATING0] = alternatingValue;
             modSourceValues[UNIFBIRAND0] = randomValue;
