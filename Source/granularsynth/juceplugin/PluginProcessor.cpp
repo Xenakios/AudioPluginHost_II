@@ -299,13 +299,17 @@ void AudioPluginAudioProcessor::getStateInformation(juce::MemoryBlock &destData)
     auto &mm = granulator.modmatrix;
     for (int i = 0; i < GranulatorModConfig::FixedMatrixSize; ++i)
     {
-        if (mm.rt.routes[i].active && mm.rt.routes[i].source && mm.rt.routes[i].target)
+        if (mm.rt.routes[i].active)
         {
             auto routingstate = choc::value::createObject("routing");
             routingstate.setMember("slot", i);
-            routingstate.setMember("source", (int)(mm.rt.routes[i].source->src));
+            if (mm.rt.routes[i].source)
+                routingstate.setMember("source", (int)(mm.rt.routes[i].source->src));
+            if (mm.rt.routes[i].sourceVia)
+                routingstate.setMember("via", (int)(mm.rt.routes[i].sourceVia->src));
             routingstate.setMember("depth", mm.rt.routes[i].depth);
-            routingstate.setMember("dest", (int)(mm.rt.routes[i].target->baz));
+            if (mm.rt.routes[i].target)
+                routingstate.setMember("dest", (int)(mm.rt.routes[i].target->baz));
             modroutings.addArrayElement(routingstate);
         }
     }
@@ -351,7 +355,7 @@ void AudioPluginAudioProcessor::setStateInformation(const void *data, int sizeIn
                 }
             }
         }
-        if (false) // (state.hasObjectMember("modroutings"))
+        if (state.hasObjectMember("modroutings"))
         {
             auto routings = state["modroutings"];
             auto &mm = granulator.modmatrix;
@@ -366,11 +370,15 @@ void AudioPluginAudioProcessor::setStateInformation(const void *data, int sizeIn
                 if (slot >= 0 && slot < GranulatorModConfig::FixedMatrixSize)
                 {
                     mm.rt.updateActiveAt(slot, true);
-                    int src = rstate["source"].get<int>();
+                    uint32_t src = rstate["source"].getWithDefault(0);
+                    uint32_t srcvia = rstate["via"].getWithDefault(0);
                     float d = rstate["depth"].get<float>();
-                    int dest = rstate["dest"].get<int>();
-                    // mm.rt.updateRoutingAt(slot, mm.sourceIds[src],
-                    //                       GranulatorModConfig::TargetIdentifier{dest}, d);
+                    int dest = rstate["dest"].getWithDefault(0);
+                    mm.rt.updateRoutingAt(slot, GranulatorModConfig::SourceIdentifier{src},
+                                          GranulatorModConfig::SourceIdentifier{srcvia}, {},
+                                          GranulatorModConfig::TargetIdentifier{dest}, d);
+                    if (srcvia == 0)
+                        mm.rt.routes[slot].sourceVia = std::nullopt;
                 }
             }
             mm.m.prepare(mm.rt, granulator.m_sr, granul_block_size);
@@ -405,14 +413,19 @@ void AudioPluginAudioProcessor::sendExtraStatesToGUI()
             msg.opcode = 1;
             msg.modslot = i;
             msg.modsource = mm.rt.routes[i].source->src;
+            if (mm.rt.routes[i].sourceVia)
+                msg.modvia = mm.rt.routes[i].sourceVia->src;
             msg.depth = mm.rt.routes[i].depth;
             msg.moddest = mm.rt.routes[i].target->baz;
-            if (msg.moddest == 1)
+            if (msg.moddest == ToneGranulator::PAR_PITCH ||
+                msg.moddest == ToneGranulator::PAR_FMPITCH ||
+                msg.moddest == ToneGranulator::PAR_F0CO)
                 msg.depth /= 24.0f;
-            if (msg.moddest == 2)
+            if (msg.moddest == ToneGranulator::PAR_AZIMUTH ||
+                msg.moddest == ToneGranulator::PAR_ELEVATION)
                 msg.depth /= 30.0f;
-            if (msg.moddest == 3)
-                msg.depth /= 24.0f;
+            if (msg.moddest == ToneGranulator::PAR_OSC_SYNC)
+                msg.depth /= 4.0;
             to_gui_fifo.push(msg);
         }
     }

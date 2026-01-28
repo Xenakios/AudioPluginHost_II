@@ -171,8 +171,10 @@ void AudioPluginAudioProcessorEditor::timerCallback()
         }
         if (msg.opcode == 1 && msg.modslot < modRowComps.size())
         {
-            modRowComps[msg.modslot]->sourceCombo.setSelectedItemIndex(msg.modsource,
-                                                                       juce::dontSendNotification);
+            modRowComps[msg.modslot]->sourceCombo.setSelectedId(msg.modsource + 1,
+                                                                juce::dontSendNotification);
+            modRowComps[msg.modslot]->viaCombo.setSelectedId(msg.modvia + 1,
+                                                             juce::dontSendNotification);
             modRowComps[msg.modslot]->depthSlider.setValue(msg.depth, juce::dontSendNotification);
             modRowComps[msg.modslot]->destCombo.setSelectedId(msg.moddest,
                                                               juce::dontSendNotification);
