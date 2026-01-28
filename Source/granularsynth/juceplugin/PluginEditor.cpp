@@ -157,6 +157,10 @@ void AudioPluginAudioProcessorEditor::showFilterMenu(int whichfilter)
                 msg.filterindex = whichfilter;
                 msg.filtermodel = mod;
                 processorRef.from_gui_fifo.push(msg);
+                if (whichfilter == 0)
+                    filter0But.setButtonText(sfpp::toString(mod));
+                if (whichfilter == 1)
+                    filter1But.setButtonText(sfpp::toString(mod));
             });
         }
     }
