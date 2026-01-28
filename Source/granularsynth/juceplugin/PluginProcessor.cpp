@@ -141,12 +141,12 @@ void AudioPluginAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
         if (msg.isController())
         {
             auto &mm = granulator.modmatrix;
-            auto ccnum = msg.getControllerNumber();
+            uint32_t ccnum = msg.getControllerNumber();
             if (ccnum >= 21 && ccnum < 21 + 8)
             {
                 ccnum -= 21;
-                mm.sourceValues[9 + ccnum] =
-                    juce::jmap<float>(msg.getControllerValue(), 0, 127, -1.0, 1.0);
+                granulator.modSourceValues[ToneGranulator::MIDICCSTART + ccnum] =
+                    juce::jmap<float>(msg.getControllerValue(), 0, 127, 0.0, 1.0);
             }
             /*
             if (msg.getControllerNumber() == 21)
@@ -192,7 +192,8 @@ void AudioPluginAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
                 // DBG(msg.modslot << " " << msg.modsource << " " << msg.depth << " " <<
                 // msg.moddest);
                 mm.rt.updateRoutingAt(
-                    msg.modslot, mm.sourceIds[msg.modsource], mm.sourceIds[msg.modvia], {},
+                    msg.modslot, GranulatorModConfig::SourceIdentifier{(uint32_t)msg.modsource},
+                    GranulatorModConfig::SourceIdentifier{(uint32_t)msg.modvia}, {},
                     GranulatorModConfig::TargetIdentifier{msg.moddest}, msg.depth);
                 if (msg.modvia == 0)
                 {
@@ -350,7 +351,7 @@ void AudioPluginAudioProcessor::setStateInformation(const void *data, int sizeIn
                 }
             }
         }
-        if (state.hasObjectMember("modroutings"))
+        if (false) // (state.hasObjectMember("modroutings"))
         {
             auto routings = state["modroutings"];
             auto &mm = granulator.modmatrix;
@@ -368,9 +369,8 @@ void AudioPluginAudioProcessor::setStateInformation(const void *data, int sizeIn
                     int src = rstate["source"].get<int>();
                     float d = rstate["depth"].get<float>();
                     int dest = rstate["dest"].get<int>();
-                    mm.rt.updateRoutingAt(slot, mm.sourceIds[src],
-                                          GranulatorModConfig::TargetIdentifier{dest},
-                                          d);
+                    // mm.rt.updateRoutingAt(slot, mm.sourceIds[src],
+                    //                       GranulatorModConfig::TargetIdentifier{dest}, d);
                 }
             }
             mm.m.prepare(mm.rt, granulator.m_sr, granul_block_size);

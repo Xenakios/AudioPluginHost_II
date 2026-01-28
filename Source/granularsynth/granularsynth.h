@@ -23,25 +23,7 @@ struct GranulatorModConfig
 {
     struct SourceIdentifier
     {
-        enum SI
-        {
-            NOSOURCE,
-            LFO0,
-            LFO1,
-            LFO2,
-            LFO3,
-            LFO4,
-            LFO5,
-            LFO6,
-            LFO7,
-            ENV0,
-            ENV1,
-            ALTERNATING0,
-            UNIFBIRAND0,
-            MIDICCSTART,
-            MIDICCEND = MIDICCSTART + 64
-        } src{LFO0};
-
+        uint32_t src{0};
         bool operator==(const SourceIdentifier &other) const { return src == other.src; }
     };
 
@@ -119,8 +101,7 @@ class GranulatorModMatrix
   public:
     FixedMatrix<GranulatorModConfig> m;
     FixedMatrix<GranulatorModConfig>::RoutingTable rt;
-    std::array<GranulatorModConfig::SourceIdentifier, 32> sourceIds;
-    std::array<float, 32> sourceValues;
+    // std::array<GranulatorModConfig::SourceIdentifier, 32> sourceIds;
 
     double samplerate = 0.0;
 
@@ -139,10 +120,8 @@ class GranulatorModMatrix
     GranulatorModMatrix(double sr) : samplerate(sr)
     {
         initTables();
-        for (auto &v : sourceValues)
-            v = 0.0f;
-        sourceIds[0] =
-            GranulatorModConfig::SourceIdentifier{GranulatorModConfig::SourceIdentifier::NOSOURCE};
+        // sourceIds[0] =
+        //     GranulatorModConfig::SourceIdentifier{GranulatorModConfig::SourceIdentifier::NOSOURCE};
         for (size_t i = 0; i < numLfos; ++i)
         {
             auto lfo = std::make_unique<lfo_t>(this);
@@ -152,25 +131,25 @@ class GranulatorModMatrix
             lfo_rates[i] = 0.0;
             lfo_deforms[i] = 0.0;
             lfo_shifts[i] = 0.5f;
-            sourceIds[i + 1] =
-                GranulatorModConfig::SourceIdentifier{(GranulatorModConfig::SourceIdentifier::SI)(
-                    GranulatorModConfig::SourceIdentifier::LFO0 + i)};
+            // sourceIds[i + 1] =
+            //     GranulatorModConfig::SourceIdentifier{(GranulatorModConfig::SourceIdentifier::SI)(
+            //         GranulatorModConfig::SourceIdentifier::LFO0 + i)};
         }
         for (int i = 0; i < 8; ++i)
         {
-            sourceIds[i + 9] =
-                GranulatorModConfig::SourceIdentifier{(GranulatorModConfig::SourceIdentifier::SI)(
-                    GranulatorModConfig::SourceIdentifier::MIDICCSTART + i)};
+            // sourceIds[i + 9] =
+            //     GranulatorModConfig::SourceIdentifier{(GranulatorModConfig::SourceIdentifier::SI)(
+            //         GranulatorModConfig::SourceIdentifier::MIDICCSTART + i)};
         }
-        sourceIds[17] =
-            GranulatorModConfig::SourceIdentifier{(GranulatorModConfig::SourceIdentifier::SI)(
-                GranulatorModConfig::SourceIdentifier::ALTERNATING0)};
-        sourceIds[18] =
-            GranulatorModConfig::SourceIdentifier{(GranulatorModConfig::SourceIdentifier::SI)(
-                GranulatorModConfig::SourceIdentifier::UNIFBIRAND0)};
+        // sourceIds[17] =
+        //     GranulatorModConfig::SourceIdentifier{(GranulatorModConfig::SourceIdentifier::SI)(
+        //         GranulatorModConfig::SourceIdentifier::ALTERNATING0)};
+        // sourceIds[18] =
+        //     GranulatorModConfig::SourceIdentifier{(GranulatorModConfig::SourceIdentifier::SI)(
+        //         GranulatorModConfig::SourceIdentifier::UNIFBIRAND0)};
         for (int i = 0; i < 19; ++i)
         {
-            m.bindSourceValue(sourceIds[i], sourceValues[i]);
+            // m.bindSourceValue(sourceIds[i], sourceValues[i]);
         }
     }
     void init_from_json_file(std::string path)
@@ -875,62 +854,36 @@ class ToneGranulator
         PAR_FMFEEDBACK = 1700,
         PAR_OSC_SYNC = 1800
     };
+    enum SI
+    {
+        NOSOURCE,
+        LFO0,
+        LFO1,
+        LFO2,
+        LFO3,
+        LFO4,
+        LFO5,
+        LFO6,
+        LFO7,
+        ENV0,
+        ENV1,
+        ALTERNATING0,
+        UNIFBIRAND0,
+
+        MIDICCSTART,
+        MIDICCEND = MIDICCSTART + 64
+    };
     float dummyTargetValue = 0.0f;
     float alternatingValue = -1.0f;
     float randomValue = 0.0f;
-    void set_filter(int which, sfpp::FilterModel mo, sfpp::ModelConfig conf)
+    struct ModSourceInfo
     {
-        FilterInfo finfo;
-        finfo.model = mo;
-        finfo.modelconfig = conf;
-        for (int i = 0; i < numvoices; ++i)
-        {
-            auto &v = voices[i];
-            // v->set_samplerate(sr);
-            v->set_filter_type(which, finfo);
-        }
-    }
-    void initFilter(double sr, int filter_routing, std::string filttype0, std::string filttype1,
-                    float taillen, float tailfadelen)
-    {
-        const FilterInfo *filter0info = nullptr;
-        const FilterInfo *filter1info = nullptr;
-        for (const auto &finfo : g_filter_infos)
-        {
-            if (finfo.address == filttype0)
-            {
-                filter0info = &finfo;
-                std::print("filter 0 is {}\n", finfo.address);
-            }
-            if (finfo.address == filttype1)
-            {
-                filter1info = &finfo;
-                std::print("filter 1 is {}\n", finfo.address);
-            }
-        }
-        if (!filter0info)
-        {
-            throw std::runtime_error(std::format(
-                "could not find filter 0 \"{}\", ensure the name is correct", filttype0));
-        }
-        if (!filter1info)
-        {
-            throw std::runtime_error(std::format(
-                "could not find filter 1 \"{}\", ensure the name is correct", filttype1));
-        }
-
-        for (int i = 0; i < numvoices; ++i)
-        {
-            auto &v = voices[i];
-            v->set_samplerate(sr);
-            v->set_filter_type(0, *filter0info);
-            v->set_filter_type(1, *filter1info);
-            v->filter_routing = (GranulatorVoice::FilterRouting)filter_routing;
-            v->tail_len = std::clamp(taillen, 0.0f, 5.0f);
-            v->tail_fade_len = std::clamp(tailfadelen, 0.0f, v->tail_len);
-        }
-    }
-
+        std::string name;
+        GranulatorModConfig::SourceIdentifier id;
+        float val = 0.0f;
+    };
+    std::vector<ModSourceInfo> modSources;
+    std::array<float, 128> modSourceValues;
     ToneGranulator() : m_sr(44100.0), modmatrix(44100.0)
     {
         randomValue = rng.nextFloatInRange(-1.0f, 1.0f);
@@ -1047,7 +1000,82 @@ class ToneGranulator
         }
         modmatrix.m.bindTargetBaseValue(GranulatorModConfig::TargetIdentifier{(int)1},
                                         dummyTargetValue);
+
+        modSources.emplace_back("Off", GranulatorModConfig::SourceIdentifier{0});
+        for (uint32_t i = 0; i < GranulatorModMatrix::numLfos; ++i)
+        {
+            modSources.emplace_back(std::format("LFO {}", i + 1),
+                                    GranulatorModConfig::SourceIdentifier{i + 1});
+        }
+        modSources.emplace_back("Envelope 1", GranulatorModConfig::SourceIdentifier{ENV0});
+        modSources.emplace_back("Envelope 2", GranulatorModConfig::SourceIdentifier{ENV1});
+        modSources.emplace_back("Alternating", GranulatorModConfig::SourceIdentifier{ALTERNATING0});
+        modSources.emplace_back("UniRnd", GranulatorModConfig::SourceIdentifier{UNIFBIRAND0});
+        for (uint32_t i = 0; i < 8; ++i)
+        {
+            modSources.emplace_back(std::format("MIDI CC {}", i + 21),
+                                    GranulatorModConfig::SourceIdentifier{i + MIDICCSTART});
+        }
+        for (auto &v : modSourceValues)
+            v = 0.0f;
+        for (uint32_t i = 0; i < modSources.size(); ++i)
+        {
+            modmatrix.m.bindSourceValue(modSources[i].id, modSourceValues[i]);
+        }
         init_filter_infos();
+    }
+
+    void set_filter(int which, sfpp::FilterModel mo, sfpp::ModelConfig conf)
+    {
+        FilterInfo finfo;
+        finfo.model = mo;
+        finfo.modelconfig = conf;
+        for (int i = 0; i < numvoices; ++i)
+        {
+            auto &v = voices[i];
+            // v->set_samplerate(sr);
+            v->set_filter_type(which, finfo);
+        }
+    }
+    void initFilter(double sr, int filter_routing, std::string filttype0, std::string filttype1,
+                    float taillen, float tailfadelen)
+    {
+        const FilterInfo *filter0info = nullptr;
+        const FilterInfo *filter1info = nullptr;
+        for (const auto &finfo : g_filter_infos)
+        {
+            if (finfo.address == filttype0)
+            {
+                filter0info = &finfo;
+                std::print("filter 0 is {}\n", finfo.address);
+            }
+            if (finfo.address == filttype1)
+            {
+                filter1info = &finfo;
+                std::print("filter 1 is {}\n", finfo.address);
+            }
+        }
+        if (!filter0info)
+        {
+            throw std::runtime_error(std::format(
+                "could not find filter 0 \"{}\", ensure the name is correct", filttype0));
+        }
+        if (!filter1info)
+        {
+            throw std::runtime_error(std::format(
+                "could not find filter 1 \"{}\", ensure the name is correct", filttype1));
+        }
+
+        for (int i = 0; i < numvoices; ++i)
+        {
+            auto &v = voices[i];
+            v->set_samplerate(sr);
+            v->set_filter_type(0, *filter0info);
+            v->set_filter_type(1, *filter1info);
+            v->filter_routing = (GranulatorVoice::FilterRouting)filter_routing;
+            v->tail_len = std::clamp(taillen, 0.0f, 5.0f);
+            v->tail_fade_len = std::clamp(tailfadelen, 0.0f, v->tail_len);
+        }
     }
     void set_voice_aux_envelope(std::array<float, SimpleEnvelope<false>::maxnumsteps> env)
     {
@@ -1215,15 +1243,15 @@ class ToneGranulator
         int bufframecount = 0;
         while (bufframecount < nframes)
         {
-            for (size_t i = 0; i < modmatrix.numLfos; ++i)
+            for (uint32_t i = 0; i < modmatrix.numLfos; ++i)
             {
                 modmatrix.m_lfos[i]->applyPhaseOffset(modmatrix.lfo_shifts[i]);
                 modmatrix.m_lfos[i]->process_block(modmatrix.lfo_rates[i], modmatrix.lfo_deforms[i],
                                                    modmatrix.lfo_shapes[i]);
-                modmatrix.sourceValues[i + 1] = modmatrix.m_lfos[i]->outputBlock[0];
+                modSourceValues[LFO0 + i] = modmatrix.m_lfos[i]->outputBlock[0];
             }
-            modmatrix.sourceValues[17] = alternatingValue;
-            modmatrix.sourceValues[18] = randomValue;
+            modSourceValues[ALTERNATING0] = alternatingValue;
+            modSourceValues[UNIFBIRAND0] = randomValue;
             modmatrix.m.process();
             if (!self_generate)
             {

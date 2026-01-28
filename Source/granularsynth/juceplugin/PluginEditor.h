@@ -77,27 +77,17 @@ struct ModulationRowComponent : public juce::Component
         addAndMakeVisible(depthSlider);
         addAndMakeVisible(destCombo);
         auto updatfunc = [this]() {
-            stateChangedCallback(modslotindex, sourceCombo.getSelectedItemIndex(),
-                                 viaCombo.getSelectedItemIndex(), depthSlider.getValue(),
+            stateChangedCallback(modslotindex, sourceCombo.getSelectedId() - 1,
+                                 viaCombo.getSelectedId() - 1, depthSlider.getValue(),
                                  destCombo.getSelectedId());
         };
-        sourceCombo.addItem("Off", 1);
-        viaCombo.addItem("Off", 1);
-        for (int i = 0; i < 8; ++i)
+        for (int i = 0; i < g->modSources.size(); ++i)
         {
-            sourceCombo.addItem("LFO " + juce::String(i + 1), i + 2);
-            viaCombo.addItem("LFO " + juce::String(i), i + 2);
+            auto &ms = g->modSources[i];
+            sourceCombo.addItem(ms.name, ms.id.src + 1);
+            viaCombo.addItem(ms.name, ms.id.src + 1);
         }
-        
-        for (int i = 0; i < 8; ++i)
-        {
-            sourceCombo.addItem("MIDI CC " + juce::String(21 + i), 100 + i);
-            viaCombo.addItem("MIDI CC " + juce::String(21 + i), 100 + i);
-        }
-        sourceCombo.addItem("Alternating per grain", 1000);
-        viaCombo.addItem("Alternating per grain", 1000);
-        sourceCombo.addItem("Random per grain", 1001);
-        viaCombo.addItem("Random per grain", 1001);
+
         sourceCombo.setSelectedItemIndex(0, juce::dontSendNotification);
         viaCombo.setSelectedItemIndex(0, juce::dontSendNotification);
         sourceCombo.onChange = updatfunc;
