@@ -96,6 +96,8 @@ struct ModulationRowComponent : public juce::Component
         }
         sourceCombo.addItem("Alternating per grain", 1000);
         viaCombo.addItem("Alternating per grain", 1000);
+        sourceCombo.addItem("Random per grain", 1001);
+        viaCombo.addItem("Random per grain", 1001);
         sourceCombo.setSelectedItemIndex(0, juce::dontSendNotification);
         viaCombo.setSelectedItemIndex(0, juce::dontSendNotification);
         sourceCombo.onChange = updatfunc;

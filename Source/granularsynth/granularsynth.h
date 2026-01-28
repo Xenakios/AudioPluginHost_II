@@ -37,6 +37,7 @@ struct GranulatorModConfig
             ENV0,
             ENV1,
             ALTERNATING0,
+            UNIFBIRAND0,
             MIDICCSTART,
             MIDICCEND = MIDICCSTART + 64
         } src{LFO0};
@@ -164,7 +165,10 @@ class GranulatorModMatrix
         sourceIds[17] =
             GranulatorModConfig::SourceIdentifier{(GranulatorModConfig::SourceIdentifier::SI)(
                 GranulatorModConfig::SourceIdentifier::ALTERNATING0)};
-        for (int i = 0; i < 18; ++i)
+        sourceIds[18] =
+            GranulatorModConfig::SourceIdentifier{(GranulatorModConfig::SourceIdentifier::SI)(
+                GranulatorModConfig::SourceIdentifier::UNIFBIRAND0)};
+        for (int i = 0; i < 19; ++i)
         {
             m.bindSourceValue(sourceIds[i], sourceValues[i]);
         }
@@ -850,6 +854,30 @@ class ToneGranulator
     float noise_corr = 0.0;
     float env_shape = 0.5;
     int osc_type = 4;
+    enum PARAMS
+    {
+        PAR_MAINVOLUME = 100,
+        PAR_AMBORDER = 200,
+        PAR_OSCTYPE = 300,
+        PAR_DENSITY = 400,
+        PAR_PITCH = 500,
+        PAR_AZIMUTH = 600,
+        PAR_ELEVATION = 700,
+        PAR_DURATION = 800,
+        PAR_F0CO = 900,
+        PAR_F0RE = 1000,
+        PAR_F0EX = 1100,
+        PAR_F1CO = 1200,
+        PAR_F1RE = 1300,
+        PAR_F1EX = 1400,
+        PAR_FMPITCH = 1500,
+        PAR_FMDEPTH = 1600,
+        PAR_FMFEEDBACK = 1700,
+        PAR_OSC_SYNC = 1800
+    };
+    float dummyTargetValue = 0.0f;
+    float alternatingValue = -1.0f;
+    float randomValue = 0.0f;
     void set_filter(int which, sfpp::FilterModel mo, sfpp::ModelConfig conf)
     {
         FilterInfo finfo;
@@ -902,31 +930,10 @@ class ToneGranulator
             v->tail_fade_len = std::clamp(tailfadelen, 0.0f, v->tail_len);
         }
     }
-    enum PARAMS
-    {
-        PAR_MAINVOLUME = 100,
-        PAR_AMBORDER = 200,
-        PAR_OSCTYPE = 300,
-        PAR_DENSITY = 400,
-        PAR_PITCH = 500,
-        PAR_AZIMUTH = 600,
-        PAR_ELEVATION = 700,
-        PAR_DURATION = 800,
-        PAR_F0CO = 900,
-        PAR_F0RE = 1000,
-        PAR_F0EX = 1100,
-        PAR_F1CO = 1200,
-        PAR_F1RE = 1300,
-        PAR_F1EX = 1400,
-        PAR_FMPITCH = 1500,
-        PAR_FMDEPTH = 1600,
-        PAR_FMFEEDBACK = 1700,
-        PAR_OSC_SYNC = 1800
-    };
-    float dummyTargetValue = 0.0f;
-    float alternatingValue = -1.0f;
+
     ToneGranulator() : m_sr(44100.0), modmatrix(44100.0)
     {
+        randomValue = rng.nextFloatInRange(-1.0f, 1.0f);
         parmetadatas.reserve(64);
         parmetadatas.push_back(pmd()
                                    .withRange(-24.0, 0.0)
@@ -1160,11 +1167,13 @@ class ToneGranulator
                 {
                     if (!voices[j]->active)
                     {
-                        // std::print("starting voice {} alternating value {}\n", j, alternatingValue);
+                        // std::print("starting voice {} alternating value {}\n", j,
+                        // alternatingValue);
                         if (graincount % 2 == 0)
                             alternatingValue = -1.0f;
                         else
                             alternatingValue = 1.0f;
+                        randomValue = rng.nextFloatInRange(-1.0f, 1.0f);
                         voices[j]->grainid = graincount;
                         voices[j]->start(genev);
                         wasfound = true;
@@ -1214,6 +1223,7 @@ class ToneGranulator
                 modmatrix.sourceValues[i + 1] = modmatrix.m_lfos[i]->outputBlock[0];
             }
             modmatrix.sourceValues[17] = alternatingValue;
+            modmatrix.sourceValues[18] = randomValue;
             modmatrix.m.process();
             if (!self_generate)
             {
