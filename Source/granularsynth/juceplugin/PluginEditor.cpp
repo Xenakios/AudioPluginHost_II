@@ -107,7 +107,6 @@ AudioPluginAudioProcessorEditor::~AudioPluginAudioProcessorEditor() {}
 void AudioPluginAudioProcessorEditor::showFilterMenu(int whichfilter)
 {
     juce::PopupMenu menu;
-    // menu.addItem("No filter", [this]() {});
     auto models = sfpp::Filter::availableModels();
     for (auto &mod : models)
     {
@@ -121,27 +120,31 @@ void AudioPluginAudioProcessorEditor::showFilterMenu(int whichfilter)
                 auto [pt, st, dt, smt] = s;
                 if (pt != sfpp::Passband::UNSUPPORTED)
                 {
-                    address += "/" + sfpp::toString(pt);
+                    address += " " + sfpp::toString(pt);
                 }
                 if (st != sfpp::Slope::UNSUPPORTED)
                 {
-                    address += "/" + sfpp::toString(st);
+                    address += " " + sfpp::toString(st);
                 }
                 if (dt != sfpp::DriveMode::UNSUPPORTED)
                 {
-                    address += "/" + sfpp::toString(dt);
+                    address += " " + sfpp::toString(dt);
                 }
                 if (smt != sfpp::FilterSubModel::UNSUPPORTED)
                 {
-                    address += "/" + sfpp::toString(smt);
+                    address += " " + sfpp::toString(smt);
                 }
-                submenu.addItem(address, [this, mod, s, whichfilter]() {
+                submenu.addItem(address, [this, mod, s, address, whichfilter]() {
                     ThreadMessage msg;
                     msg.opcode = 100;
                     msg.filterindex = whichfilter;
                     msg.filtermodel = mod;
                     msg.filterconfig = s;
                     processorRef.from_gui_fifo.push(msg);
+                    if (whichfilter == 0)
+                        filter0But.setButtonText(sfpp::toString(mod) + " : " + address);
+                    if (whichfilter == 1)
+                        filter1But.setButtonText(sfpp::toString(mod) + " : " + address);
                 });
             }
             menu.addSubMenu(sfpp::toString(mod), submenu);
@@ -211,8 +214,8 @@ void AudioPluginAudioProcessorEditor::resized()
     }
     layout.performLayout(juce::Rectangle<int>(0, 0, getWidth(), 230));
     lfoTabs.setBounds(0, paramEntries.back()->getBottom() + 1, 400, 110);
-    filter0But.setBounds(lfoTabs.getRight() + 1, lfoTabs.getY(), 60, 25);
-    filter1But.setBounds(filter0But.getRight() + 1, lfoTabs.getY(), 60, 25);
+    filter0But.setBounds(lfoTabs.getRight() + 1, lfoTabs.getY(), 300, 25);
+    filter1But.setBounds(lfoTabs.getRight() + 1, filter0But.getBottom() + 1, 300, 25);
     int yoffs = lfoTabs.getBottom() + 1;
     for (int i = 0; i < modRowComps.size(); ++i)
     {
