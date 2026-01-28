@@ -854,13 +854,13 @@ class ToneGranulator
         ENV1,
         ALTERNATING0,
         UNIFBIRAND0,
-
+        UNIFBIRAND1,
         MIDICCSTART,
         MIDICCEND = MIDICCSTART + 64
     };
     float dummyTargetValue = 0.0f;
     float alternatingValue = -1.0f;
-    float randomValue = 0.0f;
+    std::array<float, 8> randomValues;
     struct ModSourceInfo
     {
         std::string name;
@@ -871,7 +871,8 @@ class ToneGranulator
     std::array<float, 128> modSourceValues;
     ToneGranulator() : m_sr(44100.0), modmatrix(44100.0)
     {
-        randomValue = rng.nextFloatInRange(-1.0f, 1.0f);
+        for (auto &v : randomValues)
+            v = rng.nextFloatInRange(-1.0f, 1.0f);
         parmetadatas.reserve(64);
         parmetadatas.push_back(pmd()
                                    .withRange(-24.0, 0.0)
@@ -1013,7 +1014,8 @@ class ToneGranulator
         modSources.emplace_back("NOT IMPLEMENTED 1", GranulatorModConfig::SourceIdentifier{ENV0});
         modSources.emplace_back("NOT IMPLEMENTED 2", GranulatorModConfig::SourceIdentifier{ENV1});
         modSources.emplace_back("Alternating", GranulatorModConfig::SourceIdentifier{ALTERNATING0});
-        modSources.emplace_back("UniRnd", GranulatorModConfig::SourceIdentifier{UNIFBIRAND0});
+        modSources.emplace_back("UniRnd 1", GranulatorModConfig::SourceIdentifier{UNIFBIRAND0});
+        modSources.emplace_back("UniRnd 2", GranulatorModConfig::SourceIdentifier{UNIFBIRAND1});
         for (uint32_t i = 0; i < 8; ++i)
         {
             modSources.emplace_back(std::format("MIDI CC {}", i + 21),
@@ -1209,7 +1211,8 @@ class ToneGranulator
                             alternatingValue = -1.0f;
                         else
                             alternatingValue = 1.0f;
-                        randomValue = rng.nextFloatInRange(-1.0f, 1.0f);
+                        randomValues[0] = rng.nextFloatInRange(-1.0f, 1.0f);
+                        randomValues[1] = rng.nextFloatInRange(-1.0f, 1.0f);
                         voices[j]->grainid = graincount;
                         voices[j]->start(genev);
                         wasfound = true;
@@ -1263,7 +1266,8 @@ class ToneGranulator
                     modSourceValues[LFO0 + i] = (modmatrix.m_lfos[i]->outputBlock[0] + 1.0f) * 0.5f;
             }
             modSourceValues[ALTERNATING0] = alternatingValue;
-            modSourceValues[UNIFBIRAND0] = randomValue;
+            modSourceValues[UNIFBIRAND0] = randomValues[0];
+            modSourceValues[UNIFBIRAND1] = randomValues[1];
             modmatrix.m.process();
             if (!self_generate)
             {
