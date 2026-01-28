@@ -88,12 +88,14 @@ struct ModulationRowComponent : public juce::Component
             sourceCombo.addItem("LFO " + juce::String(i + 1), i + 2);
             viaCombo.addItem("LFO " + juce::String(i), i + 2);
         }
+        
         for (int i = 0; i < 8; ++i)
         {
             sourceCombo.addItem("MIDI CC " + juce::String(21 + i), 100 + i);
             viaCombo.addItem("MIDI CC " + juce::String(21 + i), 100 + i);
         }
-
+        sourceCombo.addItem("Alternating per grain", 1000);
+        viaCombo.addItem("Alternating per grain", 1000);
         sourceCombo.setSelectedItemIndex(0, juce::dontSendNotification);
         viaCombo.setSelectedItemIndex(0, juce::dontSendNotification);
         sourceCombo.onChange = updatfunc;
