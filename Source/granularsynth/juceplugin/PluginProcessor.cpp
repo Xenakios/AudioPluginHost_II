@@ -148,16 +148,6 @@ void AudioPluginAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
                 granulator.modSourceValues[ToneGranulator::MIDICCSTART + ccnum] =
                     juce::jmap<float>(msg.getControllerValue(), 0, 127, 0.0, 1.0);
             }
-            /*
-            if (msg.getControllerNumber() == 21)
-                *parGrainRate = juce::jmap<float>(msg.getControllerValue(), 0, 127, 0.0, 6.0);
-
-                if (msg.getControllerNumber() == 22)
-                *parGrainDuration = juce::jmap<float>(msg.getControllerValue(), 0, 127, 0.002, 0.2);
-            if (msg.getControllerNumber() == 23)
-                *parGrainCenterPitch =
-                    juce::jmap<float>(msg.getControllerValue(), 0, 127, -36.0, 36.0);
-            */
         }
     }
 

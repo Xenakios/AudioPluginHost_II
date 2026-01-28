@@ -15,9 +15,11 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor(AudioPluginAudi
         processorRef.suspendProcessing(false);
     };
     addAndMakeVisible(filter0But);
-    filter0But.setButtonText("...");
+    filter0But.setButtonText("F1");
     filter0But.onClick = [this]() { showFilterMenu(0); };
     addAndMakeVisible(filter1But);
+    filter1But.setButtonText("F2");
+    filter1But.onClick = [this]() { showFilterMenu(1); };
     auto &params = p.getParameters();
     for (int i = 0; i < params.size(); ++i)
     {
@@ -191,18 +193,11 @@ void AudioPluginAudioProcessorEditor::timerCallback()
 //==============================================================================
 void AudioPluginAudioProcessorEditor::paint(juce::Graphics &g)
 {
-    // (Our component is opaque, so we must completely fill the background with a solid colour)
     g.fillAll(juce::Colours::darkgrey);
 }
 
 void AudioPluginAudioProcessorEditor::resized()
 {
-    /*
-    auto layout =
-        juce::FlexBox(juce::FlexBox::Direction::column, juce::FlexBox::Wrap::wrap,
-                      juce::FlexBox::AlignContent::spaceAround, juce::FlexBox::AlignItems::stretch,
-                      juce::FlexBox::JustifyContent::flexStart);
-                      */
     juce::FlexBox layout;
     layout.flexDirection = juce::FlexBox::Direction::column;
     layout.flexWrap = juce::FlexBox::Wrap::wrap;
@@ -213,11 +208,11 @@ void AudioPluginAudioProcessorEditor::resized()
                              .withMinHeight(25)
                              .withMinWidth(50)
                              .withMaxWidth(getWidth() / 2));
-        // paramEntries[i]->setBounds(1, 1 + i * 25, getWidth(), 25);
     }
     layout.performLayout(juce::Rectangle<int>(0, 0, getWidth(), 200));
     lfoTabs.setBounds(0, paramEntries.back()->getBottom() + 1, 400, 110);
     filter0But.setBounds(lfoTabs.getRight() + 1, lfoTabs.getY(), 60, 25);
+    filter1But.setBounds(filter0But.getRight() + 1, lfoTabs.getY(), 60, 25);
     int yoffs = lfoTabs.getBottom() + 1;
     for (int i = 0; i < modRowComps.size(); ++i)
     {

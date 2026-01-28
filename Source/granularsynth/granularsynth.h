@@ -951,6 +951,18 @@ class ToneGranulator
                                    .withID(PAR_F0RE)
                                    .withFlags(1));
         parmetadatas.push_back(pmd()
+                                   .withRange(-48.0, 48.0)
+                                   .withDefault(0.0)
+                                   .withName("Filter 2 Frequency")
+                                   .withID(PAR_F1CO)
+                                   .withFlags(1));
+        parmetadatas.push_back(pmd()
+                                   .withRange(0.0, 1.0)
+                                   .withDefault(0.0)
+                                   .withName("Filter 2 Resonance")
+                                   .withID(PAR_F1RE)
+                                   .withFlags(1));
+        parmetadatas.push_back(pmd()
                                    .withRange(-180.0, 180.0)
                                    .withDefault(0.0)
                                    .withName("Azimuth")
@@ -1173,6 +1185,10 @@ class ToneGranulator
                     modmatrix.m.getTargetValue(GranulatorModConfig::TargetIdentifier{PAR_F0CO});
                 genev.filterparams[0][1] =
                     modmatrix.m.getTargetValue(GranulatorModConfig::TargetIdentifier{PAR_F0RE});
+                genev.filterparams[1][0] =
+                    modmatrix.m.getTargetValue(GranulatorModConfig::TargetIdentifier{PAR_F1CO});
+                genev.filterparams[1][1] =
+                    modmatrix.m.getTargetValue(GranulatorModConfig::TargetIdentifier{PAR_F1RE});
                 genev.modamounts[GrainEvent::MD_PITCH] = grain_pitch_mod;
                 bool wasfound = false;
                 for (int j = 0; j < voices.size(); ++j)
