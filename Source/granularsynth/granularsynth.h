@@ -787,6 +787,31 @@ class GranulatorVoice
 
 using events_t = std::vector<GrainEvent>;
 
+class StepModSource
+{
+  public:
+    size_t curstep = 0;
+    size_t numactivesteps = 0;
+    std::vector<float> steps;
+    StepModSource() { steps.reserve(16384); }
+    void setSteps(std::vector<float> newsteps)
+    {
+        steps = newsteps;
+        curstep = 0;
+        numactivesteps = steps.size();
+    }
+    float next()
+    {
+        if (steps.size() == 0)
+            return 0.0f;
+        float result = steps[curstep];
+        ++curstep;
+        if (curstep >= numactivesteps)
+            curstep = 0;
+        return result;
+    }
+};
+
 class ToneGranulator
 {
   public:
@@ -850,17 +875,21 @@ class ToneGranulator
         LFO5,
         LFO6,
         LFO7,
-        ENV0,
-        ENV1,
-        ALTERNATING0,
-        UNIFBIRAND0,
-        UNIFBIRAND1,
+        STEPS0,
+        STEPS1,
+        STEPS2,
+        STEPS3,
+        STEPS4,
+        STEPS5,
+        STEPS6,
+        STEPS7,
         MIDICCSTART,
         MIDICCEND = MIDICCSTART + 64
     };
     float dummyTargetValue = 0.0f;
-    float alternatingValue = -1.0f;
-    std::array<float, 8> randomValues;
+
+    alignas(32) std::array<float, 8> stepModValues;
+    alignas(32) std::array<StepModSource, 8> stepModSources;
     struct ModSourceInfo
     {
         std::string name;
@@ -871,8 +900,32 @@ class ToneGranulator
     std::array<float, 128> modSourceValues;
     ToneGranulator() : m_sr(44100.0), modmatrix(44100.0)
     {
-        for (auto &v : randomValues)
-            v = rng.nextFloatInRange(-1.0f, 1.0f);
+        for (auto &v : stepModValues)
+            v = 0.0f;
+        stepModSources[0].setSteps({-1.0f, 1.0f});
+        stepModSources[1].setSteps({-1.0f, 0.0f, 1.0f});
+        stepModSources[2].setSteps({-1.0f, -0.33333333333333337f, 0.33333333333333326f, 1.0f});
+        stepModSources[3].setSteps({-1.0f, -0.5f, 0.0f, 0.5f, 1.0f});
+        for (size_t i = 0; i < 4; ++i)
+        {
+            stepModSources[4 + i].steps.resize(16384);
+            stepModSources[4 + i].numactivesteps = 16384;
+        }
+        for (size_t i = 0; i < 16384; ++i)
+        {
+            stepModSources[4].steps[i] = rng.nextFloatInRange(-1.0f, 1.0f);
+            stepModSources[5].steps[i] = rng.nextFloatInRange(-1.0f, 1.0f);
+            float z = rng.nextFloat();
+            if (z < 0.5f)
+                stepModSources[6].steps[i] = -1.0f;
+            else
+                stepModSources[6].steps[i] = 1.0f;
+            z = rng.nextFloat();
+            if (z < 0.5f)
+                stepModSources[7].steps[i] = -1.0f;
+            else
+                stepModSources[7].steps[i] = 1.0f;
+        }
         parmetadatas.reserve(64);
         parmetadatas.push_back(pmd()
                                    .withRange(-24.0, 0.0)
@@ -1015,11 +1068,12 @@ class ToneGranulator
             modSources.emplace_back(std::format("LFO {}", i + 1),
                                     GranulatorModConfig::SourceIdentifier{i + 1});
         }
-        modSources.emplace_back("NOT IMPLEMENTED 1", GranulatorModConfig::SourceIdentifier{ENV0});
-        modSources.emplace_back("NOT IMPLEMENTED 2", GranulatorModConfig::SourceIdentifier{ENV1});
-        modSources.emplace_back("Alternating", GranulatorModConfig::SourceIdentifier{ALTERNATING0});
-        modSources.emplace_back("UniRnd 1", GranulatorModConfig::SourceIdentifier{UNIFBIRAND0});
-        modSources.emplace_back("UniRnd 2", GranulatorModConfig::SourceIdentifier{UNIFBIRAND1});
+        for (uint32_t i = 0; i < 8; ++i)
+        {
+            modSources.emplace_back(std::format("StepSeq {}", i + 1),
+                                    GranulatorModConfig::SourceIdentifier{STEPS0 + i});
+        }
+
         for (uint32_t i = 0; i < 8; ++i)
         {
             modSources.emplace_back(std::format("MIDI CC {}", i + 21),
@@ -1211,12 +1265,8 @@ class ToneGranulator
                     {
                         // std::print("starting voice {} alternating value {}\n", j,
                         // alternatingValue);
-                        if (graincount % 2 == 0)
-                            alternatingValue = -1.0f;
-                        else
-                            alternatingValue = 1.0f;
-                        randomValues[0] = rng.nextFloatInRange(-1.0f, 1.0f);
-                        randomValues[1] = rng.nextFloatInRange(-1.0f, 1.0f);
+                        for (size_t sm = 0; sm < stepModSources.size(); ++sm)
+                            stepModValues[sm] = stepModSources[sm].next();
                         voices[j]->grainid = graincount;
                         voices[j]->start(genev);
                         wasfound = true;
@@ -1269,9 +1319,8 @@ class ToneGranulator
                 else
                     modSourceValues[LFO0 + i] = (modmatrix.m_lfos[i]->outputBlock[0] + 1.0f) * 0.5f;
             }
-            modSourceValues[ALTERNATING0] = alternatingValue;
-            modSourceValues[UNIFBIRAND0] = randomValues[0];
-            modSourceValues[UNIFBIRAND1] = randomValues[1];
+            for (size_t i = 0; i < stepModSources.size(); ++i)
+                modSourceValues[STEPS0 + i] = stepModValues[i];
             modmatrix.m.process();
             if (!self_generate)
             {
