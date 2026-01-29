@@ -31,8 +31,8 @@ struct LFOComponent : public juce::Component
     {
         auto upfunc = [this]() {
             stateChangedCallback(lfoindex, shapeCombo.getSelectedId() - 1, rateSlider.getValue(),
-                                 deformSlider.getValue(), shiftSlider.getValue(), warpSlider.getValue(),
-                                 unipolarButton.getToggleState());
+                                 deformSlider.getValue(), shiftSlider.getValue(),
+                                 warpSlider.getValue(), unipolarButton.getToggleState());
         };
         addAndMakeVisible(shapeCombo);
         shapeCombo.addItem("SINE", 1);
@@ -66,8 +66,7 @@ struct LFOComponent : public juce::Component
         addAndMakeVisible(warpSlider);
         warpSlider.setRange(-1.0, 1.0);
         warpSlider.setNumDecimalPlacesToDisplay(2);
-        warpSlider.setTextBoxStyle(juce::Slider::TextEntryBoxPosition::TextBoxRight, false, 50,
-                                    20);
+        warpSlider.setTextBoxStyle(juce::Slider::TextEntryBoxPosition::TextBoxRight, false, 50, 20);
         warpSlider.onValueChange = upfunc;
 
         addAndMakeVisible(unipolarButton);
@@ -95,7 +94,7 @@ struct LFOComponent : public juce::Component
 
 struct ModulationRowComponent : public juce::Component
 {
-    ModulationRowComponent(ToneGranulator *g)
+    ModulationRowComponent(ToneGranulator *g) : gr(g)
     {
         addAndMakeVisible(sourceCombo);
         addAndMakeVisible(viaCombo);
@@ -103,8 +102,7 @@ struct ModulationRowComponent : public juce::Component
         addAndMakeVisible(destCombo);
         auto updatfunc = [this]() {
             stateChangedCallback(modslotindex, sourceCombo.getSelectedId() - 1,
-                                 viaCombo.getSelectedId() - 1, depthSlider.getValue(),
-                                 destCombo.getSelectedId());
+                                 viaCombo.getSelectedId() - 1, depthSlider.getValue(), targetID);
         };
         for (int i = 0; i < g->modSources.size(); ++i)
         {
@@ -123,6 +121,7 @@ struct ModulationRowComponent : public juce::Component
         depthSlider.onValueChange = updatfunc;
         depthSlider.setTextBoxStyle(juce::Slider::TextEntryBoxPosition::TextBoxRight, false, 50,
                                     20);
+
         destCombo.addItem("No target", 1);
         for (auto &pmd : g->parmetadatas)
         {
@@ -133,7 +132,59 @@ struct ModulationRowComponent : public juce::Component
         }
         destCombo.setSelectedItemIndex(0, juce::dontSendNotification);
         destCombo.onChange = updatfunc;
+
+        addAndMakeVisible(destButton);
+        destButton.onClick = [this, g, updatfunc]() {
+            juce::PopupMenu menu;
+            std::map<std::string, juce::PopupMenu> submenus;
+            auto updf = [this, updatfunc](uint32_t parid) {
+                setTarget(parid);
+                updatfunc();
+            };
+            menu.addItem("No target", [updf]() { updf(1); });
+            for (auto &pmd : g->parmetadatas)
+            {
+                if (pmd.flags & CLAP_PARAM_IS_MODULATABLE)
+                {
+                    if (pmd.groupName.empty())
+                    {
+                        menu.addItem(pmd.name, [updf, pmd]() { updf(pmd.id); });
+                    }
+                    else
+                    {
+                        if (!submenus.count(pmd.groupName))
+                        {
+                            submenus[pmd.groupName] = juce::PopupMenu();
+                        }
+                        submenus[pmd.groupName].addItem(pmd.name, [updf, pmd]() { updf(pmd.id); });
+                    }
+                }
+            }
+            for (auto &e : submenus)
+            {
+                menu.addSubMenu(e.first, e.second);
+            }
+            menu.showMenuAsync(juce::PopupMenu::Options{});
+        };
     }
+    void setTarget(uint32_t parid)
+    {
+        targetID = parid;
+        for (auto &pmd : gr->parmetadatas)
+        {
+            if (pmd.id == parid)
+            {
+
+                destButton.setButtonText(pmd.name);
+                return;
+            }
+        }
+        if (parid == 1)
+            destButton.setButtonText("No target");
+        else
+            destButton.setButtonText("INVALID ID");
+    }
+
     void resized() override
     {
         auto layout = juce::FlexBox(juce::FlexBox::Direction::row, juce::FlexBox::Wrap::noWrap,
@@ -143,15 +194,19 @@ struct ModulationRowComponent : public juce::Component
         layout.items.add(juce::FlexItem(sourceCombo).withFlex(1.0));
         layout.items.add(juce::FlexItem(viaCombo).withFlex(1.0));
         layout.items.add(juce::FlexItem(depthSlider).withFlex(2.0));
-        layout.items.add(juce::FlexItem(destCombo).withFlex(1.0));
+        // layout.items.add(juce::FlexItem(destCombo).withFlex(1.0));
+        layout.items.add(juce::FlexItem(destButton).withFlex(1.0));
         layout.performLayout(juce::Rectangle<int>{0, 0, getWidth(), getHeight()});
     }
+    ToneGranulator *gr = nullptr;
     std::function<void(int, int, int, float, int)> stateChangedCallback;
     int modslotindex = -1;
+    uint32_t targetID = 1;
     juce::ComboBox sourceCombo;
     juce::ComboBox viaCombo;
     juce::Slider depthSlider;
     juce::ComboBox destCombo;
+    juce::TextButton destButton;
 };
 
 //==============================================================================

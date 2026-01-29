@@ -951,24 +951,28 @@ class ToneGranulator
                                    .withDefault(0.0)
                                    .withName("Filter 1 Frequency")
                                    .withID(PAR_F0CO)
+                                   .withGroupName("Filter 1")
                                    .withFlags(CLAP_PARAM_IS_MODULATABLE));
         parmetadatas.push_back(pmd()
                                    .withRange(0.0, 1.0)
                                    .withDefault(0.0)
                                    .withName("Filter 1 Resonance")
                                    .withID(PAR_F0RE)
+                                   .withGroupName("Filter 1")
                                    .withFlags(CLAP_PARAM_IS_MODULATABLE));
         parmetadatas.push_back(pmd()
                                    .withRange(-48.0, 48.0)
                                    .withDefault(0.0)
                                    .withName("Filter 2 Frequency")
                                    .withID(PAR_F1CO)
+                                   .withGroupName("Filter 2")
                                    .withFlags(CLAP_PARAM_IS_MODULATABLE));
         parmetadatas.push_back(pmd()
                                    .withRange(0.0, 1.0)
                                    .withDefault(0.0)
                                    .withName("Filter 2 Resonance")
                                    .withID(PAR_F1RE)
+                                   .withGroupName("Filter 2")
                                    .withFlags(CLAP_PARAM_IS_MODULATABLE));
         parmetadatas.push_back(pmd()
                                    .withRange(-180.0, 180.0)
