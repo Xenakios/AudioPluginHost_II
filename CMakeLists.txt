@@ -175,7 +175,7 @@ target_compile_options(TestingProgram PRIVATE -Werror=return-type)
 
 add_executable(enosccli
     Source/Experimental/enosc_cli.cpp
-    
+    Source/granularsynth/js_impl.cpp
 )
 target_include_directories(enosccli PRIVATE libs/metamodule-core-modules/4ms/core)
 # Source/Experimental/xaudiograph.cpp
@@ -241,6 +241,7 @@ target_sources(ToneGranulatorPlugin
     PRIVATE
         Source/granularsynth/juceplugin/PluginProcessor.cpp
         Source/granularsynth/juceplugin/PluginEditor.cpp
+        Source/granularsynth/js_impl.cpp
 )
 
 target_compile_options(ToneGranulatorPlugin PRIVATE -Werror=return-type "$<$<COMPILE_LANGUAGE:CXX>:-fno-char8_t>")

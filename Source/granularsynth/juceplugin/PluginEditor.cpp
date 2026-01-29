@@ -98,7 +98,7 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor(AudioPluginAudi
     }
     addAndMakeVisible(lfoTabs);
     lfoTabs.setCurrentTabIndex(0);
-    setSize(800, 650);
+    setSize(1200, 650);
     startTimer(100);
 }
 

@@ -92,6 +92,12 @@ struct LFOComponent : public juce::Component
     juce::ToggleButton unipolarButton;
 };
 
+struct StepSeqComponent : public juce::Component
+{
+    StepSeqComponent() {}
+    
+};
+
 struct ModulationRowComponent : public juce::Component
 {
     ModulationRowComponent(ToneGranulator *g) : gr(g)

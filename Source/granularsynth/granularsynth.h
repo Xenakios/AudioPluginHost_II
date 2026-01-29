@@ -812,6 +812,8 @@ class StepModSource
     }
 };
 
+std::vector<float> generate_from_js(std::string jscode);
+
 class ToneGranulator
 {
   public:
@@ -902,7 +904,21 @@ class ToneGranulator
     {
         for (auto &v : stepModValues)
             v = 0.0f;
-        stepModSources[0].setSteps({-1.0f, 1.0f});
+        // stepModSources[0].setSteps({-1.0f, 1.0f});
+        stepModSources[0].setSteps(generate_from_js(R"(
+        function generate_steps()
+        {
+            arr = [];
+            for (var i=0;i<100;++i)
+            {
+              if (i % 5 == 0 || i % 11 == 0)
+                arr.push(1.0);
+              else arr.push(-1.0);
+            }
+            return arr;
+        }
+        
+    )"));
         stepModSources[1].setSteps({-1.0f, 0.0f, 1.0f});
         stepModSources[2].setSteps({-1.0f, -0.33333333333333337f, 0.33333333333333326f, 1.0f});
         stepModSources[3].setSteps({-1.0f, -0.5f, 0.0f, 0.5f, 1.0f});
