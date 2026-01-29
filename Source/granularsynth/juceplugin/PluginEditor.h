@@ -94,8 +94,36 @@ struct LFOComponent : public juce::Component
 
 struct StepSeqComponent : public juce::Component
 {
-    StepSeqComponent() {}
-
+    StepSeqComponent(int seqindex, ToneGranulator *g) : gr(g)
+    {
+        addAndMakeVisible(loadStepsBut);
+        loadStepsBut.setButtonText("Run Python");
+        loadStepsBut.onClick = [this, seqindex]() {
+            juce::ChildProcess cp;
+            cp.start(std::format(
+                R"(python C:\develop\AudioPluginHost_mk2\Source\granularsynth\stepseq.py {})",
+                seqindex));
+            auto data = cp.readAllProcessOutput();
+            if (!data.containsIgnoreCase("error"))
+            {
+                auto tokens = juce::StringArray::fromTokens(data, false);
+                std::vector<float> steps;
+                for (auto &e : tokens)
+                {
+                    float v = std::clamp(e.getFloatValue(), -1.0f, 1.0f);
+                    steps.push_back(v);
+                }
+                gr->stepModSources[seqindex].setSteps(steps);
+            }
+            else
+            {
+                DBG(data);
+            }
+        };
+    }
+    void resized() override { loadStepsBut.setBounds(0, 0, 150, 25); }
+    juce::TextButton loadStepsBut;
+    ToneGranulator *gr = nullptr;
 };
 
 struct ModulationRowComponent : public juce::Component
@@ -237,7 +265,7 @@ class AudioPluginAudioProcessorEditor final : public juce::AudioProcessorEditor,
     std::vector<std::unique_ptr<ModulationRowComponent>> modRowComps;
     std::vector<std::unique_ptr<LFOComponent>> lfocomps;
     juce::TabbedComponent lfoTabs;
-    juce::TextButton loadStepsBut;
+    std::vector<std::unique_ptr<StepSeqComponent>> stepcomps;
     void showFilterMenu(int whichfilter);
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(AudioPluginAudioProcessorEditor)
 };

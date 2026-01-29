@@ -93,27 +93,19 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor(AudioPluginAudi
             msg.lfounipolar = uni;
             processorRef.from_gui_fifo.push(msg);
         };
-        lfoTabs.addTab("LFO " + juce::String(i + 1), juce::Colours::grey, lfoc.get(), false);
+        lfoTabs.addTab("LFO " + juce::String(i + 1), juce::Colours::lightgrey, lfoc.get(), false);
         lfocomps.push_back(std::move(lfoc));
+    }
+    for (int i = 0; i < 8; ++i)
+    {
+        auto stepcomp = std::make_unique<StepSeqComponent>(i, &processorRef.granulator);
+        lfoTabs.addTab("STEP SEQ " + juce::String(i + 1), juce::Colours::lightgrey, stepcomp.get(),
+                       false);
+        stepcomps.push_back(std::move(stepcomp));
     }
     addAndMakeVisible(lfoTabs);
     lfoTabs.setCurrentTabIndex(0);
-    addAndMakeVisible(loadStepsBut);
-    loadStepsBut.setButtonText("Run");
-    loadStepsBut.onClick = [this]() {
-        juce::ChildProcess cp;
-        cp.start(R"(python C:\develop\AudioPluginHost_mk2\Source\granularsynth\stepseq.py)");
-        auto data = cp.readAllProcessOutput();
-        // DBG(data);
-        auto tokens = juce::StringArray::fromTokens(data, false);
-        std::vector<float> steps;
-        for (auto &e : tokens)
-        {
-            float v = std::clamp(e.getFloatValue(), -1.0f, 1.0f);
-            steps.push_back(v);
-        }
-        processorRef.granulator.stepModSources[1].setSteps(steps);
-    };
+
     setSize(1200, 650);
     startTimer(100);
 }
@@ -234,10 +226,10 @@ void AudioPluginAudioProcessorEditor::resized()
                              .withMaxWidth(getWidth() / 2));
     }
     layout.performLayout(juce::Rectangle<int>(0, 0, getWidth(), 230));
-    lfoTabs.setBounds(0, paramEntries.back()->getBottom() + 1, 400, 110);
+    lfoTabs.setBounds(0, paramEntries.back()->getBottom() + 1, 900, 110);
     filter0But.setBounds(lfoTabs.getRight() + 1, lfoTabs.getY(), 300, 25);
     filter1But.setBounds(lfoTabs.getRight() + 1, filter0But.getBottom() + 1, 300, 25);
-    loadStepsBut.setBounds(lfoTabs.getRight() + 1, filter1But.getBottom() + 1, 100, 25);
+
     int yoffs = lfoTabs.getBottom() + 1;
     for (int i = 0; i < modRowComps.size(); ++i)
     {
