@@ -13,7 +13,7 @@ AudioPluginAudioProcessor::AudioPluginAudioProcessor()
 #endif
       )
 {
-    auto foo = Tunings::evenDivisionOfCentsByM(1200, 12);
+    
     from_gui_fifo.reset(1024);
     to_gui_fifo.reset(1024);
     for (int i = 0; i < granulator.parmetadatas.size(); ++i)

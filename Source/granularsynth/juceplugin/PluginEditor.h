@@ -95,7 +95,7 @@ struct LFOComponent : public juce::Component
 struct StepSeqComponent : public juce::Component
 {
     StepSeqComponent() {}
-    
+
 };
 
 struct ModulationRowComponent : public juce::Component
@@ -237,6 +237,7 @@ class AudioPluginAudioProcessorEditor final : public juce::AudioProcessorEditor,
     std::vector<std::unique_ptr<ModulationRowComponent>> modRowComps;
     std::vector<std::unique_ptr<LFOComponent>> lfocomps;
     juce::TabbedComponent lfoTabs;
+    juce::TextButton loadStepsBut;
     void showFilterMenu(int whichfilter);
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(AudioPluginAudioProcessorEditor)
 };

@@ -12,6 +12,7 @@ std::vector<float> generate_from_js(std::string jscode)
     {
         ctx = choc::javascript::createQuickJSContext();
     }
+    
     std::vector<float> result;
     try
     {

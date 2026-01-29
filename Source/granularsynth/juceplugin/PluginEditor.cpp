@@ -98,6 +98,22 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor(AudioPluginAudi
     }
     addAndMakeVisible(lfoTabs);
     lfoTabs.setCurrentTabIndex(0);
+    addAndMakeVisible(loadStepsBut);
+    loadStepsBut.setButtonText("Run");
+    loadStepsBut.onClick = [this]() {
+        juce::ChildProcess cp;
+        cp.start(R"(python C:\develop\AudioPluginHost_mk2\Source\granularsynth\stepseq.py)");
+        auto data = cp.readAllProcessOutput();
+        // DBG(data);
+        auto tokens = juce::StringArray::fromTokens(data, false);
+        std::vector<float> steps;
+        for (auto &e : tokens)
+        {
+            float v = std::clamp(e.getFloatValue(), -1.0f, 1.0f);
+            steps.push_back(v);
+        }
+        processorRef.granulator.stepModSources[1].setSteps(steps);
+    };
     setSize(1200, 650);
     startTimer(100);
 }
@@ -221,6 +237,7 @@ void AudioPluginAudioProcessorEditor::resized()
     lfoTabs.setBounds(0, paramEntries.back()->getBottom() + 1, 400, 110);
     filter0But.setBounds(lfoTabs.getRight() + 1, lfoTabs.getY(), 300, 25);
     filter1But.setBounds(lfoTabs.getRight() + 1, filter0But.getBottom() + 1, 300, 25);
+    loadStepsBut.setBounds(lfoTabs.getRight() + 1, filter1But.getBottom() + 1, 100, 25);
     int yoffs = lfoTabs.getBottom() + 1;
     for (int i = 0; i < modRowComps.size(); ++i)
     {

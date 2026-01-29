@@ -14,6 +14,7 @@
 #include "sst/basic-blocks/mod-matrix/ModMatrix.h"
 #include "sst/basic-blocks/modulators/SimpleLFO.h"
 #include "sst/basic-blocks/params/ParamMetadata.h"
+#include "containers/choc_SingleReaderSingleWriterFIFO.h"
 
 using namespace sst::basic_blocks::mod_matrix;
 
@@ -790,19 +791,45 @@ using events_t = std::vector<GrainEvent>;
 class StepModSource
 {
   public:
+    static constexpr size_t maxSteps = 4096;
     size_t curstep = 0;
     size_t numactivesteps = 0;
     std::vector<float> steps;
-    StepModSource() { steps.reserve(16384); }
+    struct Message
+    {
+        int opcode = 0;
+        int numsteps = 0;
+        std::array<float, maxSteps> steps;
+    };
+    choc::fifo::SingleReaderSingleWriterFIFO<Message> fifo;
+    StepModSource()
+    {
+        fifo.reset(4);
+        steps.resize(maxSteps);
+    }
     void setSteps(std::vector<float> newsteps)
     {
-        steps = newsteps;
-        curstep = 0;
-        numactivesteps = steps.size();
+        if (newsteps.size() > maxSteps)
+            return;
+        Message msg;
+        msg.opcode = 0;
+        msg.numsteps = newsteps.size();
+        std::copy(newsteps.begin(), newsteps.end(), msg.steps.begin());
+        fifo.push(msg);
     }
     float next()
     {
-        if (steps.size() == 0)
+        Message msg;
+        while (fifo.pop(msg))
+        {
+            if (msg.opcode == 0)
+            {
+                std::copy(msg.steps.begin(), msg.steps.begin() + msg.numsteps, steps.begin());
+                numactivesteps = msg.numsteps;
+                curstep = 0;
+            }
+        }
+        if (steps.empty())
             return 0.0f;
         float result = steps[curstep];
         ++curstep;
@@ -919,7 +946,7 @@ class ToneGranulator
         }
         
     )"));
-        stepModSources[1].setSteps({-1.0f, 0.0f, 1.0f});
+        // stepModSources[1].setSteps({-1.0f, 0.0f, 1.0f});
         stepModSources[2].setSteps({-1.0f, -0.33333333333333337f, 0.33333333333333326f, 1.0f});
         stepModSources[3].setSteps({-1.0f, -0.5f, 0.0f, 0.5f, 1.0f});
         for (size_t i = 0; i < 4; ++i)
