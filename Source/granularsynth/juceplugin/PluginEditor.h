@@ -101,58 +101,66 @@ struct StepSeqComponent : public juce::Component
                                    juce::dontSendNotification);
         repaint();
     }
+    void runExternalProgram()
+    {
+        juce::ChildProcess cp;
+        double t0 = juce::Time::getMillisecondCounterHiRes();
+        cp.start(std::format(
+            R"(python C:\develop\AudioPluginHost_mk2\Source\granularsynth\stepseq.py {} {})",
+            sindex, par0Slider.getValue()));
+        auto data = cp.readAllProcessOutput();
+        double t1 = juce::Time::getMillisecondCounterHiRes();
+        DBG("running ext program took " << t1 - t0 << " millisecods");
+        if (!data.containsIgnoreCase("error"))
+        {
+            auto tokens = juce::StringArray::fromTokens(data, false);
+            std::vector<float> steps;
+            for (auto &e : tokens)
+            {
+                if (e.isEmpty())
+                    break;
+                float v = std::clamp(e.getFloatValue(), -1.0f, 1.0f);
+                // DBG(v);
+                steps.push_back(v);
+            }
+            gr->setStepSequenceSteps(sindex, steps);
+        }
+        else
+        {
+            DBG(data);
+        }
+    }
     StepSeqComponent(int seqindex, ToneGranulator *g) : gr(g), sindex(seqindex)
     {
         addAndMakeVisible(loadStepsBut);
         loadStepsBut.setButtonText("Run Python");
-        loadStepsBut.onClick = [this, seqindex]() {
-            juce::ChildProcess cp;
-            double t0 = juce::Time::getMillisecondCounterHiRes();
-            cp.start(std::format(
-                R"(python C:\develop\AudioPluginHost_mk2\Source\granularsynth\stepseq.py {})",
-                seqindex));
-            auto data = cp.readAllProcessOutput();
-            double t1 = juce::Time::getMillisecondCounterHiRes();
-            DBG("running ext program took " << t1 - t0 << " millisecods");
-            if (!data.containsIgnoreCase("error"))
-            {
-                auto tokens = juce::StringArray::fromTokens(data, false);
-                std::vector<float> steps;
-                for (auto &e : tokens)
-                {
-                    if (e.isEmpty())
-                        break;
-                    float v = std::clamp(e.getFloatValue(), -1.0f, 1.0f);
-                    // DBG(v);
-                    steps.push_back(v);
-                }
-                gr->setStepSequenceSteps(sindex, steps);
-            }
-            else
-            {
-                DBG(data);
-            }
-        };
+        loadStepsBut.onClick = [this, seqindex]() { runExternalProgram(); };
         addAndMakeVisible(unipolarBut);
         unipolarBut.setButtonText("Unipolar");
         unipolarBut.onClick = [this]() {
             gr->stepModSources[sindex].unipolar.store(unipolarBut.getToggleState());
         };
+        addAndMakeVisible(par0Slider);
+        par0Slider.setRange(0.0, 1.0);
+        par0Slider.setNumDecimalPlacesToDisplay(2);
+        par0Slider.onDragEnd = [this]() { runExternalProgram(); };
     }
+    int graphxpos = 200;
     void resized() override
     {
         loadStepsBut.setBounds(0, 0, 150, 25);
-        unipolarBut.setBounds(0, loadStepsBut.getBottom() + 1, 150, 25);
+        unipolarBut.setBounds(0, loadStepsBut.getBottom() + 1, graphxpos, 25);
+        par0Slider.setBounds(0, unipolarBut.getBottom() + 1, graphxpos, 25);
     }
     void paint(juce::Graphics &g) override
     {
         auto &msrc = gr->stepModSources[sindex];
         g.setColour(juce::Colours::green);
-        int maxstepstodraw = (getWidth() - 150) / 16;
+        int maxstepstodraw = (getWidth() - graphxpos) / 16;
         int stepstodraw = std::min<int>(maxstepstodraw, msrc.numactivesteps);
         for (int i = 0; i < stepstodraw; ++i)
         {
-            float xcor = 150.0 + i * 16.0;
+            float xcor = graphxpos + i * 16.0;
             float v = msrc.steps[i];
             if (v < 0.0)
             {
@@ -167,10 +175,11 @@ struct StepSeqComponent : public juce::Component
             }
         }
         g.setColour(juce::Colours::black);
-        g.drawLine(150.0f, getHeight() / 2.0f, getWidth(), getHeight() / 2.0f);
+        g.drawLine(float(graphxpos), getHeight() / 2.0f, getWidth(), getHeight() / 2.0f);
     }
     juce::TextButton loadStepsBut;
     juce::ToggleButton unipolarBut;
+    juce::Slider par0Slider;
     ToneGranulator *gr = nullptr;
     uint32_t sindex = 0;
 };
