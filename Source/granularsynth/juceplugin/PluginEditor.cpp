@@ -180,7 +180,10 @@ void AudioPluginAudioProcessorEditor::showFilterMenu(int whichfilter)
 
 void AudioPluginAudioProcessorEditor::timerCallback()
 {
-    infoLabel.setText(std::format("CPU Load {:3.0f}%", processorRef.perfMeasurer.getLoadAsPercentage()),
+    infoLabel.setText(std::format("[CPU Load {:3.0f}%] [{} in {} out]",
+                                  processorRef.perfMeasurer.getLoadAsPercentage(),
+                                  processorRef.getTotalNumInputChannels(),
+                                  processorRef.getTotalNumOutputChannels()),
                       juce::dontSendNotification);
     for (auto &c : stepcomps)
     {

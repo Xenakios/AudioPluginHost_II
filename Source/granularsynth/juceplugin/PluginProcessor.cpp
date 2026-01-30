@@ -174,7 +174,9 @@ void AudioPluginAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
             auto &mm = granulator.modmatrix;
             if (msg.moddest >= 1)
             {
-                msg.depth *= granulator.modRanges.at(msg.moddest);
+                auto it = granulator.modRanges.find(msg.moddest);
+                if (it != granulator.modRanges.end())
+                    msg.depth *= it->second;
                 mm.rt.updateActiveAt(msg.modslot, true);
                 // DBG(msg.modslot << " " << msg.modsource << " " << msg.depth << " " <<
                 // msg.moddest);
@@ -367,7 +369,7 @@ void AudioPluginAudioProcessor::setStateInformation(const void *data, int sizeIn
                     uint32_t src = rstate["source"].getWithDefault(0);
                     uint32_t srcvia = rstate["via"].getWithDefault(0);
                     float d = rstate["depth"].get<float>();
-                    int dest = rstate["dest"].getWithDefault(0);
+                    int dest = rstate["dest"].getWithDefault(1);
                     mm.rt.updateRoutingAt(slot, GranulatorModConfig::SourceIdentifier{src},
                                           GranulatorModConfig::SourceIdentifier{srcvia}, {},
                                           GranulatorModConfig::TargetIdentifier{dest}, d);
@@ -414,7 +416,9 @@ void AudioPluginAudioProcessor::sendExtraStatesToGUI()
                 msg.modvia = mm.rt.routes[i].sourceVia->src;
             msg.depth = mm.rt.routes[i].depth;
             msg.moddest = mm.rt.routes[i].target->baz;
-            msg.depth /= granulator.modRanges.at(msg.moddest);
+            auto it = granulator.modRanges.find(msg.moddest);
+            if (it != granulator.modRanges.end())
+                msg.depth /= it->second;
             to_gui_fifo.push(msg);
         }
     }

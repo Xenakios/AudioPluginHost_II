@@ -132,7 +132,7 @@ class GranulatorModMatrix
             lfo_shapes[i] = lfo_t::SINE;
             lfo_rates[i] = 0.0;
             lfo_deforms[i] = 0.0;
-            lfo_shifts[i] = 0.5f;
+            lfo_shifts[i] = 0.0f;
             lfo_warps[i] = 0.0f;
             lfo_unipolars[i] = false;
         }
@@ -1123,8 +1123,8 @@ class ToneGranulator
             }
         }
         // we want these for stereo testing now...
-        modRanges[PAR_AZIMUTH] = 30.0f;
-        modRanges[PAR_ELEVATION] = 30.0f;
+        // modRanges[PAR_AZIMUTH] = 30.0f;
+        // modRanges[PAR_ELEVATION] = 30.0f;
         for (int i = 0; i < numvoices; ++i)
         {
             auto v = std::make_unique<GranulatorVoice>();
