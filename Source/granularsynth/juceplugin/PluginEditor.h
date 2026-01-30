@@ -92,9 +92,10 @@ struct LFOComponent : public juce::Component
     juce::ToggleButton unipolarButton;
 };
 
-struct StepSeqComponent : public juce::Component
+struct StepSeqComponent : public juce::Component, public juce::Timer
 {
-    StepSeqComponent(int seqindex, ToneGranulator *g) : gr(g)
+    void timerCallback() override { repaint(); }
+    StepSeqComponent(int seqindex, ToneGranulator *g) : gr(g), sindex(seqindex)
     {
         addAndMakeVisible(loadStepsBut);
         loadStepsBut.setButtonText("Run Python");
@@ -110,7 +111,10 @@ struct StepSeqComponent : public juce::Component
                 std::vector<float> steps;
                 for (auto &e : tokens)
                 {
+                    if (e.isEmpty())
+                        break;
                     float v = std::clamp(e.getFloatValue(), -1.0f, 1.0f);
+                    // DBG(v);
                     steps.push_back(v);
                 }
                 gr->stepModSources[seqindex].setSteps(steps);
@@ -120,10 +124,35 @@ struct StepSeqComponent : public juce::Component
                 DBG(data);
             }
         };
+        startTimer(100);
     }
     void resized() override { loadStepsBut.setBounds(0, 0, 150, 25); }
+    void paint(juce::Graphics &g) override
+    {
+        auto &msrc = gr->stepModSources[sindex];
+        for (int i = 0; i < msrc.numactivesteps; ++i)
+        {
+            float xcor = 150.0 + i * 16.0;
+            float v = msrc.steps[i];
+            if (v < 0.0)
+            {
+                g.setColour(juce::Colours::pink);
+                float h = juce::jmap<float>(v, -1.0, 0.0, getHeight() / 2, 0.0);
+                g.fillRect(xcor, getHeight() / 2.0, 15.0, h);
+            }
+            else
+            {
+                g.setColour(juce::Colours::green);
+                float h = juce::jmap<float>(v, 0.0, 1.0, 0.0, getHeight() / 2);
+                g.fillRect(xcor, getHeight() / 2.0 - h, 15.0, h);
+            }
+        }
+        g.setColour(juce::Colours::black);
+        g.drawLine(150.0f, getHeight() / 2.0f, getWidth(), getHeight() / 2.0f);
+    }
     juce::TextButton loadStepsBut;
     ToneGranulator *gr = nullptr;
+    int sindex = 0;
 };
 
 struct ModulationRowComponent : public juce::Component
