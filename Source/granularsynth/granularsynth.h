@@ -794,6 +794,7 @@ class StepModSource
     static constexpr size_t maxSteps = 4096;
     size_t curstep = 0;
     size_t numactivesteps = 0;
+    std::atomic<bool> unipolar{false};
     std::vector<float> steps;
     struct Message
     {
@@ -835,6 +836,8 @@ class StepModSource
         ++curstep;
         if (curstep >= numactivesteps)
             curstep = 0;
+        if (unipolar.load())
+            result = (result + 2.0f) * 0.5f;
         return result;
     }
 };
@@ -891,7 +894,8 @@ class ToneGranulator
         PAR_FMDEPTH = 1600,
         PAR_FMFEEDBACK = 1700,
         PAR_OSC_SYNC = 1800,
-        PAR_ENVMORPH = 1900
+        PAR_ENVMORPH = 1900,
+        PAR_GRAINVOLUME = 2000
     };
     enum SI
     {
@@ -975,13 +979,18 @@ class ToneGranulator
                                    .withDefault(-6.0)
                                    .withName("Main volume")
                                    .withFlags(CLAP_PARAM_IS_MODULATABLE)
+                                   .withGroupName("Main output")
                                    .withID(PAR_MAINVOLUME));
-        parmetadatas.push_back(
-            pmd()
-                .withUnorderedMapFormatting({{0, "1ST"}, {1, "2ND"}, {2, "3RD"}}, true)
-                .withDefault(2)
-                .withName("Ambisonic order")
-                .withID(PAR_AMBORDER));
+        parmetadatas.push_back(pmd()
+                                   .withUnorderedMapFormatting({{0, "Stereo"},
+                                                                {1, "Ambisonic 1ST Order"},
+                                                                {2, "Ambisonic 2ND Order"},
+                                                                {3, "Ambisonic 3RD Order"}},
+                                                               true)
+                                   .withDefault(2)
+                                   .withName("Spatialization mode")
+                                   .withGroupName("Main output")
+                                   .withID(PAR_AMBORDER));
         parmetadatas.push_back(pmd()
                                    .withUnorderedMapFormatting({{0, "SINE"},
                                                                 {1, "SEMISINE"},
@@ -993,12 +1002,19 @@ class ToneGranulator
                                                                true)
                                    .withDefault(0)
                                    .withName("Oscillator type")
+                                   .withGroupName("Oscillator")
                                    .withID(PAR_OSCTYPE));
         parmetadatas.push_back(pmd()
                                    .withRange(0.0f, 7.0f)
                                    .withDefault(4.0)
                                    .withName("Density")
                                    .withID(PAR_DENSITY)
+                                   .withFlags(CLAP_PARAM_IS_MODULATABLE));
+        parmetadatas.push_back(pmd()
+                                   .withRange(0.0f, 1.0f)
+                                   .withDefault(0.75f)
+                                   .withName("Grain volume")
+                                   .withID(PAR_GRAINVOLUME)
                                    .withFlags(CLAP_PARAM_IS_MODULATABLE));
         parmetadatas.push_back(pmd()
                                    .withRange(0.002f, 0.5f)
@@ -1023,23 +1039,27 @@ class ToneGranulator
                                    .withDefault(0.0)
                                    .withName("OSC Sync")
                                    .withID(PAR_OSC_SYNC)
+                                   .withGroupName("Oscillator")
                                    .withFlags(CLAP_PARAM_IS_MODULATABLE));
         parmetadatas.push_back(pmd()
                                    .withRange(-48.0, 48.0)
                                    .withDefault(0.0)
                                    .withName("FM Pitch")
                                    .withID(PAR_FMPITCH)
+                                   .withGroupName("Oscillator")
                                    .withFlags(CLAP_PARAM_IS_MODULATABLE));
         parmetadatas.push_back(pmd()
                                    .withRange(0.0, 1.0)
                                    .withDefault(0.0)
                                    .withName("FM Depth")
+                                   .withGroupName("Oscillator")
                                    .withID(PAR_FMDEPTH)
                                    .withFlags(CLAP_PARAM_IS_MODULATABLE));
         parmetadatas.push_back(pmd()
                                    .withRange(-1.0, 1.0)
                                    .withDefault(0.0)
                                    .withName("FM Feedback")
+                                   .withGroupName("Oscillator")
                                    .withID(PAR_FMFEEDBACK)
                                    .withFlags(CLAP_PARAM_IS_MODULATABLE));
         parmetadatas.push_back(pmd()
@@ -1272,7 +1292,9 @@ class ToneGranulator
                     modmatrix.m.getTargetValue(GranulatorModConfig::TargetIdentifier{PAR_PITCH});
                 float gdur =
                     modmatrix.m.getTargetValue(GranulatorModConfig::TargetIdentifier{PAR_DURATION});
-                GrainEvent genev{0.0, gdur, pitch, 0.75};
+                float gvol = modmatrix.m.getTargetValue(
+                    GranulatorModConfig::TargetIdentifier{PAR_GRAINVOLUME});
+                GrainEvent genev{0.0, gdur, pitch, gvol};
                 genev.envelope_shape =
                     modmatrix.m.getTargetValue(GranulatorModConfig::TargetIdentifier{PAR_ENVMORPH});
                 genev.azimuth =

@@ -117,32 +117,41 @@ struct StepSeqComponent : public juce::Component, public juce::Timer
                     // DBG(v);
                     steps.push_back(v);
                 }
-                gr->stepModSources[seqindex].setSteps(steps);
+                gr->stepModSources[sindex].setSteps(steps);
             }
             else
             {
                 DBG(data);
             }
         };
+        addAndMakeVisible(unipolarBut);
+        unipolarBut.setButtonText("Unipolar");
+        unipolarBut.onClick = [this]() {
+            gr->stepModSources[sindex].unipolar.store(unipolarBut.getToggleState());
+        };
         startTimer(100);
     }
-    void resized() override { loadStepsBut.setBounds(0, 0, 150, 25); }
+    void resized() override
+    {
+        loadStepsBut.setBounds(0, 0, 150, 25);
+        unipolarBut.setBounds(0, loadStepsBut.getBottom() + 1, 150, 25);
+    }
     void paint(juce::Graphics &g) override
     {
         auto &msrc = gr->stepModSources[sindex];
+        g.setColour(juce::Colours::green);
         for (int i = 0; i < msrc.numactivesteps; ++i)
         {
             float xcor = 150.0 + i * 16.0;
             float v = msrc.steps[i];
             if (v < 0.0)
             {
-                g.setColour(juce::Colours::pink);
                 float h = juce::jmap<float>(v, -1.0, 0.0, getHeight() / 2, 0.0);
                 g.fillRect(xcor, getHeight() / 2.0, 15.0, h);
             }
             else
             {
-                g.setColour(juce::Colours::green);
+
                 float h = juce::jmap<float>(v, 0.0, 1.0, 0.0, getHeight() / 2);
                 g.fillRect(xcor, getHeight() / 2.0 - h, 15.0, h);
             }
@@ -151,8 +160,9 @@ struct StepSeqComponent : public juce::Component, public juce::Timer
         g.drawLine(150.0f, getHeight() / 2.0f, getWidth(), getHeight() / 2.0f);
     }
     juce::TextButton loadStepsBut;
+    juce::ToggleButton unipolarBut;
     ToneGranulator *gr = nullptr;
-    int sindex = 0;
+    uint32_t sindex = 0;
 };
 
 struct ModulationRowComponent : public juce::Component
