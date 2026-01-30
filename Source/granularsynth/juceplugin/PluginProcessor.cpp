@@ -99,7 +99,7 @@ void AudioPluginAudioProcessor::changeProgramName(int index, const juce::String 
 //==============================================================================
 void AudioPluginAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 {
-    juce::ignoreUnused(sampleRate, samplesPerBlock);
+    perfMeasurer.reset(sampleRate, samplesPerBlock);
     workBuffer.resize(samplesPerBlock * 32);
     granulator.prepare(sampleRate, {}, 3, 0, 0.001f, 0.001f);
 }
@@ -126,6 +126,7 @@ bool AudioPluginAudioProcessor::isBusesLayoutSupported(const BusesLayout &layout
 void AudioPluginAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
                                              juce::MidiBuffer &midiMessages)
 {
+    juce::AudioProcessLoadMeasurer::ScopedTimer perftimer(perfMeasurer, buffer.getNumSamples());
     juce::ignoreUnused(midiMessages);
 
     juce::ScopedNoDenormals noDenormals;
@@ -154,11 +155,12 @@ void AudioPluginAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
     ThreadMessage msg;
     while (from_gui_fifo.pop(msg))
     {
-        if (msg.opcode == 100 && msg.filterindex >= 0 && msg.filterindex < 2)
+        if (msg.opcode == ThreadMessage::OP_FILTERTYPE && msg.filterindex >= 0 &&
+            msg.filterindex < 2)
         {
             granulator.set_filter(msg.filterindex, msg.filtermodel, msg.filterconfig);
         }
-        if (msg.opcode == 2 && msg.lfoindex >= 0)
+        if (msg.opcode == ThreadMessage::OP_LFOPARAM && msg.lfoindex >= 0)
         {
             granulator.modmatrix.lfo_shapes[msg.lfoindex] = msg.lfoshape;
             granulator.modmatrix.lfo_rates[msg.lfoindex] = msg.lforate;
@@ -167,7 +169,7 @@ void AudioPluginAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
             granulator.modmatrix.lfo_warps[msg.lfoindex] = msg.lfowarp;
             granulator.modmatrix.lfo_unipolars[msg.lfoindex] = msg.lfounipolar;
         }
-        if (msg.opcode == 1)
+        if (msg.opcode == ThreadMessage::OP_MODROUTING)
         {
             auto &mm = granulator.modmatrix;
             if (msg.moddest >= 1)

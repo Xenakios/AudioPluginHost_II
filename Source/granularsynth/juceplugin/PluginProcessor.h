@@ -66,12 +66,12 @@ class AudioPluginAudioProcessor final : public juce::AudioProcessor
     ToneGranulator granulator;
     choc::fifo::SingleReaderSingleWriterFIFO<ThreadMessage> from_gui_fifo;
     choc::fifo::SingleReaderSingleWriterFIFO<ThreadMessage> to_gui_fifo;
-
+    juce::AudioProcessLoadMeasurer perfMeasurer;
   private:
     std::vector<float> workBuffer;
     int prior_ambi_order = -1;
-
     std::unordered_map<juce::AudioProcessorParameter *, int> jucepartoindex;
+    
     void sendExtraStatesToGUI();
     //==============================================================================
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(AudioPluginAudioProcessor)

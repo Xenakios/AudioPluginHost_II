@@ -6,6 +6,7 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor(AudioPluginAudi
     : AudioProcessorEditor(&p), processorRef(p),
       lfoTabs(juce::TabbedButtonBar::Orientation::TabsAtTop)
 {
+    /*
     addAndMakeVisible(loadModulationSettingsBut);
     loadModulationSettingsBut.setButtonText("LOAD MOD");
     loadModulationSettingsBut.onClick = [this]() {
@@ -14,6 +15,8 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor(AudioPluginAudi
             R"(C:\develop\AudioPluginHost_mk2\Source\granularsynth\modmatrixconf.json)");
         processorRef.suspendProcessing(false);
     };
+    */
+    addAndMakeVisible(infoLabel);
     addAndMakeVisible(filter0But);
     filter0But.setButtonText("F1");
     filter0But.onClick = [this]() { showFilterMenu(0); };
@@ -177,6 +180,8 @@ void AudioPluginAudioProcessorEditor::showFilterMenu(int whichfilter)
 
 void AudioPluginAudioProcessorEditor::timerCallback()
 {
+    infoLabel.setText(std::format("CPU Load {:3.0f}%", processorRef.perfMeasurer.getLoadAsPercentage()),
+                      juce::dontSendNotification);
     for (auto &c : stepcomps)
     {
         c->updateGUI();
@@ -239,5 +244,6 @@ void AudioPluginAudioProcessorEditor::resized()
     {
         modRowComps[i]->setBounds(1, yoffs + i * 26, getWidth() - 2, 25);
     }
-    loadModulationSettingsBut.setBounds(1, getHeight() - 25, 100, 24);
+    infoLabel.setBounds(0, getHeight() - 25, getWidth(), 24);
+    // loadModulationSettingsBut.setBounds(1, getHeight() - 25, 100, 24);
 }

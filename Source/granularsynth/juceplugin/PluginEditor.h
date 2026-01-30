@@ -315,6 +315,7 @@ class AudioPluginAudioProcessorEditor final : public juce::AudioProcessorEditor,
     std::vector<std::unique_ptr<LFOComponent>> lfocomps;
     juce::TabbedComponent lfoTabs;
     std::vector<std::unique_ptr<StepSeqComponent>> stepcomps;
+    juce::Label infoLabel;
     void showFilterMenu(int whichfilter);
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(AudioPluginAudioProcessorEditor)
 };
