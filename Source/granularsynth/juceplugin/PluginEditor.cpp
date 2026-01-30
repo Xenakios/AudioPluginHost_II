@@ -62,7 +62,7 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor(AudioPluginAudi
             if (slot >= 0 && src >= 0 && dest >= 0)
             {
                 ThreadMessage msg;
-                msg.opcode = 1;
+                msg.opcode = ThreadMessage::OP_MODROUTING;
                 msg.modslot = slot;
                 msg.modsource = src;
                 msg.modvia = via;
@@ -83,7 +83,7 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor(AudioPluginAudi
         lfoc->stateChangedCallback = [this](int lfoindex, int shape, float rateval, float deformval,
                                             float shift, float warp, bool uni) {
             ThreadMessage msg;
-            msg.opcode = 2;
+            msg.opcode = ThreadMessage::OP_LFOPARAM;
             msg.lfoindex = lfoindex;
             msg.lfoshape = shape;
             msg.lforate = rateval;
@@ -144,7 +144,7 @@ void AudioPluginAudioProcessorEditor::showFilterMenu(int whichfilter)
                 }
                 submenu.addItem(address, [this, mod, s, address, whichfilter]() {
                     ThreadMessage msg;
-                    msg.opcode = 100;
+                    msg.opcode = ThreadMessage::OP_FILTERTYPE;
                     msg.filterindex = whichfilter;
                     msg.filtermodel = mod;
                     msg.filterconfig = s;
@@ -161,7 +161,7 @@ void AudioPluginAudioProcessorEditor::showFilterMenu(int whichfilter)
         {
             menu.addItem(sfpp::toString(mod), [this, mod, whichfilter]() {
                 ThreadMessage msg;
-                msg.opcode = 100;
+                msg.opcode = ThreadMessage::OP_FILTERTYPE;
                 msg.filterindex = whichfilter;
                 msg.filtermodel = mod;
                 processorRef.from_gui_fifo.push(msg);

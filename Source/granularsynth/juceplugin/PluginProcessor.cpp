@@ -389,7 +389,7 @@ void AudioPluginAudioProcessor::sendExtraStatesToGUI()
     for (int i = 0; i < granulator.modmatrix.numLfos; ++i)
     {
         ThreadMessage msg;
-        msg.opcode = 2;
+        msg.opcode = ThreadMessage::OP_LFOPARAM;
         msg.lfoindex = i;
         msg.lforate = granulator.modmatrix.lfo_rates[i];
         msg.lfoshape = granulator.modmatrix.lfo_shapes[i];
@@ -405,7 +405,7 @@ void AudioPluginAudioProcessor::sendExtraStatesToGUI()
         if (mm.rt.routes[i].source && mm.rt.routes[i].target)
         {
             ThreadMessage msg;
-            msg.opcode = 1;
+            msg.opcode = ThreadMessage::OP_MODROUTING;
             msg.modslot = i;
             msg.modsource = mm.rt.routes[i].source->src;
             if (mm.rt.routes[i].sourceVia)

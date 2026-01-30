@@ -6,7 +6,14 @@
 
 struct ThreadMessage
 {
-    int16_t opcode = 0;
+    enum OpCode
+    {
+        OP_NOOP,
+        OP_MODROUTING,
+        OP_LFOPARAM,
+        OP_FILTERTYPE
+    };
+    OpCode opcode = OP_NOOP;
     int16_t modslot = -1;
     int modsource = -1;
     int modvia = 0;
