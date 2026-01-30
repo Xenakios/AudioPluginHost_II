@@ -140,7 +140,9 @@ struct StepSeqComponent : public juce::Component, public juce::Timer
     {
         auto &msrc = gr->stepModSources[sindex];
         g.setColour(juce::Colours::green);
-        for (int i = 0; i < msrc.numactivesteps; ++i)
+        int maxstepstodraw = (getWidth() - 150) / 16;
+        int stepstodraw = std::min<int>(maxstepstodraw, msrc.numactivesteps);
+        for (int i = 0; i < stepstodraw; ++i)
         {
             float xcor = 150.0 + i * 16.0;
             float v = msrc.steps[i];

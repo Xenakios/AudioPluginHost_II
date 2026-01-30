@@ -935,7 +935,8 @@ class ToneGranulator
     {
         for (auto &v : stepModValues)
             v = 0.0f;
-        // stepModSources[0].setSteps({-1.0f, 1.0f});
+        stepModSources[0].setSteps({-1.0f, 1.0f});
+        /*
         stepModSources[0].setSteps(generate_from_js(R"(
         function generate_steps()
         {
@@ -950,15 +951,16 @@ class ToneGranulator
         }
         
     )"));
-        // stepModSources[1].setSteps({-1.0f, 0.0f, 1.0f});
+        */
+        stepModSources[1].setSteps({-1.0f, 0.0f, 1.0f});
         stepModSources[2].setSteps({-1.0f, -0.33333333333333337f, 0.33333333333333326f, 1.0f});
         stepModSources[3].setSteps({-1.0f, -0.5f, 0.0f, 0.5f, 1.0f});
         for (size_t i = 0; i < 4; ++i)
         {
-            stepModSources[4 + i].steps.resize(16384);
-            stepModSources[4 + i].numactivesteps = 16384;
+            stepModSources[4 + i].steps.resize(StepModSource::maxSteps);
+            stepModSources[4 + i].numactivesteps = StepModSource::maxSteps;
         }
-        for (size_t i = 0; i < 16384; ++i)
+        for (size_t i = 0; i < StepModSource::maxSteps; ++i)
         {
             stepModSources[4].steps[i] = rng.nextFloatInRange(-1.0f, 1.0f);
             stepModSources[5].steps[i] = rng.nextFloatInRange(-1.0f, 1.0f);
