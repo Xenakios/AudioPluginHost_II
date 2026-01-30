@@ -177,6 +177,10 @@ void AudioPluginAudioProcessorEditor::showFilterMenu(int whichfilter)
 
 void AudioPluginAudioProcessorEditor::timerCallback()
 {
+    for (auto &c : stepcomps)
+    {
+        c->updateGUI();
+    }
     ThreadMessage msg;
     while (processorRef.to_gui_fifo.pop(msg))
     {

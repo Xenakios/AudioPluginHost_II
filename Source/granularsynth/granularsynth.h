@@ -837,7 +837,7 @@ class StepModSource
         if (curstep >= numactivesteps)
             curstep = 0;
         if (unipolar.load())
-            result = (result + 2.0f) * 0.5f;
+            result = (result + 1.0f) * 0.5f;
         return result;
     }
 };

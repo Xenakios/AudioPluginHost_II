@@ -92,9 +92,15 @@ struct LFOComponent : public juce::Component
     juce::ToggleButton unipolarButton;
 };
 
-struct StepSeqComponent : public juce::Component, public juce::Timer
+struct StepSeqComponent : public juce::Component
 {
-    void timerCallback() override { repaint(); }
+
+    void updateGUI()
+    {
+        unipolarBut.setToggleState(gr->stepModSources[sindex].unipolar.load(),
+                                   juce::dontSendNotification);
+        repaint();
+    }
     StepSeqComponent(int seqindex, ToneGranulator *g) : gr(g), sindex(seqindex)
     {
         addAndMakeVisible(loadStepsBut);
@@ -129,7 +135,7 @@ struct StepSeqComponent : public juce::Component, public juce::Timer
         unipolarBut.onClick = [this]() {
             gr->stepModSources[sindex].unipolar.store(unipolarBut.getToggleState());
         };
-        startTimer(100);
+        
     }
     void resized() override
     {
