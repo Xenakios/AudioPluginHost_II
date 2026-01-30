@@ -949,7 +949,7 @@ class ToneGranulator
             }
             return arr;
         }
-        
+
     )"));
         */
         stepModSources[1].setSteps({-1.0f, 0.0f, 1.0f});
@@ -1065,7 +1065,7 @@ class ToneGranulator
                                    .withID(PAR_FMFEEDBACK)
                                    .withFlags(CLAP_PARAM_IS_MODULATABLE));
         parmetadatas.push_back(pmd()
-                                   .withRange(-48.0, 48.0)
+                                   .withRange(-48.0, 64.0)
                                    .withDefault(0.0)
                                    .withName("Filter 1 Frequency")
                                    .withID(PAR_F0CO)
@@ -1079,7 +1079,7 @@ class ToneGranulator
                                    .withGroupName("Filter 1")
                                    .withFlags(CLAP_PARAM_IS_MODULATABLE));
         parmetadatas.push_back(pmd()
-                                   .withRange(-48.0, 48.0)
+                                   .withRange(-48.0, 64.0)
                                    .withDefault(0.0)
                                    .withName("Filter 2 Frequency")
                                    .withID(PAR_F1CO)

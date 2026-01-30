@@ -107,10 +107,13 @@ struct StepSeqComponent : public juce::Component
         loadStepsBut.setButtonText("Run Python");
         loadStepsBut.onClick = [this, seqindex]() {
             juce::ChildProcess cp;
+            double t0 = juce::Time::getMillisecondCounterHiRes();
             cp.start(std::format(
                 R"(python C:\develop\AudioPluginHost_mk2\Source\granularsynth\stepseq.py {})",
                 seqindex));
             auto data = cp.readAllProcessOutput();
+            double t1 = juce::Time::getMillisecondCounterHiRes();
+            DBG("running ext program took " << t1 - t0 << " millisecods");
             if (!data.containsIgnoreCase("error"))
             {
                 auto tokens = juce::StringArray::fromTokens(data, false);
@@ -135,7 +138,6 @@ struct StepSeqComponent : public juce::Component
         unipolarBut.onClick = [this]() {
             gr->stepModSources[sindex].unipolar.store(unipolarBut.getToggleState());
         };
-        
     }
     void resized() override
     {
