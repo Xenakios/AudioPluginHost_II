@@ -126,7 +126,7 @@ struct StepSeqComponent : public juce::Component
                     // DBG(v);
                     steps.push_back(v);
                 }
-                gr->stepModSources[sindex].setSteps(steps);
+                gr->setStepSequenceSteps(sindex, steps);
             }
             else
             {

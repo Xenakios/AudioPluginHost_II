@@ -13,7 +13,7 @@ AudioPluginAudioProcessor::AudioPluginAudioProcessor()
 #endif
       )
 {
-    
+
     from_gui_fifo.reset(1024);
     to_gui_fifo.reset(1024);
     for (int i = 0; i < granulator.parmetadatas.size(); ++i)
@@ -172,15 +172,7 @@ void AudioPluginAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
             auto &mm = granulator.modmatrix;
             if (msg.moddest >= 1)
             {
-                if (msg.moddest == ToneGranulator::PAR_PITCH ||
-                    msg.moddest == ToneGranulator::PAR_FMPITCH ||
-                    msg.moddest == ToneGranulator::PAR_F0CO)
-                    msg.depth *= 24.0f;
-                if (msg.moddest == ToneGranulator::PAR_AZIMUTH ||
-                    msg.moddest == ToneGranulator::PAR_ELEVATION)
-                    msg.depth *= 30.0f;
-                if (msg.moddest == ToneGranulator::PAR_MAINVOLUME)
-                    msg.depth *= 12.0f;
+                msg.depth *= granulator.modRanges.at(msg.moddest);
                 mm.rt.updateActiveAt(msg.modslot, true);
                 // DBG(msg.modslot << " " << msg.modsource << " " << msg.depth << " " <<
                 // msg.moddest);
@@ -420,15 +412,7 @@ void AudioPluginAudioProcessor::sendExtraStatesToGUI()
                 msg.modvia = mm.rt.routes[i].sourceVia->src;
             msg.depth = mm.rt.routes[i].depth;
             msg.moddest = mm.rt.routes[i].target->baz;
-            if (msg.moddest == ToneGranulator::PAR_PITCH ||
-                msg.moddest == ToneGranulator::PAR_FMPITCH ||
-                msg.moddest == ToneGranulator::PAR_F0CO)
-                msg.depth /= 24.0f;
-            if (msg.moddest == ToneGranulator::PAR_AZIMUTH ||
-                msg.moddest == ToneGranulator::PAR_ELEVATION)
-                msg.depth /= 30.0f;
-            if (msg.moddest == ToneGranulator::PAR_OSC_SYNC)
-                msg.depth /= 4.0;
+            msg.depth /= granulator.modRanges.at(msg.moddest);
             to_gui_fifo.push(msg);
         }
     }
