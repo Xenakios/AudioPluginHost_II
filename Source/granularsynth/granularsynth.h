@@ -86,7 +86,10 @@ struct GranulatorModConfig
         case CURVE_CUBE:
             return [](auto x) { return x * x * x; };
         case CURVE_STEPS4:
-            return [](auto x) { return std::round(x * 4.0) / 4.0; };
+            return [id](auto x) {
+                float steps = std::clamp((int)id.par0, 2, 16);
+                return std::round(x * steps) / steps;
+            };
         case CURVE_EXPSIN1:
             return [](auto x) { return expsin(x, 1, 8.0f); };
         case 6:
@@ -109,7 +112,6 @@ template <> struct std::hash<GranulatorModConfig::MyCurve>
         return h1;
     }
 };
-
 
 template <> struct std::hash<GranulatorModConfig::SourceIdentifier>
 {

@@ -19,6 +19,7 @@ struct ThreadMessage
     int modsource = -1;
     int modvia = 0;
     int modcurve = 0;
+    float modcurvepar0 = 0.0f;
     float depth = 0.0f;
     int moddest = -1;
     int16_t lfoindex = -1;
@@ -69,11 +70,12 @@ class AudioPluginAudioProcessor final : public juce::AudioProcessor
     choc::fifo::SingleReaderSingleWriterFIFO<ThreadMessage> from_gui_fifo;
     choc::fifo::SingleReaderSingleWriterFIFO<ThreadMessage> to_gui_fifo;
     juce::AudioProcessLoadMeasurer perfMeasurer;
+
   private:
     std::vector<float> workBuffer;
     int prior_ambi_order = -1;
     std::unordered_map<juce::AudioProcessorParameter *, int> jucepartoindex;
-    
+
     void sendExtraStatesToGUI();
     //==============================================================================
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(AudioPluginAudioProcessor)

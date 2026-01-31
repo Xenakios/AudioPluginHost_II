@@ -71,6 +71,7 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor(AudioPluginAudi
                 msg.modvia = args.via;
                 msg.moddest = args.target;
                 msg.modcurve = args.curve;
+                msg.modcurvepar0 = args.curvepar0;
                 msg.opcode = ThreadMessage::OP_MODROUTING;
                 if (args.onlydepth)
                 {

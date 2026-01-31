@@ -188,7 +188,7 @@ void AudioPluginAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
                 mm.rt.updateRoutingAt(
                     msg.modslot, GranulatorModConfig::SourceIdentifier{(uint32_t)msg.modsource},
                     GranulatorModConfig::SourceIdentifier{(uint32_t)msg.modvia},
-                    GranulatorModConfig::MyCurve{msg.modcurve},
+                    GranulatorModConfig::MyCurve{msg.modcurve, msg.modcurvepar0},
                     GranulatorModConfig::TargetIdentifier{msg.moddest}, msg.depth);
                 if (msg.modvia == 0)
                 {

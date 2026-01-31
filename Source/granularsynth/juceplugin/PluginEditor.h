@@ -199,6 +199,7 @@ struct ModulationRowComponent : public juce::Component
                                 sourceCombo.getSelectedId() - 1,
                                 viaCombo.getSelectedId() - 1,
                                 curveCombo.getSelectedId() - 1,
+                                curveParEditor.getText().getFloatValue(),
                                 (float)depthSlider.getValue(),
                                 targetID};
             stateChangedCallback(pars);
@@ -223,6 +224,7 @@ struct ModulationRowComponent : public juce::Component
                                 sourceCombo.getSelectedId() - 1,
                                 viaCombo.getSelectedId() - 1,
                                 curveCombo.getSelectedId() - 1,
+                                curveParEditor.getText().getFloatValue(),
                                 (float)depthSlider.getValue(),
                                 targetID};
             stateChangedCallback(pars);
@@ -251,6 +253,10 @@ struct ModulationRowComponent : public juce::Component
         curveCombo.addItem(juce::CharPointer_UTF8("EXPSINE 2"), mcf::CURVE_EXPSIN2 + 1);
         curveCombo.setSelectedId(mcf::CURVE_LINEAR + 1, juce::dontSendNotification);
         curveCombo.onChange = updatfunc;
+
+        addAndMakeVisible(curveParEditor);
+        curveParEditor.setText("0.0", juce::dontSendNotification);
+        curveParEditor.onReturnKey = updatfunc;
 
         addAndMakeVisible(destButton);
         destButton.onClick = [this, g, updatfunc]() {
@@ -315,6 +321,7 @@ struct ModulationRowComponent : public juce::Component
         layout.items.add(juce::FlexItem(depthSlider).withFlex(2.0));
         // layout.items.add(juce::FlexItem(destCombo).withFlex(1.0));
         layout.items.add(juce::FlexItem(curveCombo).withFlex(0.5));
+        layout.items.add(juce::FlexItem(curveParEditor).withFlex(0.5));
         layout.items.add(juce::FlexItem(destButton).withFlex(1.0));
         layout.performLayout(juce::Rectangle<int>{0, 0, getWidth(), getHeight()});
     }
@@ -326,6 +333,7 @@ struct ModulationRowComponent : public juce::Component
         int source = 0;
         int via = 0;
         int curve = 1;
+        float curvepar0 = 0.0f;
         float depth = 0.0f;
         uint32_t target;
     };
@@ -336,6 +344,7 @@ struct ModulationRowComponent : public juce::Component
     juce::ComboBox viaCombo;
     juce::Slider depthSlider;
     juce::ComboBox curveCombo;
+    juce::TextEditor curveParEditor;
     juce::ComboBox destCombo;
     juce::TextButton destButton;
 };
