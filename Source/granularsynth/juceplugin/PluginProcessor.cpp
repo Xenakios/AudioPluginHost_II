@@ -273,6 +273,18 @@ void AudioPluginAudioProcessor::getStateInformation(juce::MemoryBlock &destData)
         mainparams.setMember(id, p->convertFrom0to1(p->getValue()));
     }
     state.setMember("params", mainparams);
+    auto filterstates = choc::value::createEmptyArray();
+    for (int i = 0; i < 2; ++i)
+    {
+        auto filterstate = choc::value::createObject("filterstate");
+        filterstate.setMember("model", (int64_t)granulator.filtersModels[i]);
+        filterstate.setMember("pt", (int64_t)granulator.filtersConfigs[i].pt);
+        filterstate.setMember("st", (int64_t)granulator.filtersConfigs[i].st);
+        filterstate.setMember("dt", (int64_t)granulator.filtersConfigs[i].dt);
+        filterstate.setMember("mt", (int64_t)granulator.filtersConfigs[i].mt);
+        filterstates.addArrayElement(filterstate);
+    }
+    state.setMember("filterstates", filterstates);
     auto lfostates = choc::value::createEmptyArray();
     for (int i = 0; i < GranulatorModMatrix::numLfos; ++i)
     {
@@ -333,6 +345,30 @@ void AudioPluginAudioProcessor::setStateInformation(const void *data, int sizeIn
             }
         }
         suspendProcessing(true);
+        if (state.hasObjectMember("filterstates"))
+        {
+            auto filterstates = state["filterstates"];
+            for (int i = 0; i < filterstates.size(); ++i)
+            {
+                auto filterstate = filterstates[i];
+                if (i < 2)
+                {
+                    sfpp::FilterModel m = (sfpp::FilterModel)filterstate["model"].getWithDefault(0);
+                    sfpp::ModelConfig conf;
+                    conf.dt = (decltype(conf.dt))filterstate["dt"].getWithDefault(0);
+                    conf.st = (decltype(conf.st))filterstate["st"].getWithDefault(0);
+                    conf.mt = (decltype(conf.mt))filterstate["mt"].getWithDefault(0);
+                    conf.pt = (decltype(conf.pt))filterstate["pt"].getWithDefault(0);
+                    ThreadMessage msg;
+                    msg.opcode = ThreadMessage::OP_FILTERTYPE;
+                    msg.filterindex = i;
+                    msg.filtermodel = m;
+                    msg.filterconfig = conf;
+                    from_gui_fifo.push(msg);
+                    
+                }
+            }
+        }
         if (state.hasObjectMember("lfostates"))
         {
             auto lfostates = state["lfostates"];

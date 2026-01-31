@@ -1167,12 +1167,15 @@ class ToneGranulator
         }
         init_filter_infos();
     }
-
+    std::array<sfpp::FilterModel, 2> filtersModels{sfpp::FilterModel(), sfpp::FilterModel()};
+    std::array<sfpp::ModelConfig, 2> filtersConfigs{sfpp::ModelConfig(), sfpp::ModelConfig()};
     void set_filter(int which, sfpp::FilterModel mo, sfpp::ModelConfig conf)
     {
         FilterInfo finfo;
         finfo.model = mo;
         finfo.modelconfig = conf;
+        filtersModels[which] = mo;
+        filtersConfigs[which] = conf;
         for (int i = 0; i < numvoices; ++i)
         {
             auto &v = voices[i];
@@ -1180,8 +1183,8 @@ class ToneGranulator
             v->set_filter_type(which, finfo);
         }
     }
-    void initFilter(double sr, int filter_routing, std::string filttype0, std::string filttype1,
-                    float taillen, float tailfadelen)
+    void initFilterri(double sr, int filter_routing, std::string filttype0, std::string filttype1,
+                      float taillen, float tailfadelen)
     {
         const FilterInfo *filter0info = nullptr;
         const FilterInfo *filter1info = nullptr;
