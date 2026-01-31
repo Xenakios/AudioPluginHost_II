@@ -36,11 +36,12 @@ struct LFOComponent : public juce::Component
         };
         addAndMakeVisible(shapeCombo);
         shapeCombo.addItem("SINE", 1);
-        shapeCombo.addItem("RAMP", 2);
-        shapeCombo.addItem("TRIANGLE", 4);
-        shapeCombo.addItem("SQUARE", 5);
+        // shapeCombo.addItem("RAMP", 2);
+        // shapeCombo.addItem("TRIANGLE", 4);
+        shapeCombo.addItem("SINE->SQUARE->TRIANGLE", 5);
         shapeCombo.addItem("SMOOTH NOISE", 6);
         shapeCombo.addItem("S&H NOISE", 7);
+        shapeCombo.addItem("DOWN->TRI->UP", 9);
         shapeCombo.onChange = upfunc;
 
         addAndMakeVisible(rateSlider);
@@ -75,7 +76,7 @@ struct LFOComponent : public juce::Component
     }
     void resized()
     {
-        shapeCombo.setBounds(0, 0, 100, 25);
+        shapeCombo.setBounds(0, 0, 200, 25);
         unipolarButton.setBounds(shapeCombo.getRight() + 1, 0, 100, 25);
         rateSlider.setBounds(0, shapeCombo.getBottom() + 1, 200, 25);
         deformSlider.setBounds(0, rateSlider.getBottom() + 1, 200, 25);
