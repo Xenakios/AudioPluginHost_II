@@ -198,6 +198,7 @@ struct ModulationRowComponent : public juce::Component
                                 modslotindex,
                                 sourceCombo.getSelectedId() - 1,
                                 viaCombo.getSelectedId() - 1,
+                                curveCombo.getSelectedId() - 1,
                                 (float)depthSlider.getValue(),
                                 targetID};
             stateChangedCallback(pars);
@@ -221,6 +222,7 @@ struct ModulationRowComponent : public juce::Component
                                 modslotindex,
                                 sourceCombo.getSelectedId() - 1,
                                 viaCombo.getSelectedId() - 1,
+                                curveCombo.getSelectedId() - 1,
                                 (float)depthSlider.getValue(),
                                 targetID};
             stateChangedCallback(pars);
@@ -238,6 +240,16 @@ struct ModulationRowComponent : public juce::Component
         }
         destCombo.setSelectedItemIndex(0, juce::dontSendNotification);
         destCombo.onChange = updatfunc;
+
+        addAndMakeVisible(curveCombo);
+        curveCombo.addItem(juce::CharPointer_UTF8("-"), 2);
+        curveCombo.addItem(juce::CharPointer_UTF8("x²"), 3);
+        curveCombo.addItem(juce::CharPointer_UTF8("x³"), 4);
+        curveCombo.addItem(juce::CharPointer_UTF8("4 steps"), 5);
+        curveCombo.addItem(juce::CharPointer_UTF8("EXPSINE 1"), 6);
+        curveCombo.addItem(juce::CharPointer_UTF8("EXPSINE 2"), 7);
+        curveCombo.setSelectedId(2, juce::dontSendNotification);
+        curveCombo.onChange = updatfunc;
 
         addAndMakeVisible(destButton);
         destButton.onClick = [this, g, updatfunc]() {
@@ -301,6 +313,7 @@ struct ModulationRowComponent : public juce::Component
         layout.items.add(juce::FlexItem(viaCombo).withFlex(1.0));
         layout.items.add(juce::FlexItem(depthSlider).withFlex(2.0));
         // layout.items.add(juce::FlexItem(destCombo).withFlex(1.0));
+        layout.items.add(juce::FlexItem(curveCombo).withFlex(0.5));
         layout.items.add(juce::FlexItem(destButton).withFlex(1.0));
         layout.performLayout(juce::Rectangle<int>{0, 0, getWidth(), getHeight()});
     }
@@ -311,6 +324,7 @@ struct ModulationRowComponent : public juce::Component
         int slot = 0;
         int source = 0;
         int via = 0;
+        int curve = 1;
         float depth = 0.0f;
         uint32_t target;
     };
@@ -320,6 +334,7 @@ struct ModulationRowComponent : public juce::Component
     juce::ComboBox sourceCombo;
     juce::ComboBox viaCombo;
     juce::Slider depthSlider;
+    juce::ComboBox curveCombo;
     juce::ComboBox destCombo;
     juce::TextButton destButton;
 };

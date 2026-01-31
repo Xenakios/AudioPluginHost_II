@@ -70,6 +70,7 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor(AudioPluginAudi
                 msg.modsource = args.source;
                 msg.modvia = args.via;
                 msg.moddest = args.target;
+                msg.modcurve = args.curve;
                 msg.opcode = ThreadMessage::OP_MODROUTING;
                 if (args.onlydepth)
                 {
@@ -218,6 +219,8 @@ void AudioPluginAudioProcessorEditor::timerCallback()
             modRowComps[msg.modslot]->destCombo.setSelectedId(msg.moddest,
                                                               juce::dontSendNotification);
             modRowComps[msg.modslot]->setTarget(msg.moddest);
+            modRowComps[msg.modslot]->curveCombo.setSelectedId(msg.modcurve + 1,
+                                                               juce::dontSendNotification);
         }
     }
 }

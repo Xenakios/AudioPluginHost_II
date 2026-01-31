@@ -187,7 +187,7 @@ void AudioPluginAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
                 // msg.moddest);
                 mm.rt.updateRoutingAt(
                     msg.modslot, GranulatorModConfig::SourceIdentifier{(uint32_t)msg.modsource},
-                    GranulatorModConfig::SourceIdentifier{(uint32_t)msg.modvia}, {},
+                    GranulatorModConfig::SourceIdentifier{(uint32_t)msg.modvia}, msg.modcurve,
                     GranulatorModConfig::TargetIdentifier{msg.moddest}, msg.depth);
                 if (msg.modvia == 0)
                 {
@@ -314,6 +314,8 @@ void AudioPluginAudioProcessor::getStateInformation(juce::MemoryBlock &destData)
             routingstate.setMember("depth", mm.rt.routes[i].depth);
             if (mm.rt.routes[i].target)
                 routingstate.setMember("dest", (int)(mm.rt.routes[i].target->baz));
+            if (mm.rt.routes[i].curve)
+                routingstate.setMember("curve", *mm.rt.routes[i].curve);
             modroutings.addArrayElement(routingstate);
         }
     }
@@ -365,7 +367,6 @@ void AudioPluginAudioProcessor::setStateInformation(const void *data, int sizeIn
                     msg.filtermodel = m;
                     msg.filterconfig = conf;
                     from_gui_fifo.push(msg);
-                    
                 }
             }
         }
@@ -403,10 +404,11 @@ void AudioPluginAudioProcessor::setStateInformation(const void *data, int sizeIn
                     mm.rt.updateActiveAt(slot, true);
                     uint32_t src = rstate["source"].getWithDefault(0);
                     uint32_t srcvia = rstate["via"].getWithDefault(0);
+                    int curve = rstate["curve"].getWithDefault(1);
                     float d = rstate["depth"].get<float>();
                     int dest = rstate["dest"].getWithDefault(1);
                     mm.rt.updateRoutingAt(slot, GranulatorModConfig::SourceIdentifier{src},
-                                          GranulatorModConfig::SourceIdentifier{srcvia}, {},
+                                          GranulatorModConfig::SourceIdentifier{srcvia}, curve,
                                           GranulatorModConfig::TargetIdentifier{dest}, d);
                     if (srcvia == 0)
                         mm.rt.routes[slot].sourceVia = std::nullopt;
@@ -451,6 +453,7 @@ void AudioPluginAudioProcessor::sendExtraStatesToGUI()
                 msg.modvia = mm.rt.routes[i].sourceVia->src;
             msg.depth = mm.rt.routes[i].depth;
             msg.moddest = mm.rt.routes[i].target->baz;
+            msg.modcurve = mm.rt.routes[i].curve.value_or(1);
             auto it = granulator.modRanges.find(msg.moddest);
             if (it != granulator.modRanges.end())
                 msg.depth /= it->second;

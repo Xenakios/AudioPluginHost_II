@@ -57,12 +57,26 @@ struct GranulatorModConfig
     {
         switch (id)
         {
-        case 2:
-            return [](auto x) { return std::sin(x); };
         case 1:
-            return [](auto x) { return x * x * x; };
+            return [](auto x) { return x; };
+        case 2:
+            return [](auto x) { return x * x; };
         case 3:
+            return [](auto x) { return x * x * x; };
+        case 4:
             return [](auto x) { return std::round(x * 4.0) / 4.0; };
+        case 5:
+            return [](auto x) {
+                float norm = (x + 1.0f) * 0.5f;
+                float amplitude = norm * norm;
+                return amplitude * std::sin(2 * M_PI * norm * 8.0);
+            };
+        case 6:
+            return [](auto x) {
+                float norm = (x + 1.0f) * 0.5f;
+                float amplitude = norm * norm * norm;
+                return amplitude * std::sin(2 * M_PI * norm * 12.0);
+            };
         }
 
         return [](auto x) { return x; };
@@ -850,7 +864,7 @@ class ToneGranulator
     std::unordered_map<uint32_t, float> modRanges;
     float grain_pitch_mod = 0.0;
     float pulse_width = 0.5;
-    
+
     choc::fifo::SingleReaderSingleWriterFIFO<StepModSource::Message> fifo;
     int osc_type = 4;
     enum PARAMS

@@ -18,6 +18,7 @@ struct ThreadMessage
     int16_t modslot = -1;
     int modsource = -1;
     int modvia = 0;
+    int modcurve = 0;
     float depth = 0.0f;
     int moddest = -1;
     int16_t lfoindex = -1;
