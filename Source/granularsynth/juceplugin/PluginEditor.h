@@ -242,13 +242,14 @@ struct ModulationRowComponent : public juce::Component
         destCombo.onChange = updatfunc;
 
         addAndMakeVisible(curveCombo);
-        curveCombo.addItem(juce::CharPointer_UTF8("-"), 2);
-        curveCombo.addItem(juce::CharPointer_UTF8("x²"), 3);
-        curveCombo.addItem(juce::CharPointer_UTF8("x³"), 4);
-        curveCombo.addItem(juce::CharPointer_UTF8("4 steps"), 5);
-        curveCombo.addItem(juce::CharPointer_UTF8("EXPSINE 1"), 6);
-        curveCombo.addItem(juce::CharPointer_UTF8("EXPSINE 2"), 7);
-        curveCombo.setSelectedId(2, juce::dontSendNotification);
+        using mcf = GranulatorModConfig;
+        curveCombo.addItem(juce::CharPointer_UTF8("-"), mcf::CURVE_LINEAR + 1);
+        curveCombo.addItem(juce::CharPointer_UTF8("x²"), mcf::CURVE_SQUARE + 1);
+        curveCombo.addItem(juce::CharPointer_UTF8("x³"), mcf::CURVE_CUBE + 1);
+        curveCombo.addItem(juce::CharPointer_UTF8("4 steps"), mcf::CURVE_STEPS4 + 1);
+        curveCombo.addItem(juce::CharPointer_UTF8("EXPSINE 1"), mcf::CURVE_EXPSIN1 + 1);
+        curveCombo.addItem(juce::CharPointer_UTF8("EXPSINE 2"), mcf::CURVE_EXPSIN2 + 1);
+        curveCombo.setSelectedId(mcf::CURVE_LINEAR + 1, juce::dontSendNotification);
         curveCombo.onChange = updatfunc;
 
         addAndMakeVisible(destButton);

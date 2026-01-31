@@ -40,9 +40,6 @@ struct GranulatorModConfig
             // return baz == other.baz && nm == other.nm && depthPosition == other.depthPosition;
         }
     };
-
-    using CurveIdentifier = int;
-
     static bool isTargetModMatrixDepth(const TargetIdentifier &t) { return t.depthPosition >= 0; }
     static bool supportsLag(const SourceIdentifier &s) { return true; }
     static size_t getTargetModMatrixElement(const TargetIdentifier &t)
@@ -52,31 +49,48 @@ struct GranulatorModConfig
     }
 
     using RoutingExtraPayload = int;
-
+    struct MyCurve
+    {
+        int id = 0;
+        float par0 = 0.0f;
+        bool operator==(const MyCurve &other) { return id == other.id; }
+    };
+    using CurveIdentifier = MyCurve;
+    enum CurveTypes
+    {
+        CURVE_LINEAR = 1,
+        CURVE_SQUARE,
+        CURVE_CUBE,
+        CURVE_STEPS4,
+        CURVE_EXPSIN1,
+        CURVE_EXPSIN2
+    };
+    static float expsin(float x, int ampmode, float frequency)
+    {
+        float norm = (x + 1.0f) * 0.5f;
+        float amplitude = 1.0f;
+        if (ampmode == 1)
+            amplitude = norm * norm;
+        else if (ampmode == 2)
+            amplitude = norm * norm * norm;
+        return amplitude * std::sin(2 * M_PI * norm * frequency);
+    }
     static std::function<float(float)> getCurveOperator(CurveIdentifier id)
     {
-        switch (id)
+        switch (id.id)
         {
-        case 1:
+        case CURVE_LINEAR:
             return [](auto x) { return x; };
-        case 2:
+        case CURVE_SQUARE:
             return [](auto x) { return x * x; };
-        case 3:
+        case CURVE_CUBE:
             return [](auto x) { return x * x * x; };
-        case 4:
+        case CURVE_STEPS4:
             return [](auto x) { return std::round(x * 4.0) / 4.0; };
-        case 5:
-            return [](auto x) {
-                float norm = (x + 1.0f) * 0.5f;
-                float amplitude = norm * norm;
-                return amplitude * std::sin(2 * M_PI * norm * 8.0);
-            };
+        case CURVE_EXPSIN1:
+            return [](auto x) { return expsin(x, 1, 8.0f); };
         case 6:
-            return [](auto x) {
-                float norm = (x + 1.0f) * 0.5f;
-                float amplitude = norm * norm * norm;
-                return amplitude * std::sin(2 * M_PI * norm * 12.0);
-            };
+            return [](auto x) { return expsin(x, 2, 12.0f); };
         }
 
         return [](auto x) { return x; };
@@ -86,6 +100,16 @@ struct GranulatorModConfig
     static constexpr size_t FixedMatrixSize{16};
     static constexpr bool ProvidesNonZeroTargetBases{true};
 };
+
+template <> struct std::hash<GranulatorModConfig::MyCurve>
+{
+    std::size_t operator()(const GranulatorModConfig::MyCurve &c) const noexcept
+    {
+        auto h1 = std::hash<int>{}((int)c.id);
+        return h1;
+    }
+};
+
 
 template <> struct std::hash<GranulatorModConfig::SourceIdentifier>
 {
