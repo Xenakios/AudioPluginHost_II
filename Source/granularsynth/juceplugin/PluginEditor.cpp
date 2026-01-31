@@ -61,16 +61,20 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor(AudioPluginAudi
     {
         auto modcomp = std::make_unique<ModulationRowComponent>(&processorRef.granulator);
         modcomp->modslotindex = i;
-        modcomp->stateChangedCallback = [this](int slot, int src, int via, float val, int dest) {
-            if (slot >= 0 && src >= 0 && dest >= 0)
+        modcomp->stateChangedCallback = [this](ModulationRowComponent::CallbackParams args) {
+            if (args.slot >= 0 && args.source >= 0 && args.target >= 0)
             {
                 ThreadMessage msg;
+                msg.modslot = args.slot;
+                msg.depth = args.depth;
+                msg.modsource = args.source;
+                msg.modvia = args.via;
+                msg.moddest = args.target;
                 msg.opcode = ThreadMessage::OP_MODROUTING;
-                msg.modslot = slot;
-                msg.modsource = src;
-                msg.modvia = via;
-                msg.depth = val;
-                msg.moddest = dest;
+                if (args.onlydepth)
+                {
+                    msg.opcode = ThreadMessage::OP_MODPARAM;
+                }
                 processorRef.from_gui_fifo.push(msg);
             }
         };
@@ -192,7 +196,7 @@ void AudioPluginAudioProcessorEditor::timerCallback()
     ThreadMessage msg;
     while (processorRef.to_gui_fifo.pop(msg))
     {
-        if (msg.opcode == 2 && msg.lfoindex < lfocomps.size())
+        if (msg.opcode == ThreadMessage::OP_LFOPARAM && msg.lfoindex < lfocomps.size())
         {
             lfocomps[msg.lfoindex]->rateSlider.setValue(msg.lforate, juce::dontSendNotification);
             lfocomps[msg.lfoindex]->deformSlider.setValue(msg.lfodeform,
@@ -204,7 +208,7 @@ void AudioPluginAudioProcessorEditor::timerCallback()
             lfocomps[msg.lfoindex]->unipolarButton.setToggleState(msg.lfounipolar,
                                                                   juce::dontSendNotification);
         }
-        if (msg.opcode == 1 && msg.modslot < modRowComps.size())
+        if (msg.opcode == ThreadMessage::OP_MODROUTING && msg.modslot < modRowComps.size())
         {
             modRowComps[msg.modslot]->sourceCombo.setSelectedId(msg.modsource + 1,
                                                                 juce::dontSendNotification);

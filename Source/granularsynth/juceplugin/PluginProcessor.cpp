@@ -169,14 +169,19 @@ void AudioPluginAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
             granulator.modmatrix.lfo_warps[msg.lfoindex] = msg.lfowarp;
             granulator.modmatrix.lfo_unipolars[msg.lfoindex] = msg.lfounipolar;
         }
-        if (msg.opcode == ThreadMessage::OP_MODROUTING)
+        auto &mm = granulator.modmatrix;
+        if (msg.opcode == ThreadMessage::OP_MODROUTING || msg.opcode == ThreadMessage::OP_MODPARAM)
         {
-            auto &mm = granulator.modmatrix;
-            if (msg.moddest >= 1)
+            jassert(msg.moddest >= 1);
+            auto it = granulator.modRanges.find(msg.moddest);
+            if (it != granulator.modRanges.end())
+                msg.depth *= it->second;
+            if (msg.opcode == ThreadMessage::OP_MODPARAM)
             {
-                auto it = granulator.modRanges.find(msg.moddest);
-                if (it != granulator.modRanges.end())
-                    msg.depth *= it->second;
+                mm.rt.updateDepthAt(msg.modslot, msg.depth);
+            }
+            else
+            {
                 mm.rt.updateActiveAt(msg.modslot, true);
                 // DBG(msg.modslot << " " << msg.modsource << " " << msg.depth << " " <<
                 // msg.moddest);
@@ -188,12 +193,6 @@ void AudioPluginAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
                 {
                     mm.rt.routes[msg.modslot].sourceVia = std::nullopt;
                 }
-                mm.m.prepare(mm.rt, granulator.m_sr, granul_block_size);
-            }
-            else
-            {
-                // DBG("deactivated slot " << msg.modslot);
-                mm.rt.updateActiveAt(msg.modslot, false);
                 mm.m.prepare(mm.rt, granulator.m_sr, granul_block_size);
             }
         }

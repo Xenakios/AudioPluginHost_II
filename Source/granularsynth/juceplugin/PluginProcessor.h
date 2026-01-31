@@ -10,6 +10,7 @@ struct ThreadMessage
     {
         OP_NOOP,
         OP_MODROUTING,
+        OP_MODPARAM,
         OP_LFOPARAM,
         OP_FILTERTYPE
     };

@@ -192,9 +192,14 @@ struct ModulationRowComponent : public juce::Component
         addAndMakeVisible(viaCombo);
         addAndMakeVisible(depthSlider);
         addAndMakeVisible(destCombo);
-        auto updatfunc = [this]() {
-            stateChangedCallback(modslotindex, sourceCombo.getSelectedId() - 1,
-                                 viaCombo.getSelectedId() - 1, depthSlider.getValue(), targetID);
+        auto updatfunc = [this] {
+            CallbackParams pars{false,
+                                modslotindex,
+                                sourceCombo.getSelectedId() - 1,
+                                viaCombo.getSelectedId() - 1,
+                                (float)depthSlider.getValue(),
+                                targetID};
+            stateChangedCallback(pars);
         };
         for (int i = 0; i < g->modSources.size(); ++i)
         {
@@ -210,7 +215,15 @@ struct ModulationRowComponent : public juce::Component
 
         depthSlider.setRange(-1.0, 1.0);
         depthSlider.setNumDecimalPlacesToDisplay(2);
-        depthSlider.onValueChange = updatfunc;
+        depthSlider.onValueChange = [this]() {
+            CallbackParams pars{true,
+                                modslotindex,
+                                sourceCombo.getSelectedId() - 1,
+                                viaCombo.getSelectedId() - 1,
+                                (float)depthSlider.getValue(),
+                                targetID};
+            stateChangedCallback(pars);
+        };
         depthSlider.setTextBoxStyle(juce::Slider::TextEntryBoxPosition::TextBoxRight, false, 50,
                                     20);
 
@@ -291,7 +304,16 @@ struct ModulationRowComponent : public juce::Component
         layout.performLayout(juce::Rectangle<int>{0, 0, getWidth(), getHeight()});
     }
     ToneGranulator *gr = nullptr;
-    std::function<void(int, int, int, float, int)> stateChangedCallback;
+    struct CallbackParams
+    {
+        bool onlydepth = false;
+        int slot = 0;
+        int source = 0;
+        int via = 0;
+        float depth = 0.0f;
+        uint32_t target;
+    };
+    std::function<void(CallbackParams)> stateChangedCallback;
     int modslotindex = -1;
     uint32_t targetID = 1;
     juce::ComboBox sourceCombo;
