@@ -850,7 +850,7 @@ class ToneGranulator
     std::unordered_map<uint32_t, float> modRanges;
     float grain_pitch_mod = 0.0;
     float pulse_width = 0.5;
-    float noise_corr = 0.0;
+    
     choc::fifo::SingleReaderSingleWriterFIFO<StepModSource::Message> fifo;
     int osc_type = 4;
     enum PARAMS
@@ -874,7 +874,8 @@ class ToneGranulator
         PAR_FMFEEDBACK = 1700,
         PAR_OSC_SYNC = 1800,
         PAR_ENVMORPH = 1900,
-        PAR_GRAINVOLUME = 2000
+        PAR_GRAINVOLUME = 2000,
+        PAR_NOISECORRELATION = 2100
     };
     enum SI
     {
@@ -1068,6 +1069,13 @@ class ToneGranulator
                                    .withName("FM Feedback")
                                    .withGroupName("Oscillator")
                                    .withID(PAR_FMFEEDBACK)
+                                   .withFlags(CLAP_PARAM_IS_MODULATABLE));
+        parmetadatas.push_back(pmd()
+                                   .withRange(-1.0, 1.0)
+                                   .withDefault(0.0)
+                                   .withName("Noise Correlation")
+                                   .withGroupName("Oscillator")
+                                   .withID(PAR_NOISECORRELATION)
                                    .withFlags(CLAP_PARAM_IS_MODULATABLE));
         parmetadatas.push_back(pmd()
                                    .withRange(-48.0, 64.0)
@@ -1330,7 +1338,8 @@ class ToneGranulator
                 genev.fm_feedback = modmatrix.m.getTargetValue(
                     GranulatorModConfig::TargetIdentifier{PAR_FMFEEDBACK});
                 genev.pulse_width = pulse_width;
-                genev.noisecorr = noise_corr;
+                genev.noisecorr = modmatrix.m.getTargetValue(
+                    GranulatorModConfig::TargetIdentifier{PAR_NOISECORRELATION});
                 genev.sync_ratio =
                     std::pow(2.0, modmatrix.m.getTargetValue(
                                       GranulatorModConfig::TargetIdentifier{PAR_OSC_SYNC}));
