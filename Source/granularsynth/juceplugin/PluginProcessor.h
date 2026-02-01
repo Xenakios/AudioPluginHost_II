@@ -70,6 +70,7 @@ class AudioPluginAudioProcessor final : public juce::AudioProcessor
     choc::fifo::SingleReaderSingleWriterFIFO<ThreadMessage> from_gui_fifo;
     choc::fifo::SingleReaderSingleWriterFIFO<ThreadMessage> to_gui_fifo;
     juce::AudioProcessLoadMeasurer perfMeasurer;
+    
 
   private:
     std::vector<float> workBuffer;

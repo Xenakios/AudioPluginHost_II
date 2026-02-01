@@ -1006,6 +1006,7 @@ class ToneGranulator
     };
     std::vector<ModSourceInfo> modSources;
     std::array<float, 128> modSourceValues;
+    std::unordered_map<int, int> midiCCMap;
     void handleStepSequencerMessages()
     {
         StepModSource::Message msg;
@@ -1033,6 +1034,11 @@ class ToneGranulator
     }
     ToneGranulator() : m_sr(44100.0), modmatrix(44100.0)
     {
+        for (int i = 0; i < 8; ++i)
+        {
+            midiCCMap[21 + i] = MIDICCSTART + i;
+            midiCCMap[41 + i] = MIDICCSTART + 8 + i;
+        }
         fifo.reset(16);
         for (auto &v : stepModValues)
             v = 0.0f;
@@ -1259,8 +1265,13 @@ class ToneGranulator
 
         for (uint32_t i = 0; i < 8; ++i)
         {
-            modSources.emplace_back(std::format("CC {}", i + 21), "MIDI",
+            modSources.emplace_back(std::format("MIDI CC {}", i + 21), "MIDI",
                                     GranulatorModConfig::SourceIdentifier{i + MIDICCSTART});
+        }
+        for (uint32_t i = 0; i < 8; ++i)
+        {
+            modSources.emplace_back(std::format("MIDI CC {}", i + 41), "MIDI",
+                                    GranulatorModConfig::SourceIdentifier{i + 8 + MIDICCSTART});
         }
         for (auto &v : modSourceValues)
             v = 0.0f;

@@ -143,10 +143,10 @@ void AudioPluginAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
         {
             auto &mm = granulator.modmatrix;
             uint32_t ccnum = msg.getControllerNumber();
-            if (ccnum >= 21 && ccnum < 21 + 8)
+            auto it = granulator.midiCCMap.find(ccnum);
+            if (it != granulator.midiCCMap.end())
             {
-                ccnum -= 21;
-                granulator.modSourceValues[ToneGranulator::MIDICCSTART + ccnum] =
+                granulator.modSourceValues[it->second] =
                     juce::jmap<float>(msg.getControllerValue(), 0, 127, 0.0, 1.0);
             }
         }
