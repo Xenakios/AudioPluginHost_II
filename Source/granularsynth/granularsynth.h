@@ -62,6 +62,7 @@ struct GranulatorModConfig
         CURVE_SQUARE,
         CURVE_CUBE,
         CURVE_STEPS4,
+        CURVE_STEPS5,
         CURVE_EXPSIN1,
         CURVE_EXPSIN2,
         CURVE_XOR1,
@@ -78,7 +79,7 @@ struct GranulatorModConfig
     {
         x = std::clamp(x, -1.0f, 1.0f);
         x = (x + 1.0f) * 0.5f;
-        uint16_t ival = x * 65535;
+        uint16_t ival = static_cast<uint16_t>(x * 65535.0f);
         ival = ival ^ a;
         x = ival / 65535.0f;
         return -1.0f + 2.0f * x;
@@ -126,8 +127,10 @@ struct GranulatorModConfig
         case CURVE_STEPS4:
             return [id](auto x) {
                 float steps = std::clamp((int)id.par0, 2, 16);
-                return std::round(x * steps) / steps;
+                return std::round(x * 4) / 4;
             };
+        case CURVE_STEPS5:
+            return [](auto x) { return std::round(x * 5) / 5; };
         case CURVE_EXPSIN1:
             return [](auto x) { return expsin(x, 1, 8.0f); };
         case CURVE_EXPSIN2:

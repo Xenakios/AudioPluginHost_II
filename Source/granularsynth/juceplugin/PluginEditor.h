@@ -2,6 +2,145 @@
 
 #include "PluginProcessor.h"
 
+struct DropDownComponent : public juce::Component
+{
+    struct Node
+    {
+        std::string text;
+        choc::value::Value data;
+        std::vector<Node> children;
+    };
+    Node rootNode;
+    DropDownComponent()
+    {
+        rootNode.text = "Curve";
+        rootNode.children.push_back(
+            Node{"Linear", choc::value::Value{(int64_t)GranulatorModConfig::CURVE_LINEAR}});
+        rootNode.children.push_back(
+            Node{"x^2", choc::value::Value{(int64_t)GranulatorModConfig::CURVE_SQUARE}});
+        rootNode.children.push_back(
+            Node{"x^3", choc::value::Value{(int64_t)GranulatorModConfig::CURVE_CUBE}});
+        Node xornode{"XOR"};
+        for (int i = 0; i < 4; ++i)
+        {
+            xornode.children.push_back(
+                Node{std::to_string(i),
+                     choc::value::Value{(int64_t)GranulatorModConfig::CURVE_XOR1 + i}});
+        }
+        rootNode.children.emplace_back(xornode);
+        Node stepnode{"STEPS"};
+        for (int i = 0; i < 2; ++i)
+        {
+            stepnode.children.push_back(
+                Node{std::to_string(4+i),
+                     choc::value::Value{(int64_t)GranulatorModConfig::CURVE_STEPS4 + i}});
+        }
+        rootNode.children.emplace_back(stepnode);
+        rootNode.children.push_back(
+            Node{"BIT MIRROR", choc::value::Value{(int64_t)GranulatorModConfig::CURVE_BITMIRROR}});
+    }
+    void visitNodeRecur(Node &n, juce::PopupMenu &menu)
+    {
+        if (n.children.size() == 0)
+            menu.addItem(n.text, [this, n]() {
+                selectedItem = n.data;
+                if (OnItemSelected)
+                    OnItemSelected();
+                selectedText = n.text;
+                repaint();
+            });
+        if (n.children.size() > 0)
+        {
+            juce::PopupMenu submenu;
+            for (auto &e : n.children)
+            {
+                visitNodeRecur(e, submenu);
+            }
+            menu.addSubMenu(n.text, submenu);
+        }
+    }
+    void showNodes()
+    {
+        juce::PopupMenu menu;
+        if (!rootNode.text.empty())
+        {
+            menu.addSectionHeader(rootNode.text);
+            menu.addSeparator();
+        }
+        for (auto &e : rootNode.children)
+        {
+            visitNodeRecur(e, menu);
+        }
+
+        menu.showMenuAsync(juce::PopupMenu::Options{}.withTargetComponent(this));
+    }
+    void setTree(choc::value::ValueView v)
+    {
+        tree = v;
+        repaint();
+    }
+    choc::value::ValueView getSelectedValue() { return selectedItem; }
+    void paint(juce::Graphics &g) override
+    {
+        g.fillAll(juce::Colours::darkgrey);
+        g.setColour(juce::Colours::white);
+        g.drawRect(0, 0, getWidth(), getHeight(), 2);
+        g.drawText(selectedText, 4, 2, getWidth(), getHeight() - 4, juce::Justification::centredLeft);
+    }
+    void mouseDown(const juce::MouseEvent &ev) override { showMenu(); }
+    void showMenu()
+    {
+        showNodes();
+        return;
+        if (!tree.isArray())
+            return;
+
+        juce::PopupMenu topmenu;
+        std::map<std::string, juce::PopupMenu> submenus;
+        for (int i = 0; i < tree.size(); ++i)
+        {
+            auto it = tree[i];
+            std::string txt{it["text"].getString()};
+            if (!it.hasObjectMember("children"))
+            {
+                topmenu.addItem(txt, [it, this]() {
+                    selectedItem = it;
+                    if (OnItemSelected)
+                        OnItemSelected();
+                    repaint();
+                });
+            }
+            else
+            {
+                if (submenus.count(txt) == 0)
+                    submenus[txt] = juce::PopupMenu();
+
+                auto children = it["children"];
+                for (int j = 0; j < children.size(); ++j)
+                {
+                    auto subitem = children[j];
+                    std::string subitemtext{subitem["text"].getString()};
+                    submenus[txt].addItem(subitemtext, [subitem, this]() {
+                        selectedItem = subitem;
+                        if (OnItemSelected)
+                            OnItemSelected();
+                        repaint();
+                    });
+                }
+            }
+        }
+        for (auto &m : submenus)
+        {
+            topmenu.addSubMenu(m.first, m.second);
+        }
+        topmenu.showMenuAsync(juce::PopupMenu::Options{}.withTargetComponent(this));
+    }
+    choc::value::Value tree;
+    choc::value::ValueView selectedItem;
+    std::string selectedText;
+    std::function<void(void)> OnItemSelected;
+};
+
 struct GUIParam : public juce::Component
 {
     std::unique_ptr<juce::Label> parLabel;
@@ -198,7 +337,7 @@ struct ModulationRowComponent : public juce::Component
                                 modslotindex,
                                 sourceCombo.getSelectedId() - 1,
                                 viaCombo.getSelectedId() - 1,
-                                curveCombo.getSelectedId() - 1,
+                                curveDrop.selectedItem.getWithDefault(1),
                                 curveParEditor.getText().getFloatValue(),
                                 (float)depthSlider.getValue(),
                                 targetID};
@@ -223,7 +362,7 @@ struct ModulationRowComponent : public juce::Component
                                 modslotindex,
                                 sourceCombo.getSelectedId() - 1,
                                 viaCombo.getSelectedId() - 1,
-                                curveCombo.getSelectedId() - 1,
+                                1,
                                 curveParEditor.getText().getFloatValue(),
                                 (float)depthSlider.getValue(),
                                 targetID};
@@ -243,22 +382,50 @@ struct ModulationRowComponent : public juce::Component
         destCombo.setSelectedItemIndex(0, juce::dontSendNotification);
         destCombo.onChange = updatfunc;
 
-        addAndMakeVisible(curveCombo);
+        addAndMakeVisible(curveDrop);
         using mcf = GranulatorModConfig;
-        curveCombo.addItem(juce::CharPointer_UTF8("-"), mcf::CURVE_LINEAR + 1);
-        curveCombo.addItem(juce::CharPointer_UTF8("x²"), mcf::CURVE_SQUARE + 1);
-        curveCombo.addItem(juce::CharPointer_UTF8("x³"), mcf::CURVE_CUBE + 1);
-        curveCombo.addItem(juce::CharPointer_UTF8("4 steps"), mcf::CURVE_STEPS4 + 1);
-        curveCombo.addItem(juce::CharPointer_UTF8("EXPSINE 1"), mcf::CURVE_EXPSIN1 + 1);
-        curveCombo.addItem(juce::CharPointer_UTF8("EXPSINE 2"), mcf::CURVE_EXPSIN2 + 1);
-        curveCombo.addItem(juce::CharPointer_UTF8("XOR 1"), mcf::CURVE_XOR1 + 1);
-        curveCombo.addItem(juce::CharPointer_UTF8("XOR 2"), mcf::CURVE_XOR2 + 1);
-        curveCombo.addItem(juce::CharPointer_UTF8("XOR 3"), mcf::CURVE_XOR3 + 1);
-        curveCombo.addItem(juce::CharPointer_UTF8("XOR 4"), mcf::CURVE_XOR4 + 1);
-        curveCombo.addItem(juce::CharPointer_UTF8("BIT MIRROR"), mcf::CURVE_BITMIRROR + 1);
-        curveCombo.setSelectedId(mcf::CURVE_LINEAR + 1, juce::dontSendNotification);
-        curveCombo.onChange = updatfunc;
+        auto curveTree = choc::value::createEmptyArray();
+        curveTree.addArrayElement(
+            choc::value::createObject("item", "text", "LINEAR", "id", (int64_t)mcf::CURVE_LINEAR));
+        curveTree.addArrayElement(
+            choc::value::createObject("item", "text", "x³", "id", (int64_t)mcf::CURVE_CUBE));
+        auto xoritem = choc::value::createObject("item", "text", "XOR", "id", 0);
+        auto xorchildren = choc::value::createEmptyArray();
+        for (int i = 0; i < 4; ++i)
+        {
+            xorchildren.addArrayElement(choc::value::createObject(
+                "item", "text", std::to_string(i + 1), "id", (int64_t)mcf::CURVE_XOR1 + i));
+        }
+        xoritem.setMember("children", xorchildren);
+        curveTree.addArrayElement(xoritem);
 
+        auto stepsitem = choc::value::createObject("item", "text", "STEPS", "id", 0);
+        auto stepchildren = choc::value::createEmptyArray();
+        for (int i = 0; i < 2; ++i)
+        {
+            stepchildren.addArrayElement(choc::value::createObject(
+                "item", "text", std::to_string(i + 4), "id", (int64_t)mcf::CURVE_STEPS4 + i));
+        }
+        stepsitem.setMember("children", stepchildren);
+        curveTree.addArrayElement(stepsitem);
+
+        curveDrop.setTree(curveTree);
+        curveDrop.OnItemSelected = updatfunc;
+        /*
+    curveCombo.addItem(juce::CharPointer_UTF8("-"), mcf::CURVE_LINEAR + 1);
+    curveCombo.addItem(juce::CharPointer_UTF8("x²"), mcf::CURVE_SQUARE + 1);
+    curveCombo.addItem(juce::CharPointer_UTF8("x³"), mcf::CURVE_CUBE + 1);
+    curveCombo.addItem(juce::CharPointer_UTF8("4 steps"), mcf::CURVE_STEPS4 + 1);
+    curveCombo.addItem(juce::CharPointer_UTF8("EXPSINE 1"), mcf::CURVE_EXPSIN1 + 1);
+    curveCombo.addItem(juce::CharPointer_UTF8("EXPSINE 2"), mcf::CURVE_EXPSIN2 + 1);
+    curveCombo.addItem(juce::CharPointer_UTF8("XOR 1"), mcf::CURVE_XOR1 + 1);
+    curveCombo.addItem(juce::CharPointer_UTF8("XOR 2"), mcf::CURVE_XOR2 + 1);
+    curveCombo.addItem(juce::CharPointer_UTF8("XOR 3"), mcf::CURVE_XOR3 + 1);
+    curveCombo.addItem(juce::CharPointer_UTF8("XOR 4"), mcf::CURVE_XOR4 + 1);
+    curveCombo.addItem(juce::CharPointer_UTF8("BIT MIRROR"), mcf::CURVE_BITMIRROR + 1);
+    curveCombo.setSelectedId(mcf::CURVE_LINEAR + 1, juce::dontSendNotification);
+    curveCombo.onChange = updatfunc;
+    */
         // addAndMakeVisible(curveParEditor);
         curveParEditor.setText("0.0", juce::dontSendNotification);
         curveParEditor.onReturnKey = updatfunc;
@@ -325,7 +492,7 @@ struct ModulationRowComponent : public juce::Component
         layout.items.add(juce::FlexItem(viaCombo).withFlex(1.0));
         layout.items.add(juce::FlexItem(depthSlider).withFlex(2.0));
         // layout.items.add(juce::FlexItem(destCombo).withFlex(1.0));
-        layout.items.add(juce::FlexItem(curveCombo).withFlex(0.5));
+        layout.items.add(juce::FlexItem(curveDrop).withFlex(0.5));
         // layout.items.add(juce::FlexItem(curveParEditor).withFlex(0.5));
         layout.items.add(juce::FlexItem(destButton).withFlex(1.0));
         layout.performLayout(juce::Rectangle<int>{0, 0, getWidth(), getHeight()});
@@ -348,7 +515,8 @@ struct ModulationRowComponent : public juce::Component
     juce::ComboBox sourceCombo;
     juce::ComboBox viaCombo;
     juce::Slider depthSlider;
-    juce::ComboBox curveCombo;
+    // juce::ComboBox curveCombo;
+    DropDownComponent curveDrop;
     juce::TextEditor curveParEditor;
     juce::ComboBox destCombo;
     juce::TextButton destButton;
