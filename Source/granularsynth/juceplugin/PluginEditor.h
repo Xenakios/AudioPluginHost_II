@@ -7,43 +7,16 @@ struct DropDownComponent : public juce::Component
     struct Node
     {
         std::string text;
-        choc::value::Value data;
+        int id = -1;
         std::vector<Node> children;
     };
     Node rootNode;
-    DropDownComponent()
-    {
-        rootNode.text = "Curve";
-        rootNode.children.push_back(
-            Node{"Linear", choc::value::Value{(int64_t)GranulatorModConfig::CURVE_LINEAR}});
-        rootNode.children.push_back(
-            Node{"x^2", choc::value::Value{(int64_t)GranulatorModConfig::CURVE_SQUARE}});
-        rootNode.children.push_back(
-            Node{"x^3", choc::value::Value{(int64_t)GranulatorModConfig::CURVE_CUBE}});
-        Node xornode{"XOR"};
-        for (int i = 0; i < 4; ++i)
-        {
-            xornode.children.push_back(
-                Node{std::to_string(i),
-                     choc::value::Value{(int64_t)GranulatorModConfig::CURVE_XOR1 + i}});
-        }
-        rootNode.children.emplace_back(xornode);
-        Node stepnode{"STEPS"};
-        for (int i = 0; i < 2; ++i)
-        {
-            stepnode.children.push_back(
-                Node{std::to_string(4+i),
-                     choc::value::Value{(int64_t)GranulatorModConfig::CURVE_STEPS4 + i}});
-        }
-        rootNode.children.emplace_back(stepnode);
-        rootNode.children.push_back(
-            Node{"BIT MIRROR", choc::value::Value{(int64_t)GranulatorModConfig::CURVE_BITMIRROR}});
-    }
-    void visitNodeRecur(Node &n, juce::PopupMenu &menu)
+    DropDownComponent() {}
+    void buildMenusRecur(Node &n, juce::PopupMenu &menu)
     {
         if (n.children.size() == 0)
             menu.addItem(n.text, [this, n]() {
-                selectedItem = n.data;
+                selectedId = n.id;
                 if (OnItemSelected)
                     OnItemSelected();
                 selectedText = n.text;
@@ -54,11 +27,40 @@ struct DropDownComponent : public juce::Component
             juce::PopupMenu submenu;
             for (auto &e : n.children)
             {
-                visitNodeRecur(e, submenu);
+                buildMenusRecur(e, submenu);
             }
             menu.addSubMenu(n.text, submenu);
         }
     }
+    Node *findNodeRecur(Node &n, int tofind)
+    {
+        if (n.id == tofind)
+            return &n;
+        for (int i = 0; i < n.children.size(); ++i)
+        {
+            auto ptr = findNodeRecur(n.children[i], tofind);
+            if (ptr)
+                return ptr;
+        }
+        return nullptr;
+    }
+    void setSelectedId(int id)
+    {
+        Node *found = nullptr;
+        for (auto &e : rootNode.children)
+        {
+            found = findNodeRecur(e, id);
+            if (found)
+                break;
+        }
+        if (found)
+        {
+            selectedId = found->id;
+            selectedText = found->text;
+            repaint();
+        }
+    }
+
     void showNodes()
     {
         juce::PopupMenu menu;
@@ -69,74 +71,24 @@ struct DropDownComponent : public juce::Component
         }
         for (auto &e : rootNode.children)
         {
-            visitNodeRecur(e, menu);
+            buildMenusRecur(e, menu);
         }
-
         menu.showMenuAsync(juce::PopupMenu::Options{}.withTargetComponent(this));
     }
-    void setTree(choc::value::ValueView v)
-    {
-        tree = v;
-        repaint();
-    }
-    choc::value::ValueView getSelectedValue() { return selectedItem; }
+
+    int getSelectedId() { return selectedId; }
     void paint(juce::Graphics &g) override
     {
-        g.fillAll(juce::Colours::darkgrey);
+        g.fillAll(juce::Colours::black);
         g.setColour(juce::Colours::white);
         g.drawRect(0, 0, getWidth(), getHeight(), 2);
-        g.drawText(selectedText, 4, 2, getWidth(), getHeight() - 4, juce::Justification::centredLeft);
+        g.drawText(selectedText, 4, 2, getWidth(), getHeight() - 4,
+                   juce::Justification::centredLeft);
     }
     void mouseDown(const juce::MouseEvent &ev) override { showMenu(); }
-    void showMenu()
-    {
-        showNodes();
-        return;
-        if (!tree.isArray())
-            return;
+    void showMenu() { showNodes(); }
 
-        juce::PopupMenu topmenu;
-        std::map<std::string, juce::PopupMenu> submenus;
-        for (int i = 0; i < tree.size(); ++i)
-        {
-            auto it = tree[i];
-            std::string txt{it["text"].getString()};
-            if (!it.hasObjectMember("children"))
-            {
-                topmenu.addItem(txt, [it, this]() {
-                    selectedItem = it;
-                    if (OnItemSelected)
-                        OnItemSelected();
-                    repaint();
-                });
-            }
-            else
-            {
-                if (submenus.count(txt) == 0)
-                    submenus[txt] = juce::PopupMenu();
-
-                auto children = it["children"];
-                for (int j = 0; j < children.size(); ++j)
-                {
-                    auto subitem = children[j];
-                    std::string subitemtext{subitem["text"].getString()};
-                    submenus[txt].addItem(subitemtext, [subitem, this]() {
-                        selectedItem = subitem;
-                        if (OnItemSelected)
-                            OnItemSelected();
-                        repaint();
-                    });
-                }
-            }
-        }
-        for (auto &m : submenus)
-        {
-            topmenu.addSubMenu(m.first, m.second);
-        }
-        topmenu.showMenuAsync(juce::PopupMenu::Options{}.withTargetComponent(this));
-    }
-    choc::value::Value tree;
-    choc::value::ValueView selectedItem;
+    int selectedId = -1;
     std::string selectedText;
     std::function<void(void)> OnItemSelected;
 };
@@ -337,7 +289,7 @@ struct ModulationRowComponent : public juce::Component
                                 modslotindex,
                                 sourceCombo.getSelectedId() - 1,
                                 viaCombo.getSelectedId() - 1,
-                                curveDrop.selectedItem.getWithDefault(1),
+                                curveDrop.selectedId,
                                 curveParEditor.getText().getFloatValue(),
                                 (float)depthSlider.getValue(),
                                 targetID};
@@ -384,32 +336,28 @@ struct ModulationRowComponent : public juce::Component
 
         addAndMakeVisible(curveDrop);
         using mcf = GranulatorModConfig;
-        auto curveTree = choc::value::createEmptyArray();
-        curveTree.addArrayElement(
-            choc::value::createObject("item", "text", "LINEAR", "id", (int64_t)mcf::CURVE_LINEAR));
-        curveTree.addArrayElement(
-            choc::value::createObject("item", "text", "x³", "id", (int64_t)mcf::CURVE_CUBE));
-        auto xoritem = choc::value::createObject("item", "text", "XOR", "id", 0);
-        auto xorchildren = choc::value::createEmptyArray();
+        using Node = DropDownComponent::Node;
+        curveDrop.rootNode.text = "Curve";
+        curveDrop.rootNode.children.push_back(Node{"Linear", GranulatorModConfig::CURVE_LINEAR});
+        curveDrop.rootNode.children.push_back(Node{"x^2", GranulatorModConfig::CURVE_SQUARE});
+        curveDrop.rootNode.children.push_back(Node{"x^3", GranulatorModConfig::CURVE_CUBE});
+        Node xornode{"XOR"};
         for (int i = 0; i < 4; ++i)
         {
-            xorchildren.addArrayElement(choc::value::createObject(
-                "item", "text", std::to_string(i + 1), "id", (int64_t)mcf::CURVE_XOR1 + i));
+            xornode.children.push_back(
+                Node{std::format("XOR {}", i + 1), GranulatorModConfig::CURVE_XOR1 + i});
         }
-        xoritem.setMember("children", xorchildren);
-        curveTree.addArrayElement(xoritem);
-
-        auto stepsitem = choc::value::createObject("item", "text", "STEPS", "id", 0);
-        auto stepchildren = choc::value::createEmptyArray();
-        for (int i = 0; i < 2; ++i)
+        curveDrop.rootNode.children.emplace_back(xornode);
+        Node stepnode{"STEPS"};
+        for (int i = 0; i < 4; ++i)
         {
-            stepchildren.addArrayElement(choc::value::createObject(
-                "item", "text", std::to_string(i + 4), "id", (int64_t)mcf::CURVE_STEPS4 + i));
+            stepnode.children.push_back(
+                Node{std::format("{} STEPS", 4 + i), GranulatorModConfig::CURVE_STEPS4 + i});
         }
-        stepsitem.setMember("children", stepchildren);
-        curveTree.addArrayElement(stepsitem);
+        curveDrop.rootNode.children.emplace_back(stepnode);
+        curveDrop.rootNode.children.push_back(
+            Node{"BIT MIRROR", GranulatorModConfig::CURVE_BITMIRROR});
 
-        curveDrop.setTree(curveTree);
         curveDrop.OnItemSelected = updatfunc;
         /*
     curveCombo.addItem(juce::CharPointer_UTF8("-"), mcf::CURVE_LINEAR + 1);

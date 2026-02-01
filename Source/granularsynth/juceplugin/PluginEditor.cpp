@@ -220,8 +220,7 @@ void AudioPluginAudioProcessorEditor::timerCallback()
             modRowComps[msg.modslot]->destCombo.setSelectedId(msg.moddest,
                                                               juce::dontSendNotification);
             modRowComps[msg.modslot]->setTarget(msg.moddest);
-            //modRowComps[msg.modslot]->curveCombo.setSelectedId(msg.modcurve + 1,
-            //                                                   juce::dontSendNotification);
+            modRowComps[msg.modslot]->curveDrop.setSelectedId(msg.modcurve);
         }
     }
 }
