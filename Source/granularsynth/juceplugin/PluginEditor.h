@@ -88,7 +88,7 @@ struct DropDownComponent : public juce::Component
     void mouseDown(const juce::MouseEvent &ev) override { showMenu(); }
     void showMenu() { showNodes(); }
 
-    int selectedId = -1;
+    int selectedId = 0;
     std::string selectedText;
     std::function<void(void)> OnItemSelected;
 };
@@ -301,8 +301,9 @@ struct ModulationRowComponent : public juce::Component
             sourceDrop.rootNode.children.push_back({ms.name, (int)ms.id.src});
             viaDrop.rootNode.children.push_back({ms.name, (int)ms.id.src});
         }
-
+        sourceDrop.setSelectedId(0);
         sourceDrop.OnItemSelected = updatfunc;
+        viaDrop.setSelectedId(0);
         viaDrop.OnItemSelected = updatfunc;
 
         depthSlider.setRange(-1.0, 1.0);
@@ -344,7 +345,7 @@ struct ModulationRowComponent : public juce::Component
         curveDrop.rootNode.children.emplace_back(stepnode);
         curveDrop.rootNode.children.push_back(
             Node{"BIT MIRROR", GranulatorModConfig::CURVE_BITMIRROR});
-
+        curveDrop.setSelectedId(GranulatorModConfig::CURVE_LINEAR);
         curveDrop.OnItemSelected = updatfunc;
 
         curveParEditor.setText("0.0", juce::dontSendNotification);
@@ -380,6 +381,7 @@ struct ModulationRowComponent : public juce::Component
                 }
             }
         }
+        destDrop.setSelectedId(1);
         destDrop.OnItemSelected = updatfunc;
     }
     void setTarget(uint32_t parid)
