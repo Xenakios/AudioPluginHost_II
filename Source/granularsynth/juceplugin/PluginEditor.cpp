@@ -217,8 +217,8 @@ void AudioPluginAudioProcessorEditor::timerCallback()
             modRowComps[msg.modslot]->viaCombo.setSelectedId(msg.modvia + 1,
                                                              juce::dontSendNotification);
             modRowComps[msg.modslot]->depthSlider.setValue(msg.depth, juce::dontSendNotification);
-            modRowComps[msg.modslot]->destCombo.setSelectedId(msg.moddest,
-                                                              juce::dontSendNotification);
+            modRowComps[msg.modslot]->destDrop.setSelectedId(msg.moddest);
+                                                              
             modRowComps[msg.modslot]->setTarget(msg.moddest);
             modRowComps[msg.modslot]->curveDrop.setSelectedId(msg.modcurve);
         }

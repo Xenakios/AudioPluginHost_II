@@ -283,7 +283,7 @@ struct ModulationRowComponent : public juce::Component
         addAndMakeVisible(sourceCombo);
         addAndMakeVisible(viaCombo);
         addAndMakeVisible(depthSlider);
-        addAndMakeVisible(destCombo);
+        
         auto updatfunc = [this] {
             CallbackParams pars{false,
                                 modslotindex,
@@ -292,7 +292,7 @@ struct ModulationRowComponent : public juce::Component
                                 curveDrop.selectedId,
                                 curveParEditor.getText().getFloatValue(),
                                 (float)depthSlider.getValue(),
-                                targetID};
+                                (uint32_t)destDrop.selectedId};
             stateChangedCallback(pars);
         };
         for (int i = 0; i < g->modSources.size(); ++i)
@@ -314,25 +314,14 @@ struct ModulationRowComponent : public juce::Component
                                 modslotindex,
                                 sourceCombo.getSelectedId() - 1,
                                 viaCombo.getSelectedId() - 1,
-                                1,
+                                curveDrop.selectedId,
                                 curveParEditor.getText().getFloatValue(),
                                 (float)depthSlider.getValue(),
-                                targetID};
+                                (uint32_t)destDrop.selectedId};
             stateChangedCallback(pars);
         };
         depthSlider.setTextBoxStyle(juce::Slider::TextEntryBoxPosition::TextBoxRight, false, 50,
                                     20);
-
-        destCombo.addItem("No target", 1);
-        for (auto &pmd : g->parmetadatas)
-        {
-            if (pmd.flags & CLAP_PARAM_IS_MODULATABLE)
-            {
-                destCombo.addItem(pmd.name, pmd.id);
-            }
-        }
-        destCombo.setSelectedItemIndex(0, juce::dontSendNotification);
-        destCombo.onChange = updatfunc;
 
         addAndMakeVisible(curveDrop);
         using mcf = GranulatorModConfig;
@@ -359,75 +348,26 @@ struct ModulationRowComponent : public juce::Component
             Node{"BIT MIRROR", GranulatorModConfig::CURVE_BITMIRROR});
 
         curveDrop.OnItemSelected = updatfunc;
-        /*
-    curveCombo.addItem(juce::CharPointer_UTF8("-"), mcf::CURVE_LINEAR + 1);
-    curveCombo.addItem(juce::CharPointer_UTF8("x²"), mcf::CURVE_SQUARE + 1);
-    curveCombo.addItem(juce::CharPointer_UTF8("x³"), mcf::CURVE_CUBE + 1);
-    curveCombo.addItem(juce::CharPointer_UTF8("4 steps"), mcf::CURVE_STEPS4 + 1);
-    curveCombo.addItem(juce::CharPointer_UTF8("EXPSINE 1"), mcf::CURVE_EXPSIN1 + 1);
-    curveCombo.addItem(juce::CharPointer_UTF8("EXPSINE 2"), mcf::CURVE_EXPSIN2 + 1);
-    curveCombo.addItem(juce::CharPointer_UTF8("XOR 1"), mcf::CURVE_XOR1 + 1);
-    curveCombo.addItem(juce::CharPointer_UTF8("XOR 2"), mcf::CURVE_XOR2 + 1);
-    curveCombo.addItem(juce::CharPointer_UTF8("XOR 3"), mcf::CURVE_XOR3 + 1);
-    curveCombo.addItem(juce::CharPointer_UTF8("XOR 4"), mcf::CURVE_XOR4 + 1);
-    curveCombo.addItem(juce::CharPointer_UTF8("BIT MIRROR"), mcf::CURVE_BITMIRROR + 1);
-    curveCombo.setSelectedId(mcf::CURVE_LINEAR + 1, juce::dontSendNotification);
-    curveCombo.onChange = updatfunc;
-    */
-        // addAndMakeVisible(curveParEditor);
+
         curveParEditor.setText("0.0", juce::dontSendNotification);
         curveParEditor.onReturnKey = updatfunc;
 
-        addAndMakeVisible(destButton);
-        destButton.onClick = [this, g, updatfunc]() {
-            juce::PopupMenu menu;
-            std::map<std::string, juce::PopupMenu> submenus;
-            auto updf = [this, updatfunc](uint32_t parid) {
-                setTarget(parid);
-                updatfunc();
-            };
-            menu.addItem("No target", [updf]() { updf(1); });
-            for (auto &pmd : g->parmetadatas)
+        addAndMakeVisible(destDrop);
+        destDrop.rootNode.text = "Modulation target";
+        destDrop.rootNode.children.push_back({"No target", 1});
+        for (auto &pmd : g->parmetadatas)
+        {
+            if (pmd.flags & CLAP_PARAM_IS_MODULATABLE)
             {
-                if (pmd.flags & CLAP_PARAM_IS_MODULATABLE)
-                {
-                    if (pmd.groupName.empty())
-                    {
-                        menu.addItem(pmd.name, [updf, pmd]() { updf(pmd.id); });
-                    }
-                    else
-                    {
-                        if (!submenus.count(pmd.groupName))
-                        {
-                            submenus[pmd.groupName] = juce::PopupMenu();
-                        }
-                        submenus[pmd.groupName].addItem(pmd.name, [updf, pmd]() { updf(pmd.id); });
-                    }
-                }
+                destDrop.rootNode.children.push_back({pmd.name, (int)pmd.id});
             }
-            for (auto &e : submenus)
-            {
-                menu.addSubMenu(e.first, e.second);
-            }
-            menu.showMenuAsync(juce::PopupMenu::Options{});
-        };
+        }
+        destDrop.OnItemSelected=updatfunc;
     }
     void setTarget(uint32_t parid)
     {
         targetID = parid;
-        for (auto &pmd : gr->parmetadatas)
-        {
-            if (pmd.id == parid)
-            {
-
-                destButton.setButtonText(pmd.name);
-                return;
-            }
-        }
-        if (parid == 1)
-            destButton.setButtonText("No target");
-        else
-            destButton.setButtonText("INVALID ID");
+        destDrop.setSelectedId(parid);
     }
 
     void resized() override
@@ -442,7 +382,7 @@ struct ModulationRowComponent : public juce::Component
         // layout.items.add(juce::FlexItem(destCombo).withFlex(1.0));
         layout.items.add(juce::FlexItem(curveDrop).withFlex(0.5));
         // layout.items.add(juce::FlexItem(curveParEditor).withFlex(0.5));
-        layout.items.add(juce::FlexItem(destButton).withFlex(1.0));
+        layout.items.add(juce::FlexItem(destDrop).withFlex(1.0));
         layout.performLayout(juce::Rectangle<int>{0, 0, getWidth(), getHeight()});
     }
     ToneGranulator *gr = nullptr;
@@ -466,8 +406,7 @@ struct ModulationRowComponent : public juce::Component
     // juce::ComboBox curveCombo;
     DropDownComponent curveDrop;
     juce::TextEditor curveParEditor;
-    juce::ComboBox destCombo;
-    juce::TextButton destButton;
+    DropDownComponent destDrop;
 };
 
 //==============================================================================
