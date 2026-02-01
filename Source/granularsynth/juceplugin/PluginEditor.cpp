@@ -64,6 +64,8 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor(AudioPluginAudi
         modcomp->stateChangedCallback = [this](ModulationRowComponent::CallbackParams args) {
             if (args.slot >= 0 && args.source >= 0 && args.target >= 0)
             {
+                processorRef.updateHostDisplay(
+                    juce::AudioProcessor::ChangeDetails().withNonParameterStateChanged(true));
                 ThreadMessage msg;
                 msg.modslot = args.slot;
                 msg.depth = args.depth;

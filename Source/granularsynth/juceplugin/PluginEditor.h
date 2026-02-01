@@ -396,11 +396,11 @@ struct ModulationRowComponent : public juce::Component
                                     juce::FlexBox::AlignContent::spaceAround,
                                     juce::FlexBox::AlignItems::stretch,
                                     juce::FlexBox::JustifyContent::flexStart);
-        layout.items.add(juce::FlexItem(sourceDrop).withFlex(1.0));
-        layout.items.add(juce::FlexItem(viaDrop).withFlex(1.0));
+        layout.items.add(juce::FlexItem(sourceDrop).withFlex(0.5));
+        layout.items.add(juce::FlexItem(viaDrop).withFlex(0.5));
         layout.items.add(juce::FlexItem(depthSlider).withFlex(2.0));
         layout.items.add(juce::FlexItem(curveDrop).withFlex(0.5));
-        layout.items.add(juce::FlexItem(destDrop).withFlex(1.0));
+        layout.items.add(juce::FlexItem(destDrop).withFlex(0.5));
         layout.performLayout(juce::Rectangle<int>{0, 0, getWidth(), getHeight()});
     }
     ToneGranulator *gr = nullptr;
