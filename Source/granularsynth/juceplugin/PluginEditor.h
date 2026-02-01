@@ -283,7 +283,7 @@ struct ModulationRowComponent : public juce::Component
         addAndMakeVisible(sourceCombo);
         addAndMakeVisible(viaCombo);
         addAndMakeVisible(depthSlider);
-        
+
         auto updatfunc = [this] {
             CallbackParams pars{false,
                                 modslotindex,
@@ -355,14 +355,34 @@ struct ModulationRowComponent : public juce::Component
         addAndMakeVisible(destDrop);
         destDrop.rootNode.text = "Modulation target";
         destDrop.rootNode.children.push_back({"No target", 1});
+        std::map<std::string, Node *> nodemap;
+        destDrop.rootNode.children.reserve(128);
+        for (auto &pmd : g->parmetadatas)
+        {
+            if (pmd.flags & CLAP_PARAM_IS_MODULATABLE && !pmd.groupName.empty())
+            {
+                if (nodemap.count(pmd.groupName) == 0)
+                {
+                    destDrop.rootNode.children.push_back({pmd.groupName, 0});
+                    nodemap[pmd.groupName] = &destDrop.rootNode.children.back();
+                }
+            }
+        }
         for (auto &pmd : g->parmetadatas)
         {
             if (pmd.flags & CLAP_PARAM_IS_MODULATABLE)
             {
-                destDrop.rootNode.children.push_back({pmd.name, (int)pmd.id});
+                if (pmd.groupName.empty())
+                {
+                    destDrop.rootNode.children.push_back({pmd.name, (int)pmd.id});
+                }
+                else
+                {
+                    nodemap[pmd.groupName]->children.push_back({pmd.name, (int)pmd.id});
+                }
             }
         }
-        destDrop.OnItemSelected=updatfunc;
+        destDrop.OnItemSelected = updatfunc;
     }
     void setTarget(uint32_t parid)
     {
@@ -379,9 +399,7 @@ struct ModulationRowComponent : public juce::Component
         layout.items.add(juce::FlexItem(sourceCombo).withFlex(1.0));
         layout.items.add(juce::FlexItem(viaCombo).withFlex(1.0));
         layout.items.add(juce::FlexItem(depthSlider).withFlex(2.0));
-        // layout.items.add(juce::FlexItem(destCombo).withFlex(1.0));
         layout.items.add(juce::FlexItem(curveDrop).withFlex(0.5));
-        // layout.items.add(juce::FlexItem(curveParEditor).withFlex(0.5));
         layout.items.add(juce::FlexItem(destDrop).withFlex(1.0));
         layout.performLayout(juce::Rectangle<int>{0, 0, getWidth(), getHeight()});
     }
@@ -403,7 +421,6 @@ struct ModulationRowComponent : public juce::Component
     juce::ComboBox sourceCombo;
     juce::ComboBox viaCombo;
     juce::Slider depthSlider;
-    // juce::ComboBox curveCombo;
     DropDownComponent curveDrop;
     juce::TextEditor curveParEditor;
     DropDownComponent destDrop;
