@@ -63,8 +63,20 @@ struct GranulatorModConfig
         CURVE_CUBE,
         CURVE_STEPS4,
         CURVE_EXPSIN1,
-        CURVE_EXPSIN2
+        CURVE_EXPSIN2,
+        CURVE_XOR1,
+        CURVE_XOR2,
+        CURVE_XOR3
     };
+    static float xor_curve(float x, uint16_t a)
+    {
+        x = std::clamp(x, -1.0f, 1.0f);
+        x = (x + 1.0f) * 0.5f;
+        uint16_t ival = x * 65535;
+        ival = ival ^ a;
+        x = ival / 65535.0f;
+        return -1.0f + 2.0f * x;
+    }
     static float expsin(float x, int ampmode, float frequency)
     {
         float norm = (x + 1.0f) * 0.5f;
@@ -92,8 +104,14 @@ struct GranulatorModConfig
             };
         case CURVE_EXPSIN1:
             return [](auto x) { return expsin(x, 1, 8.0f); };
-        case 6:
+        case CURVE_EXPSIN2:
             return [](auto x) { return expsin(x, 2, 12.0f); };
+        case CURVE_XOR1:
+            return [](auto x) { return xor_curve(x, 12013); };
+        case CURVE_XOR2:
+            return [](auto x) { return xor_curve(x, 4097); };
+        case CURVE_XOR3:
+            return [](auto x) { return xor_curve(x, 60521); };
         }
 
         return [](auto x) { return x; };
@@ -946,6 +964,7 @@ class ToneGranulator
     struct ModSourceInfo
     {
         std::string name;
+        std::string groupname;
         GranulatorModConfig::SourceIdentifier id;
         float val = 0.0f;
     };
@@ -1190,21 +1209,21 @@ class ToneGranulator
         modmatrix.m.bindTargetBaseValue(GranulatorModConfig::TargetIdentifier{(int)1},
                                         dummyTargetValue);
 
-        modSources.emplace_back("Off", GranulatorModConfig::SourceIdentifier{0});
+        modSources.emplace_back("Off", "", GranulatorModConfig::SourceIdentifier{0});
         for (uint32_t i = 0; i < GranulatorModMatrix::numLfos; ++i)
         {
-            modSources.emplace_back(std::format("LFO {}", i + 1),
+            modSources.emplace_back(std::format("LFO {}", i + 1), "LFO",
                                     GranulatorModConfig::SourceIdentifier{i + 1});
         }
         for (uint32_t i = 0; i < 8; ++i)
         {
-            modSources.emplace_back(std::format("StepSeq {}", i + 1),
+            modSources.emplace_back(std::format("StepSeq {}", i + 1), "Step Sequencer",
                                     GranulatorModConfig::SourceIdentifier{STEPS0 + i});
         }
 
         for (uint32_t i = 0; i < 8; ++i)
         {
-            modSources.emplace_back(std::format("MIDI CC {}", i + 21),
+            modSources.emplace_back(std::format("CC {}", i + 21), "MIDI",
                                     GranulatorModConfig::SourceIdentifier{i + MIDICCSTART});
         }
         for (auto &v : modSourceValues)

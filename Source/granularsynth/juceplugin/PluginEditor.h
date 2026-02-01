@@ -251,10 +251,13 @@ struct ModulationRowComponent : public juce::Component
         curveCombo.addItem(juce::CharPointer_UTF8("4 steps"), mcf::CURVE_STEPS4 + 1);
         curveCombo.addItem(juce::CharPointer_UTF8("EXPSINE 1"), mcf::CURVE_EXPSIN1 + 1);
         curveCombo.addItem(juce::CharPointer_UTF8("EXPSINE 2"), mcf::CURVE_EXPSIN2 + 1);
+        curveCombo.addItem(juce::CharPointer_UTF8("XOR 1"), mcf::CURVE_XOR1 + 1);
+        curveCombo.addItem(juce::CharPointer_UTF8("XOR 2"), mcf::CURVE_XOR2 + 1);
+        curveCombo.addItem(juce::CharPointer_UTF8("XOR 3"), mcf::CURVE_XOR3 + 1);
         curveCombo.setSelectedId(mcf::CURVE_LINEAR + 1, juce::dontSendNotification);
         curveCombo.onChange = updatfunc;
 
-        addAndMakeVisible(curveParEditor);
+        // addAndMakeVisible(curveParEditor);
         curveParEditor.setText("0.0", juce::dontSendNotification);
         curveParEditor.onReturnKey = updatfunc;
 
@@ -321,7 +324,7 @@ struct ModulationRowComponent : public juce::Component
         layout.items.add(juce::FlexItem(depthSlider).withFlex(2.0));
         // layout.items.add(juce::FlexItem(destCombo).withFlex(1.0));
         layout.items.add(juce::FlexItem(curveCombo).withFlex(0.5));
-        layout.items.add(juce::FlexItem(curveParEditor).withFlex(0.5));
+        // layout.items.add(juce::FlexItem(curveParEditor).withFlex(0.5));
         layout.items.add(juce::FlexItem(destButton).withFlex(1.0));
         layout.performLayout(juce::Rectangle<int>{0, 0, getWidth(), getHeight()});
     }
