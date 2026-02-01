@@ -136,7 +136,7 @@ struct LFOComponent : public juce::Component
         shapeCombo.onChange = upfunc;
 
         addAndMakeVisible(rateSlider);
-        rateSlider.setRange(-3.0, 5.0);
+        rateSlider.setRange(-6.0, 5.0);
         rateSlider.setNumDecimalPlacesToDisplay(2);
         rateSlider.setTextBoxStyle(juce::Slider::TextEntryBoxPosition::TextBoxRight, false, 50, 20);
         rateSlider.onValueChange = upfunc;
@@ -169,10 +169,10 @@ struct LFOComponent : public juce::Component
     {
         shapeCombo.setBounds(0, 0, 200, 25);
         unipolarButton.setBounds(shapeCombo.getRight() + 1, 0, 100, 25);
-        rateSlider.setBounds(0, shapeCombo.getBottom() + 1, 200, 25);
-        deformSlider.setBounds(0, rateSlider.getBottom() + 1, 200, 25);
-        shiftSlider.setBounds(rateSlider.getRight() + 1, shapeCombo.getBottom() + 1, 200, 25);
-        warpSlider.setBounds(rateSlider.getRight() + 1, shiftSlider.getBottom() + 1, 200, 25);
+        rateSlider.setBounds(0, shapeCombo.getBottom() + 1, 400, 25);
+        deformSlider.setBounds(0, rateSlider.getBottom() + 1, 400, 25);
+        shiftSlider.setBounds(rateSlider.getRight() + 1, shapeCombo.getBottom() + 1, 400, 25);
+        warpSlider.setBounds(rateSlider.getRight() + 1, shiftSlider.getBottom() + 1, 400, 25);
     }
     int lfoindex = -1;
     std::function<void(int, int, float, float, float, float, bool)> stateChangedCallback;
