@@ -212,13 +212,13 @@ void AudioPluginAudioProcessorEditor::timerCallback()
         }
         if (msg.opcode == ThreadMessage::OP_MODROUTING && msg.modslot < modRowComps.size())
         {
-            modRowComps[msg.modslot]->sourceCombo.setSelectedId(msg.modsource + 1,
-                                                                juce::dontSendNotification);
-            modRowComps[msg.modslot]->viaCombo.setSelectedId(msg.modvia + 1,
-                                                             juce::dontSendNotification);
+            modRowComps[msg.modslot]->sourceDrop.setSelectedId(msg.modsource);
+
+            modRowComps[msg.modslot]->viaDrop.setSelectedId(msg.modvia);
+
             modRowComps[msg.modslot]->depthSlider.setValue(msg.depth, juce::dontSendNotification);
             modRowComps[msg.modslot]->destDrop.setSelectedId(msg.moddest);
-                                                              
+
             modRowComps[msg.modslot]->setTarget(msg.moddest);
             modRowComps[msg.modslot]->curveDrop.setSelectedId(msg.modcurve);
         }

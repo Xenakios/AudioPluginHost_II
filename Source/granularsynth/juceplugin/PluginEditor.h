@@ -280,15 +280,15 @@ struct ModulationRowComponent : public juce::Component
 {
     ModulationRowComponent(ToneGranulator *g) : gr(g)
     {
-        addAndMakeVisible(sourceCombo);
-        addAndMakeVisible(viaCombo);
+        addAndMakeVisible(sourceDrop);
+        addAndMakeVisible(viaDrop);
         addAndMakeVisible(depthSlider);
 
         auto updatfunc = [this] {
             CallbackParams pars{false,
                                 modslotindex,
-                                sourceCombo.getSelectedId() - 1,
-                                viaCombo.getSelectedId() - 1,
+                                sourceDrop.selectedId,
+                                viaDrop.selectedId,
                                 curveDrop.selectedId,
                                 curveParEditor.getText().getFloatValue(),
                                 (float)depthSlider.getValue(),
@@ -298,22 +298,20 @@ struct ModulationRowComponent : public juce::Component
         for (int i = 0; i < g->modSources.size(); ++i)
         {
             auto &ms = g->modSources[i];
-            sourceCombo.addItem(ms.name, ms.id.src + 1);
-            viaCombo.addItem(ms.name, ms.id.src + 1);
+            sourceDrop.rootNode.children.push_back({ms.name, (int)ms.id.src});
+            viaDrop.rootNode.children.push_back({ms.name, (int)ms.id.src});
         }
 
-        sourceCombo.setSelectedItemIndex(0, juce::dontSendNotification);
-        viaCombo.setSelectedItemIndex(0, juce::dontSendNotification);
-        sourceCombo.onChange = updatfunc;
-        viaCombo.onChange = updatfunc;
+        sourceDrop.OnItemSelected = updatfunc;
+        viaDrop.OnItemSelected = updatfunc;
 
         depthSlider.setRange(-1.0, 1.0);
         depthSlider.setNumDecimalPlacesToDisplay(2);
         depthSlider.onValueChange = [this]() {
             CallbackParams pars{true,
                                 modslotindex,
-                                sourceCombo.getSelectedId() - 1,
-                                viaCombo.getSelectedId() - 1,
+                                sourceDrop.selectedId,
+                                viaDrop.selectedId,
                                 curveDrop.selectedId,
                                 curveParEditor.getText().getFloatValue(),
                                 (float)depthSlider.getValue(),
@@ -396,8 +394,8 @@ struct ModulationRowComponent : public juce::Component
                                     juce::FlexBox::AlignContent::spaceAround,
                                     juce::FlexBox::AlignItems::stretch,
                                     juce::FlexBox::JustifyContent::flexStart);
-        layout.items.add(juce::FlexItem(sourceCombo).withFlex(1.0));
-        layout.items.add(juce::FlexItem(viaCombo).withFlex(1.0));
+        layout.items.add(juce::FlexItem(sourceDrop).withFlex(1.0));
+        layout.items.add(juce::FlexItem(viaDrop).withFlex(1.0));
         layout.items.add(juce::FlexItem(depthSlider).withFlex(2.0));
         layout.items.add(juce::FlexItem(curveDrop).withFlex(0.5));
         layout.items.add(juce::FlexItem(destDrop).withFlex(1.0));
@@ -418,8 +416,8 @@ struct ModulationRowComponent : public juce::Component
     std::function<void(CallbackParams)> stateChangedCallback;
     int modslotindex = -1;
     uint32_t targetID = 1;
-    juce::ComboBox sourceCombo;
-    juce::ComboBox viaCombo;
+    DropDownComponent sourceDrop;
+    DropDownComponent viaDrop;
     juce::Slider depthSlider;
     DropDownComponent curveDrop;
     juce::TextEditor curveParEditor;
