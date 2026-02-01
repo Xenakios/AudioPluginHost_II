@@ -254,6 +254,8 @@ struct ModulationRowComponent : public juce::Component
         curveCombo.addItem(juce::CharPointer_UTF8("XOR 1"), mcf::CURVE_XOR1 + 1);
         curveCombo.addItem(juce::CharPointer_UTF8("XOR 2"), mcf::CURVE_XOR2 + 1);
         curveCombo.addItem(juce::CharPointer_UTF8("XOR 3"), mcf::CURVE_XOR3 + 1);
+        curveCombo.addItem(juce::CharPointer_UTF8("XOR 4"), mcf::CURVE_XOR4 + 1);
+        curveCombo.addItem(juce::CharPointer_UTF8("BIT MIRROR"), mcf::CURVE_BITMIRROR + 1);
         curveCombo.setSelectedId(mcf::CURVE_LINEAR + 1, juce::dontSendNotification);
         curveCombo.onChange = updatfunc;
 

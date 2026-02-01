@@ -66,7 +66,13 @@ struct GranulatorModConfig
         CURVE_EXPSIN2,
         CURVE_XOR1,
         CURVE_XOR2,
-        CURVE_XOR3
+        CURVE_XOR3,
+        CURVE_XOR4,
+        CURVE_XOR5,
+        CURVE_XOR6,
+        CURVE_XOR7,
+        CURVE_XOR8,
+        CURVE_BITMIRROR
     };
     static float xor_curve(float x, uint16_t a)
     {
@@ -74,6 +80,26 @@ struct GranulatorModConfig
         x = (x + 1.0f) * 0.5f;
         uint16_t ival = x * 65535;
         ival = ival ^ a;
+        x = ival / 65535.0f;
+        return -1.0f + 2.0f * x;
+    }
+    static uint16_t reverse_bits_16(uint16_t n)
+    {
+        n = ((n >> 1) & 0x5555) | ((n << 1) & 0xAAAA); // Swap adjacent bits
+        n = ((n >> 2) & 0x3333) | ((n << 2) & 0xCCCC); // Swap 2-bit groups
+        n = ((n >> 4) & 0x0F0F) | ((n << 4) & 0xF0F0); // Swap nibbles
+        n = ((n >> 8) & 0x00FF) | ((n << 8) & 0xFF00); // Swap bytes
+        return n;
+    }
+
+    static float bit_reversal_curve(float x)
+    {
+        x = std::clamp(x, -1.0f, 1.0f);
+        x = (x + 1.0f) * 0.5f;
+
+        uint16_t ival = static_cast<uint16_t>(x * 65535.0f);
+        ival = reverse_bits_16(ival); // Mirror the bits
+
         x = ival / 65535.0f;
         return -1.0f + 2.0f * x;
     }
@@ -107,11 +133,15 @@ struct GranulatorModConfig
         case CURVE_EXPSIN2:
             return [](auto x) { return expsin(x, 2, 12.0f); };
         case CURVE_XOR1:
-            return [](auto x) { return xor_curve(x, 12013); };
+            return [](auto x) { return xor_curve(x, 13107); };
         case CURVE_XOR2:
-            return [](auto x) { return xor_curve(x, 4097); };
+            return [](auto x) { return xor_curve(x, 43690); };
         case CURVE_XOR3:
-            return [](auto x) { return xor_curve(x, 60521); };
+            return [](auto x) { return xor_curve(x, 25027); };
+        case CURVE_XOR4:
+            return [](auto x) { return xor_curve(x, 255); };
+        case CURVE_BITMIRROR:
+            return [](auto x) { return bit_reversal_curve(x); };
         }
 
         return [](auto x) { return x; };
