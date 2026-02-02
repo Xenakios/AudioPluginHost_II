@@ -282,6 +282,37 @@ struct StepSeqComponent : public juce::Component
 
 struct ModulationRowComponent : public juce::Component
 {
+    void fillDropWithSources(DropDownComponent &drop, std::string roottext)
+    {
+        drop.rootNode.text = roottext;
+        std::map<std::string, DropDownComponent::Node *> nodemap;
+        drop.rootNode.children.reserve(16);
+        for (int i = 0; i < gr->modSources.size(); ++i)
+        {
+            auto &ms = gr->modSources[i];
+            if (!ms.groupname.empty())
+            {
+                if (nodemap.count(ms.groupname) == 0)
+                {
+                    drop.rootNode.children.push_back({ms.groupname, -1});
+                    nodemap[ms.groupname] = &drop.rootNode.children.back();
+                }
+            }
+        }
+        for (int i = 0; i < gr->modSources.size(); ++i)
+        {
+            auto &ms = gr->modSources[i];
+            if (ms.groupname.empty())
+            {
+                drop.rootNode.children.push_back({ms.name, (int)ms.id.src});
+            }
+            else
+            {
+                nodemap[ms.groupname]->children.push_back({ms.name, (int)ms.id.src});
+            }
+        }
+        drop.setSelectedId(0);
+    }
     ModulationRowComponent(ToneGranulator *g) : gr(g)
     {
         addAndMakeVisible(sourceDrop);
@@ -299,15 +330,9 @@ struct ModulationRowComponent : public juce::Component
                                 (uint32_t)destDrop.selectedId};
             stateChangedCallback(pars);
         };
-        for (int i = 0; i < g->modSources.size(); ++i)
-        {
-            auto &ms = g->modSources[i];
-            sourceDrop.rootNode.children.push_back({ms.name, (int)ms.id.src});
-            viaDrop.rootNode.children.push_back({ms.name, (int)ms.id.src});
-        }
-        sourceDrop.setSelectedId(0);
+        fillDropWithSources(sourceDrop, "Modulation source");
         sourceDrop.OnItemSelected = updatfunc;
-        viaDrop.setSelectedId(0);
+        fillDropWithSources(viaDrop, "Modulation via source");
         viaDrop.OnItemSelected = updatfunc;
 
         depthSlider.OnValueChanged = [this]() {
