@@ -266,11 +266,11 @@ class GranulatorModMatrix
                     if (lfoindex >= 0 && lfoindex < numLfos)
                     {
                         float rate = entryob["rate"].getWithDefault(0.0f);
-                        //lfo_rates[lfoindex] = rate;
+                        // lfo_rates[lfoindex] = rate;
                         float deform = entryob["deform"].getWithDefault(0.0f);
-                        //lfo_deforms[lfoindex] = deform;
+                        // lfo_deforms[lfoindex] = deform;
                         float shift = entryob["deform"].getWithDefault(0.0f);
-                        //lfo_shifts[lfoindex] = entryob["shift"].getWithDefault(0.5f);
+                        // lfo_shifts[lfoindex] = entryob["shift"].getWithDefault(0.5f);
                         int shape = entryob["shape"].getWithDefault(0);
                         lfo_shapes[lfoindex] = shape;
                     }
@@ -731,9 +731,9 @@ class GranulatorVoice
             SHEval3(x, y, z, ambcoeffs.data());
 
         phase = 0;
-        float actdur = std::clamp(evpars.duration, 0.001f, 1.0f);
-        // actdur = std::pow(actdur, 2.0);
-        // actdur = 0.001 + 0.999 * actdur;
+        float actdur = std::clamp(evpars.duration, 0.0f, 1.0f);
+        actdur = actdur * actdur * actdur;
+        actdur = 0.002f + 0.498f * actdur;
         grain_end_phase = sr * actdur;
         gain_envelope.start(grain_end_phase);
         aux_envelope.start(grain_end_phase);
@@ -1126,9 +1126,9 @@ class ToneGranulator
                                    .withID(PAR_GRAINVOLUME)
                                    .withFlags(CLAP_PARAM_IS_MODULATABLE));
         parmetadatas.push_back(pmd()
-                                   .withRange(0.002f, 0.5f)
-                                   .withDefault(0.05f)
-                                   .withLinearScaleFormatting("MS", 1000.0)
+                                   .withRange(0.0f, 1.0f)
+                                   .withDefault(0.5f)
+                                   .withLinearScaleFormatting("%", 100.0)
                                    .withDecimalPlaces(0)
                                    .withName("Duration")
                                    .withID(PAR_DURATION)
