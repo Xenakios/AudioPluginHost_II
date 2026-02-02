@@ -1086,6 +1086,7 @@ class ToneGranulator
         parmetadatas.push_back(pmd()
                                    .withRange(-24.0, 0.0)
                                    .withDefault(-6.0)
+                                   .withLinearScaleFormatting("dB")
                                    .withName("Main volume")
                                    .withFlags(CLAP_PARAM_IS_MODULATABLE)
                                    .withGroupName("Main output")
@@ -1116,18 +1117,22 @@ class ToneGranulator
         parmetadatas.push_back(pmd()
                                    .withRange(0.0f, 7.0f)
                                    .withDefault(4.0)
+                                   .withATwoToTheBFormatting(1.0f, 1.0, "Hz")
                                    .withName("Density")
                                    .withID(PAR_DENSITY)
                                    .withFlags(CLAP_PARAM_IS_MODULATABLE));
         parmetadatas.push_back(pmd()
                                    .withRange(0.0f, 1.0f)
                                    .withDefault(0.75f)
+                                   .asCubicDecibelAttenuation()
                                    .withName("Grain volume")
                                    .withID(PAR_GRAINVOLUME)
                                    .withFlags(CLAP_PARAM_IS_MODULATABLE));
         parmetadatas.push_back(pmd()
                                    .withRange(0.002f, 0.5f)
                                    .withDefault(0.05f)
+                                   .withLinearScaleFormatting("MS", 1000.0)
+                                   .withDecimalPlaces(0)
                                    .withName("Duration")
                                    .withID(PAR_DURATION)
                                    .withFlags(CLAP_PARAM_IS_MODULATABLE));
@@ -1140,6 +1145,7 @@ class ToneGranulator
         parmetadatas.push_back(pmd()
                                    .withRange(-48.0, 48.0)
                                    .withDefault(0.0)
+                                   .withLinearScaleFormatting("SEMITONES")
                                    .withName("Pitch")
                                    .withID(PAR_PITCH)
                                    .withFlags(CLAP_PARAM_IS_MODULATABLE));

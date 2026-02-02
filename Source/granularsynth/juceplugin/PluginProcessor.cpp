@@ -15,6 +15,7 @@ AudioPluginAudioProcessor::AudioPluginAudioProcessor()
 {
 
     from_gui_fifo.reset(1024);
+    params_from_gui_fifo.reset(1024);
     to_gui_fifo.reset(1024);
     for (int i = 0; i < granulator.parmetadatas.size(); ++i)
     {
@@ -151,7 +152,14 @@ void AudioPluginAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
             }
         }
     }
-
+    ParameterMessage parmsg;
+    while (params_from_gui_fifo.pop(parmsg))
+    {
+        if (parmsg.id > 0)
+        {
+            *granulator.idtoparvalptr[parmsg.id] = parmsg.value;
+        }
+    }
     ThreadMessage msg;
     while (from_gui_fifo.pop(msg))
     {
@@ -208,6 +216,7 @@ void AudioPluginAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
             granulator.set_ambisonics_order(1);
         */
     }
+    /*
     const auto &pars = getParameters();
     for (auto &p : pars)
     {
@@ -220,6 +229,7 @@ void AudioPluginAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
             *granulator.idtoparvalptr[parid] = rpar->convertFrom0to1(rpar->getValue());
         }
     }
+    */
     granulator.osc_type = *granulator.idtoparvalptr[ToneGranulator::PAR_OSCTYPE];
 
     granulator.process_block(workBuffer.data(), buffer.getNumSamples());

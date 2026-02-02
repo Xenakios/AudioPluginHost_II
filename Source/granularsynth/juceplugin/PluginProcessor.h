@@ -4,6 +4,12 @@
 #include "../granularsynth.h"
 #include "containers/choc_SingleReaderSingleWriterFIFO.h"
 
+struct ParameterMessage
+{
+  uint32_t id = 0;
+  float value = 0.0f;
+};
+
 struct ThreadMessage
 {
     enum OpCode
@@ -68,6 +74,7 @@ class AudioPluginAudioProcessor final : public juce::AudioProcessor
     void setStateInformation(const void *data, int sizeInBytes) override;
     ToneGranulator granulator;
     choc::fifo::SingleReaderSingleWriterFIFO<ThreadMessage> from_gui_fifo;
+    choc::fifo::SingleReaderSingleWriterFIFO<ParameterMessage> params_from_gui_fifo;
     choc::fifo::SingleReaderSingleWriterFIFO<ThreadMessage> to_gui_fifo;
     juce::AudioProcessLoadMeasurer perfMeasurer;
     

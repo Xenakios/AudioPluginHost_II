@@ -1,6 +1,7 @@
 #pragma once
 
 #include "PluginProcessor.h"
+#include "../../Experimental/xap_slider.h"
 
 struct DropDownComponent : public juce::Component
 {
@@ -441,7 +442,8 @@ class AudioPluginAudioProcessorEditor final : public juce::AudioProcessorEditor,
     // This reference is provided as a quick way for your editor to
     // access the processor object that created it.
     AudioPluginAudioProcessor &processorRef;
-    std::vector<std::unique_ptr<GUIParam>> paramEntries;
+    // std::vector<std::unique_ptr<GUIParam>> paramEntries;
+    std::vector<std::unique_ptr<XapSlider>> paramComponents;
     juce::TextButton loadModulationSettingsBut;
     juce::TextButton filter0But;
     juce::TextButton filter1But;

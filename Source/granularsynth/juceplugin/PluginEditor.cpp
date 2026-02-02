@@ -23,6 +23,20 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor(AudioPluginAudi
     addAndMakeVisible(filter1But);
     filter1But.setButtonText("F2");
     filter1But.onClick = [this]() { showFilterMenu(1); };
+    for (int i = 0; i < processorRef.granulator.parmetadatas.size(); ++i)
+    {
+        auto &pmd = processorRef.granulator.parmetadatas[i];
+        auto slid = std::make_unique<XapSlider>(true, pmd);
+        slid->OnValueChanged = [this, pid = pmd.id, sli = slid.get()]() {
+            ParameterMessage msg;
+            msg.id = pid;
+            msg.value = sli->getValue();
+            processorRef.params_from_gui_fifo.push(msg);
+        };
+        addAndMakeVisible(slid.get());
+        paramComponents.push_back(std::move(slid));
+    }
+    /*
     auto &params = p.getParameters();
     for (int i = 0; i < params.size(); ++i)
     {
@@ -57,6 +71,7 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor(AudioPluginAudi
         }
         paramEntries.push_back(std::move(pare));
     }
+    */
     for (int i = 0; i < 8; ++i)
     {
         auto modcomp = std::make_unique<ModulationRowComponent>(&processorRef.granulator);
@@ -238,16 +253,18 @@ void AudioPluginAudioProcessorEditor::resized()
     juce::FlexBox layout;
     layout.flexDirection = juce::FlexBox::Direction::column;
     layout.flexWrap = juce::FlexBox::Wrap::wrap;
-    for (int i = 0; i < paramEntries.size(); ++i)
+
+    for (int i = 0; i < paramComponents.size(); ++i)
     {
-        layout.items.add(juce::FlexItem(*paramEntries[i])
+        layout.items.add(juce::FlexItem(*paramComponents[i])
                              .withFlex(1.0)
                              .withMinHeight(25)
                              .withMinWidth(50)
                              .withMaxWidth(getWidth() / 2));
     }
+
     layout.performLayout(juce::Rectangle<int>(0, 0, getWidth(), 260));
-    lfoTabs.setBounds(0, paramEntries.back()->getBottom() + 1, 900, 110);
+    lfoTabs.setBounds(0, paramComponents.back()->getBottom() + 1, 900, 110);
     filter0But.setBounds(lfoTabs.getRight() + 1, lfoTabs.getY(), 300, 25);
     filter1But.setBounds(lfoTabs.getRight() + 1, filter0But.getBottom() + 1, 300, 25);
 

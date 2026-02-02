@@ -1,6 +1,6 @@
 #pragma once
 
-#include "JuceHeader.h"
+#include <juce_gui_basics/juce_gui_basics.h>
 #include "sst/basic-blocks/params/ParamMetadata.h"
 
 using ParamDesc = sst::basic_blocks::params::ParamMetaData;
@@ -150,7 +150,7 @@ class XapSlider : public juce::Component
                        juce::Justification::centredRight);
         }
     }
-    void mouseDoubleClick(const MouseEvent &event) override
+    void mouseDoubleClick(const juce::MouseEvent &event) override
     {
         if (!isEnabled())
             return;
