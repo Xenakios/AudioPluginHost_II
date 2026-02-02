@@ -137,30 +137,16 @@ struct LFOComponent : public juce::Component
         shapeCombo.onChange = upfunc;
 
         addAndMakeVisible(rateSlider);
-        rateSlider.setRange(-6.0, 5.0);
-        rateSlider.setNumDecimalPlacesToDisplay(2);
-        rateSlider.setTextBoxStyle(juce::Slider::TextEntryBoxPosition::TextBoxRight, false, 50, 20);
-        rateSlider.onValueChange = upfunc;
+        rateSlider.OnValueChanged = upfunc;
 
         addAndMakeVisible(deformSlider);
-        deformSlider.setRange(-1.0, 1.0);
-        deformSlider.setNumDecimalPlacesToDisplay(2);
-        deformSlider.setTextBoxStyle(juce::Slider::TextEntryBoxPosition::TextBoxRight, false, 50,
-                                     20);
-        deformSlider.onValueChange = upfunc;
+        deformSlider.OnValueChanged = upfunc;
 
         addAndMakeVisible(shiftSlider);
-        shiftSlider.setRange(-1.0, 1.0);
-        shiftSlider.setNumDecimalPlacesToDisplay(2);
-        shiftSlider.setTextBoxStyle(juce::Slider::TextEntryBoxPosition::TextBoxRight, false, 50,
-                                    20);
-        shiftSlider.onValueChange = upfunc;
+        shiftSlider.OnValueChanged = upfunc;
 
         addAndMakeVisible(warpSlider);
-        warpSlider.setRange(-1.0, 1.0);
-        warpSlider.setNumDecimalPlacesToDisplay(2);
-        warpSlider.setTextBoxStyle(juce::Slider::TextEntryBoxPosition::TextBoxRight, false, 50, 20);
-        warpSlider.onValueChange = upfunc;
+        warpSlider.OnValueChanged = upfunc;
 
         addAndMakeVisible(unipolarButton);
         unipolarButton.setButtonText("Unipolar");
@@ -178,10 +164,27 @@ struct LFOComponent : public juce::Component
     int lfoindex = -1;
     std::function<void(int, int, float, float, float, float, bool)> stateChangedCallback;
     juce::ComboBox shapeCombo;
-    juce::Slider rateSlider;
-    juce::Slider deformSlider;
-    juce::Slider shiftSlider;
-    juce::Slider warpSlider;
+    XapSlider rateSlider{true, ToneGranulator::pmd()
+                                   .asFloat()
+                                   .withName("RATE")
+                                   .withRange(-6.0f, 5.0f)
+                                   .withATwoToTheBFormatting(1.0f, 1.0f, "HZ")};
+    XapSlider deformSlider{true, ToneGranulator::pmd()
+                                     .asFloat()
+                                     .withName("DEFORM")
+                                     .withRange(-1.0f, 1.0f)
+                                     .withLinearScaleFormatting("%", 100.0f)};
+    XapSlider shiftSlider{true, ToneGranulator::pmd()
+                                    .asFloat()
+                                    .withName("SHIFT")
+                                    .withRange(-1.0f, 1.0f)
+                                    .withLinearScaleFormatting("%", 100.0f)};
+    XapSlider warpSlider{true, ToneGranulator::pmd()
+                                   .asFloat()
+                                   .withName("WARP")
+                                   .withRange(-1.0f, 1.0f)
+                                   .withLinearScaleFormatting("%", 100.0f)};
+
     juce::ToggleButton unipolarButton;
 };
 
