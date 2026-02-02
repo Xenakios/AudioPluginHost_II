@@ -310,9 +310,7 @@ struct ModulationRowComponent : public juce::Component
         viaDrop.setSelectedId(0);
         viaDrop.OnItemSelected = updatfunc;
 
-        depthSlider.setRange(-1.0, 1.0);
-        depthSlider.setNumDecimalPlacesToDisplay(2);
-        depthSlider.onValueChange = [this]() {
+        depthSlider.OnValueChanged = [this]() {
             CallbackParams pars{true,
                                 modslotindex,
                                 sourceDrop.selectedId,
@@ -323,8 +321,6 @@ struct ModulationRowComponent : public juce::Component
                                 (uint32_t)destDrop.selectedId};
             stateChangedCallback(pars);
         };
-        depthSlider.setTextBoxStyle(juce::Slider::TextEntryBoxPosition::TextBoxRight, false, 50,
-                                    20);
 
         addAndMakeVisible(curveDrop);
         using mcf = GranulatorModConfig;
@@ -424,7 +420,11 @@ struct ModulationRowComponent : public juce::Component
     uint32_t targetID = 1;
     DropDownComponent sourceDrop;
     DropDownComponent viaDrop;
-    juce::Slider depthSlider;
+    XapSlider depthSlider{true, ParamDesc()
+                                    .asFloat()
+                                    .withName("DEPTH")
+                                    .withRange(-1.0f, 1.0f)
+                                    .withLinearScaleFormatting("%", 100.0f)};
     DropDownComponent curveDrop;
     juce::TextEditor curveParEditor;
     DropDownComponent destDrop;

@@ -212,6 +212,18 @@ void AudioPluginAudioProcessorEditor::timerCallback()
     {
         c->updateGUI();
     }
+    ParameterMessage parmsg;
+    while (processorRef.params_to_gui_fifo.pop(parmsg))
+    {
+        for (auto &c : paramComponents)
+        {
+            if (c->getParamDescription().id == parmsg.id)
+            {
+                c->setValue(parmsg.value);
+                break;
+            }
+        }
+    }
     ThreadMessage msg;
     while (processorRef.to_gui_fifo.pop(msg))
     {

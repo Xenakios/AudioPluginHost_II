@@ -16,6 +16,7 @@ AudioPluginAudioProcessor::AudioPluginAudioProcessor()
 
     from_gui_fifo.reset(1024);
     params_from_gui_fifo.reset(1024);
+    params_to_gui_fifo.reset(1024);
     to_gui_fifo.reset(1024);
     for (int i = 0; i < granulator.parmetadatas.size(); ++i)
     {
@@ -276,12 +277,12 @@ void AudioPluginAudioProcessor::getStateInformation(juce::MemoryBlock &destData)
 {
     auto state = choc::value::createObject("state");
     auto mainparams = choc::value::createObject("params");
-    auto &pars = getParameters();
-    for (int i = 0; i < pars.size(); ++i)
+    auto &pmds = granulator.parmetadatas;
+    for (int i = 0; i < pmds.size(); ++i)
     {
-        auto p = dynamic_cast<juce::RangedAudioParameter *>(pars[i]);
-        std::string id = p->getParameterID().toStdString();
-        mainparams.setMember(id, p->convertFrom0to1(p->getValue()));
+        std::string id = std::to_string(pmds[i].id);
+        float v = *granulator.idtoparvalptr[pmds[i].id];
+        mainparams.setMember(id, v);
     }
     state.setMember("params", mainparams);
     auto filterstates = choc::value::createEmptyArray();
@@ -346,14 +347,14 @@ void AudioPluginAudioProcessor::setStateInformation(const void *data, int sizeIn
         if (state.hasObjectMember("params"))
         {
             auto params = state["params"];
-            auto &pars = getParameters();
+            auto &pars = granulator.parmetadatas;
             for (int i = 0; i < pars.size(); ++i)
             {
-                auto p = dynamic_cast<juce::RangedAudioParameter *>(pars[i]);
-                std::string id = p->getParameterID().toStdString();
+                std::string id = std::to_string(pars[i].id);
                 if (params.hasObjectMember(id))
                 {
-                    p->setValue(p->convertTo0to1(params[id].get<float>()));
+                    float v = params[i].getWithDefault(pars[i].defaultVal);
+                    *granulator.idtoparvalptr[pars[i].id] = v;
                 }
             }
         }
@@ -439,6 +440,13 @@ void AudioPluginAudioProcessor::setStateInformation(const void *data, int sizeIn
 
 void AudioPluginAudioProcessor::sendExtraStatesToGUI()
 {
+    for (auto &p : granulator.parmetadatas)
+    {
+        ParameterMessage msg;
+        msg.id = p.id;
+        msg.value = *granulator.idtoparvalptr[msg.id];
+        params_to_gui_fifo.push(msg);
+    }
     for (int i = 0; i < granulator.modmatrix.numLfos; ++i)
     {
         ThreadMessage msg;

@@ -55,6 +55,7 @@ class XapSlider : public juce::Component
         setWantsKeyboardFocus(true);
         addChildComponent(m_ed);
     }
+    const ParamDesc &getParamDescription() const { return m_pardesc; }
     void enablementChanged() override { repaint(); }
     void mouseWheelMove(const juce::MouseEvent &event,
                         const juce::MouseWheelDetails &wheel) override
@@ -118,7 +119,8 @@ class XapSlider : public juce::Component
             g.setColour(juce::Colours::lightgrey);
             g.drawRect(2, 0, getWidth() - 4, getHeight());
             g.setColour(juce::Colours::grey);
-            g.drawText("NOT AVAILABLE", 0, 0, getWidth(), getHeight(), juce::Justification::centred);
+            g.drawText("NOT AVAILABLE", 0, 0, getWidth(), getHeight(),
+                       juce::Justification::centred);
             return;
         }
         if (!m_err_msg.isEmpty())
@@ -130,7 +132,7 @@ class XapSlider : public juce::Component
         }
         double xforvalue =
             juce::jmap<double>(m_value, m_min_value, m_max_value, 2.0, getWidth() - 4.0);
-        
+
         if (hasKeyboardFocus(false))
             g.setColour(juce::Colours::cyan);
         else
@@ -143,7 +145,10 @@ class XapSlider : public juce::Component
 
         g.drawText(m_labeltxt, 5, 0, getWidth() - 10, getHeight(),
                    juce::Justification::centredLeft);
-        auto partext = valueToString(m_value);
+        auto val = m_value;
+        if (m_pardesc.type == ParamDesc::INT)
+            val = std::floor(m_value);
+        auto partext = valueToString(val);
         if (partext)
         {
             g.drawText(*partext, 5, 0, getWidth() - 10, getHeight(),
@@ -244,6 +249,7 @@ class XapSlider : public juce::Component
             return;
         m_value = juce::jmap<double>(ev.x, 2, getWidth() - 4, m_min_value, m_max_value);
         m_value = juce::jlimit(m_min_value, m_max_value, m_value);
+
         if (OnValueChanged)
             OnValueChanged();
         repaint();

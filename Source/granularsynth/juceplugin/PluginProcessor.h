@@ -75,6 +75,7 @@ class AudioPluginAudioProcessor final : public juce::AudioProcessor
     ToneGranulator granulator;
     choc::fifo::SingleReaderSingleWriterFIFO<ThreadMessage> from_gui_fifo;
     choc::fifo::SingleReaderSingleWriterFIFO<ParameterMessage> params_from_gui_fifo;
+    choc::fifo::SingleReaderSingleWriterFIFO<ParameterMessage> params_to_gui_fifo;
     choc::fifo::SingleReaderSingleWriterFIFO<ThreadMessage> to_gui_fifo;
     juce::AudioProcessLoadMeasurer perfMeasurer;
     
