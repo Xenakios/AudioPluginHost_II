@@ -26,15 +26,18 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor(AudioPluginAudi
     for (int i = 0; i < processorRef.granulator.parmetadatas.size(); ++i)
     {
         auto &pmd = processorRef.granulator.parmetadatas[i];
-        auto slid = std::make_unique<XapSlider>(true, pmd);
-        slid->OnValueChanged = [this, pid = pmd.id, sli = slid.get()]() {
-            ParameterMessage msg;
-            msg.id = pid;
-            msg.value = sli->getValue();
-            processorRef.params_from_gui_fifo.push(msg);
-        };
-        addAndMakeVisible(slid.get());
-        paramComponents.push_back(std::move(slid));
+        if (!choc::text::startsWith(pmd.groupName, "LFO"))
+        {
+            auto slid = std::make_unique<XapSlider>(true, pmd);
+            slid->OnValueChanged = [this, pid = pmd.id, sli = slid.get()]() {
+                ParameterMessage msg;
+                msg.id = pid;
+                msg.value = sli->getValue();
+                processorRef.params_from_gui_fifo.push(msg);
+            };
+            addAndMakeVisible(slid.get());
+            paramComponents.push_back(std::move(slid));
+        }
     }
     /*
     auto &params = p.getParameters();
@@ -100,24 +103,35 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor(AudioPluginAudi
         addAndMakeVisible(*modcomp);
         modRowComps.push_back(std::move(modcomp));
     }
-
+    auto &idtomd = processorRef.granulator.idtoparmetadata;
     for (int i = 0; i < 8; ++i)
     {
-        auto lfoc = std::make_unique<LFOComponent>();
+        auto lfoc =
+            std::make_unique<LFOComponent>(*idtomd[(uint32_t)(ToneGranulator::PAR_LFORATES + i)]);
         // addAndMakeVisible(*lfoc);
         lfoc->lfoindex = i;
+
         lfoc->stateChangedCallback = [this](int lfoindex, int shape, float rateval, float deformval,
                                             float shift, float warp, bool uni) {
             ThreadMessage msg;
             msg.opcode = ThreadMessage::OP_LFOPARAM;
             msg.lfoindex = lfoindex;
             msg.lfoshape = shape;
-            msg.lforate = rateval;
-            msg.lfodeform = deformval;
-            msg.lfoshift = shift;
-            msg.lfowarp = warp;
             msg.lfounipolar = uni;
             processorRef.from_gui_fifo.push(msg);
+            ParameterMessage parmsg;
+            parmsg.id = ToneGranulator::PAR_LFORATES + lfoindex;
+            parmsg.value = rateval;
+            processorRef.params_from_gui_fifo.push(parmsg);
+            parmsg.id = ToneGranulator::PAR_LFODEFORMS + lfoindex;
+            parmsg.value = deformval;
+            processorRef.params_from_gui_fifo.push(parmsg);
+            parmsg.id = ToneGranulator::PAR_LFOSHIFTS + lfoindex;
+            parmsg.value = shift;
+            processorRef.params_from_gui_fifo.push(parmsg);
+            parmsg.id = ToneGranulator::PAR_LFOWARPS + lfoindex;
+            parmsg.value = warp;
+            processorRef.params_from_gui_fifo.push(parmsg);
         };
         lfoTabs.addTab("LFO " + juce::String(i + 1), juce::Colours::lightgrey, lfoc.get(), false);
         lfocomps.push_back(std::move(lfoc));
@@ -132,7 +146,7 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor(AudioPluginAudi
     addAndMakeVisible(lfoTabs);
     lfoTabs.setCurrentTabIndex(0);
 
-    setSize(1200, 650);
+    setSize(1500, 700);
     startTimer(100);
 }
 
@@ -223,17 +237,16 @@ void AudioPluginAudioProcessorEditor::timerCallback()
                 break;
             }
         }
+        for (auto& c : lfocomps)
+        {
+            
+        }
     }
     ThreadMessage msg;
     while (processorRef.to_gui_fifo.pop(msg))
     {
         if (msg.opcode == ThreadMessage::OP_LFOPARAM && msg.lfoindex < lfocomps.size())
         {
-            lfocomps[msg.lfoindex]->rateSlider.setValue(msg.lforate, juce::dontSendNotification);
-            lfocomps[msg.lfoindex]->deformSlider.setValue(msg.lfodeform,
-                                                          juce::dontSendNotification);
-            lfocomps[msg.lfoindex]->shiftSlider.setValue(msg.lfoshift, juce::dontSendNotification);
-            lfocomps[msg.lfoindex]->warpSlider.setValue(msg.lfowarp, juce::dontSendNotification);
             lfocomps[msg.lfoindex]->shapeCombo.setSelectedId(msg.lfoshape + 1,
                                                              juce::dontSendNotification);
             lfocomps[msg.lfoindex]->unipolarButton.setToggleState(msg.lfounipolar,
@@ -275,7 +288,7 @@ void AudioPluginAudioProcessorEditor::resized()
                              .withMaxWidth(getWidth() / 2));
     }
 
-    layout.performLayout(juce::Rectangle<int>(0, 0, getWidth(), 260));
+    layout.performLayout(juce::Rectangle<int>(0, 0, getWidth(), 330));
     lfoTabs.setBounds(0, paramComponents.back()->getBottom() + 1, 900, 110);
     filter0But.setBounds(lfoTabs.getRight() + 1, lfoTabs.getY(), 300, 25);
     filter1But.setBounds(lfoTabs.getRight() + 1, filter0But.getBottom() + 1, 300, 25);

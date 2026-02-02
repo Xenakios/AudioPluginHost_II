@@ -172,10 +172,6 @@ void AudioPluginAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
         if (msg.opcode == ThreadMessage::OP_LFOPARAM && msg.lfoindex >= 0)
         {
             granulator.modmatrix.lfo_shapes[msg.lfoindex] = msg.lfoshape;
-            granulator.modmatrix.lfo_rates[msg.lfoindex] = msg.lforate;
-            granulator.modmatrix.lfo_deforms[msg.lfoindex] = msg.lfodeform;
-            granulator.modmatrix.lfo_shifts[msg.lfoindex] = msg.lfoshift;
-            granulator.modmatrix.lfo_warps[msg.lfoindex] = msg.lfowarp;
             granulator.modmatrix.lfo_unipolars[msg.lfoindex] = msg.lfounipolar;
         }
         auto &mm = granulator.modmatrix;
@@ -302,10 +298,6 @@ void AudioPluginAudioProcessor::getStateInformation(juce::MemoryBlock &destData)
     {
         auto lfostate = choc::value::createObject("lfostate");
         lfostate.setMember("shape", granulator.modmatrix.lfo_shapes[i]);
-        lfostate.setMember("rate", granulator.modmatrix.lfo_rates[i]);
-        lfostate.setMember("deform", granulator.modmatrix.lfo_deforms[i]);
-        lfostate.setMember("shift", granulator.modmatrix.lfo_shifts[i]);
-        lfostate.setMember("warp", granulator.modmatrix.lfo_warps[i]);
         lfostate.setMember("uni", granulator.modmatrix.lfo_unipolars[i]);
 
         lfostates.addArrayElement(lfostate);
@@ -391,11 +383,7 @@ void AudioPluginAudioProcessor::setStateInformation(const void *data, int sizeIn
                 if (i < granulator.modmatrix.numLfos)
                 {
                     granulator.modmatrix.lfo_shapes[i] = lfostate["shape"].get<int>();
-                    granulator.modmatrix.lfo_rates[i] = lfostate["rate"].get<float>();
-                    granulator.modmatrix.lfo_deforms[i] = lfostate["deform"].get<float>();
                     granulator.modmatrix.lfo_unipolars[i] = lfostate["uni"].getWithDefault(false);
-                    granulator.modmatrix.lfo_shifts[i] = lfostate["shift"].getWithDefault(0.0f);
-                    granulator.modmatrix.lfo_warps[i] = lfostate["warp"].getWithDefault(0.0f);
                 }
             }
         }
@@ -452,11 +440,7 @@ void AudioPluginAudioProcessor::sendExtraStatesToGUI()
         ThreadMessage msg;
         msg.opcode = ThreadMessage::OP_LFOPARAM;
         msg.lfoindex = i;
-        msg.lforate = granulator.modmatrix.lfo_rates[i];
         msg.lfoshape = granulator.modmatrix.lfo_shapes[i];
-        msg.lfodeform = granulator.modmatrix.lfo_deforms[i];
-        msg.lfowarp = granulator.modmatrix.lfo_warps[i];
-        msg.lfoshift = granulator.modmatrix.lfo_shifts[i];
         msg.lfounipolar = granulator.modmatrix.lfo_unipolars[i];
         to_gui_fifo.push(msg);
     }

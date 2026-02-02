@@ -208,10 +208,6 @@ class GranulatorModMatrix
     alignas(32) float table_envrate_linear[512];
     alignas(32) std::array<sst::basic_blocks::dsp::RNG, numLfos> m_rngs;
     alignas(32) std::array<int, numLfos> lfo_shapes;
-    alignas(32) std::array<float, numLfos> lfo_rates;
-    alignas(32) std::array<float, numLfos> lfo_deforms;
-    alignas(32) std::array<float, numLfos> lfo_shifts;
-    alignas(32) std::array<float, numLfos> lfo_warps;
     alignas(32) std::array<bool, numLfos> lfo_unipolars;
     GranulatorModMatrix(double sr) : samplerate(sr)
     {
@@ -224,10 +220,6 @@ class GranulatorModMatrix
             m_lfos[i] = std::move(lfo);
             m_lfos[i]->attack(0);
             lfo_shapes[i] = lfo_t::SINE;
-            lfo_rates[i] = 0.0;
-            lfo_deforms[i] = 0.0;
-            lfo_shifts[i] = 0.0f;
-            lfo_warps[i] = 0.0f;
             lfo_unipolars[i] = false;
         }
     }
@@ -274,11 +266,11 @@ class GranulatorModMatrix
                     if (lfoindex >= 0 && lfoindex < numLfos)
                     {
                         float rate = entryob["rate"].getWithDefault(0.0f);
-                        lfo_rates[lfoindex] = rate;
+                        //lfo_rates[lfoindex] = rate;
                         float deform = entryob["deform"].getWithDefault(0.0f);
-                        lfo_deforms[lfoindex] = deform;
+                        //lfo_deforms[lfoindex] = deform;
                         float shift = entryob["deform"].getWithDefault(0.0f);
-                        lfo_shifts[lfoindex] = entryob["shift"].getWithDefault(0.5f);
+                        //lfo_shifts[lfoindex] = entryob["shift"].getWithDefault(0.5f);
                         int shape = entryob["shape"].getWithDefault(0);
                         lfo_shapes[lfoindex] = shape;
                     }
@@ -941,6 +933,7 @@ class ToneGranulator
     std::vector<pmd> parmetadatas;
     std::vector<float> paramvalues;
     std::unordered_map<uint32_t, float *> idtoparvalptr;
+    std::unordered_map<uint32_t, pmd *> idtoparmetadata;
     std::unordered_map<uint32_t, float> modRanges;
     float grain_pitch_mod = 0.0;
     float pulse_width = 0.5;
@@ -969,7 +962,11 @@ class ToneGranulator
         PAR_OSC_SYNC = 1800,
         PAR_ENVMORPH = 1900,
         PAR_GRAINVOLUME = 2000,
-        PAR_NOISECORRELATION = 2100
+        PAR_NOISECORRELATION = 2100,
+        PAR_LFORATES = 100000,
+        PAR_LFODEFORMS = 100100,
+        PAR_LFOSHIFTS = 100200,
+        PAR_LFOWARPS = 100300
     };
     enum SI
     {
@@ -1082,7 +1079,7 @@ class ToneGranulator
             else
                 stepModSources[7].steps[i] = 1.0f;
         }
-        parmetadatas.reserve(64);
+        parmetadatas.reserve(128);
         parmetadatas.push_back(pmd()
                                    .withRange(-24.0, 0.0)
                                    .withDefault(-6.0)
@@ -1224,9 +1221,46 @@ class ToneGranulator
                                    .withName("Elevation")
                                    .withID(PAR_ELEVATION)
                                    .withFlags(CLAP_PARAM_IS_MODULATABLE));
+        for (int i = 0; i < GranulatorModMatrix::numLfos; ++i)
+        {
+            parmetadatas.push_back(pmd()
+                                       .withRange(-6.0, 5.0)
+                                       .withDefault(0.0)
+                                       .withATwoToTheBFormatting(1.0f, 1.0f, "Hz")
+                                       .withName(std::format("LFO {} RATE", i + 1))
+                                       .withGroupName(std::format("LFO {}", i + 1))
+                                       .withID(PAR_LFORATES + i)
+                                       .withFlags(CLAP_PARAM_IS_MODULATABLE));
+            parmetadatas.push_back(pmd()
+                                       .withRange(-1.0, 1.0)
+                                       .withDefault(0.0)
+                                       .withLinearScaleFormatting("%", 100.0)
+                                       .withName(std::format("LFO {} DEFORM", i + 1))
+                                       .withGroupName(std::format("LFO {}", i + 1))
+                                       .withID(PAR_LFODEFORMS + i)
+                                       .withFlags(CLAP_PARAM_IS_MODULATABLE));
+            parmetadatas.push_back(pmd()
+                                       .withRange(-1.0, 1.0)
+                                       .withDefault(0.0)
+                                       .withLinearScaleFormatting("%", 100.0)
+                                       .withName(std::format("LFO {} SHIFT", i + 1))
+                                       .withGroupName(std::format("LFO {}", i + 1))
+                                       .withID(PAR_LFOSHIFTS + i)
+                                       .withFlags(CLAP_PARAM_IS_MODULATABLE));
+            parmetadatas.push_back(pmd()
+                                       .withRange(-1.0, 1.0)
+                                       .withDefault(0.0)
+                                       .withLinearScaleFormatting("%", 100.0)
+                                       .withName(std::format("LFO {} WARP", i + 1))
+                                       .withGroupName(std::format("LFO {}", i + 1))
+                                       .withID(PAR_LFOWARPS + i)
+                                       .withFlags(CLAP_PARAM_IS_MODULATABLE));
+        }
+
         paramvalues.resize(parmetadatas.size());
         for (int i = 0; i < parmetadatas.size(); ++i)
         {
+            idtoparmetadata[parmetadatas[i].id] = &parmetadatas[i];
             paramvalues[i] = parmetadatas[i].defaultVal;
             idtoparvalptr[parmetadatas[i].id] = &paramvalues[i];
             if (parmetadatas[i].flags & CLAP_PARAM_IS_MODULATABLE)
@@ -1517,10 +1551,17 @@ class ToneGranulator
         {
             for (uint32_t i = 0; i < modmatrix.numLfos; ++i)
             {
-                modmatrix.m_lfos[i]->applyPhaseOffset(modmatrix.lfo_shifts[i]);
-                modmatrix.m_lfos[i]->process_block(modmatrix.lfo_rates[i], modmatrix.lfo_deforms[i],
-                                                   modmatrix.lfo_shapes[i], false, 1.0f,
-                                                   modmatrix.lfo_warps[i]);
+                float shift = modmatrix.m.getTargetValue(
+                    GranulatorModConfig::TargetIdentifier{(int)(PAR_LFOSHIFTS + i)});
+                modmatrix.m_lfos[i]->applyPhaseOffset(shift);
+                float rate = modmatrix.m.getTargetValue(
+                    GranulatorModConfig::TargetIdentifier{(int)(PAR_LFORATES + i)});
+                float deform = modmatrix.m.getTargetValue(
+                    GranulatorModConfig::TargetIdentifier{(int)(PAR_LFODEFORMS + i)});
+                float warp = modmatrix.m.getTargetValue(
+                    GranulatorModConfig::TargetIdentifier{(int)(PAR_LFOWARPS + i)});
+                modmatrix.m_lfos[i]->process_block(rate, deform, modmatrix.lfo_shapes[i], false,
+                                                   1.0f, warp);
                 if (!modmatrix.lfo_unipolars[i])
                     modSourceValues[LFO0 + i] = modmatrix.m_lfos[i]->outputBlock[0];
                 else

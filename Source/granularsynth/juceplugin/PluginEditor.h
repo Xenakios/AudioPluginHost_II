@@ -119,7 +119,8 @@ struct GUIParam : public juce::Component
 
 struct LFOComponent : public juce::Component
 {
-    LFOComponent()
+    LFOComponent(ParamDesc rated)
+        : rateSlider(true, rated)
     {
         auto upfunc = [this]() {
             stateChangedCallback(lfoindex, shapeCombo.getSelectedId() - 1, rateSlider.getValue(),
@@ -164,11 +165,7 @@ struct LFOComponent : public juce::Component
     int lfoindex = -1;
     std::function<void(int, int, float, float, float, float, bool)> stateChangedCallback;
     juce::ComboBox shapeCombo;
-    XapSlider rateSlider{true, ToneGranulator::pmd()
-                                   .asFloat()
-                                   .withName("RATE")
-                                   .withRange(-6.0f, 5.0f)
-                                   .withATwoToTheBFormatting(1.0f, 1.0f, "HZ")};
+    XapSlider rateSlider;
     XapSlider deformSlider{true, ToneGranulator::pmd()
                                      .asFloat()
                                      .withName("DEFORM")

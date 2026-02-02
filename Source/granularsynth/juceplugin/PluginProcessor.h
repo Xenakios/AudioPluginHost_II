@@ -30,10 +30,7 @@ struct ThreadMessage
     int moddest = -1;
     int16_t lfoindex = -1;
     int lfoshape = -1;
-    float lforate = 0.0f;
-    float lfodeform = 0.0f;
-    float lfoshift = 0.0f;
-    float lfowarp = 0.0f;
+    
     bool lfounipolar = false;
     int16_t filterindex = -1;
     sfpp::FilterModel filtermodel;
