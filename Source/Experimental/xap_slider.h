@@ -209,6 +209,11 @@ class XapSlider : public juce::Component
     {
         if (!isEnabled())
             return;
+        if (ev.mods.isMiddleButtonDown())
+        {
+            showTextEditor();
+            return;
+        }
         if (ev.mods.isRightButtonDown())
         {
             juce::PopupMenu menu;

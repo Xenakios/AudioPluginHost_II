@@ -908,6 +908,24 @@ class StepModSource
 
 std::vector<float> generate_from_js(std::string jscode);
 
+inline double calculate_inverse(double y, double a, double b, double d)
+{
+    // Ensure we don't divide by zero
+    if (b == 0)
+        return 0;
+
+    double val = (y - a) / b;
+
+    // Clamp to [0, 1] because we know x must be in that
+    // range
+    if (val < 0)
+        val = 0;
+    if (val > 1)
+        val = 1;
+
+    return pow(val, 1.0 / d);
+}
+
 class ToneGranulator
 {
   public:
@@ -1128,7 +1146,18 @@ class ToneGranulator
         parmetadatas.push_back(pmd()
                                    .withRange(0.0f, 1.0f)
                                    .withDefault(0.5f)
-                                   .withLinearScaleFormatting("%", 100.0)
+                                   .withUserProvidedFormatting(
+                                       "MS",
+                                       [](float x) {
+                                           x = 0.002f + 0.498f * (x * x * x);
+                                           return std::format("{}", (int)(x * 1000.0f));
+                                       },
+                                       [](std::string_view v) {
+                                           float y = std::atof(v.data());
+                                           y /= 1000.0;
+                                           y = calculate_inverse(y, 0.002, 0.498, 3.0);
+                                           return y;
+                                       })
                                    .withDecimalPlaces(0)
                                    .withName("Duration")
                                    .withID(PAR_DURATION)
