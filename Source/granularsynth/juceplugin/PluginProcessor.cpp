@@ -171,7 +171,6 @@ void AudioPluginAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
         }
         if (msg.opcode == ThreadMessage::OP_LFOPARAM && msg.lfoindex >= 0)
         {
-            granulator.modmatrix.lfo_shapes[msg.lfoindex] = msg.lfoshape;
             granulator.modmatrix.lfo_unipolars[msg.lfoindex] = msg.lfounipolar;
         }
         auto &mm = granulator.modmatrix;
@@ -297,7 +296,6 @@ void AudioPluginAudioProcessor::getStateInformation(juce::MemoryBlock &destData)
     for (int i = 0; i < GranulatorModMatrix::numLfos; ++i)
     {
         auto lfostate = choc::value::createObject("lfostate");
-        lfostate.setMember("shape", granulator.modmatrix.lfo_shapes[i]);
         lfostate.setMember("uni", granulator.modmatrix.lfo_unipolars[i]);
 
         lfostates.addArrayElement(lfostate);
@@ -382,7 +380,6 @@ void AudioPluginAudioProcessor::setStateInformation(const void *data, int sizeIn
                 auto lfostate = lfostates[i];
                 if (i < granulator.modmatrix.numLfos)
                 {
-                    granulator.modmatrix.lfo_shapes[i] = lfostate["shape"].get<int>();
                     granulator.modmatrix.lfo_unipolars[i] = lfostate["uni"].getWithDefault(false);
                 }
             }
@@ -440,7 +437,6 @@ void AudioPluginAudioProcessor::sendExtraStatesToGUI()
         ThreadMessage msg;
         msg.opcode = ThreadMessage::OP_LFOPARAM;
         msg.lfoindex = i;
-        msg.lfoshape = granulator.modmatrix.lfo_shapes[i];
         msg.lfounipolar = granulator.modmatrix.lfo_unipolars[i];
         to_gui_fifo.push(msg);
     }

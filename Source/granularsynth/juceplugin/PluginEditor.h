@@ -119,15 +119,16 @@ struct GUIParam : public juce::Component
 
 struct LFOComponent : public juce::Component
 {
-    LFOComponent(ParamDesc rated)
-        : rateSlider(true, rated)
+    LFOComponent(int index, ToneGranulator *g)
+        : lfoindex(index), gr(g),
+          rateSlider(true, *g->idtoparmetadata[ToneGranulator::PAR_LFORATES + index]),
+          deformSlider(true, *g->idtoparmetadata[ToneGranulator::PAR_LFODEFORMS + index]),
+          shiftSlider(true, *g->idtoparmetadata[ToneGranulator::PAR_LFOSHIFTS + index]),
+          warpSlider(true, *g->idtoparmetadata[ToneGranulator::PAR_LFOWARPS + index]),
+          shapeSlider(true, *g->idtoparmetadata[ToneGranulator::PAR_LFOSHAPES + index])
     {
-        auto upfunc = [this]() {
-            stateChangedCallback(lfoindex, shapeCombo.getSelectedId() - 1, rateSlider.getValue(),
-                                 deformSlider.getValue(), shiftSlider.getValue(),
-                                 warpSlider.getValue(), unipolarButton.getToggleState());
-        };
-        addAndMakeVisible(shapeCombo);
+        // addAndMakeVisible(shapeCombo);
+        /*
         shapeCombo.addItem("SINE", 1);
         // shapeCombo.addItem("RAMP", 2);
         // shapeCombo.addItem("TRIANGLE", 4);
@@ -136,52 +137,55 @@ struct LFOComponent : public juce::Component
         shapeCombo.addItem("S&H NOISE", 7);
         shapeCombo.addItem("DOWN->TRI->UP", 9);
         shapeCombo.onChange = upfunc;
-
+        */
         addAndMakeVisible(rateSlider);
-        rateSlider.OnValueChanged = upfunc;
+        rateSlider.OnValueChanged = [this]() {
+            stateChangedCallback(rateSlider.getParamDescription().id, rateSlider.getValue());
+        };
 
         addAndMakeVisible(deformSlider);
-        deformSlider.OnValueChanged = upfunc;
+        deformSlider.OnValueChanged = [this]() {
+            stateChangedCallback(deformSlider.getParamDescription().id, deformSlider.getValue());
+        };
 
         addAndMakeVisible(shiftSlider);
-        shiftSlider.OnValueChanged = upfunc;
+        shiftSlider.OnValueChanged = [this]() {
+            stateChangedCallback(shiftSlider.getParamDescription().id, shiftSlider.getValue());
+        };
 
         addAndMakeVisible(warpSlider);
-        warpSlider.OnValueChanged = upfunc;
+        warpSlider.OnValueChanged = [this]() {
+            stateChangedCallback(warpSlider.getParamDescription().id, warpSlider.getValue());
+        };
+
+        addAndMakeVisible(shapeSlider);
+        shapeSlider.OnValueChanged = [this]() {
+            stateChangedCallback(shapeSlider.getParamDescription().id, shapeSlider.getValue());
+        };
 
         addAndMakeVisible(unipolarButton);
         unipolarButton.setButtonText("Unipolar");
-        unipolarButton.onClick = upfunc;
+        // unipolarButton.onClick = upfunc;
     }
     void resized()
     {
-        shapeCombo.setBounds(0, 0, 200, 25);
-        unipolarButton.setBounds(shapeCombo.getRight() + 1, 0, 100, 25);
-        rateSlider.setBounds(0, shapeCombo.getBottom() + 1, 400, 25);
+        // shapeCombo.setBounds(0, 0, 200, 25);
+        shapeSlider.setBounds(0, 0, 200, 25);
+        unipolarButton.setBounds(shapeSlider.getRight() + 1, 0, 100, 25);
+        rateSlider.setBounds(0, shapeSlider.getBottom() + 1, 400, 25);
         deformSlider.setBounds(0, rateSlider.getBottom() + 1, 400, 25);
-        shiftSlider.setBounds(rateSlider.getRight() + 1, shapeCombo.getBottom() + 1, 400, 25);
+        shiftSlider.setBounds(rateSlider.getRight() + 1, shapeSlider.getBottom() + 1, 400, 25);
         warpSlider.setBounds(rateSlider.getRight() + 1, shiftSlider.getBottom() + 1, 400, 25);
     }
     int lfoindex = -1;
-    std::function<void(int, int, float, float, float, float, bool)> stateChangedCallback;
-    juce::ComboBox shapeCombo;
-    XapSlider rateSlider;
-    XapSlider deformSlider{true, ToneGranulator::pmd()
-                                     .asFloat()
-                                     .withName("DEFORM")
-                                     .withRange(-1.0f, 1.0f)
-                                     .withLinearScaleFormatting("%", 100.0f)};
-    XapSlider shiftSlider{true, ToneGranulator::pmd()
-                                    .asFloat()
-                                    .withName("SHIFT")
-                                    .withRange(-1.0f, 1.0f)
-                                    .withLinearScaleFormatting("%", 100.0f)};
-    XapSlider warpSlider{true, ToneGranulator::pmd()
-                                   .asFloat()
-                                   .withName("WARP")
-                                   .withRange(-1.0f, 1.0f)
-                                   .withLinearScaleFormatting("%", 100.0f)};
+    ToneGranulator *gr = nullptr;
+    std::function<void(uint32_t, float)> stateChangedCallback;
 
+    XapSlider rateSlider;
+    XapSlider deformSlider;
+    XapSlider shiftSlider;
+    XapSlider warpSlider;
+    XapSlider shapeSlider;
     juce::ToggleButton unipolarButton;
 };
 
@@ -477,6 +481,7 @@ class AudioPluginAudioProcessorEditor final : public juce::AudioProcessorEditor,
     juce::TabbedComponent lfoTabs;
     std::vector<std::unique_ptr<StepSeqComponent>> stepcomps;
     juce::Label infoLabel;
+    std::unordered_map<uint32_t, XapSlider *> idToSlider;
     void showFilterMenu(int whichfilter);
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(AudioPluginAudioProcessorEditor)
 };

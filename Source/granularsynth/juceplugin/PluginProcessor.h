@@ -29,8 +29,6 @@ struct ThreadMessage
     float depth = 0.0f;
     int moddest = -1;
     int16_t lfoindex = -1;
-    int lfoshape = -1;
-    
     bool lfounipolar = false;
     int16_t filterindex = -1;
     sfpp::FilterModel filtermodel;

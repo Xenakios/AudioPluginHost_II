@@ -207,7 +207,6 @@ class GranulatorModMatrix
     alignas(32) std::array<std::unique_ptr<lfo_t>, numLfos> m_lfos;
     alignas(32) float table_envrate_linear[512];
     alignas(32) std::array<sst::basic_blocks::dsp::RNG, numLfos> m_rngs;
-    alignas(32) std::array<int, numLfos> lfo_shapes;
     alignas(32) std::array<bool, numLfos> lfo_unipolars;
     GranulatorModMatrix(double sr) : samplerate(sr)
     {
@@ -219,7 +218,6 @@ class GranulatorModMatrix
             auto lfo = std::make_unique<lfo_t>(this);
             m_lfos[i] = std::move(lfo);
             m_lfos[i]->attack(0);
-            lfo_shapes[i] = lfo_t::SINE;
             lfo_unipolars[i] = false;
         }
     }
@@ -272,7 +270,7 @@ class GranulatorModMatrix
                         float shift = entryob["deform"].getWithDefault(0.0f);
                         // lfo_shifts[lfoindex] = entryob["shift"].getWithDefault(0.5f);
                         int shape = entryob["shape"].getWithDefault(0);
-                        lfo_shapes[lfoindex] = shape;
+                        // lfo_shapes[lfoindex] = shape;
                     }
                 }
             }
@@ -953,6 +951,7 @@ class ToneGranulator
     std::unordered_map<uint32_t, float *> idtoparvalptr;
     std::unordered_map<uint32_t, pmd *> idtoparmetadata;
     std::unordered_map<uint32_t, float> modRanges;
+    std::unordered_map<int, int> shapeParToActualShape;
     float grain_pitch_mod = 0.0;
     float pulse_width = 0.5;
 
@@ -984,7 +983,9 @@ class ToneGranulator
         PAR_LFORATES = 100000,
         PAR_LFODEFORMS = 100100,
         PAR_LFOSHIFTS = 100200,
-        PAR_LFOWARPS = 100300
+        PAR_LFOWARPS = 100300,
+        PAR_LFOSHAPES = 100400,
+        PAR_LFOUNIPOLARS = 100500
     };
     enum SI
     {
@@ -1049,6 +1050,11 @@ class ToneGranulator
     }
     ToneGranulator() : m_sr(44100.0), modmatrix(44100.0)
     {
+        shapeParToActualShape[0] = GranulatorModMatrix::lfo_t::SINE;
+        shapeParToActualShape[1] = GranulatorModMatrix::lfo_t::PULSE;
+        shapeParToActualShape[2] = GranulatorModMatrix::lfo_t::SAW_TRI_RAMP;
+        shapeParToActualShape[3] = GranulatorModMatrix::lfo_t::SMOOTH_NOISE;
+        shapeParToActualShape[4] = GranulatorModMatrix::lfo_t::SH_NOISE;
         for (int i = 0; i < 8; ++i)
         {
             midiCCMap[21 + i] = MIDICCSTART + i;
@@ -1154,19 +1160,21 @@ class ToneGranulator
         parmetadatas.push_back(pmd()
                                    .withRange(0.0f, 1.0f)
                                    .withDefault(0.5f)
+                                   .withLinearScaleFormatting("%", 100.0f)
                                    .withName("Env Morph")
                                    .withID(PAR_ENVMORPH)
                                    .withFlags(CLAP_PARAM_IS_MODULATABLE));
         parmetadatas.push_back(pmd()
                                    .withRange(-48.0, 48.0)
                                    .withDefault(0.0)
-                                   .withLinearScaleFormatting("SEMITONES")
+                                   .withLinearScaleFormatting("ST")
                                    .withName("Pitch")
                                    .withID(PAR_PITCH)
                                    .withFlags(CLAP_PARAM_IS_MODULATABLE));
         parmetadatas.push_back(pmd()
                                    .withRange(0.0, 4.0)
                                    .withDefault(0.0)
+                                   .withLinearScaleFormatting("ST", 12.0f)
                                    .withName("OSC Sync")
                                    .withID(PAR_OSC_SYNC)
                                    .withGroupName("Oscillator")
@@ -1174,6 +1182,7 @@ class ToneGranulator
         parmetadatas.push_back(pmd()
                                    .withRange(-48.0, 48.0)
                                    .withDefault(0.0)
+                                   .withLinearScaleFormatting("ST")
                                    .withName("FM Pitch")
                                    .withID(PAR_FMPITCH)
                                    .withGroupName("Oscillator")
@@ -1181,6 +1190,7 @@ class ToneGranulator
         parmetadatas.push_back(pmd()
                                    .withRange(0.0, 1.0)
                                    .withDefault(0.0)
+                                   .withLinearScaleFormatting("%", 100.0f)
                                    .withName("FM Depth")
                                    .withGroupName("Oscillator")
                                    .withID(PAR_FMDEPTH)
@@ -1188,6 +1198,7 @@ class ToneGranulator
         parmetadatas.push_back(pmd()
                                    .withRange(-1.0, 1.0)
                                    .withDefault(0.0)
+                                   .withLinearScaleFormatting("%", 100.0f)
                                    .withName("FM Feedback")
                                    .withGroupName("Oscillator")
                                    .withID(PAR_FMFEEDBACK)
@@ -1195,6 +1206,7 @@ class ToneGranulator
         parmetadatas.push_back(pmd()
                                    .withRange(-1.0, 1.0)
                                    .withDefault(0.0)
+                                   .withLinearScaleFormatting("%", 100.0f)
                                    .withName("Noise Correlation")
                                    .withGroupName("Oscillator")
                                    .withID(PAR_NOISECORRELATION)
@@ -1202,6 +1214,7 @@ class ToneGranulator
         parmetadatas.push_back(pmd()
                                    .withRange(-48.0, 64.0)
                                    .withDefault(0.0)
+                                   .withLinearScaleFormatting("ST")
                                    .withName("Filter 1 Frequency")
                                    .withID(PAR_F0CO)
                                    .withGroupName("Filter 1")
@@ -1209,6 +1222,7 @@ class ToneGranulator
         parmetadatas.push_back(pmd()
                                    .withRange(0.0, 1.0)
                                    .withDefault(0.0)
+                                   .withLinearScaleFormatting("%", 100.0f)
                                    .withName("Filter 1 Resonance")
                                    .withID(PAR_F0RE)
                                    .withGroupName("Filter 1")
@@ -1216,6 +1230,7 @@ class ToneGranulator
         parmetadatas.push_back(pmd()
                                    .withRange(-48.0, 64.0)
                                    .withDefault(0.0)
+                                   .withLinearScaleFormatting("ST")
                                    .withName("Filter 2 Frequency")
                                    .withID(PAR_F1CO)
                                    .withGroupName("Filter 2")
@@ -1223,6 +1238,7 @@ class ToneGranulator
         parmetadatas.push_back(pmd()
                                    .withRange(0.0, 1.0)
                                    .withDefault(0.0)
+                                   .withLinearScaleFormatting("%", 100.0f)
                                    .withName("Filter 2 Resonance")
                                    .withID(PAR_F1RE)
                                    .withGroupName("Filter 2")
@@ -1230,20 +1246,33 @@ class ToneGranulator
         parmetadatas.push_back(pmd()
                                    .withRange(-180.0, 180.0)
                                    .withDefault(0.0)
+                                   .withLinearScaleFormatting("°")
                                    .withName("Azimuth")
                                    .withID(PAR_AZIMUTH)
                                    .withFlags(CLAP_PARAM_IS_MODULATABLE));
         parmetadatas.push_back(pmd()
                                    .withRange(-180.0, 180.0)
                                    .withDefault(0.0)
+                                   .withLinearScaleFormatting("°")
                                    .withName("Elevation")
                                    .withID(PAR_ELEVATION)
                                    .withFlags(CLAP_PARAM_IS_MODULATABLE));
         for (int i = 0; i < GranulatorModMatrix::numLfos; ++i)
         {
             parmetadatas.push_back(pmd()
+                                       .withUnorderedMapFormatting({{0, "SIN"},
+                                                                    {1, "SIN->SQR->TRI"},
+                                                                    {2, "DOWN->TRI->UP"},
+                                                                    {3, "SMOOTH NOISE"},
+                                                                    {4, "S& NOISE"}},
+                                                                   true)
+                                       .withName(std::format("LFO {} SHAPE", i + 1))
+                                       .withGroupName(std::format("LFO {}", i + 1))
+                                       .withID(PAR_LFOSHAPES + i));
+            parmetadatas.push_back(pmd()
                                        .withRange(-6.0, 5.0)
                                        .withDefault(0.0)
+                                       .withDecimalPlaces(3)
                                        .withATwoToTheBFormatting(1.0f, 1.0f, "Hz")
                                        .withName(std::format("LFO {} RATE", i + 1))
                                        .withGroupName(std::format("LFO {}", i + 1))
@@ -1252,7 +1281,7 @@ class ToneGranulator
             parmetadatas.push_back(pmd()
                                        .withRange(-1.0, 1.0)
                                        .withDefault(0.0)
-                                       .withLinearScaleFormatting("%", 100.0)
+                                       .withLinearScaleFormatting("%", 100.0f)
                                        .withName(std::format("LFO {} DEFORM", i + 1))
                                        .withGroupName(std::format("LFO {}", i + 1))
                                        .withID(PAR_LFODEFORMS + i)
@@ -1260,7 +1289,7 @@ class ToneGranulator
             parmetadatas.push_back(pmd()
                                        .withRange(-1.0, 1.0)
                                        .withDefault(0.0)
-                                       .withLinearScaleFormatting("%", 100.0)
+                                       .withLinearScaleFormatting("%", 100.0f)
                                        .withName(std::format("LFO {} SHIFT", i + 1))
                                        .withGroupName(std::format("LFO {}", i + 1))
                                        .withID(PAR_LFOSHIFTS + i)
@@ -1268,7 +1297,7 @@ class ToneGranulator
             parmetadatas.push_back(pmd()
                                        .withRange(-1.0, 1.0)
                                        .withDefault(0.0)
-                                       .withLinearScaleFormatting("%", 100.0)
+                                       .withLinearScaleFormatting("%", 100.0f)
                                        .withName(std::format("LFO {} WARP", i + 1))
                                        .withGroupName(std::format("LFO {}", i + 1))
                                        .withID(PAR_LFOWARPS + i)
@@ -1578,8 +1607,9 @@ class ToneGranulator
                     GranulatorModConfig::TargetIdentifier{(int)(PAR_LFODEFORMS + i)});
                 float warp = modmatrix.m.getTargetValue(
                     GranulatorModConfig::TargetIdentifier{(int)(PAR_LFOWARPS + i)});
-                modmatrix.m_lfos[i]->process_block(rate, deform, modmatrix.lfo_shapes[i], false,
-                                                   1.0f, warp);
+                int shape = *idtoparvalptr[PAR_LFOSHAPES + i];
+                shape = shapeParToActualShape[shape];
+                modmatrix.m_lfos[i]->process_block(rate, deform, shape, false, 1.0f, warp);
                 if (!modmatrix.lfo_unipolars[i])
                     modSourceValues[LFO0 + i] = modmatrix.m_lfos[i]->outputBlock[0];
                 else

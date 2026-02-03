@@ -35,46 +35,12 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor(AudioPluginAudi
                 msg.value = sli->getValue();
                 processorRef.params_from_gui_fifo.push(msg);
             };
+            idToSlider[pmd.id] = slid.get();
             addAndMakeVisible(slid.get());
             paramComponents.push_back(std::move(slid));
         }
     }
-    /*
-    auto &params = p.getParameters();
-    for (int i = 0; i < params.size(); ++i)
-    {
-        auto pare = std::make_unique<GUIParam>();
-        addAndMakeVisible(*pare);
-        pare->parLabel = std::make_unique<juce::Label>();
-        pare->addAndMakeVisible(pare->parLabel.get());
-        auto pa = static_cast<juce::RangedAudioParameter *>(params[i]);
-        pare->parLabel->setText(pa->getName(100), juce::dontSendNotification);
-        if (!pa->isDiscrete())
-        {
-            pare->slider = std::make_unique<juce::Slider>();
-            pare->slider->setTextBoxStyle(juce::Slider::TextEntryBoxPosition::TextBoxRight, false,
-                                          50, 20);
-            pare->slidAttach =
-                std::make_unique<juce::SliderParameterAttachment>(*pa, *pare->slider, nullptr);
-            pare->addAndMakeVisible(pare->slider.get());
-        }
-        else
-        {
-            pare->combo = std::make_unique<juce::ComboBox>();
-            auto strs = pa->getAllValueStrings();
-            int j = 1;
-            for (auto &str : strs)
-            {
-                pare->combo->addItem(str, j);
-                ++j;
-            }
-            pare->choiceAttach =
-                std::make_unique<juce::ComboBoxParameterAttachment>(*pa, *pare->combo, nullptr);
-            pare->addAndMakeVisible(pare->combo.get());
-        }
-        paramEntries.push_back(std::move(pare));
-    }
-    */
+
     for (int i = 0; i < 8; ++i)
     {
         auto modcomp = std::make_unique<ModulationRowComponent>(&processorRef.granulator);
@@ -106,33 +72,18 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor(AudioPluginAudi
     auto &idtomd = processorRef.granulator.idtoparmetadata;
     for (int i = 0; i < 8; ++i)
     {
-        auto lfoc =
-            std::make_unique<LFOComponent>(*idtomd[(uint32_t)(ToneGranulator::PAR_LFORATES + i)]);
-        // addAndMakeVisible(*lfoc);
-        lfoc->lfoindex = i;
-
-        lfoc->stateChangedCallback = [this](int lfoindex, int shape, float rateval, float deformval,
-                                            float shift, float warp, bool uni) {
-            ThreadMessage msg;
-            msg.opcode = ThreadMessage::OP_LFOPARAM;
-            msg.lfoindex = lfoindex;
-            msg.lfoshape = shape;
-            msg.lfounipolar = uni;
-            processorRef.from_gui_fifo.push(msg);
+        auto lfoc = std::make_unique<LFOComponent>(i, &processorRef.granulator);
+        lfoc->stateChangedCallback = [this](uint32_t parid, float val) {
             ParameterMessage parmsg;
-            parmsg.id = ToneGranulator::PAR_LFORATES + lfoindex;
-            parmsg.value = rateval;
-            processorRef.params_from_gui_fifo.push(parmsg);
-            parmsg.id = ToneGranulator::PAR_LFODEFORMS + lfoindex;
-            parmsg.value = deformval;
-            processorRef.params_from_gui_fifo.push(parmsg);
-            parmsg.id = ToneGranulator::PAR_LFOSHIFTS + lfoindex;
-            parmsg.value = shift;
-            processorRef.params_from_gui_fifo.push(parmsg);
-            parmsg.id = ToneGranulator::PAR_LFOWARPS + lfoindex;
-            parmsg.value = warp;
+            parmsg.id = parid;
+            parmsg.value = val;
             processorRef.params_from_gui_fifo.push(parmsg);
         };
+        idToSlider[ToneGranulator::PAR_LFORATES + i] = &lfoc->rateSlider;
+        idToSlider[ToneGranulator::PAR_LFODEFORMS + i] = &lfoc->deformSlider;
+        idToSlider[ToneGranulator::PAR_LFOSHIFTS + i] = &lfoc->shiftSlider;
+        idToSlider[ToneGranulator::PAR_LFOWARPS + i] = &lfoc->warpSlider;
+        idToSlider[ToneGranulator::PAR_LFOSHAPES + i] = &lfoc->shapeSlider;
         lfoTabs.addTab("LFO " + juce::String(i + 1), juce::Colours::lightgrey, lfoc.get(), false);
         lfocomps.push_back(std::move(lfoc));
     }
@@ -229,17 +180,10 @@ void AudioPluginAudioProcessorEditor::timerCallback()
     ParameterMessage parmsg;
     while (processorRef.params_to_gui_fifo.pop(parmsg))
     {
-        for (auto &c : paramComponents)
+        auto it = idToSlider.find(parmsg.id);
+        if (it != idToSlider.end())
         {
-            if (c->getParamDescription().id == parmsg.id)
-            {
-                c->setValue(parmsg.value);
-                break;
-            }
-        }
-        for (auto& c : lfocomps)
-        {
-            
+            it->second->setValue(parmsg.value);
         }
     }
     ThreadMessage msg;
@@ -247,8 +191,6 @@ void AudioPluginAudioProcessorEditor::timerCallback()
     {
         if (msg.opcode == ThreadMessage::OP_LFOPARAM && msg.lfoindex < lfocomps.size())
         {
-            lfocomps[msg.lfoindex]->shapeCombo.setSelectedId(msg.lfoshape + 1,
-                                                             juce::dontSendNotification);
             lfocomps[msg.lfoindex]->unipolarButton.setToggleState(msg.lfounipolar,
                                                                   juce::dontSendNotification);
         }
