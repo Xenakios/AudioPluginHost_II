@@ -169,10 +169,7 @@ void AudioPluginAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
         {
             granulator.set_filter(msg.filterindex, msg.filtermodel, msg.filterconfig);
         }
-        if (msg.opcode == ThreadMessage::OP_LFOPARAM && msg.lfoindex >= 0)
-        {
-            granulator.modmatrix.lfo_unipolars[msg.lfoindex] = msg.lfounipolar;
-        }
+        
         auto &mm = granulator.modmatrix;
         if (msg.opcode == ThreadMessage::OP_MODROUTING || msg.opcode == ThreadMessage::OP_MODPARAM)
         {
@@ -292,15 +289,7 @@ void AudioPluginAudioProcessor::getStateInformation(juce::MemoryBlock &destData)
         filterstates.addArrayElement(filterstate);
     }
     state.setMember("filterstates", filterstates);
-    auto lfostates = choc::value::createEmptyArray();
-    for (int i = 0; i < GranulatorModMatrix::numLfos; ++i)
-    {
-        auto lfostate = choc::value::createObject("lfostate");
-        lfostate.setMember("uni", granulator.modmatrix.lfo_unipolars[i]);
-
-        lfostates.addArrayElement(lfostate);
-    }
-    state.setMember("lfostates", lfostates);
+    
     auto modroutings = choc::value::createEmptyArray();
     auto &mm = granulator.modmatrix;
     for (int i = 0; i < GranulatorModConfig::FixedMatrixSize; ++i)
@@ -372,18 +361,7 @@ void AudioPluginAudioProcessor::setStateInformation(const void *data, int sizeIn
                 }
             }
         }
-        if (state.hasObjectMember("lfostates"))
-        {
-            auto lfostates = state["lfostates"];
-            for (int i = 0; i < lfostates.size(); ++i)
-            {
-                auto lfostate = lfostates[i];
-                if (i < granulator.modmatrix.numLfos)
-                {
-                    granulator.modmatrix.lfo_unipolars[i] = lfostate["uni"].getWithDefault(false);
-                }
-            }
-        }
+        
         if (state.hasObjectMember("modroutings"))
         {
             auto routings = state["modroutings"];
@@ -432,14 +410,7 @@ void AudioPluginAudioProcessor::sendExtraStatesToGUI()
         msg.value = *granulator.idtoparvalptr[msg.id];
         params_to_gui_fifo.push(msg);
     }
-    for (int i = 0; i < granulator.modmatrix.numLfos; ++i)
-    {
-        ThreadMessage msg;
-        msg.opcode = ThreadMessage::OP_LFOPARAM;
-        msg.lfoindex = i;
-        msg.lfounipolar = granulator.modmatrix.lfo_unipolars[i];
-        to_gui_fifo.push(msg);
-    }
+    
     auto &mm = granulator.modmatrix;
     for (int i = 0; i < GranulatorModConfig::FixedMatrixSize; ++i)
     {

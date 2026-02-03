@@ -125,7 +125,8 @@ struct LFOComponent : public juce::Component
           deformSlider(true, *g->idtoparmetadata[ToneGranulator::PAR_LFODEFORMS + index]),
           shiftSlider(true, *g->idtoparmetadata[ToneGranulator::PAR_LFOSHIFTS + index]),
           warpSlider(true, *g->idtoparmetadata[ToneGranulator::PAR_LFOWARPS + index]),
-          shapeSlider(true, *g->idtoparmetadata[ToneGranulator::PAR_LFOSHAPES + index])
+          shapeSlider(true, *g->idtoparmetadata[ToneGranulator::PAR_LFOSHAPES + index]),
+          unipolarSlider(true, *g->idtoparmetadata[ToneGranulator::PAR_LFOUNIPOLARS + index])
     {
         // addAndMakeVisible(shapeCombo);
         /*
@@ -163,15 +164,17 @@ struct LFOComponent : public juce::Component
             stateChangedCallback(shapeSlider.getParamDescription().id, shapeSlider.getValue());
         };
 
-        addAndMakeVisible(unipolarButton);
-        unipolarButton.setButtonText("Unipolar");
-        // unipolarButton.onClick = upfunc;
+        addAndMakeVisible(unipolarSlider);
+        unipolarSlider.OnValueChanged = [this]() {
+            stateChangedCallback(unipolarSlider.getParamDescription().id,
+                                 unipolarSlider.getValue());
+        };
     }
     void resized()
     {
         // shapeCombo.setBounds(0, 0, 200, 25);
         shapeSlider.setBounds(0, 0, 200, 25);
-        unipolarButton.setBounds(shapeSlider.getRight() + 1, 0, 100, 25);
+        unipolarSlider.setBounds(shapeSlider.getRight() + 1, 0, 200, 25);
         rateSlider.setBounds(0, shapeSlider.getBottom() + 1, 400, 25);
         deformSlider.setBounds(0, rateSlider.getBottom() + 1, 400, 25);
         shiftSlider.setBounds(rateSlider.getRight() + 1, shapeSlider.getBottom() + 1, 400, 25);
@@ -186,7 +189,7 @@ struct LFOComponent : public juce::Component
     XapSlider shiftSlider;
     XapSlider warpSlider;
     XapSlider shapeSlider;
-    juce::ToggleButton unipolarButton;
+    XapSlider unipolarSlider;
 };
 
 struct StepSeqComponent : public juce::Component

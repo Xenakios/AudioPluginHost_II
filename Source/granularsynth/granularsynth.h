@@ -207,7 +207,6 @@ class GranulatorModMatrix
     alignas(32) std::array<std::unique_ptr<lfo_t>, numLfos> m_lfos;
     alignas(32) float table_envrate_linear[512];
     alignas(32) std::array<sst::basic_blocks::dsp::RNG, numLfos> m_rngs;
-    alignas(32) std::array<bool, numLfos> lfo_unipolars;
     GranulatorModMatrix(double sr) : samplerate(sr)
     {
         initTables();
@@ -218,7 +217,6 @@ class GranulatorModMatrix
             auto lfo = std::make_unique<lfo_t>(this);
             m_lfos[i] = std::move(lfo);
             m_lfos[i]->attack(0);
-            lfo_unipolars[i] = false;
         }
     }
     void init_from_json_file(std::string path)
@@ -1260,6 +1258,11 @@ class ToneGranulator
         for (int i = 0; i < GranulatorModMatrix::numLfos; ++i)
         {
             parmetadatas.push_back(pmd()
+                                       .asOnOffBool()
+                                       .withID(PAR_LFOUNIPOLARS + i)
+                                       .withName(std::format("LFO {} UNIPOLAR", i + 1))
+                                       .withGroupName(std::format("LFO {}", i + 1)));
+            parmetadatas.push_back(pmd()
                                        .withUnorderedMapFormatting({{0, "SIN"},
                                                                     {1, "SIN->SQR->TRI"},
                                                                     {2, "DOWN->TRI->UP"},
@@ -1610,7 +1613,8 @@ class ToneGranulator
                 int shape = *idtoparvalptr[PAR_LFOSHAPES + i];
                 shape = shapeParToActualShape[shape];
                 modmatrix.m_lfos[i]->process_block(rate, deform, shape, false, 1.0f, warp);
-                if (!modmatrix.lfo_unipolars[i])
+                bool unipolar = (*idtoparvalptr[PAR_LFOUNIPOLARS + i]) > 0.5f;
+                if (!unipolar)
                     modSourceValues[LFO0 + i] = modmatrix.m_lfos[i]->outputBlock[0];
                 else
                     modSourceValues[LFO0 + i] = (modmatrix.m_lfos[i]->outputBlock[0] + 1.0f) * 0.5f;

@@ -84,6 +84,7 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor(AudioPluginAudi
         idToSlider[ToneGranulator::PAR_LFOSHIFTS + i] = &lfoc->shiftSlider;
         idToSlider[ToneGranulator::PAR_LFOWARPS + i] = &lfoc->warpSlider;
         idToSlider[ToneGranulator::PAR_LFOSHAPES + i] = &lfoc->shapeSlider;
+        idToSlider[ToneGranulator::PAR_LFOUNIPOLARS + i] = &lfoc->unipolarSlider;
         lfoTabs.addTab("LFO " + juce::String(i + 1), juce::Colours::lightgrey, lfoc.get(), false);
         lfocomps.push_back(std::move(lfoc));
     }
@@ -189,11 +190,6 @@ void AudioPluginAudioProcessorEditor::timerCallback()
     ThreadMessage msg;
     while (processorRef.to_gui_fifo.pop(msg))
     {
-        if (msg.opcode == ThreadMessage::OP_LFOPARAM && msg.lfoindex < lfocomps.size())
-        {
-            lfocomps[msg.lfoindex]->unipolarButton.setToggleState(msg.lfounipolar,
-                                                                  juce::dontSendNotification);
-        }
         if (msg.opcode == ThreadMessage::OP_MODROUTING && msg.modslot < modRowComps.size())
         {
             modRowComps[msg.modslot]->sourceDrop.setSelectedId(msg.modsource);

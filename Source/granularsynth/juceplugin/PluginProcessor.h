@@ -17,7 +17,6 @@ struct ThreadMessage
         OP_NOOP,
         OP_MODROUTING,
         OP_MODPARAM,
-        OP_LFOPARAM,
         OP_FILTERTYPE
     };
     OpCode opcode = OP_NOOP;
@@ -28,8 +27,6 @@ struct ThreadMessage
     float modcurvepar0 = 0.0f;
     float depth = 0.0f;
     int moddest = -1;
-    int16_t lfoindex = -1;
-    bool lfounipolar = false;
     int16_t filterindex = -1;
     sfpp::FilterModel filtermodel;
     sfpp::ModelConfig filterconfig;
