@@ -56,6 +56,11 @@ class XapSlider : public juce::Component
         addChildComponent(m_ed);
     }
     const ParamDesc &getParamDescription() const { return m_pardesc; }
+    void setModulationDisplayDepth(float d, std::string units)
+    {
+        m_pardesc = m_pardesc.withLinearScaleFormatting(units, d);
+        repaint();
+    }
     void enablementChanged() override { repaint(); }
     void mouseWheelMove(const juce::MouseEvent &event,
                         const juce::MouseWheelDetails &wheel) override

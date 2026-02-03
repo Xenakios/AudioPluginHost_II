@@ -411,12 +411,26 @@ struct ModulationRowComponent : public juce::Component
             }
         }
         destDrop.setSelectedId(1);
-        destDrop.OnItemSelected = updatfunc;
+        destDrop.OnItemSelected = [updatfunc, this]() {
+            auto id = destDrop.selectedId;
+            if (id > 1)
+            {
+                auto pmd = gr->idtoparmetadata[destDrop.selectedId];
+                auto d = gr->modRanges[destDrop.selectedId];
+                depthSlider.setModulationDisplayDepth(d, pmd->unit);
+                updatfunc();
+            }
+        };
     }
     void setTarget(uint32_t parid)
     {
-        targetID = parid;
         destDrop.setSelectedId(parid);
+        if (parid > 1)
+        {
+            auto pmd = gr->idtoparmetadata[destDrop.selectedId];
+            auto d = gr->modRanges[destDrop.selectedId];
+            depthSlider.setModulationDisplayDepth(d, pmd->unit);
+        }
     }
 
     void resized() override
@@ -446,7 +460,7 @@ struct ModulationRowComponent : public juce::Component
     };
     std::function<void(CallbackParams)> stateChangedCallback;
     int modslotindex = -1;
-    uint32_t targetID = 1;
+
     DropDownComponent sourceDrop;
     DropDownComponent viaDrop;
     XapSlider depthSlider{true, ParamDesc()
