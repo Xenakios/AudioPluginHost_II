@@ -1150,7 +1150,7 @@ class ToneGranulator
         parmetadatas.push_back(pmd()
                                    .withRange(0.0f, 1.0f)
                                    .withDefault(0.5f)
-                                   .withLinearScaleFormatting("%", 100.0f)
+                                   .withOffsetPowerFormatting("ms", 0.002f, 0.498f, 3.0f, 1000.0f)
                                    .withDecimalPlaces(0)
                                    .withName("Duration")
                                    .withID(PAR_DURATION)
