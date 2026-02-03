@@ -1146,18 +1146,7 @@ class ToneGranulator
         parmetadatas.push_back(pmd()
                                    .withRange(0.0f, 1.0f)
                                    .withDefault(0.5f)
-                                   .withUserProvidedFormatting(
-                                       "MS",
-                                       [](float x) {
-                                           x = 0.002f + 0.498f * (x * x * x);
-                                           return std::format("{}", (int)(x * 1000.0f));
-                                       },
-                                       [](std::string_view v) {
-                                           float y = std::atof(v.data());
-                                           y /= 1000.0;
-                                           y = calculate_inverse(y, 0.002, 0.498, 3.0);
-                                           return y;
-                                       })
+                                   .withLinearScaleFormatting("%", 100.0f)
                                    .withDecimalPlaces(0)
                                    .withName("Duration")
                                    .withID(PAR_DURATION)
