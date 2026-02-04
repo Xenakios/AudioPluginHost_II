@@ -17,12 +17,26 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor(AudioPluginAudi
     };
     */
     addAndMakeVisible(infoLabel);
-    addAndMakeVisible(filter0But);
-    filter0But.setButtonText("F1");
-    filter0But.onClick = [this]() { showFilterMenu(0); };
-    addAndMakeVisible(filter1But);
-    filter1But.setButtonText("F2");
-    filter1But.onClick = [this]() { showFilterMenu(1); };
+
+    addAndMakeVisible(filter1Drop);
+    fillDropWithFilters(0, filter1Drop, "Filter 1");
+    filter1Drop.OnItemSelected = [this]() {
+        auto it = filterInfoMap.find(filter1Drop.selectedId);
+        if (it != filterInfoMap.end())
+        {
+            DBG(sfpp::toString(it->second.filtermodel)
+                << " " << sfpp::toString(it->second.filterconfig.pt));
+                ThreadMessage msg;
+                msg.opcode = ThreadMessage::OP_FILTERTYPE;
+                msg.filterindex = 0;
+                msg.filtermodel = it->second.filtermodel;
+                msg.filterconfig = it->second.filterconfig;
+                processorRef.from_gui_fifo.push(msg);
+        }
+    };
+
+    addAndMakeVisible(filter2Drop);
+
     for (int i = 0; i < processorRef.granulator.parmetadatas.size(); ++i)
     {
         auto &pmd = processorRef.granulator.parmetadatas[i];
@@ -104,6 +118,57 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor(AudioPluginAudi
 
 AudioPluginAudioProcessorEditor::~AudioPluginAudioProcessorEditor() {}
 
+void AudioPluginAudioProcessorEditor::fillDropWithFilters(int filterIndex, DropDownComponent &drop,
+                                                          std::string rootText)
+{
+    drop.rootNode.text = rootText;
+    std::map<std::string, DropDownComponent::Node *> nodemap;
+    drop.rootNode.children.reserve(32);
+    auto models = sfpp::Filter::availableModels();
+    int filterID = 0;
+    for (auto &mod : models)
+    {
+        auto modelname = sfpp::toString(mod);
+        if (!nodemap.contains(modelname))
+        {
+            drop.rootNode.children.push_back({sfpp::toString(mod), filterID});
+            filterInfoMap[filterID] = {mod};
+            ++filterID;
+            nodemap[modelname] = &drop.rootNode.children.back();
+        }
+        auto subm = sfpp::Filter::availableModelConfigurations(mod, true);
+        if (subm.size() > 0)
+        {
+            for (auto s : subm)
+            {
+                std::string subname = "";
+                auto [pt, st, dt, smt] = s;
+                if (pt != sfpp::Passband::UNSUPPORTED)
+                {
+                    subname += " " + sfpp::toString(pt);
+                }
+                if (st != sfpp::Slope::UNSUPPORTED)
+                {
+                    subname += " " + sfpp::toString(st);
+                }
+                if (dt != sfpp::DriveMode::UNSUPPORTED)
+                {
+                    subname += " " + sfpp::toString(dt);
+                }
+                if (smt != sfpp::FilterSubModel::UNSUPPORTED)
+                {
+                    subname += " " + sfpp::toString(smt);
+                }
+                nodemap[modelname]->children.push_back({subname, filterID});
+                filterInfoMap[filterID] = {mod,s};
+                ++filterID;
+            }
+        }
+    }
+
+    drop.setSelectedId(0);
+}
+
 void AudioPluginAudioProcessorEditor::showFilterMenu(int whichfilter)
 {
     juce::PopupMenu menu;
@@ -141,10 +206,10 @@ void AudioPluginAudioProcessorEditor::showFilterMenu(int whichfilter)
                     msg.filtermodel = mod;
                     msg.filterconfig = s;
                     processorRef.from_gui_fifo.push(msg);
-                    if (whichfilter == 0)
-                        filter0But.setButtonText(sfpp::toString(mod) + " : " + address);
-                    if (whichfilter == 1)
-                        filter1But.setButtonText(sfpp::toString(mod) + " : " + address);
+                    // if (whichfilter == 0)
+                    //     filter0But.setButtonText(sfpp::toString(mod) + " : " + address);
+                    // if (whichfilter == 1)
+                    //     filter1But.setButtonText(sfpp::toString(mod) + " : " + address);
                 });
             }
             menu.addSubMenu(sfpp::toString(mod), submenu);
@@ -157,10 +222,10 @@ void AudioPluginAudioProcessorEditor::showFilterMenu(int whichfilter)
                 msg.filterindex = whichfilter;
                 msg.filtermodel = mod;
                 processorRef.from_gui_fifo.push(msg);
-                if (whichfilter == 0)
-                    filter0But.setButtonText(sfpp::toString(mod));
-                if (whichfilter == 1)
-                    filter1But.setButtonText(sfpp::toString(mod));
+                // if (whichfilter == 0)
+                //     filter0But.setButtonText(sfpp::toString(mod));
+                // if (whichfilter == 1)
+                //     filter1But.setButtonText(sfpp::toString(mod));
             });
         }
     }
@@ -228,8 +293,8 @@ void AudioPluginAudioProcessorEditor::resized()
 
     layout.performLayout(juce::Rectangle<int>(0, 0, getWidth(), 330));
     lfoTabs.setBounds(0, paramComponents.back()->getBottom() + 1, 900, 110);
-    filter0But.setBounds(lfoTabs.getRight() + 1, lfoTabs.getY(), 300, 25);
-    filter1But.setBounds(lfoTabs.getRight() + 1, filter0But.getBottom() + 1, 300, 25);
+    filter1Drop.setBounds(lfoTabs.getRight() + 1, lfoTabs.getY(), 300, 25);
+    filter2Drop.setBounds(lfoTabs.getRight() + 1, filter1Drop.getBottom() + 1, 300, 25);
 
     int yoffs = lfoTabs.getBottom() + 1;
     for (int i = 0; i < modRowComps.size(); ++i)

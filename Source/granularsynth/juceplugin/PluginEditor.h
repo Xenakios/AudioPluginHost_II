@@ -509,8 +509,15 @@ class AudioPluginAudioProcessorEditor final : public juce::AudioProcessorEditor,
     // std::vector<std::unique_ptr<GUIParam>> paramEntries;
     std::vector<std::unique_ptr<XapSlider>> paramComponents;
     juce::TextButton loadModulationSettingsBut;
-    juce::TextButton filter0But;
-    juce::TextButton filter1But;
+    struct FilterInfo
+    {
+        sfpp::FilterModel filtermodel;
+        sfpp::ModelConfig filterconfig;
+    };
+    std::map<int64_t, FilterInfo> filterInfoMap;
+    DropDownComponent filter1Drop;
+    DropDownComponent filter2Drop;
+    void fillDropWithFilters(int filterIndex, DropDownComponent &drop, std::string rootText);
     std::vector<std::unique_ptr<ModulationRowComponent>> modRowComps;
     std::vector<std::unique_ptr<LFOComponent>> lfocomps;
     juce::TabbedComponent lfoTabs;
