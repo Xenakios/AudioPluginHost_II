@@ -51,7 +51,7 @@ struct DropDownComponent : public juce::Component
             menu.addSubMenu(n.text, submenu);
         }
     }
-    Node *findNodeRecur(Node &n, int tofind)
+    Node *findNodeRecur(Node &n, int64_t tofind)
     {
         if (n.id == tofind)
             return &n;
@@ -63,7 +63,7 @@ struct DropDownComponent : public juce::Component
         }
         return nullptr;
     }
-    void setSelectedId(int id)
+    void setSelectedId(int64_t id)
     {
         Node *found = nullptr;
         for (auto &e : rootNode.children)

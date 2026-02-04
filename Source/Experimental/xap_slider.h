@@ -37,7 +37,7 @@ class XapSlider : public juce::Component
         m_snap_positions.resize(9);
         for (int i = 0; i < 9; ++i)
             m_snap_positions[i] = m_min_value + (m_max_value - m_min_value) / 8 * i;
-        m_param_step = (m_max_value - m_min_value) / 50;
+        m_param_step = (m_max_value - m_min_value) / 64;
         if (m_pardesc.type == ParamDesc::BOOL)
             m_param_step = 1;
         keypress_to_step.emplace_back(

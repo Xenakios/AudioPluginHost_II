@@ -169,7 +169,7 @@ void AudioPluginAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
         {
             granulator.set_filter(msg.filterindex, msg.filtermodel, msg.filterconfig);
         }
-        
+
         auto &mm = granulator.modmatrix;
         if (msg.opcode == ThreadMessage::OP_MODROUTING || msg.opcode == ThreadMessage::OP_MODPARAM)
         {
@@ -289,7 +289,7 @@ void AudioPluginAudioProcessor::getStateInformation(juce::MemoryBlock &destData)
         filterstates.addArrayElement(filterstate);
     }
     state.setMember("filterstates", filterstates);
-    
+
     auto modroutings = choc::value::createEmptyArray();
     auto &mm = granulator.modmatrix;
     for (int i = 0; i < GranulatorModConfig::FixedMatrixSize; ++i)
@@ -361,7 +361,7 @@ void AudioPluginAudioProcessor::setStateInformation(const void *data, int sizeIn
                 }
             }
         }
-        
+
         if (state.hasObjectMember("modroutings"))
         {
             auto routings = state["modroutings"];
@@ -410,7 +410,18 @@ void AudioPluginAudioProcessor::sendExtraStatesToGUI()
         msg.value = *granulator.idtoparvalptr[msg.id];
         params_to_gui_fifo.push(msg);
     }
-    
+    {
+        ThreadMessage msg;
+        msg.opcode = ThreadMessage::OP_FILTERTYPE;
+        for (int i = 0; i < granulator.filtersConfigs.size(); ++i)
+        {
+            msg.filterindex = i;
+            msg.filtermodel = granulator.filtersModels[i];
+            msg.filterconfig = granulator.filtersConfigs[i];
+            to_gui_fifo.push(msg);
+        }
+    }
+
     auto &mm = granulator.modmatrix;
     for (int i = 0; i < GranulatorModConfig::FixedMatrixSize; ++i)
     {

@@ -26,12 +26,12 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor(AudioPluginAudi
         {
             DBG(sfpp::toString(it->second.filtermodel)
                 << " " << sfpp::toString(it->second.filterconfig.pt));
-                ThreadMessage msg;
-                msg.opcode = ThreadMessage::OP_FILTERTYPE;
-                msg.filterindex = 0;
-                msg.filtermodel = it->second.filtermodel;
-                msg.filterconfig = it->second.filterconfig;
-                processorRef.from_gui_fifo.push(msg);
+            ThreadMessage msg;
+            msg.opcode = ThreadMessage::OP_FILTERTYPE;
+            msg.filterindex = 0;
+            msg.filtermodel = it->second.filtermodel;
+            msg.filterconfig = it->second.filterconfig;
+            processorRef.from_gui_fifo.push(msg);
         }
     };
 
@@ -160,7 +160,7 @@ void AudioPluginAudioProcessorEditor::fillDropWithFilters(int filterIndex, DropD
                     subname += " " + sfpp::toString(smt);
                 }
                 nodemap[modelname]->children.push_back({subname, filterID});
-                filterInfoMap[filterID] = {mod,s};
+                filterInfoMap[filterID] = {mod, s};
                 ++filterID;
             }
         }
@@ -255,6 +255,21 @@ void AudioPluginAudioProcessorEditor::timerCallback()
     ThreadMessage msg;
     while (processorRef.to_gui_fifo.pop(msg))
     {
+        if (msg.opcode == ThreadMessage::OP_FILTERTYPE)
+        {
+            for (auto &e : filterInfoMap)
+            {
+                if (e.second.filtermodel == msg.filtermodel &&
+                    e.second.filterconfig == msg.filterconfig)
+                {
+                    if (msg.filterindex == 0)
+                        filter1Drop.setSelectedId(e.first);
+                    if (msg.filterindex == 1)
+                        filter2Drop.setSelectedId(e.first);
+                    break;
+                }
+            }
+        }
         if (msg.opcode == ThreadMessage::OP_MODROUTING && msg.modslot < modRowComps.size())
         {
             modRowComps[msg.modslot]->sourceDrop.setSelectedId(msg.modsource);
