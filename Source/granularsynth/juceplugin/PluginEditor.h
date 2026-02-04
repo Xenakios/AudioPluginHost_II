@@ -5,10 +5,28 @@
 
 struct DropDownComponent : public juce::Component
 {
+
+    /* investigate using this later, thanks to Ryan Robinson in AudioProgrammer Discord
+    struct Group;
+    struct Item;
+    using Node = std::variant<Group, Item>;
+
+    struct Group
+    {
+        std::string name{};
+        std::vector<Node> children{};
+    };
+
+    struct Item
+    {
+        std::string name{};
+        int64_t id = -1;
+    };
+    */
     struct Node
     {
         std::string text;
-        int id = -1;
+        int64_t id = -1;
         std::vector<Node> children;
     };
     Node rootNode;
@@ -89,7 +107,7 @@ struct DropDownComponent : public juce::Component
     void mouseDown(const juce::MouseEvent &ev) override { showMenu(); }
     void showMenu() { showNodes(); }
 
-    int selectedId = 0;
+    int64_t selectedId = 0;
     std::string selectedText;
     std::function<void(void)> OnItemSelected;
 };
@@ -326,9 +344,9 @@ struct ModulationRowComponent : public juce::Component
         auto updatfunc = [this] {
             CallbackParams pars{false,
                                 modslotindex,
-                                sourceDrop.selectedId,
-                                viaDrop.selectedId,
-                                curveDrop.selectedId,
+                                (int)sourceDrop.selectedId,
+                                (int)viaDrop.selectedId,
+                                (int)curveDrop.selectedId,
                                 curveParEditor.getText().getFloatValue(),
                                 (float)depthSlider.getValue(),
                                 (uint32_t)destDrop.selectedId};
@@ -342,9 +360,9 @@ struct ModulationRowComponent : public juce::Component
         depthSlider.OnValueChanged = [this]() {
             CallbackParams pars{true,
                                 modslotindex,
-                                sourceDrop.selectedId,
-                                viaDrop.selectedId,
-                                curveDrop.selectedId,
+                                (int)sourceDrop.selectedId,
+                                (int)viaDrop.selectedId,
+                                (int)curveDrop.selectedId,
                                 curveParEditor.getText().getFloatValue(),
                                 (float)depthSlider.getValue(),
                                 (uint32_t)destDrop.selectedId};

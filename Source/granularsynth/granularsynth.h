@@ -1118,7 +1118,7 @@ class ToneGranulator
                                                                true)
                                    .withDefault(2)
                                    .withName("Spatialization mode")
-                                   .withGroupName("Main output")
+                                   .withGroupName("Spatialization")
                                    .withID(PAR_AMBORDER));
         parmetadatas.push_back(pmd()
                                    .withUnorderedMapFormatting({{0, "SINE"},
@@ -1138,6 +1138,7 @@ class ToneGranulator
                                    .withDefault(4.0)
                                    .withATwoToTheBFormatting(1.0f, 1.0, "Hz")
                                    .withName("Density")
+                                   .withGroupName("Time")
                                    .withID(PAR_DENSITY)
                                    .withFlags(CLAP_PARAM_IS_MODULATABLE));
         parmetadatas.push_back(pmd()
@@ -1145,6 +1146,7 @@ class ToneGranulator
                                    .withDefault(0.75f)
                                    .asCubicDecibelAttenuation()
                                    .withName("Grain volume")
+                                   .withGroupName("Volume")
                                    .withID(PAR_GRAINVOLUME)
                                    .withFlags(CLAP_PARAM_IS_MODULATABLE));
         parmetadatas.push_back(pmd()
@@ -1153,6 +1155,7 @@ class ToneGranulator
                                    .withOffsetPowerFormatting("ms", 0.002f, 0.498f, 3.0f, 1000.0f)
                                    .withDecimalPlaces(0)
                                    .withName("Duration")
+                                   .withGroupName("Time")
                                    .withID(PAR_DURATION)
                                    .withFlags(CLAP_PARAM_IS_MODULATABLE));
         parmetadatas.push_back(pmd()
@@ -1160,6 +1163,7 @@ class ToneGranulator
                                    .withDefault(0.5f)
                                    .withLinearScaleFormatting("%", 100.0f)
                                    .withName("Env Morph")
+                                   .withGroupName("Volume")
                                    .withID(PAR_ENVMORPH)
                                    .withFlags(CLAP_PARAM_IS_MODULATABLE));
         parmetadatas.push_back(pmd()
@@ -1167,6 +1171,7 @@ class ToneGranulator
                                    .withDefault(0.0)
                                    .withLinearScaleFormatting("ST")
                                    .withName("Pitch")
+                                   .withGroupName("Oscillator")
                                    .withID(PAR_PITCH)
                                    .withFlags(CLAP_PARAM_IS_MODULATABLE));
         parmetadatas.push_back(pmd()
@@ -1246,6 +1251,7 @@ class ToneGranulator
                                    .withDefault(0.0)
                                    .withLinearScaleFormatting("°")
                                    .withName("Azimuth")
+                                   .withGroupName("Spatialization")
                                    .withID(PAR_AZIMUTH)
                                    .withFlags(CLAP_PARAM_IS_MODULATABLE));
         parmetadatas.push_back(pmd()
@@ -1253,6 +1259,7 @@ class ToneGranulator
                                    .withDefault(0.0)
                                    .withLinearScaleFormatting("°")
                                    .withName("Elevation")
+                                   .withGroupName("Spatialization")
                                    .withID(PAR_ELEVATION)
                                    .withFlags(CLAP_PARAM_IS_MODULATABLE));
         for (int i = 0; i < GranulatorModMatrix::numLfos; ++i)
