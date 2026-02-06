@@ -517,6 +517,7 @@ class AudioPluginAudioProcessorEditor final : public juce::AudioProcessorEditor,
     std::map<int64_t, FilterInfo> filterInfoMap;
     DropDownComponent filter1Drop;
     DropDownComponent filter2Drop;
+    void handleFilterSelection(int filterindex);
     void fillDropWithFilters(int filterIndex, DropDownComponent &drop, std::string rootText);
     std::vector<std::unique_ptr<ModulationRowComponent>> modRowComps;
     std::vector<std::unique_ptr<LFOComponent>> lfocomps;

@@ -20,23 +20,11 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor(AudioPluginAudi
 
     addAndMakeVisible(filter1Drop);
     fillDropWithFilters(0, filter1Drop, "Filter 1");
-    filter1Drop.OnItemSelected = [this]() {
-        auto it = filterInfoMap.find(filter1Drop.selectedId);
-        if (it != filterInfoMap.end())
-        {
-            DBG(sfpp::toString(it->second.filtermodel)
-                << " " << sfpp::toString(it->second.filterconfig.pt));
-            ThreadMessage msg;
-            msg.opcode = ThreadMessage::OP_FILTERTYPE;
-            msg.filterindex = 0;
-            msg.filtermodel = it->second.filtermodel;
-            msg.filterconfig = it->second.filterconfig;
-            processorRef.from_gui_fifo.push(msg);
-        }
-    };
+    filter1Drop.OnItemSelected = [this]() { handleFilterSelection(0); };
 
     addAndMakeVisible(filter2Drop);
     fillDropWithFilters(1, filter2Drop, "Filter 2");
+    filter2Drop.OnItemSelected = [this]() { handleFilterSelection(1); };
 
     for (int i = 0; i < processorRef.granulator.parmetadatas.size(); ++i)
     {
@@ -118,6 +106,25 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor(AudioPluginAudi
 }
 
 AudioPluginAudioProcessorEditor::~AudioPluginAudioProcessorEditor() {}
+
+void AudioPluginAudioProcessorEditor::handleFilterSelection(int filterindex)
+{
+    DropDownComponent *c = &filter1Drop;
+    if (filterindex == 1)
+        c = &filter2Drop;
+    auto it = filterInfoMap.find(c->selectedId);
+    if (it != filterInfoMap.end())
+    {
+        DBG(sfpp::toString(it->second.filtermodel)
+            << " " << sfpp::toString(it->second.filterconfig.pt));
+        ThreadMessage msg;
+        msg.opcode = ThreadMessage::OP_FILTERTYPE;
+        msg.filterindex = filterindex;
+        msg.filtermodel = it->second.filtermodel;
+        msg.filterconfig = it->second.filterconfig;
+        processorRef.from_gui_fifo.push(msg);
+    }
+}
 
 void AudioPluginAudioProcessorEditor::fillDropWithFilters(int filterIndex, DropDownComponent &drop,
                                                           std::string rootText)
