@@ -13,7 +13,7 @@ AudioPluginAudioProcessor::AudioPluginAudioProcessor()
 #endif
       )
 {
-
+    buffer_adapter.reset(1024);
     from_gui_fifo.reset(1024);
     params_from_gui_fifo.reset(1024);
     params_to_gui_fifo.reset(1024);
@@ -103,7 +103,7 @@ void AudioPluginAudioProcessor::prepareToPlay(double sampleRate, int samplesPerB
 {
     perfMeasurer.reset(sampleRate, samplesPerBlock);
     workBuffer.resize(samplesPerBlock * 32);
-    granulator.prepare(sampleRate, {}, 3, 0, 0.001f, 0.001f);
+    granulator.prepare(sampleRate, {}, 3, 0, 0.002f, 0.002f);
 }
 
 void AudioPluginAudioProcessor::releaseResources() {}
@@ -225,15 +225,29 @@ void AudioPluginAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
     */
     granulator.osc_type = *granulator.idtoparvalptr[ToneGranulator::PAR_OSCTYPE];
 
-    granulator.process_block(workBuffer.data(), buffer.getNumSamples());
+    std::array<float, 16> adapter_block;
     int procnumoutchs = granulator.num_out_chans;
+    while (buffer_adapter.getUsedSlots() < buffer.getNumSamples())
+    {
+        granulator.process_block(workBuffer.data(), granul_block_size);
+        for (int j = 0; j < granul_block_size; ++j)
+        {
+            for (int i = 0; i < procnumoutchs; ++i)
+            {
+                adapter_block[i] = workBuffer[j * procnumoutchs + i];
+            }
+            buffer_adapter.push(adapter_block);
+        }
+    }
+
     auto channelDatas = buffer.getArrayOfWritePointers();
     if (totalNumOutputChannels == 2)
     {
         for (int j = 0; j < buffer.getNumSamples(); ++j)
         {
-            float m = workBuffer[j * procnumoutchs + 0];
-            float s = workBuffer[j * procnumoutchs + 1];
+            buffer_adapter.pop(adapter_block);
+            float m = adapter_block[0];
+            float s = adapter_block[1];
             channelDatas[0][j] = std::clamp(m + s, -1.0f, 1.0f);
             channelDatas[1][j] = std::clamp(m - s, -1.0f, 1.0f);
         }

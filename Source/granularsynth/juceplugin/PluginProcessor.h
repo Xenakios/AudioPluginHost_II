@@ -6,8 +6,8 @@
 
 struct ParameterMessage
 {
-  uint32_t id = 0;
-  float value = 0.0f;
+    uint32_t id = 0;
+    float value = 0.0f;
 };
 
 struct ThreadMessage
@@ -70,10 +70,10 @@ class AudioPluginAudioProcessor final : public juce::AudioProcessor
     choc::fifo::SingleReaderSingleWriterFIFO<ParameterMessage> params_to_gui_fifo;
     choc::fifo::SingleReaderSingleWriterFIFO<ThreadMessage> to_gui_fifo;
     juce::AudioProcessLoadMeasurer perfMeasurer;
-    
 
   private:
-    std::vector<float> workBuffer;
+    alignas(32) std::vector<float> workBuffer;
+    alignas(32) choc::fifo::SingleReaderSingleWriterFIFO<std::array<float, 16>> buffer_adapter;
     int prior_ambi_order = -1;
     std::unordered_map<juce::AudioProcessorParameter *, int> jucepartoindex;
 

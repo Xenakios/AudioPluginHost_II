@@ -36,6 +36,7 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor(AudioPluginAudi
     };
 
     addAndMakeVisible(filter2Drop);
+    fillDropWithFilters(1, filter2Drop, "Filter 2");
 
     for (int i = 0; i < processorRef.granulator.parmetadatas.size(); ++i)
     {
