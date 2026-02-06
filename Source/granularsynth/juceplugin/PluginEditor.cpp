@@ -1,6 +1,36 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 
+void StepSeqComponent::runExternalProgram()
+{
+    juce::ChildProcess cp;
+    double t0 = juce::Time::getMillisecondCounterHiRes();
+    cp.start(std::format(
+        R"(python C:\develop\AudioPluginHost_mk2\Source\granularsynth\stepseq.py {} {})", sindex,
+        par0Slider.getValue()));
+    auto data = cp.readAllProcessOutput();
+    double t1 = juce::Time::getMillisecondCounterHiRes();
+    DBG("running ext program took " << t1 - t0 << " millisecods");
+    if (!data.containsIgnoreCase("error"))
+    {
+        auto tokens = juce::StringArray::fromTokens(data, false);
+        std::vector<float> steps;
+        for (auto &e : tokens)
+        {
+            if (e.isEmpty())
+                break;
+            float v = std::clamp(e.getFloatValue(), -1.0f, 1.0f);
+            // DBG(v);
+            steps.push_back(v);
+        }
+        gr->setStepSequenceSteps(sindex, steps);
+    }
+    else
+    {
+        DBG(data);
+    }
+}
+
 //==============================================================================
 AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor(AudioPluginAudioProcessor &p)
     : AudioProcessorEditor(&p), processorRef(p),
@@ -242,8 +272,10 @@ void AudioPluginAudioProcessorEditor::showFilterMenu(int whichfilter)
 
 void AudioPluginAudioProcessorEditor::timerCallback()
 {
-    infoLabel.setText(std::format("[CPU Load {:3.0f}%] [{} in {} out]",
+    infoLabel.setText(std::format("[CPU Load {:3.0f}%] [{}/{} voices] [{} in {} out]",
                                   processorRef.perfMeasurer.getLoadAsPercentage(),
+                                  processorRef.granulator.numVoicesUsed.load(),
+                                  processorRef.granulator.numvoices,
                                   processorRef.getTotalNumInputChannels(),
                                   processorRef.getTotalNumOutputChannels()),
                       juce::dontSendNotification);

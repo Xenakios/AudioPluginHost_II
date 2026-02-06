@@ -219,35 +219,8 @@ struct StepSeqComponent : public juce::Component
                                    juce::dontSendNotification);
         repaint();
     }
-    void runExternalProgram()
-    {
-        juce::ChildProcess cp;
-        double t0 = juce::Time::getMillisecondCounterHiRes();
-        cp.start(std::format(
-            R"(python C:\develop\AudioPluginHost_mk2\Source\granularsynth\stepseq.py {} {})",
-            sindex, par0Slider.getValue()));
-        auto data = cp.readAllProcessOutput();
-        double t1 = juce::Time::getMillisecondCounterHiRes();
-        DBG("running ext program took " << t1 - t0 << " millisecods");
-        if (!data.containsIgnoreCase("error"))
-        {
-            auto tokens = juce::StringArray::fromTokens(data, false);
-            std::vector<float> steps;
-            for (auto &e : tokens)
-            {
-                if (e.isEmpty())
-                    break;
-                float v = std::clamp(e.getFloatValue(), -1.0f, 1.0f);
-                // DBG(v);
-                steps.push_back(v);
-            }
-            gr->setStepSequenceSteps(sindex, steps);
-        }
-        else
-        {
-            DBG(data);
-        }
-    }
+    void runExternalProgram();
+
     StepSeqComponent(int seqindex, ToneGranulator *g) : gr(g), sindex(seqindex)
     {
         addAndMakeVisible(loadStepsBut);

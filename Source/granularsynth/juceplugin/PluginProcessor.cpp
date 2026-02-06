@@ -226,6 +226,7 @@ void AudioPluginAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
     granulator.osc_type = *granulator.idtoparvalptr[ToneGranulator::PAR_OSCTYPE];
 
     std::array<float, 16> adapter_block;
+    std::fill(adapter_block.begin(), adapter_block.end(), 0.0f);
     int procnumoutchs = granulator.num_out_chans;
     while (buffer_adapter.getUsedSlots() < buffer.getNumSamples())
     {
@@ -239,7 +240,7 @@ void AudioPluginAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
             buffer_adapter.push(adapter_block);
         }
     }
-
+    buffer.clear();
     auto channelDatas = buffer.getArrayOfWritePointers();
     if (totalNumOutputChannels == 2)
     {

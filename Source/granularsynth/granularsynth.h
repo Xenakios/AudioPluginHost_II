@@ -1021,6 +1021,7 @@ class ToneGranulator
     std::vector<ModSourceInfo> modSources;
     std::array<float, 128> modSourceValues;
     std::unordered_map<int, int> midiCCMap;
+    alignas(16) std::atomic<int> numVoicesUsed;
     void handleStepSequencerMessages()
     {
         StepModSource::Message msg;
@@ -1714,5 +1715,12 @@ class ToneGranulator
             bufframecount += granul_block_size;
             playposframes += granul_block_size;
         }
+        int voicesused = 0;
+        for (auto &v : voices)
+        {
+            if (v->active)
+                ++voicesused;
+        }
+        numVoicesUsed = voicesused;
     }
 };
