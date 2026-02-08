@@ -212,9 +212,10 @@ struct LFOComponent : public juce::Component
 
 struct StepSeqComponent : public juce::Component
 {
-
+    uint16_t playingStep = 0;
     void updateGUI()
     {
+        playingStep = gr->stepModSources[sindex].curstepforgui;
         unipolarBut.setToggleState(gr->stepModSources[sindex].unipolar.load(),
                                    juce::dontSendNotification);
         repaint();
@@ -246,13 +247,16 @@ struct StepSeqComponent : public juce::Component
     void paint(juce::Graphics &g) override
     {
         auto &msrc = gr->stepModSources[sindex];
-        g.setColour(juce::Colours::green);
         int maxstepstodraw = (getWidth() - graphxpos) / 16;
         int stepstodraw = std::min<int>(maxstepstodraw, msrc.numactivesteps);
         for (int i = 0; i < stepstodraw; ++i)
         {
             float xcor = graphxpos + i * 16.0;
             float v = msrc.steps[i];
+            if (i == playingStep)
+                g.setColour(juce::Colours::white);
+            else
+                g.setColour(juce::Colours::green);
             if (v < 0.0)
             {
                 float h = juce::jmap<float>(v, -1.0, 0.0, getHeight() / 2, 0.0);

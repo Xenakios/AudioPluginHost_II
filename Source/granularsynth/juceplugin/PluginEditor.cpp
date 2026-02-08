@@ -132,7 +132,7 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor(AudioPluginAudi
     lfoTabs.setCurrentTabIndex(0);
 
     setSize(1500, 700);
-    startTimer(100);
+    startTimer(50);
 }
 
 AudioPluginAudioProcessorEditor::~AudioPluginAudioProcessorEditor() {}

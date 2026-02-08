@@ -874,7 +874,8 @@ class StepModSource
 {
   public:
     static constexpr size_t maxSteps = 4096;
-    size_t curstep = 0;
+    uint16_t curstep = 0;
+    std::atomic<uint16_t> curstepforgui;
     size_t numactivesteps = 0;
     std::atomic<bool> unipolar{false};
     std::vector<float> steps;
@@ -893,9 +894,13 @@ class StepModSource
         if (steps.empty())
             return 0.0f;
         float result = steps[curstep];
+        curstepforgui = curstep;
         ++curstep;
         if (curstep >= numactivesteps)
+        {
             curstep = 0;
+        }
+
         if (unipolar.load())
             result = (result + 1.0f) * 0.5f;
         return result;

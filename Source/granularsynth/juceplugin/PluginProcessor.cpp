@@ -244,13 +244,15 @@ void AudioPluginAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
     auto channelDatas = buffer.getArrayOfWritePointers();
     if (totalNumOutputChannels == 2)
     {
+        const float midGain = 1.414f;
+        // const float midGain = 1.0f;
         for (int j = 0; j < buffer.getNumSamples(); ++j)
         {
             buffer_adapter.pop(adapter_block);
-            float m = adapter_block[0];
+            float m = adapter_block[0] * midGain;
             float s = adapter_block[1];
-            channelDatas[0][j] = std::clamp(m + s, -1.0f, 1.0f);
-            channelDatas[1][j] = std::clamp(m - s, -1.0f, 1.0f);
+            channelDatas[0][j] = std::clamp((m + s) * 0.5f, -1.0f, 1.0f);
+            channelDatas[1][j] = std::clamp((m - s) * 0.5f, -1.0f, 1.0f);
         }
     }
     if (totalNumOutputChannels == 16)
