@@ -983,6 +983,7 @@ class ToneGranulator
         PAR_ENVMORPH = 1900,
         PAR_GRAINVOLUME = 2000,
         PAR_NOISECORRELATION = 2100,
+        PAR_AMBIDIFFUSION = 2200,
         PAR_LFORATES = 100000,
         PAR_LFODEFORMS = 100100,
         PAR_LFOSHIFTS = 100200,
@@ -1253,7 +1254,7 @@ class ToneGranulator
                                    .withGroupName("Filter 2")
                                    .withFlags(CLAP_PARAM_IS_MODULATABLE));
         parmetadatas.push_back(pmd()
-                                   .withRange(-180.0, 180.0)
+                                   .withRange(-180.0f, 180.0f)
                                    .withDefault(0.0)
                                    .withLinearScaleFormatting("°")
                                    .withName("Azimuth")
@@ -1261,12 +1262,20 @@ class ToneGranulator
                                    .withID(PAR_AZIMUTH)
                                    .withFlags(CLAP_PARAM_IS_MODULATABLE));
         parmetadatas.push_back(pmd()
-                                   .withRange(-180.0, 180.0)
+                                   .withRange(-180.0f, 180.0f)
                                    .withDefault(0.0)
                                    .withLinearScaleFormatting("°")
                                    .withName("Elevation")
                                    .withGroupName("Spatialization")
                                    .withID(PAR_ELEVATION)
+                                   .withFlags(CLAP_PARAM_IS_MODULATABLE));
+        parmetadatas.push_back(pmd()
+                                   .withRange(0.0f, 1.0f)
+                                   .withDefault(0.0)
+                                   .withLinearScaleFormatting("%", 100.0f)
+                                   .withName("Ambisonic Diffusion")
+                                   .withGroupName("Spatialization")
+                                   .withID(PAR_AMBIDIFFUSION)
                                    .withFlags(CLAP_PARAM_IS_MODULATABLE));
         for (int i = 0; i < GranulatorModMatrix::numLfos; ++i)
         {
@@ -1572,6 +1581,16 @@ class ToneGranulator
                             stepModValues[sm] = stepModSources[sm].next();
                         voices[j]->grainid = graincount;
                         voices[j]->start(genev);
+                        float ambdif = *idtoparvalptr[PAR_AMBIDIFFUSION];
+                        if (ambdif > 0.0f)
+                        {
+                            ambdif *= 0.1f;
+                            for (size_t coeff = 4; coeff < 16; ++coeff)
+                            {
+                                float diffamount = rng.nextHypCos(0.0f, ambdif);
+                                voices[j]->ambcoeffs[coeff] += diffamount;
+                            }
+                        }
                         wasfound = true;
                         ++graincount;
                         break;
