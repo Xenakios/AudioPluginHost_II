@@ -236,13 +236,25 @@ struct StepSeqComponent : public juce::Component
         par0Slider.setRange(0.0, 1.0);
         par0Slider.setNumDecimalPlacesToDisplay(2);
         par0Slider.onDragEnd = [this]() { runExternalProgram(); };
+        addAndMakeVisible(loopEdit);
+        loopEdit.setText("0 16", juce::dontSendNotification);
+        loopEdit.onReturnKey = [this]() {
+            auto tokens = juce::StringArray::fromTokens(loopEdit.getText(), false);
+            if (tokens.size() == 2)
+            {
+                int loopstart = std::clamp(tokens[0].getIntValue(), 0, 4095);
+                int looplen = std::clamp(tokens[1].getIntValue(), 1, 4095);
+                gr->setStepSequenceSteps(sindex, {}, loopstart, looplen);
+            }
+        };
     }
     int graphxpos = 200;
     void resized() override
     {
         loadStepsBut.setBounds(0, 0, 150, 25);
         unipolarBut.setBounds(0, loadStepsBut.getBottom() + 1, graphxpos, 25);
-        par0Slider.setBounds(0, unipolarBut.getBottom() + 1, graphxpos, 25);
+        // par0Slider.setBounds(0, unipolarBut.getBottom() + 1, graphxpos, 25);
+        loopEdit.setBounds(0, unipolarBut.getBottom() + 1, graphxpos, 25);
     }
     void paint(juce::Graphics &g) override
     {
@@ -275,6 +287,7 @@ struct StepSeqComponent : public juce::Component
     juce::TextButton loadStepsBut;
     juce::ToggleButton unipolarBut;
     juce::Slider par0Slider;
+    juce::TextEditor loopEdit;
     ToneGranulator *gr = nullptr;
     uint32_t sindex = 0;
 };

@@ -23,7 +23,7 @@ void StepSeqComponent::runExternalProgram()
             // DBG(v);
             steps.push_back(v);
         }
-        gr->setStepSequenceSteps(sindex, steps);
+        gr->setStepSequenceSteps(sindex, steps, 0, steps.size());
     }
     else
     {

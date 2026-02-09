@@ -874,16 +874,25 @@ class StepModSource
 {
   public:
     static constexpr size_t maxSteps = 4096;
-    uint16_t curstep = 0;
-    std::atomic<uint16_t> curstepforgui;
-    size_t numactivesteps = 0;
+    int curstep = 0;
+    std::atomic<int> curstepforgui;
+    int numactivesteps = 0;
+    int loopstartstep = 0;
+    int looplen = 1;
     std::atomic<bool> unipolar{false};
     std::vector<float> steps;
     struct Message
     {
-        int opcode = 0;
+        enum Opcode
+        {
+            OP_SETPARAMS,
+            OP_SETSTEPS
+        };
+        Opcode opcode = OP_SETPARAMS;
         uint32_t dest = 0;
         int numsteps = 0;
+        int loopstart = 0;
+        int looplen = 1;
         std::array<float, maxSteps> steps;
     };
 
@@ -896,11 +905,10 @@ class StepModSource
         float result = steps[curstep];
         curstepforgui = curstep;
         ++curstep;
-        if (curstep >= numactivesteps)
+        if (curstep >= numactivesteps || curstep >= loopstartstep + looplen)
         {
-            curstep = 0;
+            curstep = loopstartstep;
         }
-
         if (unipolar.load())
             result = (result + 1.0f) * 0.5f;
         return result;
@@ -1033,43 +1041,53 @@ class ToneGranulator
         StepModSource::Message msg;
         while (fifo.pop(msg))
         {
-            if (msg.opcode == 0 && msg.dest < stepModSources.size())
+
+            if (msg.opcode == StepModSource::Message::OP_SETPARAMS &&
+                msg.dest < stepModSources.size())
+            {
+                auto &ms = stepModSources[msg.dest];
+                ms.numactivesteps = msg.loopstart + msg.looplen;
+                ms.looplen = msg.looplen;
+                ms.curstep = msg.loopstart;
+                ms.loopstartstep = msg.loopstart;
+            }
+            if (msg.opcode == StepModSource::Message::OP_SETSTEPS &&
+                msg.dest < stepModSources.size())
             {
                 auto &ms = stepModSources[msg.dest];
                 std::copy(msg.steps.begin(), msg.steps.begin() + msg.numsteps, ms.steps.begin());
                 ms.numactivesteps = msg.numsteps;
-                ms.curstep = 0;
+                ms.looplen = msg.looplen;
+                ms.curstep = msg.loopstart;
+                ms.loopstartstep = msg.loopstart;
             }
         }
     }
-    void setStepSequenceSteps(uint32_t seqIndex, std::vector<float> newsteps)
+    void setStepSequenceSteps(uint32_t seqIndex, std::vector<float> newsteps, int loopstart,
+                              int looplen)
     {
         if (newsteps.size() > StepModSource::maxSteps)
             return;
         StepModSource::Message msg;
-        msg.opcode = 0;
         msg.dest = seqIndex;
-        msg.numsteps = newsteps.size();
-        std::copy(newsteps.begin(), newsteps.end(), msg.steps.begin());
+        if (newsteps.size() == 0)
+        {
+            msg.opcode = StepModSource::Message::OP_SETPARAMS;
+            msg.numsteps = newsteps.size();
+            msg.loopstart = loopstart;
+            msg.looplen = looplen;
+        }
+        if (newsteps.size() > 0)
+        {
+            msg.opcode = StepModSource::Message::OP_SETSTEPS;
+            msg.numsteps = newsteps.size();
+            msg.loopstart = loopstart;
+            msg.looplen = looplen;
+            std::copy(newsteps.begin(), newsteps.end(), msg.steps.begin());
+        }
         fifo.push(msg);
     }
-    ToneGranulator() : m_sr(44100.0), modmatrix(44100.0)
-    {
-        shapeParToActualShape[0] = GranulatorModMatrix::lfo_t::SINE;
-        shapeParToActualShape[1] = GranulatorModMatrix::lfo_t::PULSE;
-        shapeParToActualShape[2] = GranulatorModMatrix::lfo_t::SAW_TRI_RAMP;
-        shapeParToActualShape[3] = GranulatorModMatrix::lfo_t::SMOOTH_NOISE;
-        shapeParToActualShape[4] = GranulatorModMatrix::lfo_t::SH_NOISE;
-        for (int i = 0; i < 8; ++i)
-        {
-            midiCCMap[21 + i] = MIDICCSTART + i;
-            midiCCMap[41 + i] = MIDICCSTART + 8 + i;
-        }
-        fifo.reset(16);
-        for (auto &v : stepModValues)
-            v = 0.0f;
-        setStepSequenceSteps(0, {-1.0f, 1.0f});
-        /*
+    /*
         stepModSources[0].setSteps(generate_from_js(R"(
         function generate_steps()
         {
@@ -1085,9 +1103,25 @@ class ToneGranulator
 
     )"));
         */
-        setStepSequenceSteps(1, {-1.0f, 0.0f, 1.0f});
-        setStepSequenceSteps(2, {-1.0f, -0.333f, 0.333f, 1.0f});
-        setStepSequenceSteps(3, {-1.0f, -0.5f, 0.0f, 0.5f, 1.0f});
+    ToneGranulator() : m_sr(44100.0), modmatrix(44100.0)
+    {
+        shapeParToActualShape[0] = GranulatorModMatrix::lfo_t::SINE;
+        shapeParToActualShape[1] = GranulatorModMatrix::lfo_t::PULSE;
+        shapeParToActualShape[2] = GranulatorModMatrix::lfo_t::SAW_TRI_RAMP;
+        shapeParToActualShape[3] = GranulatorModMatrix::lfo_t::SMOOTH_NOISE;
+        shapeParToActualShape[4] = GranulatorModMatrix::lfo_t::SH_NOISE;
+        for (int i = 0; i < 8; ++i)
+        {
+            midiCCMap[21 + i] = MIDICCSTART + i;
+            midiCCMap[41 + i] = MIDICCSTART + 8 + i;
+        }
+        fifo.reset(16);
+        for (auto &v : stepModValues)
+            v = 0.0f;
+        setStepSequenceSteps(0, {-1.0f, 1.0f}, 0, 2);
+        setStepSequenceSteps(1, {-1.0f, 0.0f, 1.0f}, 0, 3);
+        setStepSequenceSteps(2, {-1.0f, -0.333f, 0.333f, 1.0f}, 0, 4);
+        setStepSequenceSteps(3, {-1.0f, -0.5f, 0.0f, 0.5f, 1.0f}, 0, 5);
         for (size_t i = 0; i < 4; ++i)
         {
             stepModSources[4 + i].steps.resize(StepModSource::maxSteps);
