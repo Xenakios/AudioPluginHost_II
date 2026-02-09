@@ -5,7 +5,7 @@
 
 class MyCustomLNF : public juce::LookAndFeel_V4
 {
-public:
+  public:
     // Update the constructor/member to avoid that deprecation warning!
     juce::Font myFont{juce::FontOptions("Comic Sans MS", 20.0f, juce::Font::bold)};
 
@@ -245,6 +245,7 @@ struct StepSeqComponent : public juce::Component
 
     StepSeqComponent(int seqindex, ToneGranulator *g) : gr(g), sindex(seqindex)
     {
+        setWantsKeyboardFocus(true);
         addAndMakeVisible(loadStepsBut);
         loadStepsBut.setButtonText("Run Python");
         loadStepsBut.onClick = [this, seqindex]() { runExternalProgram(); };
@@ -269,6 +270,38 @@ struct StepSeqComponent : public juce::Component
             }
         };
     }
+    bool keyPressed(const juce::KeyPress &ev) override
+    {
+        auto &msrc = gr->stepModSources[sindex];
+        int curstart = msrc.loopstartstep;
+        int curlooplen = msrc.looplen;
+        if (ev.getKeyCode() == 'E')
+        {
+            gr->setStepSequenceSteps(sindex, {}, curstart, 8);
+            return true;
+        }
+        if (ev.getKeyCode() == 'Q')
+        {
+            gr->setStepSequenceSteps(sindex, {}, curstart + 1, curlooplen);
+            return true;
+        }
+        if (ev.getKeyCode() == 'A')
+        {
+            gr->setStepSequenceSteps(sindex, {}, curstart - 1, curlooplen);
+            return true;
+        }
+        if (ev.getKeyCode() == 'W')
+        {
+            gr->setStepSequenceSteps(sindex, {}, curstart, curlooplen + 1);
+            return true;
+        }
+        if (ev.getKeyCode() == 'S')
+        {
+            gr->setStepSequenceSteps(sindex, {}, curstart, curlooplen - 1);
+            return true;
+        }
+        return false;
+    }
     int graphxpos = 200;
     void resized() override
     {
@@ -282,14 +315,20 @@ struct StepSeqComponent : public juce::Component
         auto &msrc = gr->stepModSources[sindex];
         int maxstepstodraw = (getWidth() - graphxpos) / 16;
         int stepstodraw = std::min<int>(maxstepstodraw, msrc.numactivesteps);
-        for (int i = 0; i < stepstodraw; ++i)
+        for (int i = 0; i < maxstepstodraw; ++i)
         {
             float xcor = graphxpos + i * 16.0;
             float v = msrc.steps[i];
             if (i == playingStep)
                 g.setColour(juce::Colours::white);
             else
-                g.setColour(juce::Colours::green);
+            {
+                if (i >= msrc.loopstartstep && i < msrc.loopstartstep + msrc.looplen)
+                    g.setColour(juce::Colours::green);
+                else
+                    g.setColour(juce::Colours::darkgreen.darker());
+            }
+
             if (v < 0.0)
             {
                 float h = juce::jmap<float>(v, -1.0, 0.0, getHeight() / 2, 0.0);

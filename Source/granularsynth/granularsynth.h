@@ -1047,10 +1047,10 @@ class ToneGranulator
                 msg.dest < stepModSources.size())
             {
                 auto &ms = stepModSources[msg.dest];
+                ms.looplen = std::clamp(msg.looplen, 1, 4095);
+                ms.loopstartstep = std::clamp(msg.loopstart, 0, 4095);
+                ms.curstep = ms.loopstartstep;
                 ms.numactivesteps = msg.loopstart + msg.looplen;
-                ms.looplen = msg.looplen;
-                ms.curstep = msg.loopstart;
-                ms.loopstartstep = msg.loopstart;
             }
             if (msg.opcode == StepModSource::Message::OP_SETSTEPS &&
                 msg.dest < stepModSources.size())
