@@ -31,21 +31,29 @@ void StepSeqComponent::runExternalProgram()
     }
 }
 
+inline void updateAllFonts(juce::Component &parent, const juce::Font &newFont)
+{
+    for (auto *child : parent.getChildren())
+    {
+        if (auto *drop = dynamic_cast<DropDownComponent *>(child))
+        {
+            drop->myfont = newFont;
+        }
+        if (auto *xaps = dynamic_cast<XapSlider *>(child))
+        {
+            xaps->m_font = newFont;
+        }
+        // Keep digging deeper
+        updateAllFonts(*child, newFont);
+    }
+}
+
 //==============================================================================
 AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor(AudioPluginAudioProcessor &p)
     : AudioProcessorEditor(&p), processorRef(p),
       lfoTabs(juce::TabbedButtonBar::Orientation::TabsAtTop)
 {
-    /*
-    addAndMakeVisible(loadModulationSettingsBut);
-    loadModulationSettingsBut.setButtonText("LOAD MOD");
-    loadModulationSettingsBut.onClick = [this]() {
-        processorRef.suspendProcessing(true);
-        processorRef.granulator.modmatrix.init_from_json_file(
-            R"(C:\develop\AudioPluginHost_mk2\Source\granularsynth\modmatrixconf.json)");
-        processorRef.suspendProcessing(false);
-    };
-    */
+
     addAndMakeVisible(infoLabel);
 
     addAndMakeVisible(filter1Drop);
@@ -128,14 +136,16 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor(AudioPluginAudi
                        false);
         stepcomps.push_back(std::move(stepcomp));
     }
+    
     addAndMakeVisible(lfoTabs);
     lfoTabs.setCurrentTabIndex(0);
-
+    setLookAndFeel(&lnf);
+    updateAllFonts(*this, lnf.myFont);
     setSize(1500, 700);
     startTimer(50);
 }
 
-AudioPluginAudioProcessorEditor::~AudioPluginAudioProcessorEditor() {}
+AudioPluginAudioProcessorEditor::~AudioPluginAudioProcessorEditor() { setLookAndFeel(nullptr); }
 
 void AudioPluginAudioProcessorEditor::handleFilterSelection(int filterindex)
 {

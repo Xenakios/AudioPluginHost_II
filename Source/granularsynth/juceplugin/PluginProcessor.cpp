@@ -351,7 +351,7 @@ void AudioPluginAudioProcessor::setStateInformation(const void *data, int sizeIn
                 std::string id = std::to_string(pars[i].id);
                 if (params.hasObjectMember(id))
                 {
-                    float v = params[i].getWithDefault(pars[i].defaultVal);
+                    float v = params[id].getWithDefault(pars[i].defaultVal);
                     *granulator.idtoparvalptr[pars[i].id] = v;
                 }
             }
@@ -414,7 +414,7 @@ void AudioPluginAudioProcessor::setStateInformation(const void *data, int sizeIn
     }
     catch (std::exception &ex)
     {
-        DBG(ex.what());
+        DBG("tonegranulator error restoring state : " << ex.what());
     }
     suspendProcessing(false);
     sendExtraStatesToGUI();

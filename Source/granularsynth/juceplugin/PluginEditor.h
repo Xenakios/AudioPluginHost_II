@@ -3,6 +3,25 @@
 #include "PluginProcessor.h"
 #include "../../Experimental/xap_slider.h"
 
+class MyCustomLNF : public juce::LookAndFeel_V4
+{
+public:
+    // Update the constructor/member to avoid that deprecation warning!
+    juce::Font myFont{juce::FontOptions("Comic Sans MS", 20.0f, juce::Font::bold)};
+
+    // This covers Labels (and many components that use Labels internally)
+    juce::Font getLabelFont(juce::Label &l) override { return myFont; }
+
+    // This covers standard TextButtons
+    juce::Font getTextButtonFont(juce::TextButton &b, int buttonHeight) override { return myFont; }
+
+    // This ensures custom typefaces are retrieved if something asks for it
+    juce::Typeface::Ptr getTypefaceForFont(const juce::Font &f) override
+    {
+        return myFont.getTypefacePtr();
+    }
+};
+
 struct DropDownComponent : public juce::Component
 {
 
@@ -96,9 +115,11 @@ struct DropDownComponent : public juce::Component
     }
 
     int getSelectedId() { return selectedId; }
+    juce::Font myfont;
     void paint(juce::Graphics &g) override
     {
         g.fillAll(juce::Colours::black);
+        g.setFont(myfont);
         g.setColour(juce::Colours::white);
         g.drawRect(0, 0, getWidth(), getHeight(), 2);
         g.drawText(selectedText, 4, 2, getWidth(), getHeight() - 4,
@@ -493,8 +514,7 @@ class AudioPluginAudioProcessorEditor final : public juce::AudioProcessorEditor,
     void resized() override;
 
   private:
-    // This reference is provided as a quick way for your editor to
-    // access the processor object that created it.
+    MyCustomLNF lnf;
     AudioPluginAudioProcessor &processorRef;
     // std::vector<std::unique_ptr<GUIParam>> paramEntries;
     std::vector<std::unique_ptr<XapSlider>> paramComponents;

@@ -992,6 +992,7 @@ class ToneGranulator
         PAR_GRAINVOLUME = 2000,
         PAR_NOISECORRELATION = 2100,
         PAR_AMBIDIFFUSION = 2200,
+        PAR_TEST = 2300,
         PAR_LFORATES = 100000,
         PAR_LFODEFORMS = 100100,
         PAR_LFOSHIFTS = 100200,
@@ -1126,6 +1127,8 @@ class ToneGranulator
         {
             stepModSources[4 + i].steps.resize(StepModSource::maxSteps);
             stepModSources[4 + i].numactivesteps = StepModSource::maxSteps;
+            stepModSources[4 + i].loopstartstep = 0;
+            stepModSources[4 + i].looplen = StepModSource::maxSteps;
         }
         for (size_t i = 0; i < StepModSource::maxSteps; ++i)
         {
@@ -1311,6 +1314,14 @@ class ToneGranulator
                                    .withGroupName("Spatialization")
                                    .withID(PAR_AMBIDIFFUSION)
                                    .withFlags(CLAP_PARAM_IS_MODULATABLE));
+        parmetadatas.push_back(pmd()
+                                   .withRange(0.0f, 1.0f)
+                                   .withDefault(0.0)
+                                   .withLinearScaleFormatting("%", 100.0f)
+                                   .withName("Error test")
+                                   .withGroupName("Spatialization")
+                                   .withID(PAR_TEST)
+                                   .withFlags(CLAP_PARAM_IS_MODULATABLE));
         for (int i = 0; i < GranulatorModMatrix::numLfos; ++i)
         {
             parmetadatas.push_back(pmd()
@@ -1323,7 +1334,7 @@ class ToneGranulator
                                                                     {1, "SIN->SQR->TRI"},
                                                                     {2, "DOWN->TRI->UP"},
                                                                     {3, "SMOOTH NOISE"},
-                                                                    {4, "S& NOISE"}},
+                                                                    {4, "S&H NOISE"}},
                                                                    true)
                                        .withName(std::format("LFO {} SHAPE", i + 1))
                                        .withGroupName(std::format("LFO {}", i + 1))
