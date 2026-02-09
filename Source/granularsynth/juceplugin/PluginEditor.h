@@ -234,6 +234,8 @@ struct LFOComponent : public juce::Component
 struct StepSeqComponent : public juce::Component
 {
     uint16_t playingStep = 0;
+    xenakios::Xoroshiro128Plus rng;
+    juce::Range<int> editRange{0, 8};
     void updateGUI()
     {
         playingStep = gr->stepModSources[sindex].curstepforgui;
@@ -245,6 +247,7 @@ struct StepSeqComponent : public juce::Component
 
     StepSeqComponent(int seqindex, ToneGranulator *g) : gr(g), sindex(seqindex)
     {
+        rng.seed(11400714819323198485ULL, 17 + sindex * 31);
         setWantsKeyboardFocus(true);
         addAndMakeVisible(loadStepsBut);
         loadStepsBut.setButtonText("Run Python");
@@ -270,38 +273,8 @@ struct StepSeqComponent : public juce::Component
             }
         };
     }
-    bool keyPressed(const juce::KeyPress &ev) override
-    {
-        auto &msrc = gr->stepModSources[sindex];
-        int curstart = msrc.loopstartstep;
-        int curlooplen = msrc.looplen;
-        if (ev.getKeyCode() == 'E')
-        {
-            gr->setStepSequenceSteps(sindex, {}, curstart, 8);
-            return true;
-        }
-        if (ev.getKeyCode() == 'Q')
-        {
-            gr->setStepSequenceSteps(sindex, {}, curstart + 1, curlooplen);
-            return true;
-        }
-        if (ev.getKeyCode() == 'A')
-        {
-            gr->setStepSequenceSteps(sindex, {}, curstart - 1, curlooplen);
-            return true;
-        }
-        if (ev.getKeyCode() == 'W')
-        {
-            gr->setStepSequenceSteps(sindex, {}, curstart, curlooplen + 1);
-            return true;
-        }
-        if (ev.getKeyCode() == 'S')
-        {
-            gr->setStepSequenceSteps(sindex, {}, curstart, curlooplen - 1);
-            return true;
-        }
-        return false;
-    }
+    bool keyPressed(const juce::KeyPress &ev) override;
+
     int graphxpos = 200;
     void resized() override
     {
@@ -341,6 +314,9 @@ struct StepSeqComponent : public juce::Component
                 g.fillRect(xcor, getHeight() / 2.0 - h, 15.0, h);
             }
         }
+        g.setColour(juce::Colours::white);
+        g.drawRect(graphxpos + editRange.getStart() * 16.0, 1.0f, editRange.getLength() * 16.0,
+                   (float)getHeight() - 2.0f, 2.0f);
         g.setColour(juce::Colours::black);
         g.drawLine(float(graphxpos), getHeight() / 2.0f, getWidth(), getHeight() / 2.0f);
     }

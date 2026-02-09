@@ -1,6 +1,69 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 
+bool StepSeqComponent::keyPressed(const juce::KeyPress &ev)
+{
+    auto &msrc = gr->stepModSources[sindex];
+    int curstart = msrc.loopstartstep;
+    int curlooplen = msrc.looplen;
+
+    bool ret = false;
+    if (ev.getKeyCode() == 'E')
+    {
+        gr->setStepSequenceSteps(sindex, {}, editRange.getStart(), editRange.getLength());
+        ret = true;
+    }
+    else if (ev.getKeyCode() == 'D')
+    {
+        auto cursteps = msrc.steps;
+        for (int i = 0; i < editRange.getLength(); ++i)
+        {
+            int index = editRange.getStart() + i;
+            cursteps[index] = rng.nextFloatInRange(-1.0f, 1.0f);
+        }
+        gr->setStepSequenceSteps(sindex, std::move(cursteps), editRange.getStart(),
+                                 editRange.getLength());
+        ret = true;
+    }
+    else if (ev.getKeyCode() == 'Q' && ev.getModifiers() == juce::ModifierKeys::noModifiers)
+    {
+        editRange = editRange.movedToStartAt(editRange.getStart() + 1);
+        ret = true;
+    }
+    else if (ev.getKeyCode() == 'Q' && ev.getModifiers().isShiftDown())
+    {
+        if (editRange.getLength() > 1)
+            editRange.setStart(editRange.getStart() + 1);
+        ret = true;
+    }
+    else if (ev.getKeyCode() == 'A' && ev.getModifiers() == juce::ModifierKeys::noModifiers)
+    {
+        editRange = editRange.movedToStartAt(editRange.getStart() - 1);
+        ret = true;
+    }
+    else if (ev.getKeyCode() == 'A' && ev.getModifiers().isShiftDown())
+    {
+        if (editRange.getStart() > 0)
+            editRange.setStart(editRange.getStart() - 1);
+        ret = true;
+    }
+
+    else if (ev.getKeyCode() == 'W')
+    {
+        editRange = editRange.withLength(editRange.getLength() + 1);
+        ret = true;
+    }
+    else if (ev.getKeyCode() == 'S')
+    {
+        editRange = editRange.withLength(editRange.getLength() - 1);
+        ret = true;
+    }
+    editRange = juce::Range<int>{0, 4096}.constrainRange(editRange);
+    if (editRange.getLength() < 1)
+        editRange.setLength(1);
+    return ret;
+}
+
 void StepSeqComponent::runExternalProgram()
 {
     juce::ChildProcess cp;
@@ -136,7 +199,7 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor(AudioPluginAudi
                        false);
         stepcomps.push_back(std::move(stepcomp));
     }
-    
+
     addAndMakeVisible(lfoTabs);
     lfoTabs.setCurrentTabIndex(0);
     setLookAndFeel(&lnf);

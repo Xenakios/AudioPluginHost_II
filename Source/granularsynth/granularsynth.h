@@ -1057,10 +1057,10 @@ class ToneGranulator
             {
                 auto &ms = stepModSources[msg.dest];
                 std::copy(msg.steps.begin(), msg.steps.begin() + msg.numsteps, ms.steps.begin());
-                ms.numactivesteps = msg.numsteps;
-                ms.looplen = msg.looplen;
-                ms.curstep = msg.loopstart;
-                ms.loopstartstep = msg.loopstart;
+                ms.looplen = std::clamp(msg.looplen, 1, 4095);
+                ms.loopstartstep = std::clamp(msg.loopstart, 0, 4095);
+                ms.curstep = ms.loopstartstep;
+                ms.numactivesteps = msg.loopstart + msg.looplen;
             }
         }
     }
