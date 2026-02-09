@@ -885,15 +885,16 @@ class StepModSource
     {
         enum Opcode
         {
-            OP_SETPARAMS,
-            OP_SETSTEPS
+            OP_NOOP,
+            OP_NUMSTEPS,
+            OP_LOOPSTART,
+            OP_LOOPLEN,
+            OP_SETSTEP = 1024
         };
-        Opcode opcode = OP_SETPARAMS;
+        Opcode opcode = OP_NOOP;
         uint32_t dest = 0;
-        int numsteps = 0;
-        int loopstart = 0;
-        int looplen = 1;
-        std::array<float, maxSteps> steps;
+        float fval0 = 0.0f;
+        int ival0 = 0;
     };
 
     StepModSource() { steps.resize(maxSteps); }
@@ -1042,31 +1043,34 @@ class ToneGranulator
         StepModSource::Message msg;
         while (fifo.pop(msg))
         {
-
-            if (msg.opcode == StepModSource::Message::OP_SETPARAMS &&
-                msg.dest < stepModSources.size())
+            if (msg.dest < stepModSources.size())
             {
                 auto &ms = stepModSources[msg.dest];
-                ms.looplen = std::clamp(msg.looplen, 1, 4095);
-                ms.loopstartstep = std::clamp(msg.loopstart, 0, 4095);
-                ms.curstep = ms.loopstartstep;
-                ms.numactivesteps = msg.loopstart + msg.looplen;
-            }
-            if (msg.opcode == StepModSource::Message::OP_SETSTEPS &&
-                msg.dest < stepModSources.size())
-            {
-                auto &ms = stepModSources[msg.dest];
-                std::copy(msg.steps.begin(), msg.steps.begin() + msg.numsteps, ms.steps.begin());
-                ms.looplen = std::clamp(msg.looplen, 1, 4095);
-                ms.loopstartstep = std::clamp(msg.loopstart, 0, 4095);
-                ms.curstep = ms.loopstartstep;
-                ms.numactivesteps = msg.loopstart + msg.looplen;
+                if (msg.opcode == StepModSource::Message::OP_NUMSTEPS)
+                    ms.numactivesteps = msg.ival0;
+                else if (msg.opcode == StepModSource::Message::OP_LOOPSTART)
+                    ms.loopstartstep = msg.ival0;
+                else if (msg.opcode == StepModSource::Message::OP_LOOPLEN)
+                    ms.looplen = msg.ival0;
+                else if (msg.opcode == StepModSource::Message::OP_SETSTEP)
+                {
+                    if (msg.ival0 >= 0 && msg.ival0 < StepModSource::maxSteps)
+                    {
+                        ms.steps[msg.ival0] = msg.fval0;
+                    }
+                }
+                if (ms.curstep < ms.loopstartstep || ms.curstep > ms.loopstartstep + ms.looplen)
+                {
+                    ms.curstep = ms.loopstartstep;
+                    ms.curstepforgui = ms.curstep;
+                }
             }
         }
     }
-    void setStepSequenceSteps(uint32_t seqIndex, std::vector<float> newsteps, int loopstart,
-                              int looplen)
+    void setStepSequenceStepsA(uint32_t seqIndex, std::vector<float> newsteps, int loopstart,
+                               int looplen)
     {
+        /*
         if (newsteps.size() > StepModSource::maxSteps)
             return;
         StepModSource::Message msg;
@@ -1087,6 +1091,7 @@ class ToneGranulator
             std::copy(newsteps.begin(), newsteps.end(), msg.steps.begin());
         }
         fifo.push(msg);
+        */
     }
     /*
         stepModSources[0].setSteps(generate_from_js(R"(
@@ -1119,10 +1124,22 @@ class ToneGranulator
         fifo.reset(16);
         for (auto &v : stepModValues)
             v = 0.0f;
-        setStepSequenceSteps(0, {-1.0f, 1.0f}, 0, 2);
-        setStepSequenceSteps(1, {-1.0f, 0.0f, 1.0f}, 0, 3);
-        setStepSequenceSteps(2, {-1.0f, -0.333f, 0.333f, 1.0f}, 0, 4);
-        setStepSequenceSteps(3, {-1.0f, -0.5f, 0.0f, 0.5f, 1.0f}, 0, 5);
+        auto sendfunc = [this](uint32_t destss, std::vector<float> values) {
+            int i = 0;
+            for (auto v : values)
+            {
+                fifo.push({StepModSource::Message::OP_SETSTEP, destss, v, i});
+                ++i;
+            }
+            fifo.push({StepModSource::Message::OP_NUMSTEPS, destss, 0.0f, StepModSource::maxSteps});
+            fifo.push({StepModSource::Message::OP_LOOPSTART, destss, 0.0f, 0});
+            fifo.push({StepModSource::Message::OP_LOOPLEN, destss, 0.0f, (int)values.size()});
+        };
+        sendfunc(0, {-1.0f, 1.0f});
+        sendfunc(1, {-1.0f, 0.0f, 1.0f});
+        sendfunc(2, {-1.0f, -0.333f, 0.333f, 1.0f});
+        sendfunc(3, {-1.0f, -0.5f, 0.0f, 0.5f, 1.0f});
+
         for (size_t i = 0; i < 4; ++i)
         {
             stepModSources[4 + i].steps.resize(StepModSource::maxSteps);
@@ -1661,7 +1678,8 @@ class ToneGranulator
             playposframes = 0;
             m_sr = next_samplerate;
             set_ambisonics_order(next_ambisonics_order);
-            // initFilter(m_sr, next_filter_routing, next_filt0type, next_filt1type, next_tail_len,
+            // initFilter(m_sr, next_filter_routing, next_filt0type, next_filt1type,
+            // next_tail_len,
             //            next_tail_fade_len);
             gainlag.setRateInMilliseconds(1000.0, m_sr, 1.0);
             gainlag.setTarget(0.0);

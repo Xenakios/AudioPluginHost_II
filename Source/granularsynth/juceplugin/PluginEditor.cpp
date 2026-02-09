@@ -10,19 +10,18 @@ bool StepSeqComponent::keyPressed(const juce::KeyPress &ev)
     bool ret = false;
     if (ev.getKeyCode() == 'E')
     {
-        gr->setStepSequenceSteps(sindex, {}, editRange.getStart(), editRange.getLength());
+        gr->fifo.push({StepModSource::Message::OP_LOOPSTART, sindex, 0.0f, editRange.getStart()});
+        gr->fifo.push({StepModSource::Message::OP_LOOPLEN, sindex, 0.0f, editRange.getLength()});
         ret = true;
     }
     else if (ev.getKeyCode() == 'D')
     {
-        auto cursteps = msrc.steps;
         for (int i = 0; i < editRange.getLength(); ++i)
         {
             int index = editRange.getStart() + i;
-            cursteps[index] = rng.nextFloatInRange(-1.0f, 1.0f);
+            gr->fifo.push({StepModSource::Message::OP_SETSTEP, sindex,
+                           rng.nextFloatInRange(-1.0f, 1.0f), index});
         }
-        gr->setStepSequenceSteps(sindex, std::move(cursteps), editRange.getStart(),
-                                 editRange.getLength());
         ret = true;
     }
     else if (ev.getKeyCode() == 'Q' && ev.getModifiers() == juce::ModifierKeys::noModifiers)
@@ -86,7 +85,7 @@ void StepSeqComponent::runExternalProgram()
             // DBG(v);
             steps.push_back(v);
         }
-        gr->setStepSequenceSteps(sindex, steps, 0, steps.size());
+        // gr->setStepSequenceSteps(sindex, steps, 0, steps.size());
     }
     else
     {

@@ -269,7 +269,7 @@ struct StepSeqComponent : public juce::Component
             {
                 int loopstart = std::clamp(tokens[0].getIntValue(), 0, 4095);
                 int looplen = std::clamp(tokens[1].getIntValue(), 1, 4095);
-                gr->setStepSequenceSteps(sindex, {}, loopstart, looplen);
+                // gr->setStepSequenceSteps(sindex, {}, loopstart, looplen);
             }
         };
     }
