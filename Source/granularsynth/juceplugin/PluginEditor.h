@@ -261,17 +261,7 @@ struct StepSeqComponent : public juce::Component
         par0Slider.setRange(0.0, 1.0);
         par0Slider.setNumDecimalPlacesToDisplay(2);
         par0Slider.onDragEnd = [this]() { runExternalProgram(); };
-        addAndMakeVisible(loopEdit);
-        loopEdit.setText("0 16", juce::dontSendNotification);
-        loopEdit.onReturnKey = [this]() {
-            auto tokens = juce::StringArray::fromTokens(loopEdit.getText(), false);
-            if (tokens.size() == 2)
-            {
-                int loopstart = std::clamp(tokens[0].getIntValue(), 0, 4095);
-                int looplen = std::clamp(tokens[1].getIntValue(), 1, 4095);
-                // gr->setStepSequenceSteps(sindex, {}, loopstart, looplen);
-            }
-        };
+        
     }
     bool keyPressed(const juce::KeyPress &ev) override;
 
@@ -281,7 +271,7 @@ struct StepSeqComponent : public juce::Component
         loadStepsBut.setBounds(0, 0, 150, 25);
         unipolarBut.setBounds(0, loadStepsBut.getBottom() + 1, graphxpos, 25);
         // par0Slider.setBounds(0, unipolarBut.getBottom() + 1, graphxpos, 25);
-        loopEdit.setBounds(0, unipolarBut.getBottom() + 1, graphxpos, 25);
+        
     }
     void paint(juce::Graphics &g) override
     {
@@ -319,11 +309,21 @@ struct StepSeqComponent : public juce::Component
                    (float)getHeight() - 2.0f, 2.0f);
         g.setColour(juce::Colours::black);
         g.drawLine(float(graphxpos), getHeight() / 2.0f, getWidth(), getHeight() / 2.0f);
+        if (autoSetLoop)
+        {
+            g.drawText("A", graphxpos + editRange.getStart() * 16.0, 2, 16, 16,
+                       juce::Justification::centred);
+        }
+    }
+    void setLoopFromSelection()
+    {
+        gr->fifo.push({StepModSource::Message::OP_LOOPSTART, sindex, 0.0f, editRange.getStart()});
+        gr->fifo.push({StepModSource::Message::OP_LOOPLEN, sindex, 0.0f, editRange.getLength()});
     }
     juce::TextButton loadStepsBut;
     juce::ToggleButton unipolarBut;
     juce::Slider par0Slider;
-    juce::TextEditor loopEdit;
+    bool autoSetLoop = false;
     ToneGranulator *gr = nullptr;
     uint32_t sindex = 0;
 };

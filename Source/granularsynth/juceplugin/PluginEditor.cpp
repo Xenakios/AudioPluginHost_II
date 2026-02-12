@@ -8,10 +8,30 @@ bool StepSeqComponent::keyPressed(const juce::KeyPress &ev)
     int curlooplen = msrc.looplen;
 
     bool ret = false;
-    if (ev.getKeyCode() == 'E')
+    auto incdecstep = [this, &msrc](float step) {
+        int index = editRange.getStart();
+        float v = msrc.steps[index];
+        v = std::clamp(v + step, -1.0f, 1.0f);
+        gr->fifo.push({StepModSource::Message::OP_SETSTEP, sindex, v, index});
+    };
+    if (ev.getKeyCode() == 'Y')
     {
-        gr->fifo.push({StepModSource::Message::OP_LOOPSTART, sindex, 0.0f, editRange.getStart()});
-        gr->fifo.push({StepModSource::Message::OP_LOOPLEN, sindex, 0.0f, editRange.getLength()});
+        autoSetLoop = !autoSetLoop;
+        ret = true;
+    }
+    else if (ev.getKeyCode() == 'T')
+    {
+        incdecstep(0.1f);
+        ret = true;
+    }
+    else if (ev.getKeyCode() == 'G')
+    {
+        incdecstep(-0.1f);
+        ret = true;
+    }
+    else if (ev.getKeyCode() == 'E')
+    {
+        setLoopFromSelection();
         ret = true;
     }
     else if (ev.getKeyCode() == 'D')
@@ -60,6 +80,10 @@ bool StepSeqComponent::keyPressed(const juce::KeyPress &ev)
     editRange = juce::Range<int>{0, 4096}.constrainRange(editRange);
     if (editRange.getLength() < 1)
         editRange.setLength(1);
+    if (ret && autoSetLoop)
+    {
+        setLoopFromSelection();
+    }
     return ret;
 }
 
