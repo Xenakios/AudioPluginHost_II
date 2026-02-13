@@ -70,6 +70,7 @@ class AudioPluginAudioProcessor final : public juce::AudioProcessor
     choc::fifo::SingleReaderSingleWriterFIFO<ParameterMessage> params_to_gui_fifo;
     choc::fifo::SingleReaderSingleWriterFIFO<ThreadMessage> to_gui_fifo;
     juce::AudioProcessLoadMeasurer perfMeasurer;
+    juce::ThreadPool tpool{juce::ThreadPool::Options{"granulatorworker", 1}};
 
   private:
     alignas(32) std::vector<float> workBuffer;

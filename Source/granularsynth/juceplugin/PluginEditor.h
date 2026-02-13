@@ -245,11 +245,12 @@ struct StepSeqComponent : public juce::Component
     }
     void runExternalProgram();
 
-    StepSeqComponent(int seqindex, ToneGranulator *g) : gr(g), sindex(seqindex)
+    StepSeqComponent(int seqindex, ToneGranulator *g, juce::ThreadPool *tp)
+        : gr(g), sindex(seqindex), threadPool(tp)
     {
         rng.seed(11400714819323198485ULL, 17 + sindex * 31);
         setWantsKeyboardFocus(true);
-        
+
         addAndMakeVisible(unipolarBut);
         unipolarBut.setButtonText("Unipolar");
         unipolarBut.onClick = [this]() {
@@ -282,6 +283,7 @@ struct StepSeqComponent : public juce::Component
     bool autoSetLoop = false;
     ToneGranulator *gr = nullptr;
     uint32_t sindex = 0;
+    juce::ThreadPool *threadPool = nullptr;
 };
 
 struct ModulationRowComponent : public juce::Component

@@ -169,31 +169,33 @@ bool StepSeqComponent::keyPressed(const juce::KeyPress &ev)
 
 void StepSeqComponent::runExternalProgram()
 {
-    juce::ChildProcess cp;
-    double t0 = juce::Time::getMillisecondCounterHiRes();
-    cp.start(std::format(
-        R"(python C:\develop\AudioPluginHost_mk2\Source\granularsynth\stepseq.py {} {} {})", sindex,
-        editRange.getStart(), editRange.getLength()));
-    auto data = cp.readAllProcessOutput();
-    double t1 = juce::Time::getMillisecondCounterHiRes();
-    DBG("running ext program took " << t1 - t0 << " millisecods");
-    if (!data.containsIgnoreCase("error"))
-    {
-        auto tokens = juce::StringArray::fromTokens(data, false);
-        for (int i = 0; i < tokens.size(); ++i)
+    threadPool->addJob([this]() {
+        juce::ChildProcess cp;
+        double t0 = juce::Time::getMillisecondCounterHiRes();
+        cp.start(std::format(
+            R"(python C:\develop\AudioPluginHost_mk2\Source\granularsynth\stepseq.py {} {} {})",
+            sindex, editRange.getStart(), editRange.getLength()));
+        auto data = cp.readAllProcessOutput();
+        double t1 = juce::Time::getMillisecondCounterHiRes();
+        DBG("running ext program took " << t1 - t0 << " millisecods");
+        if (!data.containsIgnoreCase("error"))
         {
-            if (tokens[i].isEmpty() || i == 4096 || i > editRange.getLength())
-                break;
-            float v = std::clamp(tokens[i].getFloatValue(), -1.0f, 1.0f);
-            // DBG(v);
-            int index = editRange.getStart() + i;
-            gr->fifo.push({StepModSource::Message::OP_SETSTEP, sindex, v, index});
+            auto tokens = juce::StringArray::fromTokens(data, false);
+            for (int i = 0; i < tokens.size(); ++i)
+            {
+                if (tokens[i].isEmpty() || i == 4096 || i > editRange.getLength())
+                    break;
+                float v = std::clamp(tokens[i].getFloatValue(), -1.0f, 1.0f);
+                // DBG(v);
+                int index = editRange.getStart() + i;
+                gr->fifo.push({StepModSource::Message::OP_SETSTEP, sindex, v, index});
+            }
         }
-    }
-    else
-    {
-        DBG(data);
-    }
+        else
+        {
+            DBG(data);
+        }
+    });
 }
 
 inline void updateAllFonts(juce::Component &parent, const juce::Font &newFont)
@@ -296,7 +298,8 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor(AudioPluginAudi
     }
     for (int i = 0; i < 8; ++i)
     {
-        auto stepcomp = std::make_unique<StepSeqComponent>(i, &processorRef.granulator);
+        auto stepcomp =
+            std::make_unique<StepSeqComponent>(i, &processorRef.granulator, &processorRef.tpool);
         lfoTabs.addTab("STEP SEQ " + juce::String(i + 1), juce::Colours::lightgrey, stepcomp.get(),
                        false);
         stepcomps.push_back(std::move(stepcomp));
