@@ -66,6 +66,11 @@ bool StepSeqComponent::keyPressed(const juce::KeyPress &ev)
         autoSetLoop = !autoSetLoop;
         actionetaken = 1;
     }
+    else if (ev.getKeyCode() == 'P')
+    {
+        runExternalProgram();
+        actionetaken = 2;
+    }
     else if (ev.getKeyCode() == 'T')
     {
         incdecstep(0.1f);
@@ -157,24 +162,23 @@ void StepSeqComponent::runExternalProgram()
     juce::ChildProcess cp;
     double t0 = juce::Time::getMillisecondCounterHiRes();
     cp.start(std::format(
-        R"(python C:\develop\AudioPluginHost_mk2\Source\granularsynth\stepseq.py {} {})", sindex,
-        par0Slider.getValue()));
+        R"(python C:\develop\AudioPluginHost_mk2\Source\granularsynth\stepseq.py {} {} {})", sindex,
+        editRange.getStart(), editRange.getLength()));
     auto data = cp.readAllProcessOutput();
     double t1 = juce::Time::getMillisecondCounterHiRes();
     DBG("running ext program took " << t1 - t0 << " millisecods");
     if (!data.containsIgnoreCase("error"))
     {
         auto tokens = juce::StringArray::fromTokens(data, false);
-        std::vector<float> steps;
-        for (auto &e : tokens)
+        for (int i = 0; i < tokens.size(); ++i)
         {
-            if (e.isEmpty())
+            if (tokens[i].isEmpty() || i == 4096 || i > editRange.getLength())
                 break;
-            float v = std::clamp(e.getFloatValue(), -1.0f, 1.0f);
+            float v = std::clamp(tokens[i].getFloatValue(), -1.0f, 1.0f);
             // DBG(v);
-            steps.push_back(v);
+            int index = editRange.getStart() + i;
+            gr->fifo.push({StepModSource::Message::OP_SETSTEP, sindex, v, index});
         }
-        // gr->setStepSequenceSteps(sindex, steps, 0, steps.size());
     }
     else
     {

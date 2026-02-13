@@ -249,9 +249,7 @@ struct StepSeqComponent : public juce::Component
     {
         rng.seed(11400714819323198485ULL, 17 + sindex * 31);
         setWantsKeyboardFocus(true);
-        addAndMakeVisible(loadStepsBut);
-        loadStepsBut.setButtonText("Run Python");
-        loadStepsBut.onClick = [this, seqindex]() { runExternalProgram(); };
+        
         addAndMakeVisible(unipolarBut);
         unipolarBut.setButtonText("Unipolar");
         unipolarBut.onClick = [this]() {
@@ -268,8 +266,7 @@ struct StepSeqComponent : public juce::Component
     int graphxpos = 200;
     void resized() override
     {
-        loadStepsBut.setBounds(0, 0, 150, 25);
-        unipolarBut.setBounds(0, loadStepsBut.getBottom() + 1, graphxpos, 25);
+        unipolarBut.setBounds(0, 1, graphxpos, 25);
         // par0Slider.setBounds(0, unipolarBut.getBottom() + 1, graphxpos, 25);
     }
     void paint(juce::Graphics &g) override;
@@ -279,7 +276,7 @@ struct StepSeqComponent : public juce::Component
         gr->fifo.push({StepModSource::Message::OP_LOOPSTART, sindex, 0.0f, editRange.getStart()});
         gr->fifo.push({StepModSource::Message::OP_LOOPLEN, sindex, 0.0f, editRange.getLength()});
     }
-    juce::TextButton loadStepsBut;
+
     juce::ToggleButton unipolarBut;
     juce::Slider par0Slider;
     bool autoSetLoop = false;
