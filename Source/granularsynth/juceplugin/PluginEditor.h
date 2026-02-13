@@ -255,13 +255,13 @@ struct StepSeqComponent : public juce::Component
         addAndMakeVisible(unipolarBut);
         unipolarBut.setButtonText("Unipolar");
         unipolarBut.onClick = [this]() {
-            gr->stepModSources[sindex].unipolar.store(unipolarBut.getToggleState());
+            gr->fifo.push(
+                {StepModSource::Message::OP_UNIPOLAR, sindex, 0.0f, unipolarBut.getToggleState()});
         };
         addAndMakeVisible(par0Slider);
         par0Slider.setRange(0.0, 1.0);
         par0Slider.setNumDecimalPlacesToDisplay(2);
         par0Slider.onDragEnd = [this]() { runExternalProgram(); };
-        
     }
     bool keyPressed(const juce::KeyPress &ev) override;
 
@@ -271,50 +271,9 @@ struct StepSeqComponent : public juce::Component
         loadStepsBut.setBounds(0, 0, 150, 25);
         unipolarBut.setBounds(0, loadStepsBut.getBottom() + 1, graphxpos, 25);
         // par0Slider.setBounds(0, unipolarBut.getBottom() + 1, graphxpos, 25);
-        
     }
-    void paint(juce::Graphics &g) override
-    {
-        auto &msrc = gr->stepModSources[sindex];
-        int maxstepstodraw = (getWidth() - graphxpos) / 16;
-        int stepstodraw = std::min<int>(maxstepstodraw, msrc.numactivesteps);
-        for (int i = 0; i < maxstepstodraw; ++i)
-        {
-            float xcor = graphxpos + i * 16.0;
-            float v = msrc.steps[i];
-            if (i == playingStep)
-                g.setColour(juce::Colours::white);
-            else
-            {
-                if (i >= msrc.loopstartstep && i < msrc.loopstartstep + msrc.looplen)
-                    g.setColour(juce::Colours::green);
-                else
-                    g.setColour(juce::Colours::darkgreen.darker());
-            }
+    void paint(juce::Graphics &g) override;
 
-            if (v < 0.0)
-            {
-                float h = juce::jmap<float>(v, -1.0, 0.0, getHeight() / 2, 0.0);
-                g.fillRect(xcor, getHeight() / 2.0, 15.0, h);
-            }
-            else
-            {
-
-                float h = juce::jmap<float>(v, 0.0, 1.0, 0.0, getHeight() / 2);
-                g.fillRect(xcor, getHeight() / 2.0 - h, 15.0, h);
-            }
-        }
-        g.setColour(juce::Colours::white);
-        g.drawRect(graphxpos + editRange.getStart() * 16.0, 1.0f, editRange.getLength() * 16.0,
-                   (float)getHeight() - 2.0f, 2.0f);
-        g.setColour(juce::Colours::black);
-        g.drawLine(float(graphxpos), getHeight() / 2.0f, getWidth(), getHeight() / 2.0f);
-        if (autoSetLoop)
-        {
-            g.drawText("A", graphxpos + editRange.getStart() * 16.0, 2, 16, 16,
-                       juce::Justification::centred);
-        }
-    }
     void setLoopFromSelection()
     {
         gr->fifo.push({StepModSource::Message::OP_LOOPSTART, sindex, 0.0f, editRange.getStart()});

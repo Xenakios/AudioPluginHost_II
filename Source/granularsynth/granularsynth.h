@@ -889,7 +889,8 @@ class StepModSource
             OP_NUMSTEPS,
             OP_LOOPSTART,
             OP_LOOPLEN,
-            OP_SETSTEP = 1024
+            OP_SETSTEP,
+            OP_UNIPOLAR
         };
         Opcode opcode = OP_NOOP;
         uint32_t dest = 0;
@@ -1046,7 +1047,11 @@ class ToneGranulator
             if (msg.dest < stepModSources.size())
             {
                 auto &ms = stepModSources[msg.dest];
-                if (msg.opcode == StepModSource::Message::OP_NUMSTEPS)
+                if (msg.opcode == StepModSource::Message::OP_UNIPOLAR)
+                {
+                    ms.unipolar = msg.ival0;
+                }
+                else if (msg.opcode == StepModSource::Message::OP_NUMSTEPS)
                     ms.numactivesteps = msg.ival0;
                 else if (msg.opcode == StepModSource::Message::OP_LOOPSTART)
                     ms.loopstartstep = msg.ival0;
@@ -1121,7 +1126,7 @@ class ToneGranulator
             midiCCMap[21 + i] = MIDICCSTART + i;
             midiCCMap[41 + i] = MIDICCSTART + 8 + i;
         }
-        fifo.reset(16);
+        fifo.reset(1024);
         for (auto &v : stepModValues)
             v = 0.0f;
         auto sendfunc = [this](uint32_t destss, std::vector<float> values) {

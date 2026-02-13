@@ -1,13 +1,60 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 
+void StepSeqComponent::paint(juce::Graphics &g)
+{
+    g.fillAll(juce::Colours::black);
+    auto &msrc = gr->stepModSources[sindex];
+    int maxstepstodraw = (getWidth() - graphxpos) / 16;
+    int stepstodraw = std::min<int>(maxstepstodraw, msrc.numactivesteps);
+    for (int i = 0; i < maxstepstodraw; ++i)
+    {
+        float xcor = graphxpos + i * 16.0;
+        float v = msrc.steps[i];
+        if (msrc.unipolar)
+            v = (v + 1.0) * 0.5;
+        if (i == playingStep)
+            g.setColour(juce::Colours::white);
+        else
+        {
+            if (i >= msrc.loopstartstep && i < msrc.loopstartstep + msrc.looplen)
+                g.setColour(juce::Colours::green);
+            else
+                g.setColour(juce::Colours::darkgreen.darker());
+        }
+
+        if (v < 0.0)
+        {
+            float h = juce::jmap<float>(v, -1.0, 0.0, getHeight() / 2, 0.0);
+            g.fillRect(xcor, getHeight() / 2.0, 15.0, h);
+        }
+        else
+        {
+
+            float h = juce::jmap<float>(v, 0.0, 1.0, 0.0, getHeight() / 2);
+            g.fillRect(xcor, getHeight() / 2.0 - h, 15.0, h);
+        }
+    }
+    g.setColour(juce::Colours::white);
+    g.drawRect(graphxpos + editRange.getStart() * 16.0, 1.0f, editRange.getLength() * 16.0,
+               (float)getHeight() - 2.0f, 2.0f);
+    g.setColour(juce::Colours::black);
+    g.drawLine(float(graphxpos), getHeight() / 2.0f, getWidth(), getHeight() / 2.0f);
+    juce::String txt;
+    txt << editRange.getStart() << " " << editRange.getEnd() << "\n";
+    if (autoSetLoop)
+        txt << "LOOP FOLLOWS SELECTION";
+    g.setColour(juce::Colours::white);
+    g.drawMultiLineText(txt, graphxpos, 20, 200);
+}
+
 bool StepSeqComponent::keyPressed(const juce::KeyPress &ev)
 {
     auto &msrc = gr->stepModSources[sindex];
     int curstart = msrc.loopstartstep;
     int curlooplen = msrc.looplen;
 
-    bool ret = false;
+    int actionetaken = 0;
     auto incdecstep = [this, &msrc](float step) {
         int index = editRange.getStart();
         float v = msrc.steps[index];
@@ -17,24 +64,24 @@ bool StepSeqComponent::keyPressed(const juce::KeyPress &ev)
     if (ev.getKeyCode() == 'Y')
     {
         autoSetLoop = !autoSetLoop;
-        ret = true;
+        actionetaken = 1;
     }
     else if (ev.getKeyCode() == 'T')
     {
         incdecstep(0.1f);
-        ret = true;
+        actionetaken = 2;
     }
     else if (ev.getKeyCode() == 'G')
     {
         incdecstep(-0.1f);
-        ret = true;
+        actionetaken = 2;
     }
     else if (ev.getKeyCode() == 'E')
     {
         setLoopFromSelection();
-        ret = true;
+        actionetaken = 2;
     }
-    else if (ev.getKeyCode() == 'D')
+    else if (ev.getKeyCode() == 'D' && ev.getModifiers() == juce::ModifierKeys::noModifiers)
     {
         for (int i = 0; i < editRange.getLength(); ++i)
         {
@@ -42,49 +89,67 @@ bool StepSeqComponent::keyPressed(const juce::KeyPress &ev)
             gr->fifo.push({StepModSource::Message::OP_SETSTEP, sindex,
                            rng.nextFloatInRange(-1.0f, 1.0f), index});
         }
-        ret = true;
+        actionetaken = 2;
+    }
+    else if (ev.getKeyCode() == 'D' && ev.getModifiers().isShiftDown())
+    {
+        if (editRange.getLength() > 1)
+        {
+            for (int i = 0; i < editRange.getLength(); ++i)
+            {
+                int index = editRange.getStart() + i;
+                float v = -1.0 + 2.0 / (editRange.getLength() - 1) * i;
+                gr->fifo.push({StepModSource::Message::OP_SETSTEP, sindex, v, index});
+            }
+        }
+        else
+        {
+            gr->fifo.push({StepModSource::Message::OP_SETSTEP, sindex, 0.0f, editRange.getStart()});
+        }
+
+        actionetaken = 2;
     }
     else if (ev.getKeyCode() == 'Q' && ev.getModifiers() == juce::ModifierKeys::noModifiers)
     {
         editRange = editRange.movedToStartAt(editRange.getStart() + 1);
-        ret = true;
+        actionetaken = 1;
     }
     else if (ev.getKeyCode() == 'Q' && ev.getModifiers().isShiftDown())
     {
         if (editRange.getLength() > 1)
             editRange.setStart(editRange.getStart() + 1);
-        ret = true;
+        actionetaken = 1;
     }
     else if (ev.getKeyCode() == 'A' && ev.getModifiers() == juce::ModifierKeys::noModifiers)
     {
         editRange = editRange.movedToStartAt(editRange.getStart() - 1);
-        ret = true;
+        actionetaken = 1;
     }
     else if (ev.getKeyCode() == 'A' && ev.getModifiers().isShiftDown())
     {
         if (editRange.getStart() > 0)
             editRange.setStart(editRange.getStart() - 1);
-        ret = true;
+        actionetaken = 1;
     }
 
     else if (ev.getKeyCode() == 'W')
     {
         editRange = editRange.withLength(editRange.getLength() + 1);
-        ret = true;
+        actionetaken = 1;
     }
     else if (ev.getKeyCode() == 'S')
     {
         editRange = editRange.withLength(editRange.getLength() - 1);
-        ret = true;
+        actionetaken = 1;
     }
     editRange = juce::Range<int>{0, 4096}.constrainRange(editRange);
     if (editRange.getLength() < 1)
         editRange.setLength(1);
-    if (ret && autoSetLoop)
+    if (actionetaken == 1 && autoSetLoop)
     {
         setLoopFromSelection();
     }
-    return ret;
+    return actionetaken > 0;
 }
 
 void StepSeqComponent::runExternalProgram()
