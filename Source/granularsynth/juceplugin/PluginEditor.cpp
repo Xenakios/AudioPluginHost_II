@@ -38,6 +38,9 @@ void StepSeqComponent::paint(juce::Graphics &g)
     g.setColour(juce::Colours::white);
     g.drawRect(graphxpos + editRange.getStart() * 16.0, 1.0f, editRange.getLength() * 16.0,
                (float)getHeight() - 2.0f, 2.0f);
+    g.setColour(juce::Colours::cyan);
+    float xcor = graphxpos + (msrc.loopstartstep + msrc.loopoffset) * 16.0;
+    g.drawLine(xcor, 0, xcor, getHeight());
     g.setColour(juce::Colours::black);
     g.drawLine(float(graphxpos), getHeight() / 2.0f, getWidth(), getHeight() / 2.0f);
     juce::String txt;
@@ -79,6 +82,13 @@ bool StepSeqComponent::keyPressed(const juce::KeyPress &ev)
     else if (ev.getKeyCode() == 'G')
     {
         incdecstep(-0.1f);
+        actionetaken = 2;
+    }
+    else if (ev.getKeyCode() == 'Z')
+    {
+        int curoff = msrc.loopoffset;
+        curoff = (curoff + 1) % msrc.looplen;
+        gr->fifo.push({StepModSource::Message::OP_OFFSET, sindex, 0.0f, curoff});
         actionetaken = 2;
     }
     else if (ev.getKeyCode() == 'E')

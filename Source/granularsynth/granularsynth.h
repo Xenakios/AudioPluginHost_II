@@ -875,10 +875,12 @@ class StepModSource
   public:
     static constexpr size_t maxSteps = 4096;
     int curstep = 0;
+    int looppos = 0;
     std::atomic<int> curstepforgui;
     int numactivesteps = 0;
     int loopstartstep = 0;
     int looplen = 1;
+    int loopoffset = 0;
     std::atomic<bool> unipolar{false};
     std::vector<float> steps;
     struct Message
@@ -890,7 +892,8 @@ class StepModSource
             OP_LOOPSTART,
             OP_LOOPLEN,
             OP_SETSTEP,
-            OP_UNIPOLAR
+            OP_UNIPOLAR,
+            OP_OFFSET
         };
         Opcode opcode = OP_NOOP;
         uint32_t dest = 0;
@@ -904,13 +907,10 @@ class StepModSource
     {
         if (steps.empty())
             return 0.0f;
+        curstep = loopstartstep + ((looppos + loopoffset) % looplen);
         float result = steps[curstep];
         curstepforgui = curstep;
-        ++curstep;
-        if (curstep >= numactivesteps || curstep >= loopstartstep + looplen)
-        {
-            curstep = loopstartstep;
-        }
+        looppos = (looppos + 1) % looplen;
         if (unipolar.load())
             result = (result + 1.0f) * 0.5f;
         return result;
@@ -1050,6 +1050,10 @@ class ToneGranulator
                 if (msg.opcode == StepModSource::Message::OP_UNIPOLAR)
                 {
                     ms.unipolar = msg.ival0;
+                }
+                else if (msg.opcode == StepModSource::Message::OP_OFFSET)
+                {
+                    ms.loopoffset = msg.ival0;
                 }
                 else if (msg.opcode == StepModSource::Message::OP_NUMSTEPS)
                     ms.numactivesteps = msg.ival0;
