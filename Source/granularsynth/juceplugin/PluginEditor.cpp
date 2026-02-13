@@ -40,7 +40,7 @@ void StepSeqComponent::paint(juce::Graphics &g)
                (float)getHeight() - 2.0f, 2.0f);
     g.setColour(juce::Colours::cyan);
     float xcor = graphxpos + (msrc.loopstartstep + msrc.loopoffset) * 16.0;
-    g.drawLine(xcor, 0, xcor, getHeight());
+    g.drawLine(xcor, 0, xcor, getHeight(), 3.0f);
     g.setColour(juce::Colours::black);
     g.drawLine(float(graphxpos), getHeight() / 2.0f, getWidth(), getHeight() / 2.0f);
     juce::String txt;
