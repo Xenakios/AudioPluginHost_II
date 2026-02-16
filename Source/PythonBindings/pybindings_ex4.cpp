@@ -83,13 +83,15 @@ inline xenakios::Envelope envelope_from_pyob(py::object ob)
 }
 
 inline py::array_t<float> generate_tone(std::string tone_name, py::object pitch_param,
-                                        py::object volume_param, double sr, double duration)
+                                        py::object sync_param, py::object volume_param, double sr,
+                                        double duration)
 {
     auto tone_type = osc_name_to_index(tone_name);
     if (tone_type < 0 || tone_type > 6)
         throw std::runtime_error("Invalid tone type");
     auto pitch_env = envelope_from_pyob(pitch_param);
     auto vol_env = envelope_from_pyob(volume_param);
+    auto sync_env = envelope_from_pyob(sync_param);
     int chans = 1;
     int frames = duration * sr;
     py::buffer_info binfo(
@@ -141,6 +143,9 @@ inline py::array_t<float> generate_tone(std::string tone_name, py::object pitch_
         double pitch = pitch_env.getValueAtPosition(tpos);
         pitch = std::clamp(pitch, -24.0, 136.0);
         double hz = 440.0 * std::pow(2.0, 1.0 / 12 * (pitch - 69.0));
+        double sync = sync_env.getValueAtPosition(tpos);
+        sync = std::clamp(sync, 0.0, 48.0);
+        double syncratio = std::pow(2.0, 1.0 / 12.0 * sync);
         vol_env.processBlock(tpos, sr, 0, blocksize);
 
         std::visit(
@@ -155,6 +160,7 @@ inline py::array_t<float> generate_tone(std::string tone_name, py::object pitch_
                 else
                 {
                     osc.setFrequency(hz);
+                    osc.setSyncRatio(syncratio);
                 }
 
                 for (int i = 0; i < framestoprocess; ++i)
@@ -290,23 +296,24 @@ inline std::vector<std::string> get_sst_filter_types()
 inline void set_granulator_params(ToneGranulator &gran, py::dict dict)
 {
     if (dict.contains("rate"))
-        gran.grain_rate_oct = dict["rate"].cast<double>();
+        *gran.idtoparvalptr[ToneGranulator::PAR_DENSITY] = dict["rate"].cast<double>();
     if (dict.contains("pitch_center"))
-        gran.pitch_center = dict["pitch_center"].cast<double>();
+        *gran.idtoparvalptr[ToneGranulator::PAR_PITCH] = dict["pitch_center"].cast<double>();
     if (dict.contains("duration"))
-        gran.grain_dur = dict["duration"].cast<double>();
+        *gran.idtoparvalptr[ToneGranulator::PAR_DURATION] = dict["duration"].cast<double>();
     if (dict.contains("fil0cutoff"))
-        gran.filt_cut_off = dict["fil0cutoff"].cast<double>();
+        *gran.idtoparvalptr[ToneGranulator::PAR_F0CO] = dict["fil0cutoff"].cast<double>();
     if (dict.contains("fil0reson"))
-        gran.filt_reso = dict["fil0reson"].cast<double>();
+        *gran.idtoparvalptr[ToneGranulator::PAR_F0RE] = dict["fil0reson"].cast<double>();
     if (dict.contains("env_shape"))
-        gran.env_shape = dict["env_shape"].cast<double>();
+        *gran.idtoparvalptr[ToneGranulator::PAR_ENVMORPH] = dict["env_shape"].cast<double>();
     if (dict.contains("osc_type"))
-        gran.osc_type = dict["osc_type"].cast<int>();
+        *gran.idtoparvalptr[ToneGranulator::PAR_OSCTYPE] = dict["osc_type"].cast<int>();
 }
 
-inline py::array_t<float> render_granulator(ToneGranulator &gran, events_t evlist,
-                                            std::string outputmode, double outputduration)
+inline py::array_t<float> render_granulator(ToneGranulator &gran, double samplerate,
+                                            events_t evlist, std::string outputmode,
+                                            double outputduration)
 {
     if (evlist.empty() && (outputduration <= 0.0 || outputduration > 600.0))
         throw std::runtime_error(std::format(
@@ -331,7 +338,7 @@ inline py::array_t<float> render_granulator(ToneGranulator &gran, events_t evlis
     }
     if (chans == 0)
         throw std::runtime_error("invalid audio output mode");
-    gran.prepare(std::move(evlist), ambiorder);
+    gran.prepare(samplerate, std::move(evlist), ambiorder, 0, 0.002, 0.002);
     if (gran.events_to_switch.empty() && outputduration == 0.0)
         throw std::runtime_error("grain event list empty after events were erased");
     // we can't know the exact tail amount needed until processing...
@@ -698,8 +705,8 @@ void init_py4(py::module_ &m, py::module_ &m_const)
           "ambisonics_order"_a, "azimuth"_a, "elevation"_a);
     m.def("decode_ambisonics_to_stereo", &decode_ambisonics_to_stereo, "input_audio"_a);
     m.def("airwindows_test", &process_airwindows);
-    m.def("generate_tone", &generate_tone, "tone_type"_a, "pitch"_a, "volume"_a, "samplerate"_a,
-          "duration"_a);
+    m.def("generate_tone", &generate_tone, "tone_type"_a, "pitch"_a, "sync"_a, "volume"_a,
+          "samplerate"_a, "duration"_a);
     m.def("generate_fmtone", &generate_fm, "carrierfreq"_a, "modulatorfreq"_a, "modulationamont"_a,
           "feedback"_a, "samplerate"_a, "duration"_a);
     m.def("generate_corrnoise", &generate_corrnoise);
@@ -739,11 +746,10 @@ void init_py4(py::module_ &m, py::module_ &m_const)
         .def_readwrite("volume", &GrainEvent::volume);
 
     py::class_<ToneGranulator>(m, "ToneGranulator")
-        .def(py::init<double, int, std::string, std::string, float, float>(), "sample_rate"_a,
-             "filter_routing"_a, "filter1type"_a, "filter2type"_a, "grain_tail_len"_a = 0.005,
-             "grain_tail_fade_len"_a = 0.005)
+        .def(py::init<>())
         .def("set_voice_aux_envelope", &ToneGranulator::set_voice_aux_envelope)
         .def("set_voice_gain_envelope", &ToneGranulator::set_voice_gain_envelope)
         .def("set_parameters", set_granulator_params)
-        .def("render", render_granulator, "event_list"_a, "outputmode"_a, "outputduration"_a = 0.0);
+        .def("render", render_granulator, "samplerate"_a, "event_list"_a, "outputmode"_a,
+             "outputduration"_a = 0.0);
 }

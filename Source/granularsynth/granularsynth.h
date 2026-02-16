@@ -1076,32 +1076,7 @@ class ToneGranulator
             }
         }
     }
-    void setStepSequenceStepsA(uint32_t seqIndex, std::vector<float> newsteps, int loopstart,
-                               int looplen)
-    {
-        /*
-        if (newsteps.size() > StepModSource::maxSteps)
-            return;
-        StepModSource::Message msg;
-        msg.dest = seqIndex;
-        if (newsteps.size() == 0)
-        {
-            msg.opcode = StepModSource::Message::OP_SETPARAMS;
-            msg.numsteps = newsteps.size();
-            msg.loopstart = loopstart;
-            msg.looplen = looplen;
-        }
-        if (newsteps.size() > 0)
-        {
-            msg.opcode = StepModSource::Message::OP_SETSTEPS;
-            msg.numsteps = newsteps.size();
-            msg.loopstart = loopstart;
-            msg.looplen = looplen;
-            std::copy(newsteps.begin(), newsteps.end(), msg.steps.begin());
-        }
-        fifo.push(msg);
-        */
-    }
+    
     /*
         stepModSources[0].setSteps(generate_from_js(R"(
         function generate_steps()
