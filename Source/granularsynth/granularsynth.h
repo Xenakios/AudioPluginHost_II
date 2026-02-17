@@ -949,8 +949,7 @@ class ToneGranulator
     events_t events_to_switch;
     events_t scheduledGrains;
     int scheduledIndex = 0;
-    int numToSchedule = 8;
-    float timeSpanToSchedule = 1.0f;
+
     float timeSpanCurve = 2.0f;
     std::atomic<int> thread_op{0};
 
@@ -999,7 +998,9 @@ class ToneGranulator
         PAR_GRAINVOLUME = 2000,
         PAR_NOISECORRELATION = 2100,
         PAR_AMBIDIFFUSION = 2200,
-        PAR_TEST = 2300,
+        PAR_STACKCOUNT = 2300,
+        PAR_STACKTIMESPAN = 2400,
+        PAR_STACKRANDOMPITCH = 2500,
         PAR_LFORATES = 100000,
         PAR_LFODEFORMS = 100100,
         PAR_LFOSHIFTS = 100200,
@@ -1322,12 +1323,27 @@ class ToneGranulator
                                    .withID(PAR_AMBIDIFFUSION)
                                    .withFlags(CLAP_PARAM_IS_MODULATABLE));
         parmetadatas.push_back(pmd()
-                                   .withRange(0.0f, 1.0f)
+                                   .asInt()
+                                   .withRange(1.0f, 16.0f)
+                                   .withDefault(1.0)
+                                   .withIntegerQuantization()
+                                   .withName("Stack count")
+                                   .withGroupName("Main")
+                                   .withID(PAR_STACKCOUNT));
+        parmetadatas.push_back(pmd()
+                                   .withRange(0.05f, 2.0f)
+                                   .withDefault(1.0)
+                                   .withLinearScaleFormatting("s", 1.0f)
+                                   .withName("Stack time spain")
+                                   .withGroupName("Main")
+                                   .withID(PAR_STACKTIMESPAN));
+        parmetadatas.push_back(pmd()
+                                   .withRange(0.0f, 12.0f)
                                    .withDefault(0.0)
-                                   .withLinearScaleFormatting("%", 100.0f)
-                                   .withName("Error test")
-                                   .withGroupName("Spatialization")
-                                   .withID(PAR_TEST)
+                                   .withLinearScaleFormatting("", 1.0f)
+                                   .withName("Stack pitch randomization")
+                                   .withGroupName("Main")
+                                   .withID(PAR_STACKRANDOMPITCH)
                                    .withFlags(CLAP_PARAM_IS_MODULATABLE));
         for (int i = 0; i < GranulatorModMatrix::numLfos; ++i)
         {
@@ -1623,13 +1639,16 @@ class ToneGranulator
                 genev.filterparams[1][1] =
                     modmatrix.m.getTargetValue(GranulatorModConfig::TargetIdentifier{PAR_F1RE});
                 genev.modamounts[GrainEvent::MD_PITCH] = grain_pitch_mod;
+                int numToSchedule = std::clamp(*idtoparvalptr[PAR_STACKCOUNT], 1.0f, 16.0f);
+                float pitchrand = *idtoparvalptr[PAR_STACKRANDOMPITCH];
+                float timeSpanToSchedule = *idtoparvalptr[PAR_STACKTIMESPAN];
                 for (int j = 0; j < numToSchedule; ++j)
                 {
                     double tpos = playposframes / this->m_sr;
                     double normpos = 1.0 / numToSchedule * j;
                     normpos = std::pow(normpos, 2.0);
                     tpos += timeSpanToSchedule * normpos;
-                    genev.pitch_semitones = pitch + rng.nextFloatInRange(-0.5f, 0.5f);
+                    genev.pitch_semitones = pitch + rng.nextFloatInRange(-pitchrand, pitchrand);
                     genev.time_position = tpos;
                     genev.volume = gvol * (1.0 - (0.5 * normpos));
                     scheduledGrains.push_back(genev);
