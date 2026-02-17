@@ -997,7 +997,6 @@ class ToneGranulator
         PAR_ENVMORPH = 1900,
         PAR_GRAINVOLUME = 2000,
         PAR_NOISECORRELATION = 2100,
-        PAR_AMBIDIFFUSION = 2200,
         PAR_STACKCOUNT = 2300,
         PAR_STACKTIMESPAN = 2400,
         PAR_STACKRANDOMPITCH = 2500,
@@ -1314,14 +1313,6 @@ class ToneGranulator
                                    .withName("Elevation")
                                    .withGroupName("Spatialization")
                                    .withID(PAR_ELEVATION)
-                                   .withFlags(CLAP_PARAM_IS_MODULATABLE));
-        parmetadatas.push_back(pmd()
-                                   .withRange(0.0f, 1.0f)
-                                   .withDefault(0.0)
-                                   .withLinearScaleFormatting("%", 100.0f)
-                                   .withName("Ambisonic Diffusion")
-                                   .withGroupName("Spatialization")
-                                   .withID(PAR_AMBIDIFFUSION)
                                    .withFlags(CLAP_PARAM_IS_MODULATABLE));
         parmetadatas.push_back(pmd()
                                    .asInt()
@@ -1658,14 +1649,27 @@ class ToneGranulator
                     double normpos = 1.0 / numToSchedule * j;
                     normpos = std::pow(normpos, 2.0);
                     tpos += timeSpanToSchedule * normpos;
-                    genev.pitch_semitones = pitch + rng.nextFloatInRange(-pitchrand, pitchrand);
                     genev.time_position = tpos;
-                    genev.azimuth = azimuth + rng.nextFloatInRange(-spatrand, spatrand);
-                    genev.elevation = elevation;
-                    genev.volume = gvol * (1.0 - (0.5 * normpos));
+                    // main grain parameters without randomization
+                    if (j == 0)
+                    {
+                        genev.pitch_semitones = pitch;
+                        genev.azimuth = azimuth;
+                        genev.elevation = elevation;
+                    }
+                    else
+                    {
+                        genev.pitch_semitones = pitch + rng.nextFloatInRange(-pitchrand, pitchrand);
+                        genev.azimuth = azimuth + rng.nextFloatInRange(-spatrand, spatrand);
+                        genev.elevation = elevation + rng.nextFloatInRange(-spatrand, spatrand);
+                    }
+                    // fading volume for now but should be more adjustable...
+                    genev.volume = gvol * (1.0f - (0.5f * normpos));
                     scheduledGrains.push_back(genev);
                     ++graincount;
                 }
+                // need to sort because we may have previous unstarted events and our
+                // playback scheduling logic needs the events sorted
                 std::sort(scheduledGrains.begin(), scheduledGrains.end(), [](auto &lhs, auto &rhs) {
                     return lhs.time_position < rhs.time_position;
                 });
@@ -1696,7 +1700,7 @@ class ToneGranulator
                                 stepModValues[sm] = stepModSources[sm].next();
                             voices[j]->grainid = graincount;
                             voices[j]->start(genev);
-                            float ambdif = *idtoparvalptr[PAR_AMBIDIFFUSION];
+                            float ambdif = 0.0f; // *idtoparvalptr[PAR_AMBIDIFFUSION];
                             if (ambdif > 0.0f)
                             {
                                 ambdif *= 0.1f;
