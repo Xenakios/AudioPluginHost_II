@@ -450,13 +450,15 @@ void AudioPluginAudioProcessorEditor::showFilterMenu(int whichfilter)
 
 void AudioPluginAudioProcessorEditor::timerCallback()
 {
-    infoLabel.setText(std::format("[CPU Load {:3.0f}%] [{}/{} voices] [{} in {} out]",
-                                  processorRef.perfMeasurer.getLoadAsPercentage(),
-                                  processorRef.granulator.numVoicesUsed.load(),
-                                  processorRef.granulator.numvoices,
-                                  processorRef.getTotalNumInputChannels(),
-                                  processorRef.getTotalNumOutputChannels()),
-                      juce::dontSendNotification);
+    infoLabel.setText(
+        std::format("[CPU Load {:3.0f}%] [{}/{} voices {}/{} scheduled] [{} in {} out]",
+                    processorRef.perfMeasurer.getLoadAsPercentage(),
+                    processorRef.granulator.numVoicesUsed.load(), processorRef.granulator.numvoices,
+                    processorRef.granulator.scheduledGrains.size(),
+                    processorRef.granulator.scheduledGrains.capacity(),
+                    processorRef.getTotalNumInputChannels(),
+                    processorRef.getTotalNumOutputChannels()),
+        juce::dontSendNotification);
     for (auto &c : stepcomps)
     {
         c->updateGUI();

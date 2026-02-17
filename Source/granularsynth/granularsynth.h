@@ -1669,10 +1669,15 @@ class ToneGranulator
                 std::sort(scheduledGrains.begin(), scheduledGrains.end(), [](auto &lhs, auto &rhs) {
                     return lhs.time_position < rhs.time_position;
                 });
-                std::print("{:.2f} : ", playposframes / m_sr);
-                for (auto &scgrain : scheduledGrains)
-                    std::print("{:.2f} ", scgrain.time_position);
-                std::print("\n");
+                const bool printschedulesevents = false;
+                if (printschedulesevents)
+                {
+                    std::print("{:.2f} : ", playposframes / m_sr);
+                    for (auto &scgrain : scheduledGrains)
+                        std::print("{:.2f} ", scgrain.time_position);
+                    std::print("\n");
+                }
+
                 for (size_t sm = 0; sm < stepModSources.size(); ++sm)
                 {
                     stepModValues[sm] = stepModSources[sm].next();
@@ -1812,7 +1817,7 @@ class ToneGranulator
                     {
                         if (!voices[j]->active)
                         {
-                            std::print("starting voice {} for scheduled event {}\n", j, evindex);
+                            // std::print("starting voice {} for scheduled event {}\n", j, evindex);
                             voices[j]->grainid = graincount;
                             voices[j]->start(*ev);
                             wasfound = true;

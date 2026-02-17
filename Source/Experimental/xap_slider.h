@@ -65,7 +65,7 @@ class XapSlider : public juce::Component
     void mouseWheelMove(const juce::MouseEvent &event,
                         const juce::MouseWheelDetails &wheel) override
     {
-        if (!isEnabled())
+        if (!isEnabled() || m_ed.isVisible())
             return;
         double delta = 0.0;
         if (wheel.deltaY < 0)
