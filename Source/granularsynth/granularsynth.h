@@ -948,9 +948,7 @@ class ToneGranulator
     events_t events;
     events_t events_to_switch;
     events_t scheduledGrains;
-    int scheduledIndex = 0;
-
-    float timeSpanCurve = 2.0f;
+    alignas(16) int scheduledIndex = 0;
     std::atomic<int> thread_op{0};
 
     int evindex = 0;
@@ -1001,6 +999,7 @@ class ToneGranulator
         PAR_STACKTIMESPAN = 2400,
         PAR_STACKRANDOMPITCH = 2500,
         PAR_STACKRANDOMSPATIALIZATION = 2600,
+        PAR_STACKTIMECURVE = 2700,
         PAR_LFORATES = 100000,
         PAR_LFODEFORMS = 100100,
         PAR_LFOSHIFTS = 100200,
@@ -1326,9 +1325,16 @@ class ToneGranulator
                                    .withRange(0.05f, 2.0f)
                                    .withDefault(1.0)
                                    .withLinearScaleFormatting("s", 1.0f)
-                                   .withName("Stack time spain")
+                                   .withName("Stack time span")
                                    .withGroupName("Main")
                                    .withID(PAR_STACKTIMESPAN));
+        parmetadatas.push_back(pmd()
+                                   .withRange(-1.0f, 1.0f)
+                                   .withDefault(0.0)
+                                   .withLinearScaleFormatting("", 1.0f)
+                                   .withName("Stack time curve")
+                                   .withGroupName("Main")
+                                   .withID(PAR_STACKTIMECURVE));
         parmetadatas.push_back(pmd()
                                    .withRange(0.0f, 12.0f)
                                    .withDefault(0.0)
@@ -1642,12 +1648,22 @@ class ToneGranulator
                 int numToSchedule = std::clamp(*idtoparvalptr[PAR_STACKCOUNT], 1.0f, 16.0f);
                 float pitchrand = *idtoparvalptr[PAR_STACKRANDOMPITCH];
                 float timeSpanToSchedule = *idtoparvalptr[PAR_STACKTIMESPAN];
+                float timeSpanCurve = *idtoparvalptr[PAR_STACKTIMECURVE];
                 float spatrand = *idtoparvalptr[PAR_STACKRANDOMSPATIALIZATION];
                 for (int j = 0; j < numToSchedule; ++j)
                 {
                     double tpos = playposframes / this->m_sr;
                     double normpos = 1.0 / numToSchedule * j;
-                    normpos = std::pow(normpos, 2.0);
+                    if (timeSpanCurve < 0.0f)
+                    {
+                        float ex = xenakios::mapvalue(timeSpanCurve, -1.0f, 0.0f, 4.0f, 1.0f);
+                        normpos = std::pow(normpos, ex);
+                    }
+                    else
+                    {
+                        float ex = xenakios::mapvalue(timeSpanCurve, 0.0f, 1.0f, 1.0f, 4.0f);
+                        normpos = 1.0f - std::pow(1.0f - normpos, ex);
+                    }
                     tpos += timeSpanToSchedule * normpos;
                     genev.time_position = tpos;
                     // main grain parameters without randomization
