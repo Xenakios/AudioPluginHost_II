@@ -947,6 +947,11 @@ class ToneGranulator
     std::vector<std::unique_ptr<GranulatorVoice>> voices;
     events_t events;
     events_t events_to_switch;
+    events_t scheduledGrains;
+    int scheduledIndex = 0;
+    int numToSchedule = 8;
+    float timeSpanToSchedule = 1.0f;
+    float timeSpanCurve = 2.0f;
     std::atomic<int> thread_op{0};
 
     int evindex = 0;
@@ -1076,7 +1081,7 @@ class ToneGranulator
             }
         }
     }
-    
+
     /*
         stepModSources[0].setSteps(generate_from_js(R"(
         function generate_steps()
@@ -1106,6 +1111,7 @@ class ToneGranulator
             midiCCMap[41 + i] = MIDICCSTART + 8 + i;
         }
         fifo.reset(1024);
+        scheduledGrains.reserve(2048);
         for (auto &v : stepModValues)
             v = 0.0f;
         auto sendfunc = [this](uint32_t destss, std::vector<float> values) {
@@ -1580,6 +1586,7 @@ class ToneGranulator
         {
             if (graingen_phase_prior > graingen_phase)
             {
+                std::erase_if(scheduledGrains, [](GrainEvent &e) { return e.time_position < 0.0; });
                 float pitch =
                     modmatrix.m.getTargetValue(GranulatorModConfig::TargetIdentifier{PAR_PITCH});
                 float gdur =
@@ -1616,35 +1623,58 @@ class ToneGranulator
                 genev.filterparams[1][1] =
                     modmatrix.m.getTargetValue(GranulatorModConfig::TargetIdentifier{PAR_F1RE});
                 genev.modamounts[GrainEvent::MD_PITCH] = grain_pitch_mod;
-                bool wasfound = false;
-                for (int j = 0; j < voices.size(); ++j)
+                for (int j = 0; j < numToSchedule; ++j)
                 {
-                    if (!voices[j]->active)
-                    {
-                        // std::print("starting voice {} alternating value {}\n", j,
-                        // alternatingValue);
-                        for (size_t sm = 0; sm < stepModSources.size(); ++sm)
-                            stepModValues[sm] = stepModSources[sm].next();
-                        voices[j]->grainid = graincount;
-                        voices[j]->start(genev);
-                        float ambdif = *idtoparvalptr[PAR_AMBIDIFFUSION];
-                        if (ambdif > 0.0f)
-                        {
-                            ambdif *= 0.1f;
-                            for (size_t coeff = 4; coeff < 16; ++coeff)
-                            {
-                                float diffamount = rng.nextHypCos(0.0f, ambdif);
-                                voices[j]->ambcoeffs[coeff] += diffamount;
-                            }
-                        }
-                        wasfound = true;
-                        ++graincount;
-                        break;
-                    }
+                    double tpos = playposframes / this->m_sr;
+                    double normpos = 1.0 / numToSchedule * j;
+                    normpos = std::pow(normpos, 2.0);
+                    tpos += timeSpanToSchedule * normpos;
+                    genev.pitch_semitones = pitch + rng.nextFloatInRange(-0.5f, 0.5f);
+                    genev.time_position = tpos;
+                    genev.volume = gvol * (1.0 - (0.5 * normpos));
+                    scheduledGrains.push_back(genev);
+                    ++graincount;
                 }
-                if (!wasfound)
+                std::sort(scheduledGrains.begin(), scheduledGrains.end(), [](auto &lhs, auto &rhs) {
+                    return lhs.time_position < rhs.time_position;
+                });
+                std::print("{:.2f} : ", playposframes / m_sr);
+                for (auto &scgrain : scheduledGrains)
+                    std::print("{:.2f} ", scgrain.time_position);
+                std::print("\n");
+                scheduledIndex = 0;
+                if (false)
                 {
-                    ++missedgrains;
+                    bool wasfound = false;
+                    for (int j = 0; j < voices.size(); ++j)
+                    {
+                        if (!voices[j]->active)
+                        {
+                            // std::print("starting voice {} alternating value {}\n", j,
+                            // alternatingValue);
+                            for (size_t sm = 0; sm < stepModSources.size(); ++sm)
+                                stepModValues[sm] = stepModSources[sm].next();
+                            voices[j]->grainid = graincount;
+                            voices[j]->start(genev);
+                            float ambdif = *idtoparvalptr[PAR_AMBIDIFFUSION];
+                            if (ambdif > 0.0f)
+                            {
+                                ambdif *= 0.1f;
+                                for (size_t coeff = 4; coeff < 16; ++coeff)
+                                {
+                                    float diffamount = rng.nextHypCos(0.0f, ambdif);
+                                    voices[j]->ambcoeffs[coeff] += diffamount;
+                                }
+                            }
+                            wasfound = true;
+                            ++graincount;
+                            break;
+                        }
+                    }
+                    if (!wasfound)
+                    {
+                        ++missedgrains;
+                    }
                 }
             }
             graingen_phase_prior = graingen_phase;
@@ -1736,6 +1766,36 @@ class ToneGranulator
             else
             {
                 generate_grain();
+                GrainEvent *ev = nullptr;
+                if (scheduledIndex < scheduledGrains.size())
+                    ev = &scheduledGrains[scheduledIndex];
+                while (ev &&
+                       std::floor(ev->time_position * m_sr) < playposframes + granul_block_size)
+                {
+                    bool wasfound = false;
+                    for (int j = 0; j < voices.size(); ++j)
+                    {
+                        if (!voices[j]->active)
+                        {
+                            std::print("starting voice {} for scheduled event {}\n", j, evindex);
+                            voices[j]->grainid = graincount;
+                            voices[j]->start(*ev);
+                            wasfound = true;
+                            ++graincount;
+                            break;
+                        }
+                    }
+                    ev->time_position = -1.0;
+                    if (!wasfound)
+                    {
+                        ++missedgrains;
+                    }
+                    ++scheduledIndex;
+                    if (scheduledIndex >= scheduledGrains.size())
+                        ev = nullptr;
+                    else
+                        ev = &scheduledGrains[scheduledIndex];
+                }
             }
             alignas(16) double mixsum[16][granul_block_size];
             for (int i = 0; i < 16; ++i)
