@@ -1001,6 +1001,7 @@ class ToneGranulator
         PAR_STACKCOUNT = 2300,
         PAR_STACKTIMESPAN = 2400,
         PAR_STACKRANDOMPITCH = 2500,
+        PAR_STACKRANDOMSPATIALIZATION = 2600,
         PAR_LFORATES = 100000,
         PAR_LFODEFORMS = 100100,
         PAR_LFOSHIFTS = 100200,
@@ -1345,6 +1346,14 @@ class ToneGranulator
                                    .withGroupName("Main")
                                    .withID(PAR_STACKRANDOMPITCH)
                                    .withFlags(CLAP_PARAM_IS_MODULATABLE));
+        parmetadatas.push_back(pmd()
+                                   .withRange(0.0f, 90.0f)
+                                   .withDefault(0.0)
+                                   .withLinearScaleFormatting("", 1.0f)
+                                   .withName("Stack spatialization randomization")
+                                   .withGroupName("Main")
+                                   .withID(PAR_STACKRANDOMSPATIALIZATION)
+                                   .withFlags(CLAP_PARAM_IS_MODULATABLE));
         for (int i = 0; i < GranulatorModMatrix::numLfos; ++i)
         {
             parmetadatas.push_back(pmd()
@@ -1612,9 +1621,9 @@ class ToneGranulator
                 GrainEvent genev{0.0, gdur, pitch, gvol};
                 genev.envelope_shape =
                     modmatrix.m.getTargetValue(GranulatorModConfig::TargetIdentifier{PAR_ENVMORPH});
-                genev.azimuth =
+                float azimuth =
                     modmatrix.m.getTargetValue(GranulatorModConfig::TargetIdentifier{PAR_AZIMUTH});
-                genev.elevation = modmatrix.m.getTargetValue(
+                float elevation = modmatrix.m.getTargetValue(
                     GranulatorModConfig::TargetIdentifier{PAR_ELEVATION});
                 genev.generator_type = osc_type;
                 float fm_pitch =
@@ -1642,6 +1651,7 @@ class ToneGranulator
                 int numToSchedule = std::clamp(*idtoparvalptr[PAR_STACKCOUNT], 1.0f, 16.0f);
                 float pitchrand = *idtoparvalptr[PAR_STACKRANDOMPITCH];
                 float timeSpanToSchedule = *idtoparvalptr[PAR_STACKTIMESPAN];
+                float spatrand = *idtoparvalptr[PAR_STACKRANDOMSPATIALIZATION];
                 for (int j = 0; j < numToSchedule; ++j)
                 {
                     double tpos = playposframes / this->m_sr;
@@ -1650,6 +1660,8 @@ class ToneGranulator
                     tpos += timeSpanToSchedule * normpos;
                     genev.pitch_semitones = pitch + rng.nextFloatInRange(-pitchrand, pitchrand);
                     genev.time_position = tpos;
+                    genev.azimuth = azimuth + rng.nextFloatInRange(-spatrand, spatrand);
+                    genev.elevation = elevation;
                     genev.volume = gvol * (1.0 - (0.5 * normpos));
                     scheduledGrains.push_back(genev);
                     ++graincount;
@@ -1661,6 +1673,10 @@ class ToneGranulator
                 for (auto &scgrain : scheduledGrains)
                     std::print("{:.2f} ", scgrain.time_position);
                 std::print("\n");
+                for (size_t sm = 0; sm < stepModSources.size(); ++sm)
+                {
+                    stepModValues[sm] = stepModSources[sm].next();
+                }
                 scheduledIndex = 0;
                 if (false)
                 {
