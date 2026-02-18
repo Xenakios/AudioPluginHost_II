@@ -1,6 +1,5 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
-#include "containers/choc_zlib.h"
 
 void StepSeqComponent::paint(juce::Graphics &g)
 {
@@ -67,15 +66,7 @@ bool StepSeqComponent::keyPressed(const juce::KeyPress &ev)
     };
     if (ev.getKeyCode() == 'R')
     {
-        juce::MemoryOutputStream ms;
-        juce::GZIPCompressorOutputStream os{ms};
-        for (auto &s : msrc.steps)
-        {
-            os.writeFloat(s);
-        }
-        os.flush();
-        auto b64txt = juce::Base64::toBase64(ms.getData(), ms.getDataSize());
-        DBG(b64txt);
+        
     }
     else if (ev.getKeyCode() == 'Y')
     {

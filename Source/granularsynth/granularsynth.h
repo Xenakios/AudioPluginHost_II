@@ -1132,12 +1132,12 @@ class ToneGranulator
 
         for (size_t i = 0; i < 4; ++i)
         {
-            stepModSources[4 + i].steps.resize(StepModSource::maxSteps);
+            stepModSources[4 + i].steps.resize(128);
             stepModSources[4 + i].numactivesteps = StepModSource::maxSteps;
             stepModSources[4 + i].loopstartstep = 0;
-            stepModSources[4 + i].looplen = StepModSource::maxSteps;
+            stepModSources[4 + i].looplen = 128;
         }
-        for (size_t i = 0; i < StepModSource::maxSteps; ++i)
+        for (size_t i = 0; i < 128; ++i)
         {
             stepModSources[4].steps[i] = rng.nextFloatInRange(-1.0f, 1.0f);
             stepModSources[5].steps[i] = rng.nextFloatInRange(-1.0f, 1.0f);
