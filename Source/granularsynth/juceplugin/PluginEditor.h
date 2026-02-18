@@ -249,6 +249,8 @@ struct StepSeqComponent : public juce::Component
         : gr(g), sindex(seqindex), threadPool(tp)
     {
         rng.seed(11400714819323198485ULL, 17 + sindex * 31);
+        editRange.setStart(0);
+        editRange.setLength(g->stepModSources[sindex].looplen);
         setWantsKeyboardFocus(true);
 
         addAndMakeVisible(unipolarBut);
@@ -360,6 +362,8 @@ struct ModulationRowComponent : public juce::Component
         curveDrop.rootNode.children.push_back(Node{"Linear", GranulatorModConfig::CURVE_LINEAR});
         curveDrop.rootNode.children.push_back(Node{"x^2", GranulatorModConfig::CURVE_SQUARE});
         curveDrop.rootNode.children.push_back(Node{"x^3", GranulatorModConfig::CURVE_CUBE});
+        curveDrop.rootNode.children.push_back(Node{"EXPSIN 1", GranulatorModConfig::CURVE_EXPSIN1});
+        curveDrop.rootNode.children.push_back(Node{"EXPSIN 2", GranulatorModConfig::CURVE_EXPSIN2});
         Node xornode{"XOR"};
         for (int i = 0; i < 4; ++i)
         {
@@ -489,9 +493,7 @@ class AudioPluginAudioProcessorEditor final : public juce::AudioProcessorEditor,
   private:
     // MyCustomLNF lnf;
     AudioPluginAudioProcessor &processorRef;
-    // std::vector<std::unique_ptr<GUIParam>> paramEntries;
     std::vector<std::unique_ptr<XapSlider>> paramComponents;
-    
     struct FilterInfo
     {
         sfpp::FilterModel filtermodel;
