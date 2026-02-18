@@ -1322,9 +1322,9 @@ class ToneGranulator
                                    .withGroupName("Main")
                                    .withID(PAR_STACKCOUNT));
         parmetadatas.push_back(pmd()
-                                   .withRange(0.05f, 2.0f)
-                                   .withDefault(1.0)
-                                   .withLinearScaleFormatting("s", 1.0f)
+                                   .withRange(0.0f, 1.0f)
+                                   .withDefault(0.5)
+                                   .withOffsetPowerFormatting("s", 0.05f, 1.95, 2.0f, 1.0f)
                                    .withName("Stack time span")
                                    .withGroupName("Main")
                                    .withID(PAR_STACKTIMESPAN));
@@ -1336,9 +1336,9 @@ class ToneGranulator
                                    .withGroupName("Main")
                                    .withID(PAR_STACKTIMECURVE));
         parmetadatas.push_back(pmd()
-                                   .withRange(0.0f, 12.0f)
+                                   .withRange(0.0f, 1.0f)
                                    .withDefault(0.0)
-                                   .withLinearScaleFormatting("", 1.0f)
+                                   .withOffsetPowerFormatting("st", 0.0f, 12.0f, 2.0f, 1.0f)
                                    .withName("Stack pitch randomization")
                                    .withGroupName("Main")
                                    .withID(PAR_STACKRANDOMPITCH)
@@ -1646,8 +1646,11 @@ class ToneGranulator
                     modmatrix.m.getTargetValue(GranulatorModConfig::TargetIdentifier{PAR_F1RE});
                 genev.modamounts[GrainEvent::MD_PITCH] = grain_pitch_mod;
                 int numToSchedule = std::clamp(*idtoparvalptr[PAR_STACKCOUNT], 1.0f, 16.0f);
-                float pitchrand = *idtoparvalptr[PAR_STACKRANDOMPITCH];
-                float timeSpanToSchedule = *idtoparvalptr[PAR_STACKTIMESPAN];
+                float pitchrand = std::clamp(*idtoparvalptr[PAR_STACKRANDOMPITCH], 0.0f, 1.0f);
+                pitchrand = 12.0f * std::pow(pitchrand, 2.0f);
+                float timeSpanToSchedule =
+                    std::clamp(*idtoparvalptr[PAR_STACKTIMESPAN], 0.0f, 1.0f);
+                timeSpanToSchedule = 0.05f + 1.95f * std::pow(timeSpanToSchedule, 2.0f);
                 float timeSpanCurve = *idtoparvalptr[PAR_STACKTIMECURVE];
                 float spatrand = *idtoparvalptr[PAR_STACKRANDOMSPATIALIZATION];
                 for (int j = 0; j < numToSchedule; ++j)
