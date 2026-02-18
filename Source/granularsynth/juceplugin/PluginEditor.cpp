@@ -307,8 +307,8 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor(AudioPluginAudi
 
     addAndMakeVisible(lfoTabs);
     lfoTabs.setCurrentTabIndex(0);
-    setLookAndFeel(&lnf);
-    updateAllFonts(*this, lnf.myFont);
+    // setLookAndFeel(&lnf);
+    // updateAllFonts(*this, lnf.myFont);
     setSize(1500, 700);
     startTimer(50);
 }

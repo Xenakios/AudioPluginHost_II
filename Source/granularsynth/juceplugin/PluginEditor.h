@@ -487,7 +487,7 @@ class AudioPluginAudioProcessorEditor final : public juce::AudioProcessorEditor,
     void resized() override;
 
   private:
-    MyCustomLNF lnf;
+    // MyCustomLNF lnf;
     AudioPluginAudioProcessor &processorRef;
     // std::vector<std::unique_ptr<GUIParam>> paramEntries;
     std::vector<std::unique_ptr<XapSlider>> paramComponents;
