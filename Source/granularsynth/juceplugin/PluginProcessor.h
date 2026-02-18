@@ -4,6 +4,45 @@
 #include "../granularsynth.h"
 #include "containers/choc_SingleReaderSingleWriterFIFO.h"
 
+inline std::string getHexDump(const void *data, size_t size)
+{
+    const unsigned char *p = static_cast<const unsigned char *>(data);
+    std::string output;
+
+    for (size_t i = 0; i < size; i += 16)
+    {
+        // 1. Format the offset (8 chars, hex, zero-padded)
+        output += std::format("{:08x}: ", i);
+
+        // 2. Format the hex bytes
+        for (size_t j = 0; j < 16; ++j)
+        {
+            if (i + j < size)
+            {
+                output += std::format("{:02x} ", p[i + j]);
+            }
+            else
+            {
+                output += "   "; // Alignment padding
+            }
+        }
+
+        output += " ";
+
+        // 3. Format printable ASCII
+        for (size_t j = 0; j < 16; ++j)
+        {
+            if (i + j < size)
+            {
+                unsigned char ch = p[i + j];
+                output += std::isprint(ch) ? static_cast<char>(ch) : '.';
+            }
+        }
+        output += "\n";
+    }
+    return output;
+}
+
 struct ParameterMessage
 {
     uint32_t id = 0;

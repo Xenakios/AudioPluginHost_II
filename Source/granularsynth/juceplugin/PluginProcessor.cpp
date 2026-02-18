@@ -329,19 +329,31 @@ void AudioPluginAudioProcessor::getStateInformation(juce::MemoryBlock &destData)
             modroutings.addArrayElement(routingstate);
         }
     }
+    // state.setMember("version", 666);
     state.setMember("modroutings", modroutings);
-    auto json = choc::json::toString(state);
-    destData.append(json.data(), json.size());
-    DBG(json);
+
+    auto sdata = state.serialise();
+
+    // DBG("choc serialized data size is " << sdata.data.size());
+    // auto dump = getHexDump(sdata.data.data(), sdata.data.size());
+    // DBG(dump);
+    // auto json = choc::json::toString(state);
+    destData.append(sdata.data.data(), sdata.data.size());
+    // DBG(json);
 }
 
 void AudioPluginAudioProcessor::setStateInformation(const void *data, int sizeInBytes)
 {
     try
     {
-        std::string json((char *)data, (char *)data + sizeInBytes);
-        // DBG(json);
-        auto state = choc::json::parse(json);
+        if (sizeInBytes < 1)
+            return;
+        choc::value::InputData idata{(const uint8_t *)data, (const uint8_t *)data + sizeInBytes};
+        auto state = choc::value::Value::deserialise(idata);
+
+        // std::string json((char *)data, (char *)data + sizeInBytes);
+        //  DBG(json);
+        // auto state = choc::json::parse(json);
         if (state.hasObjectMember("params"))
         {
             auto params = state["params"];

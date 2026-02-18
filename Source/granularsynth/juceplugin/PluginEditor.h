@@ -491,7 +491,7 @@ class AudioPluginAudioProcessorEditor final : public juce::AudioProcessorEditor,
     AudioPluginAudioProcessor &processorRef;
     // std::vector<std::unique_ptr<GUIParam>> paramEntries;
     std::vector<std::unique_ptr<XapSlider>> paramComponents;
-    juce::TextButton loadModulationSettingsBut;
+    
     struct FilterInfo
     {
         sfpp::FilterModel filtermodel;

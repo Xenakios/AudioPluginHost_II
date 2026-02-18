@@ -1,5 +1,6 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
+#include "containers/choc_zlib.h"
 
 void StepSeqComponent::paint(juce::Graphics &g)
 {
@@ -64,7 +65,19 @@ bool StepSeqComponent::keyPressed(const juce::KeyPress &ev)
         v = std::clamp(v + step, -1.0f, 1.0f);
         gr->fifo.push({StepModSource::Message::OP_SETSTEP, sindex, v, index});
     };
-    if (ev.getKeyCode() == 'Y')
+    if (ev.getKeyCode() == 'R')
+    {
+        juce::MemoryOutputStream ms;
+        juce::GZIPCompressorOutputStream os{ms};
+        for (auto &s : msrc.steps)
+        {
+            os.writeFloat(s);
+        }
+        os.flush();
+        auto b64txt = juce::Base64::toBase64(ms.getData(), ms.getDataSize());
+        DBG(b64txt);
+    }
+    else if (ev.getKeyCode() == 'Y')
     {
         autoSetLoop = !autoSetLoop;
         actionetaken = 1;
@@ -537,5 +550,4 @@ void AudioPluginAudioProcessorEditor::resized()
         modRowComps[i]->setBounds(1, yoffs + i * 26, getWidth() - 2, 25);
     }
     infoLabel.setBounds(0, getHeight() - 25, getWidth(), 24);
-    // loadModulationSettingsBut.setBounds(1, getHeight() - 25, 100, 24);
 }
