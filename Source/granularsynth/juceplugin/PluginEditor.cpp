@@ -249,7 +249,7 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor(AudioPluginAudi
         }
     }
 
-    for (int i = 0; i < 8; ++i)
+    for (int i = 0; i < 12; ++i)
     {
         auto modcomp = std::make_unique<ModulationRowComponent>(&processorRef.granulator);
         modcomp->modslotindex = i;
@@ -309,7 +309,7 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor(AudioPluginAudi
     lfoTabs.setCurrentTabIndex(0);
     // setLookAndFeel(&lnf);
     // updateAllFonts(*this, lnf.myFont);
-    setSize(1500, 700);
+    setSize(1500, 810);
     startTimer(50);
 }
 
