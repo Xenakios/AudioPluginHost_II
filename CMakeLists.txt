@@ -264,7 +264,8 @@ target_link_libraries(ToneGranulatorPlugin
     PUBLIC
         juce::juce_recommended_config_flags
         # juce::juce_recommended_lto_flags
-        juce::juce_recommended_warning_flags)
+        # juce::juce_recommended_warning_flags
+        )
 
 if(CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
     # target_compile_options(ToneGranulatorPlugin INTERFACE "$<$<COMPILE_LANGUAGE:CXX>:/Zc:__cplusplus;/Zc:char8_t->")

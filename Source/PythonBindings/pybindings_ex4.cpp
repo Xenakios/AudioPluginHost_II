@@ -293,22 +293,41 @@ inline std::vector<std::string> get_sst_filter_types()
     return result;
 }
 
-inline void set_granulator_params(ToneGranulator &gran, py::dict dict)
+inline void granulator_print_params(ToneGranulator &g)
 {
-    if (dict.contains("rate"))
-        *gran.idtoparvalptr[ToneGranulator::PAR_DENSITY] = dict["rate"].cast<double>();
-    if (dict.contains("pitch_center"))
-        *gran.idtoparvalptr[ToneGranulator::PAR_PITCH] = dict["pitch_center"].cast<double>();
-    if (dict.contains("duration"))
-        *gran.idtoparvalptr[ToneGranulator::PAR_DURATION] = dict["duration"].cast<double>();
-    if (dict.contains("fil0cutoff"))
-        *gran.idtoparvalptr[ToneGranulator::PAR_F0CO] = dict["fil0cutoff"].cast<double>();
-    if (dict.contains("fil0reson"))
-        *gran.idtoparvalptr[ToneGranulator::PAR_F0RE] = dict["fil0reson"].cast<double>();
-    if (dict.contains("env_shape"))
-        *gran.idtoparvalptr[ToneGranulator::PAR_ENVMORPH] = dict["env_shape"].cast<double>();
-    if (dict.contains("osc_type"))
-        *gran.idtoparvalptr[ToneGranulator::PAR_OSCTYPE] = dict["osc_type"].cast<int>();
+    for (const auto &p : g.parmetadatas)
+    {
+        std::print("{:12} {}/{} {}\n", p.id, p.groupName, p.name, p.defaultVal);
+    }
+}
+
+inline void granulator_set_param(ToneGranulator &gran, int64_t parid, float v)
+{
+    auto it = gran.idtoparvalptr.find(parid);
+    if (it != gran.idtoparvalptr.end())
+    {
+        *(it->second) = v;
+    }
+    else
+        throw std::runtime_error(std::format("parameter id {} does not exist", parid));
+}
+
+inline void granulator_set_modulation(ToneGranulator &g, int modslot, int modsource, int modvia,
+                                      double depth, int modcurve, int modtarget)
+{
+    if (modslot >= 0 && modslot < GranulatorModConfig::FixedMatrixSize)
+    {
+        g.modmatrix.rt.updateActiveAt(modslot, true);
+        g.modmatrix.rt.updateRoutingAt(modslot,
+                                       GranulatorModConfig::SourceIdentifier{(uint32_t)modsource},
+                                       GranulatorModConfig::SourceIdentifier{(uint32_t)modvia},
+                                       GranulatorModConfig::CurveIdentifier{modcurve},
+                                       GranulatorModConfig::TargetIdentifier{modtarget}, depth);
+        if (modvia == 0)
+        {
+            g.modmatrix.rt.routes[modslot].sourceVia = std::nullopt;
+        }
+    }
 }
 
 inline py::array_t<float> render_granulator(ToneGranulator &gran, double samplerate,
@@ -473,12 +492,13 @@ inline py::array_t<float> decode_ambisonics_to_stereo(const py::array_t<float> &
     alignas(32) float *readbufs[2];
     for (int i = 0; i < 2; ++i)
         readbufs[i] = (float *)input_audio.data(i);
+    const float midGain = 1.414f;
     for (int i = 0; i < frames; ++i)
     {
-        float m = readbufs[0][i];
+        float m = readbufs[0][i] * midGain;
         float s = readbufs[1][i];
-        writebufs[0][i] = m + s;
-        writebufs[1][i] = m - s;
+        writebufs[0][i] = (m + s) * 0.5f;
+        writebufs[1][i] = (m - s) * 0.5f;
     }
     return output_audio;
 }
@@ -749,7 +769,9 @@ void init_py4(py::module_ &m, py::module_ &m_const)
         .def(py::init<>())
         .def("set_voice_aux_envelope", &ToneGranulator::set_voice_aux_envelope)
         .def("set_voice_gain_envelope", &ToneGranulator::set_voice_gain_envelope)
-        .def("set_parameters", set_granulator_params)
+        .def("print_parameters", granulator_print_params)
+        .def("set_parameter", granulator_set_param)
+        .def("set_modulation", granulator_set_modulation)
         .def("render", render_granulator, "samplerate"_a, "event_list"_a, "outputmode"_a,
              "outputduration"_a = 0.0);
 }

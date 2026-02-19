@@ -1764,6 +1764,7 @@ class ToneGranulator
             graingen_phase_prior = 2.0;
             thread_op = 0;
         }
+        osc_type = *idtoparvalptr[ToneGranulator::PAR_OSCTYPE];
         handleStepSequencerMessages();
         bool self_generate = false;
         if (events.size() == 0)
