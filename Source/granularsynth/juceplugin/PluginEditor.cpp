@@ -66,7 +66,6 @@ bool StepSeqComponent::keyPressed(const juce::KeyPress &ev)
     };
     if (ev.getKeyCode() == 'R')
     {
-        
     }
     else if (ev.getKeyCode() == 'Y')
     {
@@ -344,6 +343,23 @@ void AudioPluginAudioProcessorEditor::fillDropWithFilters(int filterIndex, DropD
     drop.rootNode.text = rootText;
     std::map<std::string, DropDownComponent::Node *> nodemap;
     drop.rootNode.children.reserve(32);
+    auto inserttypes = GrainInsertFX::getAvailableModes();
+    int filterID = 0;
+    for (auto &mod : inserttypes)
+    {
+        if (!mod.groupname.empty() && !nodemap.contains(mod.groupname))
+        {
+            drop.rootNode.children.push_back({mod.groupname, filterID});
+            // filterInfoMap[filterID] = {mod};
+            ++filterID;
+            nodemap[mod.groupname] = &drop.rootNode.children.back();
+        }
+        if (!mod.groupname.empty())
+            nodemap[mod.groupname]->children.push_back({mod.displayname, filterID});
+        else
+            drop.rootNode.children.push_back({mod.displayname, filterID});
+    }
+#ifdef JUSTSSTFILTERS
     auto models = sfpp::Filter::availableModels();
     int filterID = 0;
     for (auto &mod : models)
@@ -387,6 +403,7 @@ void AudioPluginAudioProcessorEditor::fillDropWithFilters(int filterIndex, DropD
     }
 
     drop.setSelectedId(0);
+#endif
 }
 
 void AudioPluginAudioProcessorEditor::showFilterMenu(int whichfilter)

@@ -87,7 +87,10 @@ class GrainInsertFX
     {
         std::string displayname;
         std::string groupname;
-        std::string factoryname;
+        uint8_t mainmode = 0;
+        uint8_t awtype = 0;
+        sst::filtersplusplus::FilterModel sstmodel;
+        sst::filtersplusplus::ModelConfig sstconfig;
     };
     std::array<float, 12> paramvalues;
     alignas(32) sst::filtersplusplus::Filter sstfilter;
@@ -103,60 +106,64 @@ class GrainInsertFX
         delaylinememory.resize(4096);
     }
 
-    std::vector<ModeInfo> getAvailableModes()
+    static std::vector<ModeInfo> getAvailableModes()
     {
         std::vector<ModeInfo> result;
-        result.emplace_back("None", "", "none");
-        for (auto &gi : g_filter_infos)
+        result.emplace_back("None", "");
+        auto models = sfpp::Filter::availableModels();
+        for (auto &mo : models)
         {
-            result.emplace_back(gi.address, "SST Filters", "sstf/" + gi.address);
+            auto confs = sfpp::Filter::availableModelConfigurations(mo);
+            for (auto co : confs)
+            {
+                result.emplace_back(sfpp::toString(mo) + " " + sfpp::toString(co.pt),
+                                    sfpp::toString(mo), 1, 0, mo, co);
+            }
         }
-        result.emplace_back("BezEQ", "AirWindows", "aw/bezeq");
-        result.emplace_back("HipCrush", "AirWindows", "aw/hipcrush");
+        result.emplace_back("BezEQ", "AirWindows", 2, 0);
+        result.emplace_back("HipCrush", "AirWindows", 2, 1);
         return result;
     }
     void setMode(ModeInfo m)
     {
-        if (m.groupname.empty())
+        if (m.mainmode == 0)
         {
             std::fill(paramvalues.begin(), paramvalues.end(), 0.0f);
             mainmode = 0;
             numParams = 0;
         }
-        if (m.groupname == "SST Filters")
+        if (m.mainmode == 1)
         {
             mainmode = 1;
             numParams = 3;
             paramvalues[0] = 72.0;
             paramvalues[1] = 0.0;
             paramvalues[2] = 0.0;
-            sst::filtersplusplus::FilterModel model{sst::filtersplusplus::FilterModel::CytomicSVF};
-            sst::filtersplusplus::ModelConfig conf;
-            conf.pt = sst::filtersplusplus::Passband::LP;
-            auto reqdelaysize = sst::filtersplusplus::Filter::requiredDelayLinesSizes(model, conf);
+            auto reqdelaysize =
+                sst::filtersplusplus::Filter::requiredDelayLinesSizes(m.sstmodel, m.sstconfig);
             // std::print("filter {} requires {} samples of delay line\n", finfo.address,
             // reqdelaysize);
             if (reqdelaysize > delaylinememory.size())
                 delaylinememory.resize(reqdelaysize);
-            sstfilter.setFilterModel(model);
-            sstfilter.setModelConfiguration(conf);
+            sstfilter.setFilterModel(m.sstmodel);
+            sstfilter.setModelConfiguration(m.sstconfig);
             sstfilter.setSampleRateAndBlockSize(sr, blockSize);
             sstfilter.setMono();
             sstfilter.provideDelayLine(0, delaylinememory.data());
             if (!sstfilter.prepareInstance())
             {
-                std::print("could not prepare filter\n");
+                std::print("could not prepare filter {}\n", m.displayname);
             }
         }
-        if (m.groupname == "AirWindows")
+        if (m.mainmode == 2)
         {
-            mainmode = 0;
-            if (m.factoryname == "aw/bezeq")
+            mainmode = 2;
+            if (m.awtype == 0)
             {
                 awplugin = make_aw_safe<airwinconsolidated::BezEQ::BezEQ>(0);
                 numParams = airwinconsolidated::BezEQ::kNumParameters;
             }
-            else if (m.factoryname == "aw/hipcrush")
+            else if (m.awtype == 1)
             {
                 awplugin = make_aw_safe<airwinconsolidated::HipCrush::HipCrush>(0);
                 numParams = airwinconsolidated::HipCrush::kNumParameters;
@@ -181,14 +188,16 @@ class GrainInsertFX
     }
     void setParameter(uint32_t index, float v)
     {
+        assert(index < numParams);
+        paramvalues[index] = v;
         if (mainmode == 1)
         {
-            paramvalues[index] = v;
             sstfilter.makeCoefficients(0, paramvalues[0], paramvalues[1], paramvalues[2]);
         }
         else if (mainmode == 2)
         {
-            paramvalues[index] = v;
+            assert(awplugin);
+            awplugin->setParameter(index, v);
         }
     }
     void prepareBlock()
