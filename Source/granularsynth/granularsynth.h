@@ -598,7 +598,8 @@ class GranulatorVoice
                  sst::basic_blocks::dsp::EBSaw<>, sst::basic_blocks::dsp::EBPulse<>>
         theoscillator;
 
-    alignas(16) std::array<sst::filtersplusplus::Filter, 2> filters;
+    static constexpr size_t numInsertSlots = 4;
+    alignas(32) std::array<GrainInsertFX, numInsertSlots> insert_fx;
     int phase = 0;
     int grain_end_phase = 0;
     double sr = 0.0;
@@ -613,9 +614,7 @@ class GranulatorVoice
         FR_PARALLEL
     };
     FilterRouting filter_routing = FR_SERIAL;
-    std::array<double, 2> cutoffs = {0.0, 0.0};
-    std::array<double, 2> resons = {0.0, 0.0};
-    std::array<double, 2> filtextpars = {0.0, 0.0};
+
     alignas(16) std::array<double, 2> feedbacksignals = {0.0, 0.0};
     alignas(16) SimpleEnvelope<true> gain_envelope;
     alignas(16) SimpleEnvelope<false> aux_envelope;
@@ -630,31 +629,28 @@ class GranulatorVoice
     int grainid = 0;
     int ambisonic_order = 1;
     int num_outputchans = 0;
-    std::vector<float> delaylinememory;
+
     GranulatorVoice()
     {
-        delaylinememory.resize(16384);
         std::fill(ambcoeffs.begin(), ambcoeffs.end(), 0.0f);
         for (int i = 0; i < GrainEvent::MD_NUMDESTS; ++i)
             modamounts[i] = 0.0f;
     }
-    void set_samplerate(double hz) { sr = hz; }
-    void set_filter_type(size_t filtindex, const FilterInfo &finfo)
+    void set_samplerate(double hz)
     {
-        auto reqdelaysize =
-            sst::filtersplusplus::Filter::requiredDelayLinesSizes(finfo.model, finfo.modelconfig);
-        // std::print("filter {} requires {} samples of delay line\n", finfo.address, reqdelaysize);
-        if (reqdelaysize > delaylinememory.size())
-            delaylinememory.resize(reqdelaysize);
-        filters[filtindex].setFilterModel(finfo.model);
-        filters[filtindex].setModelConfiguration(finfo.modelconfig);
-        filters[filtindex].setSampleRateAndBlockSize(sr, granul_block_size);
-        filters[filtindex].setMono();
-        filters[filtindex].provideDelayLine(0, delaylinememory.data());
-        if (!filters[filtindex].prepareInstance())
-        {
-            std::print("could not prepare filter {}\n", filtindex);
-        }
+        sr = hz;
+        for (auto &fx : insert_fx)
+            fx.prepareInstance(sr, granul_block_size);
+    }
+    void set_insert_type(size_t filtindex, uint8_t mainmode, uint8_t awtype,
+                         sfpp::FilterModel model, sfpp::ModelConfig config)
+    {
+        GrainInsertFX::ModeInfo gmode;
+        gmode.mainmode = mainmode;
+        gmode.awtype = awtype;
+        gmode.sstmodel = model;
+        gmode.sstconfig = config;
+        insert_fx[filtindex].setMode(gmode);
     }
     void start(GrainEvent &evpars)
     {
@@ -734,12 +730,13 @@ class GranulatorVoice
         gain_envelope.start(grain_end_phase);
         aux_envelope.start(grain_end_phase);
 
-        for (size_t i = 0; i < filters.size(); ++i)
+        for (size_t i = 0; i < 2; ++i)
         {
-            filters[i].reset();
-            cutoffs[i] = std::clamp(evpars.filterparams[i][0] - 9.0f, -48.0f, 64.0f);
-            resons[i] = std::clamp(evpars.filterparams[i][1], 0.0f, 1.0f);
-            filtextpars[i] = std::clamp(evpars.filterparams[i][2], -1.0f, 1.0f);
+            insert_fx[i].reset();
+            insert_fx[i].paramvalues[0] =
+                std::clamp(evpars.filterparams[i][0] - 9.0f, -48.0f, 64.0f);
+            insert_fx[i].paramvalues[1] = std::clamp(evpars.filterparams[i][1], 0.0f, 1.0f);
+            insert_fx[i].paramvalues[2] = std::clamp(evpars.filterparams[i][2], -1.0f, 1.0f);
         }
         for (int i = 0; i < GrainEvent::MD_NUMDESTS; ++i)
             modamounts[i] = evpars.modamounts[i];
@@ -769,13 +766,13 @@ class GranulatorVoice
                 q.setFrequency(hz);
             },
             theoscillator);
-        for (size_t i = 0; i < filters.size(); ++i)
+        for (size_t i = 0; i < 2; ++i)
         {
             float cutoffmod = 0.0f;
             if (i == 0)
                 cutoffmod = modamounts[GrainEvent::MD_FIL0FREQ] * aux_env_value;
-            filters[i].makeCoefficients(0, cutoffs[i] + cutoffmod, resons[i], filtextpars[i]);
-            filters[i].prepareBlock();
+            // filters[i].makeCoefficients(0, cutoffs[i] + cutoffmod, resons[i], filtextpars[i]);
+            insert_fx[i].prepareBlock();
         }
         int envpeakpos = envshape * grain_end_phase;
         envpeakpos = std::clamp(envpeakpos, 16, grain_end_phase - 16);
@@ -825,17 +822,22 @@ class GranulatorVoice
             }
             if (filter_routing == FR_SERIAL)
             {
-                outsample = filters[0].processMonoSample(outsample + feedbacksignals[0]);
-                outsample = filters[1].processMonoSample(outsample);
-                feedbacksignals[0] = outsample * feedbackamt;
+                for (size_t insertIndex = 0; insertIndex < 2; ++insertIndex)
+                {
+                    outsample =
+                        insert_fx[insertIndex].processMonoSample(outsample + feedbacksignals[0]);
+                }
+                // feedbacksignals[0] = outsample * feedbackamt;
             }
             else if (filter_routing == FR_PARALLEL)
             {
+                /*
                 float split = outsample;
                 split = filters[0].processMonoSample(split + feedbacksignals[0]);
                 feedbacksignals[0] = split * feedbackamt;
                 outsample = filters[1].processMonoSample(outsample);
                 outsample = split + outsample;
+                */
             }
 
             float send1 = auxsend1 * outsample;
@@ -863,7 +865,7 @@ class GranulatorVoice
                 outputs[i * 16 + chan] = outsample * ambcoeffs[chan] * fadegain;
             }
         }
-        for (auto &f : filters)
+        for (auto &f : insert_fx)
             f.concludeBlock();
     }
 };
@@ -1469,60 +1471,19 @@ class ToneGranulator
     }
     std::array<sfpp::FilterModel, 2> filtersModels{sfpp::FilterModel(), sfpp::FilterModel()};
     std::array<sfpp::ModelConfig, 2> filtersConfigs{sfpp::ModelConfig(), sfpp::ModelConfig()};
-    void set_filter(int which, sfpp::FilterModel mo, sfpp::ModelConfig conf)
+    void set_filter(int which, uint8_t mainmode, uint8_t awtype, sfpp::FilterModel mo,
+                    sfpp::ModelConfig conf)
     {
-        FilterInfo finfo;
-        finfo.model = mo;
-        finfo.modelconfig = conf;
         filtersModels[which] = mo;
         filtersConfigs[which] = conf;
         for (int i = 0; i < numvoices; ++i)
         {
             auto &v = voices[i];
             // v->set_samplerate(sr);
-            v->set_filter_type(which, finfo);
+            v->set_insert_type(which, mainmode, awtype, mo, conf);
         }
     }
-    void initFilterri(double sr, int filter_routing, std::string filttype0, std::string filttype1,
-                      float taillen, float tailfadelen)
-    {
-        const FilterInfo *filter0info = nullptr;
-        const FilterInfo *filter1info = nullptr;
-        for (const auto &finfo : g_filter_infos)
-        {
-            if (finfo.address == filttype0)
-            {
-                filter0info = &finfo;
-                std::print("filter 0 is {}\n", finfo.address);
-            }
-            if (finfo.address == filttype1)
-            {
-                filter1info = &finfo;
-                std::print("filter 1 is {}\n", finfo.address);
-            }
-        }
-        if (!filter0info)
-        {
-            throw std::runtime_error(std::format(
-                "could not find filter 0 \"{}\", ensure the name is correct", filttype0));
-        }
-        if (!filter1info)
-        {
-            throw std::runtime_error(std::format(
-                "could not find filter 1 \"{}\", ensure the name is correct", filttype1));
-        }
 
-        for (int i = 0; i < numvoices; ++i)
-        {
-            auto &v = voices[i];
-            v->set_samplerate(sr);
-            v->set_filter_type(0, *filter0info);
-            v->set_filter_type(1, *filter1info);
-            v->filter_routing = (GranulatorVoice::FilterRouting)filter_routing;
-            v->tail_len = std::clamp(taillen, 0.0f, 5.0f);
-            v->tail_fade_len = std::clamp(tailfadelen, 0.0f, v->tail_len);
-        }
-    }
     void set_voice_aux_envelope(std::array<float, SimpleEnvelope<false>::maxnumsteps> env)
     {
         for (auto &v : voices)
@@ -1563,9 +1524,6 @@ class ToneGranulator
                 return e.time_position < 0.0 || (e.time_position + e.duration) > 120.0;
             });
         }
-        FilterInfo finfo;
-        finfo.model = sfpp::FilterModel::None;
-        finfo.modelconfig = sfpp::ModelConfig{};
         for (int i = 0; i < numvoices; ++i)
         {
             auto &v = voices[i];
@@ -1573,8 +1531,8 @@ class ToneGranulator
             v->filter_routing = (GranulatorVoice::FilterRouting)filter_routing;
             v->tail_len = tail_len;
             v->tail_fade_len = tail_fade_len;
-            v->set_filter_type(0, finfo);
-            v->set_filter_type(1, finfo);
+            v->set_insert_type(0, 0, 0, {}, {});
+            v->set_insert_type(1, 0, 0, {}, {});
         }
         next_samplerate = samplerate;
         next_ambisonics_order = ambisonics_order;

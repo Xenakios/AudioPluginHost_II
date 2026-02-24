@@ -167,7 +167,8 @@ void AudioPluginAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
         if (msg.opcode == ThreadMessage::OP_FILTERTYPE && msg.filterindex >= 0 &&
             msg.filterindex < 2)
         {
-            granulator.set_filter(msg.filterindex, msg.filtermodel, msg.filterconfig);
+            granulator.set_filter(msg.filterindex, msg.insertmainmode, msg.awtype, msg.filtermodel,
+                                  msg.filterconfig);
         }
 
         auto &mm = granulator.modmatrix;
@@ -223,7 +224,6 @@ void AudioPluginAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
         }
     }
     */
-    
 
     std::array<float, 16> adapter_block;
     std::fill(adapter_block.begin(), adapter_block.end(), 0.0f);

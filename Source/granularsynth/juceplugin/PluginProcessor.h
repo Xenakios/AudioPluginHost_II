@@ -29,6 +29,8 @@ struct ThreadMessage
     float depth = 0.0f;
     int moddest = -1;
     int16_t filterindex = -1;
+    uint8_t insertmainmode = 0;
+    uint8_t awtype = 0;
     sfpp::FilterModel filtermodel;
     sfpp::ModelConfig filterconfig;
 };

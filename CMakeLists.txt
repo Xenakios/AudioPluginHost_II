@@ -244,7 +244,12 @@ target_sources(ToneGranulatorPlugin
         Source/granularsynth/juceplugin/PluginProcessor.cpp
         Source/granularsynth/juceplugin/PluginEditor.cpp
         Source/granularsynth/js_impl.cpp
-)
+        libs/airwindows_limited/airwin_consolidated_base.cpp
+        libs/airwindows_limited/plugins/BezEQ.cpp
+        libs/airwindows_limited/plugins/BezEQProc.cpp
+        libs/airwindows_limited/plugins/HipCrush.cpp
+        libs/airwindows_limited/plugins/HipCrushProc.cpp
+)   
 
 target_compile_options(ToneGranulatorPlugin PRIVATE -Werror=return-type "$<$<COMPILE_LANGUAGE:CXX>:-fno-char8_t>")
 target_compile_definitions(ToneGranulatorPlugin
@@ -254,6 +259,7 @@ target_compile_definitions(ToneGranulatorPlugin
         JUCE_USE_CURL=0     # If you remove this, add `NEEDS_CURL TRUE` to the `juce_add_plugin` call
         JUCE_VST3_CAN_REPLACE_VST2=0
         JUCE_ASIO=1
+        _USE_MATH_DEFINES=1
         )
 
 target_link_libraries(ToneGranulatorPlugin

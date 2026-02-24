@@ -327,12 +327,12 @@ void AudioPluginAudioProcessorEditor::handleFilterSelection(int filterindex)
     if (it != filterInfoMap.end())
     {
         DBG(it->second.displayname);
-        return;
         ThreadMessage msg;
         msg.opcode = ThreadMessage::OP_FILTERTYPE;
         msg.filterindex = filterindex;
-        // msg.filtermodel = it->second.filtermodel;
-        // msg.filterconfig = it->second.filterconfig;
+        msg.insertmainmode = it->second.mainmode;
+        msg.filtermodel = it->second.sstmodel;
+        msg.filterconfig = it->second.sstconfig;
         processorRef.from_gui_fifo.push(msg);
     }
 }
@@ -507,9 +507,9 @@ void AudioPluginAudioProcessorEditor::timerCallback()
         {
             for (auto &e : filterInfoMap)
             {
-                /*
-                if (e.second.filtermodel == msg.filtermodel &&
-                    e.second.filterconfig == msg.filterconfig)
+                
+                if (e.second.sstmodel == msg.filtermodel &&
+                    e.second.sstconfig == msg.filterconfig)
                 {
                     if (msg.filterindex == 0)
                         filter1Drop.setSelectedId(e.first);
@@ -517,7 +517,7 @@ void AudioPluginAudioProcessorEditor::timerCallback()
                         filter2Drop.setSelectedId(e.first);
                     break;
                 }
-                */
+                
             }
         }
         if (msg.opcode == ThreadMessage::OP_MODROUTING && msg.modslot < modRowComps.size())

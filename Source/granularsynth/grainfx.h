@@ -122,7 +122,7 @@ class GrainInsertFX
                                     sfpp::toString(mo), 1, 0, mo, co);
             }
         }
-        
+
         return result;
     }
     void setMode(ModeInfo m)
@@ -182,6 +182,7 @@ class GrainInsertFX
             }
         }
     }
+    void reset() { sstfilter.reset(); }
     void prepareInstance(double sampleRate, size_t ablockSize)
     {
         sr = sampleRate;
@@ -204,7 +205,16 @@ class GrainInsertFX
     void prepareBlock()
     {
         if (mainmode == 1)
+        {
+            sstfilter.makeCoefficients(0, paramvalues[0], paramvalues[1], paramvalues[2]);
             sstfilter.prepareBlock();
+        }
+        else if (mainmode == 2)
+        {
+            assert(awplugin);
+            for (size_t i = 0; i < numParams; ++i)
+                awplugin->setParameter(i, paramvalues[i]);
+        }
     }
     float processMonoSample(float insample)
     {
