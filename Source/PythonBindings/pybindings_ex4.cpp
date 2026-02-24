@@ -13,9 +13,6 @@
 #include "sst/basic-blocks/dsp/SmoothingStrategies.h"
 #include <random>
 #include "../granularsynth/granularsynth.h"
-#include "airwin_consolidated_base.h"
-#include "plugins/BezEQ.h"
-#include "plugins/HipCrush.h"
 #include "../Common/xen_ambisonics.h"
 #include "gendyn.h"
 #include "../cli/xcli_utils.h"
@@ -415,18 +412,6 @@ inline py::array_t<float> render_granulator(ToneGranulator &gran, double sampler
     return output_audio;
 }
 
-// Chris has sometimes forgot to initialize variables, so with this we will get at least
-// zeros for those in the hopes that avoids problems
-template <typename AWType>
-[[nodiscard]] inline std::unique_ptr<AirwinConsolidatedBase> make_aw_safe(audioMasterCallback cb)
-{
-    static_assert(std::derived_from<AWType, AirwinConsolidatedBase>,
-                  "class must inherit from AirwinConsolidatedBase");
-    char *objbuffer = new char[sizeof(AWType)];
-    std::fill(objbuffer, objbuffer + sizeof(AWType), 0);
-    AirwinConsolidatedBase *ob = new (objbuffer) AWType(cb);
-    return std::unique_ptr<AirwinConsolidatedBase>(ob);
-}
 
 void process_airwindows(int index)
 {
