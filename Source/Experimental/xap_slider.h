@@ -167,10 +167,14 @@ class XapSlider : public juce::Component
             else
             {
                 g.setColour(juce::Colours::grey);
-                g.fillRect(100, 1, getWidth() - 100, getHeight() - 2);
-                g.setColour(juce::Colours::white);
-                g.drawText(*partext, 100, 0, getWidth() - 100, getHeight(),
-                           juce::Justification::centred);
+                int midx = getWidth() / 2;
+                g.fillRect(midx, 1, getWidth() - midx, getHeight() - 2);
+                if (hasKeyboardFocus(false))
+                    g.setColour(juce::Colours::cyan);
+                else
+                    g.setColour(juce::Colours::white);
+                g.drawText(*partext, midx + 2, 0, getWidth() - midx - 2, getHeight(),
+                           juce::Justification::centredLeft);
             }
         }
         else
