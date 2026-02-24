@@ -110,6 +110,8 @@ class GrainInsertFX
     {
         std::vector<ModeInfo> result;
         result.emplace_back("None", "");
+        result.emplace_back("BezEQ", "AirWindows", 2, 0);
+        result.emplace_back("HipCrush", "AirWindows", 2, 1);
         auto models = sfpp::Filter::availableModels();
         for (auto &mo : models)
         {
@@ -120,8 +122,7 @@ class GrainInsertFX
                                     sfpp::toString(mo), 1, 0, mo, co);
             }
         }
-        result.emplace_back("BezEQ", "AirWindows", 2, 0);
-        result.emplace_back("HipCrush", "AirWindows", 2, 1);
+        
         return result;
     }
     void setMode(ModeInfo m)

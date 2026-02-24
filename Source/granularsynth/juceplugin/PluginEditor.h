@@ -488,7 +488,7 @@ class AudioPluginAudioProcessorEditor final : public juce::AudioProcessorEditor,
         sfpp::FilterModel filtermodel;
         sfpp::ModelConfig filterconfig;
     };
-    std::map<int64_t, FilterInfo> filterInfoMap;
+    std::map<int64_t, GrainInsertFX::ModeInfo> filterInfoMap;
     DropDownComponent filter1Drop;
     DropDownComponent filter2Drop;
     void handleFilterSelection(int filterindex);

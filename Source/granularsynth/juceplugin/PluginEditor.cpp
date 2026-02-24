@@ -326,13 +326,13 @@ void AudioPluginAudioProcessorEditor::handleFilterSelection(int filterindex)
     auto it = filterInfoMap.find(c->selectedId);
     if (it != filterInfoMap.end())
     {
-        DBG(sfpp::toString(it->second.filtermodel)
-            << " " << sfpp::toString(it->second.filterconfig.pt));
+        DBG(it->second.displayname);
+        return;
         ThreadMessage msg;
         msg.opcode = ThreadMessage::OP_FILTERTYPE;
         msg.filterindex = filterindex;
-        msg.filtermodel = it->second.filtermodel;
-        msg.filterconfig = it->second.filterconfig;
+        // msg.filtermodel = it->second.filtermodel;
+        // msg.filterconfig = it->second.filterconfig;
         processorRef.from_gui_fifo.push(msg);
     }
 }
@@ -349,16 +349,23 @@ void AudioPluginAudioProcessorEditor::fillDropWithFilters(int filterIndex, DropD
     {
         if (!mod.groupname.empty() && !nodemap.contains(mod.groupname))
         {
-            drop.rootNode.children.push_back({mod.groupname, filterID});
-            // filterInfoMap[filterID] = {mod};
-            ++filterID;
+            drop.rootNode.children.push_back({mod.groupname, -1});
             nodemap[mod.groupname] = &drop.rootNode.children.back();
         }
         if (!mod.groupname.empty())
+        {
             nodemap[mod.groupname]->children.push_back({mod.displayname, filterID});
+            filterInfoMap[filterID] = mod;
+            ++filterID;
+        }
         else
+        {
             drop.rootNode.children.push_back({mod.displayname, filterID});
+            filterInfoMap[filterID] = mod;
+            ++filterID;
+        }
     }
+    drop.setSelectedId(0);
 #ifdef JUSTSSTFILTERS
     auto models = sfpp::Filter::availableModels();
     int filterID = 0;
@@ -500,6 +507,7 @@ void AudioPluginAudioProcessorEditor::timerCallback()
         {
             for (auto &e : filterInfoMap)
             {
+                /*
                 if (e.second.filtermodel == msg.filtermodel &&
                     e.second.filterconfig == msg.filterconfig)
                 {
@@ -509,6 +517,7 @@ void AudioPluginAudioProcessorEditor::timerCallback()
                         filter2Drop.setSelectedId(e.first);
                     break;
                 }
+                */
             }
         }
         if (msg.opcode == ThreadMessage::OP_MODROUTING && msg.modslot < modRowComps.size())
