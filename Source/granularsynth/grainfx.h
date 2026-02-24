@@ -118,7 +118,25 @@ class GrainInsertFX
             auto confs = sfpp::Filter::availableModelConfigurations(mo);
             for (auto co : confs)
             {
-                result.emplace_back(sfpp::toString(mo) + " " + sfpp::toString(co.pt),
+                auto [pt, st, dt, smt] = co;
+                std::string subname;
+                if (pt != sfpp::Passband::UNSUPPORTED)
+                {
+                    subname += " " + sfpp::toString(pt);
+                }
+                if (st != sfpp::Slope::UNSUPPORTED)
+                {
+                    subname += " " + sfpp::toString(st);
+                }
+                if (dt != sfpp::DriveMode::UNSUPPORTED)
+                {
+                    subname += " " + sfpp::toString(dt);
+                }
+                if (smt != sfpp::FilterSubModel::UNSUPPORTED)
+                {
+                    subname += " " + sfpp::toString(smt);
+                }
+                result.emplace_back(sfpp::toString(mo) + " " + subname,
                                     sfpp::toString(mo), 1, 0, mo, co);
             }
         }
@@ -127,6 +145,7 @@ class GrainInsertFX
     }
     void setMode(ModeInfo m)
     {
+        assert(sr > 0);
         if (m.mainmode == 0)
         {
             std::fill(paramvalues.begin(), paramvalues.end(), 0.0f);

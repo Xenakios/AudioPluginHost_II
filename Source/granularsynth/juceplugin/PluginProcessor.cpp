@@ -300,6 +300,8 @@ void AudioPluginAudioProcessor::getStateInformation(juce::MemoryBlock &destData)
     for (int i = 0; i < 2; ++i)
     {
         auto filterstate = choc::value::createObject("filterstate");
+        filterstate.setMember("mainmode", (int64_t)granulator.insertsMainModes[i]);
+        filterstate.setMember("awtype", (int64_t)granulator.insertsAWTypes[i]);
         filterstate.setMember("model", (int64_t)granulator.filtersModels[i]);
         filterstate.setMember("pt", (int64_t)granulator.filtersConfigs[i].pt);
         filterstate.setMember("st", (int64_t)granulator.filtersConfigs[i].st);
@@ -383,8 +385,12 @@ void AudioPluginAudioProcessor::setStateInformation(const void *data, int sizeIn
                     conf.st = (decltype(conf.st))filterstate["st"].getWithDefault(0);
                     conf.mt = (decltype(conf.mt))filterstate["mt"].getWithDefault(0);
                     conf.pt = (decltype(conf.pt))filterstate["pt"].getWithDefault(0);
+                    int mainmode = filterstate["mainmode"].getWithDefault(0);
+                    int awtype = filterstate["awtype"].getWithDefault(0);
                     ThreadMessage msg;
                     msg.opcode = ThreadMessage::OP_FILTERTYPE;
+                    msg.insertmainmode = mainmode;
+                    msg.awtype = awtype;
                     msg.filterindex = i;
                     msg.filtermodel = m;
                     msg.filterconfig = conf;

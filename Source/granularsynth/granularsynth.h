@@ -1469,6 +1469,8 @@ class ToneGranulator
         }
         init_filter_infos();
     }
+    std::array<size_t, 2> insertsMainModes = {0, 0};
+    std::array<size_t, 2> insertsAWTypes = {0, 0};
     std::array<sfpp::FilterModel, 2> filtersModels{sfpp::FilterModel(), sfpp::FilterModel()};
     std::array<sfpp::ModelConfig, 2> filtersConfigs{sfpp::ModelConfig(), sfpp::ModelConfig()};
     void set_filter(int which, uint8_t mainmode, uint8_t awtype, sfpp::FilterModel mo,
@@ -1476,6 +1478,8 @@ class ToneGranulator
     {
         filtersModels[which] = mo;
         filtersConfigs[which] = conf;
+        insertsMainModes[which] = mainmode;
+        insertsAWTypes[which] = awtype;
         for (int i = 0; i < numvoices; ++i)
         {
             auto &v = voices[i];
