@@ -38,7 +38,7 @@ class XapSlider : public juce::Component
         for (int i = 0; i < 9; ++i)
             m_snap_positions[i] = m_min_value + (m_max_value - m_min_value) / 8 * i;
         m_param_step = (m_max_value - m_min_value) / 64;
-        if (m_pardesc.type == ParamDesc::BOOL)
+        if (m_pardesc.type == ParamDesc::BOOL || m_pardesc.type == ParamDesc::INT)
             m_param_step = 1;
         keypress_to_step.emplace_back(
             juce::KeyPress(juce::KeyPress::leftKey, juce::ModifierKeys::noModifiers, 0),
@@ -137,15 +137,18 @@ class XapSlider : public juce::Component
         }
         double xforvalue =
             juce::jmap<double>(m_value, m_min_value, m_max_value, 2.0, getWidth() - 4.0);
-
-        if (hasKeyboardFocus(false))
-            g.setColour(juce::Colours::cyan);
-        else
+        if (m_pardesc.displayScale != ParamDesc::UNORDERED_MAP)
+        {
+            if (hasKeyboardFocus(false))
+                g.setColour(juce::Colours::cyan);
+            else
+                g.setColour(juce::Colours::lightgrey);
+            double h = getHeight() - 4;
+            g.fillEllipse(xforvalue - h / 2, 2, h, h);
             g.setColour(juce::Colours::lightgrey);
-        double h = getHeight() - 4;
-        g.fillEllipse(xforvalue - h / 2, 2, h, h);
-        g.setColour(juce::Colours::lightgrey);
-        g.drawRect(2, 0, getWidth() - 4, getHeight());
+            g.drawRect(2, 0, getWidth() - 4, getHeight());
+        }
+
         g.setColour(juce::Colours::white);
 
         g.drawText(m_labeltxt, 5, 0, getWidth() - 10, getHeight(),
@@ -156,7 +159,23 @@ class XapSlider : public juce::Component
         auto partext = valueToString(val);
         if (partext)
         {
-            g.drawText(*partext, 5, 0, getWidth() - 10, getHeight(),
+            if (m_pardesc.displayScale != ParamDesc::UNORDERED_MAP)
+            {
+                g.drawText(*partext, 5, 0, getWidth() - 10, getHeight(),
+                           juce::Justification::centredRight);
+            }
+            else
+            {
+                g.setColour(juce::Colours::grey);
+                g.fillRect(100, 1, getWidth() - 100, getHeight() - 2);
+                g.setColour(juce::Colours::white);
+                g.drawText(*partext, 100, 0, getWidth() - 100, getHeight(),
+                           juce::Justification::centred);
+            }
+        }
+        else
+        {
+            g.drawText("NO FMT (BUG)", 5, 0, getWidth() - 10, getHeight(),
                        juce::Justification::centredRight);
         }
     }
@@ -214,6 +233,17 @@ class XapSlider : public juce::Component
     {
         if (!isEnabled())
             return;
+        if (m_pardesc.displayScale == ParamDesc::UNORDERED_MAP)
+        {
+            juce::PopupMenu menu;
+            for (auto &e : m_pardesc.discreteValues)
+            {
+                menu.addItem(e.second, [e, this]() { setValue(e.first, true); });
+            }
+            menu.showMenuAsync(
+                juce::PopupMenu::Options{}.withTargetComponent(this).withMousePosition());
+            return;
+        }
         if (ev.mods.isMiddleButtonDown())
         {
             showTextEditor();

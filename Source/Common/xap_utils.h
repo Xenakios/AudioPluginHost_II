@@ -27,7 +27,8 @@ template <std::unsigned_integral T> inline clap_id to_clap_id(T x)
 
 namespace xenakios
 {
-
+// This will obviously blow up if pointer to invalid memory or a too large
+// size is passed in, so beware...
 inline std::string getHexDump(const void *data, size_t size)
 {
     const unsigned char *p = static_cast<const unsigned char *>(data);

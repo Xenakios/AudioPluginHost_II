@@ -771,7 +771,8 @@ void init_py4(py::module_ &m, py::module_ &m_const)
         .def("set_voice_gain_envelope", &ToneGranulator::set_voice_gain_envelope)
         .def("print_parameters", granulator_print_params)
         .def("set_parameter", granulator_set_param)
-        .def("set_modulation", granulator_set_modulation)
+        .def("set_modulation", granulator_set_modulation, "slot"_a, "src"_a, "via"_a, "depth"_a,
+             "curve"_a, "target"_a)
         .def("render", render_granulator, "samplerate"_a, "event_list"_a, "outputmode"_a,
              "outputduration"_a = 0.0);
 }

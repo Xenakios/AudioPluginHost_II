@@ -167,17 +167,6 @@ struct LFOComponent : public juce::Component
           shapeSlider(true, *g->idtoparmetadata[ToneGranulator::PAR_LFOSHAPES + index]),
           unipolarSlider(true, *g->idtoparmetadata[ToneGranulator::PAR_LFOUNIPOLARS + index])
     {
-        // addAndMakeVisible(shapeCombo);
-        /*
-        shapeCombo.addItem("SINE", 1);
-        // shapeCombo.addItem("RAMP", 2);
-        // shapeCombo.addItem("TRIANGLE", 4);
-        shapeCombo.addItem("SINE->SQUARE->TRIANGLE", 5);
-        shapeCombo.addItem("SMOOTH NOISE", 6);
-        shapeCombo.addItem("S&H NOISE", 7);
-        shapeCombo.addItem("DOWN->TRI->UP", 9);
-        shapeCombo.onChange = upfunc;
-        */
         addAndMakeVisible(rateSlider);
         rateSlider.OnValueChanged = [this]() {
             stateChangedCallback(rateSlider.getParamDescription().id, rateSlider.getValue());
