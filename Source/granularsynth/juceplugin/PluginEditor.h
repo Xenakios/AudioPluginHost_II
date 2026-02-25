@@ -468,7 +468,47 @@ struct ModulationRowComponent : public juce::Component
     DropDownComponent destDrop;
 };
 
-//==============================================================================
+class ParameterGroupComponent : public juce::GroupComponent
+{
+  public:
+    ParameterGroupComponent(juce::String groupName) : juce::GroupComponent{"", groupName} {}
+    void addSlider(std::unique_ptr<XapSlider> &&s)
+    {
+        addAndMakeVisible(s.get());
+        sliders.push_back(std::move(s));
+    }
+    void addHeaderComponent(juce::Component *c)
+    {
+        addAndMakeVisible(c);
+        headerComponents.push_back(c);
+    }
+    void resized() override
+    {
+        juce::FlexBox layout;
+        layout.flexDirection = juce::FlexBox::Direction::column;
+        layout.flexWrap = juce::FlexBox::Wrap::wrap;
+        for (int i = 0; i < headerComponents.size(); ++i)
+        {
+            layout.items.add(juce::FlexItem(*headerComponents[i])
+                                 .withFlex(1.0)
+                                 .withMinHeight(25)
+                                 .withMinWidth(50)
+                                 .withMaxWidth(getWidth()));
+        }
+        for (int i = 0; i < sliders.size(); ++i)
+        {
+            layout.items.add(juce::FlexItem(*sliders[i])
+                                 .withFlex(1.0)
+                                 .withMinHeight(25)
+                                 .withMinWidth(50)
+                                 .withMaxWidth(getWidth()));
+        }
+        layout.performLayout(juce::Rectangle<int>(7, 17, getWidth() - 14, getHeight() - 25));
+    }
+    std::vector<juce::Component *> headerComponents;
+    std::vector<std::unique_ptr<XapSlider>> sliders;
+};
+
 class AudioPluginAudioProcessorEditor final : public juce::AudioProcessorEditor, public juce::Timer
 {
   public:
@@ -482,6 +522,15 @@ class AudioPluginAudioProcessorEditor final : public juce::AudioProcessorEditor,
   private:
     // MyCustomLNF lnf;
     AudioPluginAudioProcessor &processorRef;
+    ParameterGroupComponent oscillatorComponent{"Oscillator"};
+    ParameterGroupComponent mainParamsComponent{"Main"};
+    ParameterGroupComponent spatParamsComponent{"Spatialization"};
+    ParameterGroupComponent miscParamsComponent{"Misc parameters"};
+    ParameterGroupComponent volumeParamsComponent{"Volume"};
+    ParameterGroupComponent timeParamsComponent{"Time"};
+    ParameterGroupComponent stackParamsComponent{"Stacking"};
+    ParameterGroupComponent insert1ParamsComponent{"Insert FX A"};
+    ParameterGroupComponent insert2ParamsComponent{"Insert FX B"};
     std::vector<std::unique_ptr<XapSlider>> paramComponents;
     struct FilterInfo
     {
@@ -489,8 +538,8 @@ class AudioPluginAudioProcessorEditor final : public juce::AudioProcessorEditor,
         sfpp::ModelConfig filterconfig;
     };
     std::map<int64_t, GrainInsertFX::ModeInfo> filterInfoMap;
-    DropDownComponent filter1Drop;
-    DropDownComponent filter2Drop;
+    std::unique_ptr<DropDownComponent> filter1Drop;
+    std::unique_ptr<DropDownComponent> filter2Drop;
     void handleFilterSelection(int filterindex);
     void fillDropWithFilters(int filterIndex, DropDownComponent &drop, std::string rootText);
     std::vector<std::unique_ptr<ModulationRowComponent>> modRowComps;

@@ -1273,7 +1273,7 @@ class ToneGranulator
                                    .withLinearScaleFormatting("ST")
                                    .withName("Filter 1 Frequency")
                                    .withID(PAR_F0CO)
-                                   .withGroupName("Filter 1")
+                                   .withGroupName("Insert A")
                                    .withFlags(CLAP_PARAM_IS_MODULATABLE));
         parmetadatas.push_back(pmd()
                                    .withRange(0.0, 1.0)
@@ -1281,7 +1281,7 @@ class ToneGranulator
                                    .withLinearScaleFormatting("%", 100.0f)
                                    .withName("Filter 1 Resonance")
                                    .withID(PAR_F0RE)
-                                   .withGroupName("Filter 1")
+                                   .withGroupName("Insert A")
                                    .withFlags(CLAP_PARAM_IS_MODULATABLE));
         parmetadatas.push_back(pmd()
                                    .withRange(-48.0, 64.0)
@@ -1289,7 +1289,7 @@ class ToneGranulator
                                    .withLinearScaleFormatting("ST")
                                    .withName("Filter 2 Frequency")
                                    .withID(PAR_F1CO)
-                                   .withGroupName("Filter 2")
+                                   .withGroupName("Insert B")
                                    .withFlags(CLAP_PARAM_IS_MODULATABLE));
         parmetadatas.push_back(pmd()
                                    .withRange(0.0, 1.0)
@@ -1297,7 +1297,7 @@ class ToneGranulator
                                    .withLinearScaleFormatting("%", 100.0f)
                                    .withName("Filter 2 Resonance")
                                    .withID(PAR_F1RE)
-                                   .withGroupName("Filter 2")
+                                   .withGroupName("Insert B")
                                    .withFlags(CLAP_PARAM_IS_MODULATABLE));
         parmetadatas.push_back(pmd()
                                    .withRange(-180.0f, 180.0f)
@@ -1321,28 +1321,28 @@ class ToneGranulator
                                    .withDefault(1.0)
                                    .withIntegerQuantization()
                                    .withName("Stack count")
-                                   .withGroupName("Main")
+                                   .withGroupName("Stacking")
                                    .withID(PAR_STACKCOUNT));
         parmetadatas.push_back(pmd()
                                    .withRange(0.0f, 1.0f)
                                    .withDefault(0.5)
                                    .withOffsetPowerFormatting("s", 0.05f, 1.95, 2.0f, 1.0f)
                                    .withName("Stack time span")
-                                   .withGroupName("Main")
+                                   .withGroupName("Stacking")
                                    .withID(PAR_STACKTIMESPAN));
         parmetadatas.push_back(pmd()
                                    .withRange(-1.0f, 1.0f)
                                    .withDefault(0.0)
                                    .withLinearScaleFormatting("", 1.0f)
                                    .withName("Stack time curve")
-                                   .withGroupName("Main")
+                                   .withGroupName("Stacking")
                                    .withID(PAR_STACKTIMECURVE));
         parmetadatas.push_back(pmd()
                                    .withRange(0.0f, 1.0f)
                                    .withDefault(0.0)
                                    .withOffsetPowerFormatting("st", 0.0f, 12.0f, 2.0f, 1.0f)
                                    .withName("Stack pitch randomization")
-                                   .withGroupName("Main")
+                                   .withGroupName("Stacking")
                                    .withID(PAR_STACKRANDOMPITCH)
                                    .withFlags(CLAP_PARAM_IS_MODULATABLE));
         parmetadatas.push_back(pmd()
@@ -1350,7 +1350,7 @@ class ToneGranulator
                                    .withDefault(0.0)
                                    .withLinearScaleFormatting("", 1.0f)
                                    .withName("Stack spatialization randomization")
-                                   .withGroupName("Main")
+                                   .withGroupName("Stacking")
                                    .withID(PAR_STACKRANDOMSPATIALIZATION)
                                    .withFlags(CLAP_PARAM_IS_MODULATABLE));
         for (int i = 0; i < GranulatorModMatrix::numLfos; ++i)
