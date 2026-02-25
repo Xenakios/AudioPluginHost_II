@@ -335,9 +335,9 @@ struct GrainEvent
     float fm_amount = 0.0f;
     float fm_feedback = 0.0f;
     float noisecorr = 0.0f;
-    float filterparams[2][3] = {{100.0f, 0.0, 0.0f}, {100.0f, 0.0, 0.0f}};
     float filterfeedback = 0.0f;
     float modamounts[MD_NUMDESTS];
+    float insertparams[4][12];
 };
 
 template <typename T> inline T degreesToRadians(T degrees) { return degrees * (M_PI / 180.0); }
@@ -599,7 +599,9 @@ class GranulatorVoice
         theoscillator;
 
     static constexpr size_t numInsertSlots = 4;
+    static constexpr size_t maxParamsPerInsert = 12;
     alignas(32) std::array<GrainInsertFX, numInsertSlots> insert_fx;
+
     int phase = 0;
     int grain_end_phase = 0;
     double sr = 0.0;
@@ -733,10 +735,21 @@ class GranulatorVoice
         for (size_t i = 0; i < 2; ++i)
         {
             insert_fx[i].reset();
-            insert_fx[i].paramvalues[0] =
-                std::clamp(evpars.filterparams[i][0] - 9.0f, -48.0f, 64.0f);
-            insert_fx[i].paramvalues[1] = std::clamp(evpars.filterparams[i][1], 0.0f, 1.0f);
-            insert_fx[i].paramvalues[2] = std::clamp(evpars.filterparams[i][2], -1.0f, 1.0f);
+            if (insert_fx[i].mainmode == 1)
+            {
+                float filtpitch =
+                    xenakios::mapvalue(evpars.insertparams[i][0], 0.0f, 1.0f, -48.0f, 72.0f);
+                insert_fx[i].paramvalues[0] = std::clamp(filtpitch - 9.0f, -48.0f, 64.0f);
+                insert_fx[i].paramvalues[1] = std::clamp(evpars.insertparams[i][1], 0.0f, 1.0f);
+                insert_fx[i].paramvalues[2] = std::clamp(evpars.insertparams[i][2], -1.0f, 1.0f);
+            }
+            else if (insert_fx[i].mainmode == 2)
+            {
+                for (size_t j = 0; j < GranulatorVoice::maxParamsPerInsert; ++j)
+                {
+                    insert_fx[i].paramvalues[j] = std::clamp(evpars.insertparams[i][j], 0.0f, 1.0f);
+                }
+            }
         }
         for (int i = 0; i < GrainEvent::MD_NUMDESTS; ++i)
             modamounts[i] = evpars.modamounts[i];
@@ -984,12 +997,10 @@ class ToneGranulator
         PAR_AZIMUTH = 600,
         PAR_ELEVATION = 700,
         PAR_DURATION = 800,
-        PAR_F0CO = 900,
-        PAR_F0RE = 1000,
-        PAR_F0EX = 1100,
-        PAR_F1CO = 1200,
-        PAR_F1RE = 1300,
-        PAR_F1EX = 1400,
+        PAR_INSERTAFIRST = 900,
+        PAR_INSERTBFIRST = PAR_INSERTAFIRST + 32,
+        PAR_INSERTCFIRST = PAR_INSERTBFIRST + 32,
+        PAR_INSERTDFIRST = PAR_INSERTCFIRST + 32,
         PAR_FMPITCH = 1500,
         PAR_FMDEPTH = 1600,
         PAR_FMFEEDBACK = 1700,
@@ -1279,38 +1290,26 @@ class ToneGranulator
                                    .withGroupName("Oscillator")
                                    .withID(PAR_NOISECORRELATION)
                                    .withFlags(CLAP_PARAM_IS_MODULATABLE));
-        parmetadatas.push_back(pmd()
-                                   .withRange(-48.0, 64.0)
-                                   .withDefault(0.0)
-                                   .withLinearScaleFormatting("ST")
-                                   .withName("Filter 1 Frequency")
-                                   .withID(PAR_F0CO)
-                                   .withGroupName("Insert A")
-                                   .withFlags(CLAP_PARAM_IS_MODULATABLE));
-        parmetadatas.push_back(pmd()
-                                   .withRange(0.0, 1.0)
-                                   .withDefault(0.0)
-                                   .withLinearScaleFormatting("%", 100.0f)
-                                   .withName("Filter 1 Resonance")
-                                   .withID(PAR_F0RE)
-                                   .withGroupName("Insert A")
-                                   .withFlags(CLAP_PARAM_IS_MODULATABLE));
-        parmetadatas.push_back(pmd()
-                                   .withRange(-48.0, 64.0)
-                                   .withDefault(0.0)
-                                   .withLinearScaleFormatting("ST")
-                                   .withName("Filter 2 Frequency")
-                                   .withID(PAR_F1CO)
-                                   .withGroupName("Insert B")
-                                   .withFlags(CLAP_PARAM_IS_MODULATABLE));
-        parmetadatas.push_back(pmd()
-                                   .withRange(0.0, 1.0)
-                                   .withDefault(0.0)
-                                   .withLinearScaleFormatting("%", 100.0f)
-                                   .withName("Filter 2 Resonance")
-                                   .withID(PAR_F1RE)
-                                   .withGroupName("Insert B")
-                                   .withFlags(CLAP_PARAM_IS_MODULATABLE));
+        for (size_t i = 0; i < GranulatorVoice::numInsertSlots; ++i)
+        {
+            auto groupname = std::format("Insert {}", char('A' + i));
+            for (size_t j = 0; j < GranulatorVoice::maxParamsPerInsert; ++j)
+            {
+                size_t insparid = PAR_INSERTAFIRST + 32 * i + j;
+                if (i == 3 && j == 0)
+                    assert(insparid == PAR_INSERTDFIRST);
+                auto insparname = std::format("Ins {} Par {}", char('A' + i), j);
+                parmetadatas.push_back(pmd()
+                                           .withRange(0.0, 1.0)
+                                           .withDefault(0.0)
+                                           .withLinearScaleFormatting("")
+                                           .withName(insparname)
+                                           .withID(insparid)
+                                           .withGroupName(groupname)
+                                           .withFlags(CLAP_PARAM_IS_MODULATABLE));
+            }
+        }
+
         parmetadatas.push_back(pmd()
                                    .withRange(-180.0f, 180.0f)
                                    .withDefault(0.0)
@@ -1611,14 +1610,17 @@ class ToneGranulator
                 genev.sync_ratio =
                     std::pow(2.0, modmatrix.m.getTargetValue(
                                       GranulatorModConfig::TargetIdentifier{PAR_OSC_SYNC}));
-                genev.filterparams[0][0] =
-                    modmatrix.m.getTargetValue(GranulatorModConfig::TargetIdentifier{PAR_F0CO});
-                genev.filterparams[0][1] =
-                    modmatrix.m.getTargetValue(GranulatorModConfig::TargetIdentifier{PAR_F0RE});
-                genev.filterparams[1][0] =
-                    modmatrix.m.getTargetValue(GranulatorModConfig::TargetIdentifier{PAR_F1CO});
-                genev.filterparams[1][1] =
-                    modmatrix.m.getTargetValue(GranulatorModConfig::TargetIdentifier{PAR_F1RE});
+                for (size_t j = 0; j < GranulatorVoice::numInsertSlots; ++j)
+                {
+                    auto numpars = voices.front()->insert_fx[j].numParams;
+                    for (size_t k = 0; k < numpars; ++k)
+                    {
+                        int insparid = PAR_INSERTAFIRST + 32 * j + k;
+                        genev.insertparams[j][k] = modmatrix.m.getTargetValue(
+                            GranulatorModConfig::TargetIdentifier{insparid});
+                    }
+                }
+
                 genev.modamounts[GrainEvent::MD_PITCH] = grain_pitch_mod;
                 int numToSchedule = std::clamp(*idtoparvalptr[PAR_STACKCOUNT], 1.0f, 16.0f);
                 float pitchrand = std::clamp(*idtoparvalptr[PAR_STACKRANDOMPITCH], 0.0f, 1.0f);

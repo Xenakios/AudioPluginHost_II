@@ -158,7 +158,7 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor(AudioPluginAudi
     lfoTabs.setCurrentTabIndex(0);
     // setLookAndFeel(&lnf);
     // updateAllFonts(*this, lnf.myFont);
-    setSize(1500, 810);
+    setSize(1500, 880);
     startTimer(50);
 }
 
@@ -392,9 +392,9 @@ void AudioPluginAudioProcessorEditor::resized()
     timeParamsComponent.setBounds(502, 0, 500, 125);
     spatParamsComponent.setBounds(0, 302, 500, 125);
     mainParamsComponent.setBounds(502, 302, 500, 125);
-    insert1ParamsComponent.setBounds(1004, 0, 500, 125);
-    insert2ParamsComponent.setBounds(1004, 126, 500, 125);
-    stackParamsComponent.setBounds(1004, 260, 500, 175);
+    insert1ParamsComponent.setBounds(1004, 0, 500, 150);
+    insert2ParamsComponent.setBounds(1004, 151, 500, 150);
+    stackParamsComponent.setBounds(1004, 302, 500, 175);
 
     lfoTabs.setBounds(0, mainParamsComponent.getBottom() + 1, getWidth(), 110);
 

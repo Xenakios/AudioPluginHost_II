@@ -501,7 +501,7 @@ class ParameterGroupComponent : public juce::GroupComponent
             layout.items.add(juce::FlexItem(*sliders[i])
                                  .withFlex(1.0)
                                  .withMargin(2.0)
-                                 .withMinHeight(25)
+                                 .withMinHeight(20)
                                  .withMinWidth(50)
                                  .withMaxWidth(getWidth()));
         }

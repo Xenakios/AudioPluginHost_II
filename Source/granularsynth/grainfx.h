@@ -136,8 +136,8 @@ class GrainInsertFX
                 {
                     subname += " " + sfpp::toString(smt);
                 }
-                result.emplace_back(sfpp::toString(mo) + " " + subname,
-                                    sfpp::toString(mo), 1, 0, mo, co);
+                result.emplace_back(sfpp::toString(mo) + " " + subname, sfpp::toString(mo), 1, 0,
+                                    mo, co);
             }
         }
 
@@ -156,7 +156,7 @@ class GrainInsertFX
         {
             mainmode = 1;
             numParams = 3;
-            paramvalues[0] = 72.0;
+            paramvalues[0] = 1.0;
             paramvalues[1] = 0.0;
             paramvalues[2] = 0.0;
             auto reqdelaysize =
@@ -246,11 +246,14 @@ class GrainInsertFX
         case 2:
         {
             assert(awplugin);
-            float *inputs[1] = {&insample};
-            float output = 0.0f;
-            float *outputs[1] = {&output};
+            float input0 = insample;
+            float input1 = insample;
+            float *inputs[2] = {&input0, &input1};
+            float output0 = 0.0f;
+            float output1 = 0.0f;
+            float *outputs[2] = {&output0, &output1};
             awplugin->processReplacing(inputs, outputs, 1);
-            return output;
+            return output0;
         }
         }
         return 0.0f;
