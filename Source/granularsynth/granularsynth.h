@@ -608,6 +608,7 @@ class GranulatorVoice
     bool active = false;
     float tail_len = 0.005;
     float tail_fade_len = 0.005;
+    float polarity_gain = 1.0f;
     int prior_osc_type = -1;
     alignas(16) std::array<float, 16> ambcoeffs;
     enum FilterRouting
@@ -831,7 +832,7 @@ class GranulatorVoice
                                                      (1.5f * M_PI));
                 }
                 envgain = std::clamp(envgain, 0.0f, 1.0f);
-                outsample *= envgain * graingain;
+                outsample *= envgain * graingain * polarity_gain;
             }
             if (filter_routing == FR_SERIAL)
             {
@@ -1837,6 +1838,10 @@ class ToneGranulator
                         if (!voices[j]->active)
                         {
                             // std::print("starting voice {} for scheduled event {}\n", j, evindex);
+                            if (graincount % 2 == 0)
+                                voices[j]->polarity_gain = 1.0f;
+                            else
+                                voices[j]->polarity_gain = -1.0f;
                             voices[j]->grainid = graincount;
                             voices[j]->tail_len = taillen;
                             voices[j]->tail_fade_len = std::clamp(taillen * 0.5, 0.002, 1.0);
