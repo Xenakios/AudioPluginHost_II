@@ -487,6 +487,7 @@ class ParameterGroupComponent : public juce::GroupComponent
         juce::FlexBox layout;
         layout.flexDirection = juce::FlexBox::Direction::column;
         layout.flexWrap = juce::FlexBox::Wrap::wrap;
+        
         for (int i = 0; i < headerComponents.size(); ++i)
         {
             layout.items.add(juce::FlexItem(*headerComponents[i])
@@ -499,6 +500,7 @@ class ParameterGroupComponent : public juce::GroupComponent
         {
             layout.items.add(juce::FlexItem(*sliders[i])
                                  .withFlex(1.0)
+                                 .withMargin(2.0)
                                  .withMinHeight(25)
                                  .withMinWidth(50)
                                  .withMaxWidth(getWidth()));
@@ -531,7 +533,6 @@ class AudioPluginAudioProcessorEditor final : public juce::AudioProcessorEditor,
     ParameterGroupComponent stackParamsComponent{"Stacking"};
     ParameterGroupComponent insert1ParamsComponent{"Insert FX A"};
     ParameterGroupComponent insert2ParamsComponent{"Insert FX B"};
-    std::vector<std::unique_ptr<XapSlider>> paramComponents;
     struct FilterInfo
     {
         sfpp::FilterModel filtermodel;

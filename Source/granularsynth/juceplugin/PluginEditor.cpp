@@ -395,22 +395,7 @@ void AudioPluginAudioProcessorEditor::resized()
     insert1ParamsComponent.setBounds(1004, 0, 500, 125);
     insert2ParamsComponent.setBounds(1004, 126, 500, 125);
     stackParamsComponent.setBounds(1004, 260, 500, 175);
-    /*
-    juce::FlexBox layout;
-    layout.flexDirection = juce::FlexBox::Direction::column;
-    layout.flexWrap = juce::FlexBox::Wrap::wrap;
 
-    for (int i = 0; i < paramComponents.size(); ++i)
-    {
-        layout.items.add(juce::FlexItem(*paramComponents[i])
-                             .withFlex(1.0)
-                             .withMinHeight(25)
-                             .withMinWidth(50)
-                             .withMaxWidth(getWidth() / 2));
-    }
-
-    layout.performLayout(juce::Rectangle<int>(0, 125, getWidth(), 330));
-    */
     lfoTabs.setBounds(0, mainParamsComponent.getBottom() + 1, getWidth(), 110);
 
     int yoffs = lfoTabs.getBottom() + 1;
