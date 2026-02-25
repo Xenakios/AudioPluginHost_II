@@ -118,8 +118,10 @@ pybind11_add_module(xenakios
     libs/airwindows_limited/plugins/BezEQProc.cpp
     libs/airwindows_limited/plugins/HipCrush.cpp
     libs/airwindows_limited/plugins/HipCrushProc.cpp
-    
+    libs/airwindows_limited/plugins/kWoodRoom.cpp
+    libs/airwindows_limited/plugins/kWoodRoomProc.cpp
 )
+
 # Source/Experimental/xaudiograph.cpp
 # target_link_libraries(xenakios PRIVATE juce::juce_core juce::juce_audio_utils)
 target_compile_options(xenakios PRIVATE -Werror=return-type)
@@ -249,6 +251,8 @@ target_sources(ToneGranulatorPlugin
         libs/airwindows_limited/plugins/BezEQProc.cpp
         libs/airwindows_limited/plugins/HipCrush.cpp
         libs/airwindows_limited/plugins/HipCrushProc.cpp
+        libs/airwindows_limited/plugins/kWoodRoom.cpp
+        libs/airwindows_limited/plugins/kWoodRoomProc.cpp
 )   
 
 target_compile_options(ToneGranulatorPlugin PRIVATE -Werror=return-type "$<$<COMPILE_LANGUAGE:CXX>:-fno-char8_t>")

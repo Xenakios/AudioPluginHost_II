@@ -5,6 +5,7 @@
 #include "airwin_consolidated_base.h"
 #include "plugins/BezEQ.h"
 #include "plugins/HipCrush.h"
+#include "plugins/kWoodRoom.h"
 
 namespace sfpp = sst::filtersplusplus;
 struct FilterInfo
@@ -112,6 +113,7 @@ class GrainInsertFX
         result.emplace_back("None", "");
         result.emplace_back("BezEQ", "AirWindows", 2, 0);
         result.emplace_back("HipCrush", "AirWindows", 2, 1);
+        result.emplace_back("KWoodRoom", "AirWindows", 2, 2);
         auto models = sfpp::Filter::availableModels();
         for (auto &mo : models)
         {
@@ -188,6 +190,11 @@ class GrainInsertFX
             {
                 awplugin = make_aw_safe<airwinconsolidated::HipCrush::HipCrush>(0);
                 numParams = airwinconsolidated::HipCrush::kNumParameters;
+            }
+            else if (m.awtype == 2)
+            {
+                awplugin = make_aw_safe<airwinconsolidated::kWoodRoom::kWoodRoom>(0);
+                numParams = airwinconsolidated::kWoodRoom::kNumParameters;
             }
             if (awplugin)
             {

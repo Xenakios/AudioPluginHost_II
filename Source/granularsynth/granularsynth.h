@@ -997,6 +997,7 @@ class ToneGranulator
         PAR_AZIMUTH = 600,
         PAR_ELEVATION = 700,
         PAR_DURATION = 800,
+        PAR_GRAINTAIL = 850,
         PAR_INSERTAFIRST = 900,
         PAR_INSERTBFIRST = PAR_INSERTAFIRST + 32,
         PAR_INSERTCFIRST = PAR_INSERTBFIRST + 32,
@@ -1223,6 +1224,14 @@ class ToneGranulator
                                    .withGroupName("Time")
                                    .withID(PAR_DURATION)
                                    .withFlags(CLAP_PARAM_IS_MODULATABLE));
+        parmetadatas.push_back(pmd()
+                                   .withRange(0.0f, 1.0f)
+                                   .withDefault(0.0f)
+                                   .withOffsetPowerFormatting("ms", 0.002f, 0.998f, 3.0f, 1000.0f)
+                                   .withDecimalPlaces(0)
+                                   .withName("Tail")
+                                   .withGroupName("Time")
+                                   .withID(PAR_GRAINTAIL));
         parmetadatas.push_back(pmd()
                                    .withRange(0.0f, 1.0f)
                                    .withDefault(0.5f)
@@ -1526,8 +1535,7 @@ class ToneGranulator
     int next_ambisonics_order = -1;
     std::string next_filt0type;
     std::string next_filt1type;
-    float next_tail_len = 0.0f;
-    float next_tail_fade_len = 0.0f;
+
     void prepare(float samplerate, events_t evlist, int ambisonics_order, int filter_routing,
                  float tail_len, float tail_fade_len)
     {
@@ -1750,6 +1758,8 @@ class ToneGranulator
             thread_op = 0;
         }
         osc_type = *idtoparvalptr[ToneGranulator::PAR_OSCTYPE];
+        float taillen = *idtoparvalptr[PAR_GRAINTAIL];
+        taillen = 0.002 + 0.998 * std::pow(taillen, 3.0);
         handleStepSequencerMessages();
         bool self_generate = false;
         if (events.size() == 0)
@@ -1828,6 +1838,8 @@ class ToneGranulator
                         {
                             // std::print("starting voice {} for scheduled event {}\n", j, evindex);
                             voices[j]->grainid = graincount;
+                            voices[j]->tail_len = taillen;
+                            voices[j]->tail_fade_len = std::clamp(taillen * 0.5, 0.002, 1.0);
                             voices[j]->start(*ev);
                             wasfound = true;
                             ++graincount;
