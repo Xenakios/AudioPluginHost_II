@@ -177,7 +177,8 @@ class GrainInsertFX
         }
         if (m.mainmode == 2)
         {
-            mainmode = 2;
+            mainmode = 0;
+            numParams = 0;
             if (m.awtype == 0)
             {
                 awplugin = make_aw_safe<airwinconsolidated::BezEQ::BezEQ>(0);
@@ -194,6 +195,7 @@ class GrainInsertFX
                 awplugin->setNumInputs(1);
                 awplugin->setNumOutputs(1);
                 awplugin->setSampleRate(sr);
+                std::fill(paramvalues.begin(), paramvalues.end(), 0.0f);
                 for (size_t i = 0; i < numParams; ++i)
                 {
                     paramvalues[i] = awplugin->getParameter(i);

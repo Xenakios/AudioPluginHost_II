@@ -177,6 +177,7 @@ void AudioPluginAudioProcessorEditor::handleFilterSelection(int filterindex)
         msg.opcode = ThreadMessage::OP_FILTERTYPE;
         msg.filterindex = filterindex;
         msg.insertmainmode = it->second.mainmode;
+        msg.awtype = it->second.awtype;
         msg.filtermodel = it->second.sstmodel;
         msg.filterconfig = it->second.sstconfig;
         processorRef.from_gui_fifo.push(msg);

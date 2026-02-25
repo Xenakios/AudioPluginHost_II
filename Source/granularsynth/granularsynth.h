@@ -1496,6 +1496,14 @@ class ToneGranulator
             auto &v = voices[i];
             // v->set_samplerate(sr);
             v->set_insert_type(which, mainmode, awtype, mo, conf);
+            if (i == 0)
+            {
+                for (size_t j = 0; j < 12; ++j)
+                {
+                    int parid = PAR_INSERTAFIRST + 32 * which + j;
+                    *idtoparvalptr[parid] = v->insert_fx[which].paramvalues[j];
+                }
+            }
         }
     }
 

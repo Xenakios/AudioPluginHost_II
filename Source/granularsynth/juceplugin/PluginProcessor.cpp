@@ -169,6 +169,14 @@ void AudioPluginAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
         {
             granulator.set_filter(msg.filterindex, msg.insertmainmode, msg.awtype, msg.filtermodel,
                                   msg.filterconfig);
+            for (size_t i = 0; i < 12; ++i)
+            {
+                ParameterMessage omsg;
+                int parid = ToneGranulator::PAR_INSERTAFIRST + 32 * msg.filterindex + i;
+                omsg.id = parid;
+                omsg.value = *granulator.idtoparvalptr[parid];
+                params_to_gui_fifo.push(omsg);
+            }
         }
 
         auto &mm = granulator.modmatrix;
