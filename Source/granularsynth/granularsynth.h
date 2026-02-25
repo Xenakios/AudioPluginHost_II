@@ -1002,6 +1002,7 @@ class ToneGranulator
         PAR_STACKRANDOMPITCH = 2500,
         PAR_STACKRANDOMSPATIALIZATION = 2600,
         PAR_STACKTIMECURVE = 2700,
+        PAR_VOLENVTYPE = 2800,
         PAR_LFORATES = 100000,
         PAR_LFODEFORMS = 100100,
         PAR_LFOSHIFTS = 100200,
@@ -1215,10 +1216,21 @@ class ToneGranulator
                                    .withRange(0.0f, 1.0f)
                                    .withDefault(0.5f)
                                    .withLinearScaleFormatting("%", 100.0f)
-                                   .withName("Env Morph")
+                                   .withName("Volume Envelope Morph")
                                    .withGroupName("Volume")
                                    .withID(PAR_ENVMORPH)
                                    .withFlags(CLAP_PARAM_IS_MODULATABLE));
+        parmetadatas.push_back(pmd()
+                                   .withUnorderedMapFormatting(
+                                       {
+                                           {0, "LINEAR PEAKING"},
+                                           {1, "EXPONENTIAL PEAKING"},
+                                       },
+                                       true)
+                                   .withDefault(0.0)
+                                   .withName("Volume Envelope Type")
+                                   .withGroupName("Volume")
+                                   .withID(PAR_VOLENVTYPE));
         parmetadatas.push_back(pmd()
                                    .withRange(-48.0, 48.0)
                                    .withDefault(0.0)
@@ -1578,6 +1590,7 @@ class ToneGranulator
                 float gvol = modmatrix.m.getTargetValue(
                     GranulatorModConfig::TargetIdentifier{PAR_GRAINVOLUME});
                 GrainEvent genev{0.0, gdur, pitch, gvol};
+                genev.envelope_type = *idtoparvalptr[PAR_VOLENVTYPE];
                 genev.envelope_shape =
                     modmatrix.m.getTargetValue(GranulatorModConfig::TargetIdentifier{PAR_ENVMORPH});
                 float azimuth =
