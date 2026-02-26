@@ -232,6 +232,12 @@ add_library(AWLIMITED
     libs/airwindows_limited/plugins/kWoodRoomProc.cpp
     libs/airwindows_limited/plugins/RingModulator.cpp
     libs/airwindows_limited/plugins/RingModulatorProc.cpp
+    libs/airwindows_limited/plugins/PrimeFIR.cpp
+    libs/airwindows_limited/plugins/PrimeFIRProc.cpp
+    libs/airwindows_limited/plugins/Hypersoft.cpp
+    libs/airwindows_limited/plugins/HypersoftProc.cpp
+    libs/airwindows_limited/plugins/DeRez3.cpp
+    libs/airwindows_limited/plugins/DeRez3Proc.cpp
 )
 
 target_compile_definitions(AWLIMITED PUBLIC _USE_MATH_DEFINES=1)

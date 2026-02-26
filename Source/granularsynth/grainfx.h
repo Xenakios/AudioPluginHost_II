@@ -7,6 +7,10 @@
 #include "plugins/HipCrush.h"
 #include "plugins/kWoodRoom.h"
 #include "plugins/RingModulator.h"
+#include "plugins/PrimeFIR.h"
+#include "plugins/Hypersoft.h"
+#include "plugins/DeRez3.h"
+#include <print>
 
 namespace sfpp = sst::filtersplusplus;
 struct FilterInfo
@@ -116,6 +120,9 @@ class GrainInsertFX
         result.emplace_back("AW HipCrush", "AirWindows", 2, 1);
         result.emplace_back("AW KWoodRoom", "AirWindows", 2, 2);
         result.emplace_back("AW RingModulator", "AirWindows", 2, 3);
+        result.emplace_back("AW PrimeFIR", "AirWindows", 2, 4);
+        result.emplace_back("AW Hypersoft", "AirWindows", 2, 5);
+        result.emplace_back("AW DeRez3", "AirWindows", 2, 6);
         auto models = sfpp::Filter::availableModels();
         for (auto &mo : models)
         {
@@ -202,6 +209,21 @@ class GrainInsertFX
             {
                 awplugin = make_aw_safe<airwinconsolidated::RingModulator::RingModulator>(0);
                 numParams = airwinconsolidated::RingModulator::kNumParameters;
+            }
+            else if (m.awtype == 4)
+            {
+                awplugin = make_aw_safe<airwinconsolidated::PrimeFIR::PrimeFIR>(0);
+                numParams = airwinconsolidated::PrimeFIR::kNumParameters;
+            }
+            else if (m.awtype == 5)
+            {
+                awplugin = make_aw_safe<airwinconsolidated::Hypersoft::Hypersoft>(0);
+                numParams = airwinconsolidated::Hypersoft::kNumParameters;
+            }
+            else if (m.awtype == 6)
+            {
+                awplugin = make_aw_safe<airwinconsolidated::DeRez3::DeRez3>(0);
+                numParams = airwinconsolidated::DeRez3::kNumParameters;
             }
             if (awplugin)
             {
