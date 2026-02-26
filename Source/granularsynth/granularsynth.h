@@ -75,7 +75,9 @@ struct GranulatorModConfig
         CURVE_XOR6,
         CURVE_XOR7,
         CURVE_XOR8,
-        CURVE_BITMIRROR
+        CURVE_BITMIRROR,
+        CURVE_BIPOLARTOUNIPOLAR,
+        CURVE_UNIPOLARTOBIPOLAR
     };
     static float xor_curve(float x, uint16_t a)
     {
@@ -148,6 +150,10 @@ struct GranulatorModConfig
             return [](auto x) { return xor_curve(x, 255); };
         case CURVE_BITMIRROR:
             return [](auto x) { return bit_reversal_curve(x); };
+        case CURVE_UNIPOLARTOBIPOLAR:
+            return [](auto x) { return std::clamp(-1.0f + 2.0f * x, -1.0f, 1.0f); };
+        case CURVE_BIPOLARTOUNIPOLAR:
+            return [](auto x) { return std::clamp((x + 1.0f) * 0.5f, 0.0f, 1.0f); };
         }
 
         return [](auto x) { return x; };

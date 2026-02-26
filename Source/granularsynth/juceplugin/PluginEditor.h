@@ -349,6 +349,10 @@ struct ModulationRowComponent : public juce::Component
         using Node = DropDownComponent::Node;
         curveDrop.rootNode.text = "Curve";
         curveDrop.rootNode.children.push_back(Node{"Linear", GranulatorModConfig::CURVE_LINEAR});
+        curveDrop.rootNode.children.push_back(
+            Node{"UNIPOL TO BIPOL", GranulatorModConfig::CURVE_UNIPOLARTOBIPOLAR});
+        curveDrop.rootNode.children.push_back(
+            Node{"BIPOL TO UNIPOL", GranulatorModConfig::CURVE_BIPOLARTOUNIPOLAR});
         curveDrop.rootNode.children.push_back(Node{"x^2", GranulatorModConfig::CURVE_SQUARE});
         curveDrop.rootNode.children.push_back(Node{"x^3", GranulatorModConfig::CURVE_CUBE});
         curveDrop.rootNode.children.push_back(Node{"EXPSIN 1", GranulatorModConfig::CURVE_EXPSIN1});
@@ -487,7 +491,7 @@ class ParameterGroupComponent : public juce::GroupComponent
         juce::FlexBox layout;
         layout.flexDirection = juce::FlexBox::Direction::column;
         layout.flexWrap = juce::FlexBox::Wrap::wrap;
-        
+
         for (int i = 0; i < headerComponents.size(); ++i)
         {
             layout.items.add(juce::FlexItem(*headerComponents[i])
