@@ -206,8 +206,8 @@ class GrainInsertFX
             if (awplugin)
             {
                 mainmode = 2;
-                awplugin->setNumInputs(1);
-                awplugin->setNumOutputs(1);
+                awplugin->setNumInputs(2);
+                awplugin->setNumOutputs(2);
                 awplugin->setSampleRate(sr);
                 std::fill(paramvalues.begin(), paramvalues.end(), 0.0f);
                 for (size_t i = 0; i < numParams; ++i)
@@ -247,6 +247,9 @@ class GrainInsertFX
         else if (mainmode == 2)
         {
             assert(awplugin);
+            // airwindows plugins probably just do a switch case and assign of a
+            // variable per setParameter, but we might want to avoid setting all the
+            // parameters if not really needed...
             for (size_t i = 0; i < numParams; ++i)
                 awplugin->setParameter(i, paramvalues[i]);
         }
@@ -269,7 +272,7 @@ class GrainInsertFX
             float output1 = 0.0f;
             float *outputs[2] = {&output0, &output1};
             awplugin->processReplacing(inputs, outputs, 1);
-            return output0;
+            return (output0 + output1) * 0.5f;
         }
         }
         return 0.0f;
