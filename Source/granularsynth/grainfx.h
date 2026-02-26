@@ -6,6 +6,7 @@
 #include "plugins/BezEQ.h"
 #include "plugins/HipCrush.h"
 #include "plugins/kWoodRoom.h"
+#include "plugins/RingModulator.h"
 
 namespace sfpp = sst::filtersplusplus;
 struct FilterInfo
@@ -111,9 +112,10 @@ class GrainInsertFX
     {
         std::vector<ModeInfo> result;
         result.emplace_back("None", "");
-        result.emplace_back("BezEQ", "AirWindows", 2, 0);
-        result.emplace_back("HipCrush", "AirWindows", 2, 1);
-        result.emplace_back("KWoodRoom", "AirWindows", 2, 2);
+        result.emplace_back("AW BezEQ", "AirWindows", 2, 0);
+        result.emplace_back("AW HipCrush", "AirWindows", 2, 1);
+        result.emplace_back("AW KWoodRoom", "AirWindows", 2, 2);
+        result.emplace_back("AW RingModulator", "AirWindows", 2, 3);
         auto models = sfpp::Filter::availableModels();
         for (auto &mo : models)
         {
@@ -195,6 +197,11 @@ class GrainInsertFX
             {
                 awplugin = make_aw_safe<airwinconsolidated::kWoodRoom::kWoodRoom>(0);
                 numParams = airwinconsolidated::kWoodRoom::kNumParameters;
+            }
+            else if (m.awtype == 3)
+            {
+                awplugin = make_aw_safe<airwinconsolidated::RingModulator::RingModulator>(0);
+                numParams = airwinconsolidated::RingModulator::kNumParameters;
             }
             if (awplugin)
             {

@@ -354,8 +354,8 @@ void AudioPluginAudioProcessorEditor::timerCallback()
         {
             for (auto &e : filterInfoMap)
             {
-
-                if (e.second.sstmodel == msg.filtermodel && e.second.sstconfig == msg.filterconfig)
+                if (e.second.mainmode == msg.insertmainmode && e.second.awtype == msg.awtype &&
+                    e.second.sstmodel == msg.filtermodel && e.second.sstconfig == msg.filterconfig)
                 {
                     if (msg.filterindex == 0)
                         filter1Drop->setSelectedId(e.first);

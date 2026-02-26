@@ -222,6 +222,20 @@ target_compile_definitions(te_tester PRIVATE NOJUCE=1 _USE_MATH_DEFINES=1 __WIND
 # juce::juce_recommended_lto_flags
 # juce_add_bundle_resources_directory(AudioPluginHost2 Assets)
 
+add_library(AWLIMITED
+    libs/airwindows_limited/airwin_consolidated_base.cpp
+    libs/airwindows_limited/plugins/BezEQ.cpp
+    libs/airwindows_limited/plugins/BezEQProc.cpp
+    libs/airwindows_limited/plugins/HipCrush.cpp
+    libs/airwindows_limited/plugins/HipCrushProc.cpp
+    libs/airwindows_limited/plugins/kWoodRoom.cpp
+    libs/airwindows_limited/plugins/kWoodRoomProc.cpp
+    libs/airwindows_limited/plugins/RingModulator.cpp
+    libs/airwindows_limited/plugins/RingModulatorProc.cpp
+)
+
+target_compile_definitions(AWLIMITED PUBLIC _USE_MATH_DEFINES=1)
+
 juce_add_plugin(ToneGranulatorPlugin
     VERSION 0.1                               # Set this if the plugin version is different to the project version
     # ICON_BIG ...                              # ICON_* arguments specify a path to an image file to use as an icon for the Standalone
@@ -246,13 +260,7 @@ target_sources(ToneGranulatorPlugin
         Source/granularsynth/juceplugin/PluginProcessor.cpp
         Source/granularsynth/juceplugin/PluginEditor.cpp
         Source/granularsynth/js_impl.cpp
-        libs/airwindows_limited/airwin_consolidated_base.cpp
-        libs/airwindows_limited/plugins/BezEQ.cpp
-        libs/airwindows_limited/plugins/BezEQProc.cpp
-        libs/airwindows_limited/plugins/HipCrush.cpp
-        libs/airwindows_limited/plugins/HipCrushProc.cpp
-        libs/airwindows_limited/plugins/kWoodRoom.cpp
-        libs/airwindows_limited/plugins/kWoodRoomProc.cpp
+        
 )   
 
 target_compile_options(ToneGranulatorPlugin PRIVATE -Werror=return-type "$<$<COMPILE_LANGUAGE:CXX>:-fno-char8_t>")
@@ -271,6 +279,7 @@ target_link_libraries(ToneGranulatorPlugin
         # AudioPluginData           # If we'd created a binary data target, we'd link to it here
         juce::juce_audio_utils
         fmt
+        AWLIMITED
     PUBLIC
         juce::juce_recommended_config_flags
         # juce::juce_recommended_lto_flags

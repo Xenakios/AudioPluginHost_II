@@ -461,6 +461,8 @@ void AudioPluginAudioProcessor::sendExtraStatesToGUI()
         for (int i = 0; i < granulator.filtersConfigs.size(); ++i)
         {
             msg.filterindex = i;
+            msg.insertmainmode = granulator.insertsMainModes[i];
+            msg.awtype = granulator.insertsAWTypes[i];
             msg.filtermodel = granulator.filtersModels[i];
             msg.filterconfig = granulator.filtersConfigs[i];
             to_gui_fifo.push(msg);
