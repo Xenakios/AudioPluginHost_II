@@ -10,6 +10,7 @@
 #include "plugins/PrimeFIR.h"
 #include "plugins/Hypersoft.h"
 #include "plugins/DeRez3.h"
+#include "plugins/CrunchCoat.h"
 #include <print>
 
 namespace sfpp = sst::filtersplusplus;
@@ -115,14 +116,19 @@ class GrainInsertFX
     static std::vector<ModeInfo> getAvailableModes()
     {
         std::vector<ModeInfo> result;
+        result.reserve(300);
         result.emplace_back("None", "");
         result.emplace_back("AW BezEQ", "AirWindows", 2, 0);
         result.emplace_back("AW HipCrush", "AirWindows", 2, 1);
         result.emplace_back("AW KWoodRoom", "AirWindows", 2, 2);
         result.emplace_back("AW RingModulator", "AirWindows", 2, 3);
-        result.emplace_back("AW PrimeFIR", "AirWindows", 2, 4);
+        // result.emplace_back("AW PrimeFIR", "AirWindows", 2, 4);
         result.emplace_back("AW Hypersoft", "AirWindows", 2, 5);
         result.emplace_back("AW DeRez3", "AirWindows", 2, 6);
+        result.emplace_back("AW CrunchCoat", "AirWindows", 2, 7);
+        std::sort(result.begin(), result.end(), [](auto const &lhs, auto const &rhs) {
+            return lhs.displayname < rhs.displayname;
+        });
         auto models = sfpp::Filter::availableModels();
         for (auto &mo : models)
         {
@@ -224,6 +230,11 @@ class GrainInsertFX
             {
                 awplugin = make_aw_safe<airwinconsolidated::DeRez3::DeRez3>(0);
                 numParams = airwinconsolidated::DeRez3::kNumParameters;
+            }
+            else if (m.awtype == 7)
+            {
+                awplugin = make_aw_safe<airwinconsolidated::CrunchCoat::CrunchCoat>(0);
+                numParams = airwinconsolidated::CrunchCoat::kNumParameters;
             }
             if (awplugin)
             {

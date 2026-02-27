@@ -238,6 +238,8 @@ add_library(AWLIMITED
     libs/airwindows_limited/plugins/HypersoftProc.cpp
     libs/airwindows_limited/plugins/DeRez3.cpp
     libs/airwindows_limited/plugins/DeRez3Proc.cpp
+    libs/airwindows_limited/plugins/CrunchCoat.cpp
+    libs/airwindows_limited/plugins/CrunchCoatProc.cpp
 )
 
 target_compile_definitions(AWLIMITED PUBLIC _USE_MATH_DEFINES=1)
