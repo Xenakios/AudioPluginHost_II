@@ -1,5 +1,9 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
+void init_step_sequencer_js();
+void deinit_step_sequencer_js();
+std::vector<float> generate_from_js(std::string jscode);
+
 
 inline void updateAllFonts(juce::Component &parent, const juce::Font &newFont)
 {
@@ -23,7 +27,7 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor(AudioPluginAudi
     : AudioProcessorEditor(&p), processorRef(p),
       lfoTabs(juce::TabbedButtonBar::Orientation::TabsAtTop)
 {
-
+    init_step_sequencer_js();
     addAndMakeVisible(oscillatorComponent);
     addAndMakeVisible(spatParamsComponent);
     addAndMakeVisible(miscParamsComponent);
@@ -162,7 +166,11 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor(AudioPluginAudi
     startTimer(50);
 }
 
-AudioPluginAudioProcessorEditor::~AudioPluginAudioProcessorEditor() { setLookAndFeel(nullptr); }
+AudioPluginAudioProcessorEditor::~AudioPluginAudioProcessorEditor() 
+{ 
+    setLookAndFeel(nullptr); 
+    deinit_step_sequencer_js();
+}
 
 void AudioPluginAudioProcessorEditor::handleFilterSelection(int filterindex)
 {
@@ -457,6 +465,7 @@ void StepSeqComponent::paint(juce::Graphics &g)
     g.drawMultiLineText(txt, graphxpos, 20, 200);
 }
 
+
 bool StepSeqComponent::keyPressed(const juce::KeyPress &ev)
 {
     auto &msrc = gr->stepModSources[sindex];
@@ -472,6 +481,12 @@ bool StepSeqComponent::keyPressed(const juce::KeyPress &ev)
     };
     if (ev.getKeyCode() == 'R')
     {
+        auto steps = generate_from_js("");
+        for (size_t i = 0; i < steps.size(); ++i)
+        {
+            gr->fifo.push({StepModSource::Message::OP_SETSTEP, sindex, steps[i], (int)i});
+        }
+        actionetaken = 2;
     }
     else if (ev.getKeyCode() == 'Y')
     {

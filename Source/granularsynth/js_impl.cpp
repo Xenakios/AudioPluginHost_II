@@ -58,26 +58,49 @@ void test_interrupt_support()
     }
 }
 
+choc::javascript::Context g_jsctx;
+
+void init_step_sequencer_js()
+{
+    if (!g_jsctx)
+    {
+        g_jsctx = choc::javascript::createQuickJSContext();
+    }
+}
+
+void deinit_step_sequencer_js()
+{
+    if (g_jsctx)
+    {
+        g_jsctx = choc::javascript::Context{};
+    }
+}
+
+const char *test_script = R"(
+function generate_steps(steps, startstep, endstep)
+{
+    for (var i=startstep;i<endstep;i++)
+    {
+        steps[i] = -1.0+2.0*Math.random();
+    }
+    return steps;
+}
+)";
+
 std::vector<float> generate_from_js(std::string jscode)
 {
-    static choc::javascript::Context ctx;
-    if (!ctx)
-    {
-        ctx = choc::javascript::createQuickJSContext();
-    }
-
+    assert(g_jsctx);
     std::vector<float> result;
     try
     {
-        ctx.run(jscode);
-        auto r = ctx.invoke("generate_steps");
-        if (r.isArray())
+        g_jsctx.run(test_script);
+        auto dest_arr = choc::value::createArray(16, [](uint32_t index) { return 0.5f; });
+        auto r = g_jsctx.invoke("generate_steps", dest_arr, 0, 16);
+
+        result.resize(r.size());
+        for (int i = 0; i < result.size(); ++i)
         {
-            result.resize(std::min((int)r.size(), 16384));
-            for (int i = 0; i < result.size(); ++i)
-            {
-                result[(size_t)i] = std::clamp(r[i].getWithDefault(0.0f), -1.0f, 1.0f);
-            }
+            result[(size_t)i] = std::clamp(r[i].getWithDefault(0.0f), -1.0f, 1.0f);
         }
     }
     catch (std::exception &ex)
