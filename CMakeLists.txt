@@ -99,6 +99,25 @@ project(cmaketest)
 # set (PYBIND11_PYTHON_VERSION "3.14")
 # set (PYBIND11_FINDPYTHON ON "OLD")
 add_subdirectory(libs/pybind11)
+add_library(AWLIMITED
+    libs/airwindows_limited/airwin_consolidated_base.cpp
+    libs/airwindows_limited/plugins/BezEQ.cpp
+    libs/airwindows_limited/plugins/BezEQProc.cpp
+    libs/airwindows_limited/plugins/HipCrush.cpp
+    libs/airwindows_limited/plugins/HipCrushProc.cpp
+    libs/airwindows_limited/plugins/kWoodRoom.cpp
+    libs/airwindows_limited/plugins/kWoodRoomProc.cpp
+    libs/airwindows_limited/plugins/RingModulator.cpp
+    libs/airwindows_limited/plugins/RingModulatorProc.cpp
+    libs/airwindows_limited/plugins/PrimeFIR.cpp
+    libs/airwindows_limited/plugins/PrimeFIRProc.cpp
+    libs/airwindows_limited/plugins/Hypersoft.cpp
+    libs/airwindows_limited/plugins/HypersoftProc.cpp
+    libs/airwindows_limited/plugins/DeRez3.cpp
+    libs/airwindows_limited/plugins/DeRez3Proc.cpp
+    libs/airwindows_limited/plugins/CrunchCoat.cpp
+    libs/airwindows_limited/plugins/CrunchCoatProc.cpp
+)
 
 pybind11_add_module(xenakios 
     Source/PythonBindings/pybindings.cpp
@@ -113,22 +132,14 @@ pybind11_add_module(xenakios
     libs/MTS-ESP/Master/libMTSMaster.cpp
     libs/MTS-ESP/Client/libMTSClient.cpp
     libs/rtaudio/RtAudio.cpp 
-    libs/airwindows_limited/airwin_consolidated_base.cpp
-    libs/airwindows_limited/plugins/BezEQ.cpp
-    libs/airwindows_limited/plugins/BezEQProc.cpp
-    libs/airwindows_limited/plugins/HipCrush.cpp
-    libs/airwindows_limited/plugins/HipCrushProc.cpp
-    libs/airwindows_limited/plugins/kWoodRoom.cpp
-    libs/airwindows_limited/plugins/kWoodRoomProc.cpp
+    
 )
 
 # Source/Experimental/xaudiograph.cpp
 # target_link_libraries(xenakios PRIVATE juce::juce_core juce::juce_audio_utils)
 target_compile_options(xenakios PRIVATE -Werror=return-type)
 target_include_directories(xenakios PRIVATE libs/pybind11/include)
-# target_link_libraries(xenakios PRIVATE airwin-registry)
-
-
+target_link_libraries(xenakios PRIVATE AWLIMITED)
 
 # WIN32_LEAN_AND_MEAN
 
@@ -222,25 +233,6 @@ target_compile_definitions(te_tester PRIVATE NOJUCE=1 _USE_MATH_DEFINES=1 __WIND
 # juce::juce_recommended_lto_flags
 # juce_add_bundle_resources_directory(AudioPluginHost2 Assets)
 
-add_library(AWLIMITED
-    libs/airwindows_limited/airwin_consolidated_base.cpp
-    libs/airwindows_limited/plugins/BezEQ.cpp
-    libs/airwindows_limited/plugins/BezEQProc.cpp
-    libs/airwindows_limited/plugins/HipCrush.cpp
-    libs/airwindows_limited/plugins/HipCrushProc.cpp
-    libs/airwindows_limited/plugins/kWoodRoom.cpp
-    libs/airwindows_limited/plugins/kWoodRoomProc.cpp
-    libs/airwindows_limited/plugins/RingModulator.cpp
-    libs/airwindows_limited/plugins/RingModulatorProc.cpp
-    libs/airwindows_limited/plugins/PrimeFIR.cpp
-    libs/airwindows_limited/plugins/PrimeFIRProc.cpp
-    libs/airwindows_limited/plugins/Hypersoft.cpp
-    libs/airwindows_limited/plugins/HypersoftProc.cpp
-    libs/airwindows_limited/plugins/DeRez3.cpp
-    libs/airwindows_limited/plugins/DeRez3Proc.cpp
-    libs/airwindows_limited/plugins/CrunchCoat.cpp
-    libs/airwindows_limited/plugins/CrunchCoatProc.cpp
-)
 
 target_compile_definitions(AWLIMITED PUBLIC _USE_MATH_DEFINES=1)
 

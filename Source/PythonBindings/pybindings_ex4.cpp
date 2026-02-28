@@ -16,6 +16,8 @@
 #include "../Common/xen_ambisonics.h"
 #include "gendyn.h"
 #include "../cli/xcli_utils.h"
+#include "../Common/clap_eventsequence.h"
+#include "../Common/xapdsp.h"
 
 namespace py = pybind11;
 
@@ -412,7 +414,6 @@ inline py::array_t<float> render_granulator(ToneGranulator &gran, double sampler
     return output_audio;
 }
 
-
 void process_airwindows(int index)
 {
     audioMasterCallback amc = 0;
@@ -486,6 +487,63 @@ inline py::array_t<float> decode_ambisonics_to_stereo(const py::array_t<float> &
         writebufs[1][i] = (m - s) * 0.5f;
     }
     return output_audio;
+}
+
+inline float fast_db_to_gain(float db)
+{
+    // 0.05 is 1/20. ln(10) is ~2.302585
+    // Total multiplier = 0.05 * 2.302585 = 0.115129
+    float x = db * 0.1151292546497022847f;
+
+    // Fast approx for e^x
+    // This uses the IEEE 754 floating point representation trick
+    union
+    {
+        float f;
+        int32_t i;
+    } u;
+    u.i = (int32_t)(12102203 * x + 1064866805);
+    return u.f;
+}
+
+inline void apply_volume_envelope(py::array_t<float> input_audio, int volume_shaping,
+                                  double sample_rate, xenakios::Envelope &vol_env)
+{
+    if (input_audio.ndim() != 2)
+        throw std::runtime_error(
+            std::format("array ndim {} incompatible, must be 2", input_audio.ndim()));
+    uint32_t numInChans = input_audio.shape(0);
+    int frames = input_audio.size();
+    alignas(32) float *writebufs[16];
+    for (int i = 0; i < numInChans; ++i)
+        writebufs[i] = input_audio.mutable_data(i);
+    int outcounter = 0;
+    const int blocksize = 8;
+    vol_env.sortPoints();
+    while (outcounter < frames)
+    {
+        double tpos = outcounter / sample_rate;
+        vol_env.processBlock(tpos, sample_rate, 0, blocksize);
+        int framestoprocess = std::min(blocksize, frames - outcounter);
+        for (int i = 0; i < framestoprocess; ++i)
+        {
+            float gain = vol_env.outputBlock[i];
+            // cubic volume response
+            if (volume_shaping == 1)
+                gain = gain * gain * gain;
+            // decibels
+            else if (volume_shaping == 2)
+            {
+                gain = std::clamp(gain, -120.0f, 12.0f);
+                gain = fast_db_to_gain(gain);
+            }
+            for (int j = 0; j < numInChans; ++j)
+            {
+                writebufs[j][outcounter + i] *= gain;
+            }
+        }
+        outcounter += blocksize;
+    }
 }
 
 inline py::array_t<float> encode_to_ambisonics(const py::array_t<float> &input_audio,
@@ -632,11 +690,8 @@ inline std::vector<double> test_simple_lfo(int sh, xenakios::Envelope &rate_env,
 
 inline std::vector<double> test_morphing_random() { return {}; }
 
-py::array_t<float> gendyn_render(Gendyn2026 &gendyn, double sr, double outdur, int rseed,
-                                 int numsegs_, int interpolationmode, int timedistribution,
-                                 int ampdistribution, xenakios::Envelope &timedistspread,
-                                 xenakios::Envelope &pitchlow, xenakios::Envelope &pitchhigh,
-                                 xenakios::Envelope &ampdistspread)
+py::array_t<float> gendyn_render(Gendyn2026 &gendyn, double sr, double outdur,
+                                 ClapEventSequence &events)
 {
     int numOutChans = 1;
     int frames = outdur * sr;
@@ -657,29 +712,65 @@ py::array_t<float> gendyn_render(Gendyn2026 &gendyn, double sr, double outdur, i
     decimator.reset();
     gendyn.prepare(sr * osfactor);
     float osbuffer[osfactor];
-    gendyn.timedist = (Gendyn2026::RANDOMDIST)timedistribution;
-    gendyn.ampdist = (Gendyn2026::RANDOMDIST)ampdistribution;
-    gendyn.numnodes = numsegs_;
-    gendyn.interpmode = (Gendyn2026::INTERPOLATION)interpolationmode;
-
-    gendyn.rng.seed(rseed, 13);
+    events.sortEvents();
+    ClapEventSequence::IteratorSampleTime eviter{events, sr};
+    float plow = 0.0f;
+    float phigh = 127.0f;
+    StereoSimperSVF highpass;
+    highpass.init();
+    highpass.setCoeff(12.0, 0.0f, 1.0 / sr);
+    StereoSimperSVF lowpass;
+    lowpass.init();
+    float lpreso = 0.0f;
+    float lpcutoff = 135.0f; // ~19khz
+    lowpass.setCoeff(lpcutoff, lpreso, 1.0 / sr);
 
     while (outcounter < frames)
     {
         size_t torender = std::min(blocksize, (size_t)frames - outcounter);
-        double tpos = outcounter / sr;
-        gendyn.timespread = timedistspread.getValueAtPosition(tpos);
-        gendyn.ampspread = ampdistspread.getValueAtPosition(tpos);
-        float plow = pitchlow.getValueAtPosition(tpos);
-        float phigh = pitchhigh.getValueAtPosition(tpos);
+        auto blockevents = eviter.readNextEvents(blocksize);
+        for (auto &ev : blockevents)
+        {
+            if (ev.event.header.type == CLAP_EVENT_PARAM_VALUE)
+            {
+                float val = ev.event.param.value;
+                if (ev.event.param.param_id == 0)
+                    gendyn.rng.seed(val, 13);
+                else if (ev.event.param.param_id == 1)
+                    gendyn.interpmode = (Gendyn2026::INTERPOLATION)val;
+                else if (ev.event.param.param_id == 2)
+                    gendyn.numnodes = val;
+                else if (ev.event.param.param_id == 3)
+                    gendyn.timedist = (Gendyn2026::RANDOMDIST)val;
+                else if (ev.event.param.param_id == 4)
+                    gendyn.ampdist = (Gendyn2026::RANDOMDIST)val;
+                else if (ev.event.param.param_id == 5)
+                    gendyn.timespread = val;
+                else if (ev.event.param.param_id == 6)
+                    gendyn.ampspread = val;
+                else if (ev.event.param.param_id == 7)
+                    gendyn.ampspread = val;
+                else if (ev.event.param.param_id == 8)
+                    plow = val;
+                else if (ev.event.param.param_id == 9)
+                    phigh = val;
+                else if (ev.event.param.param_id == 100)
+                    highpass.setCoeff(val, 0.0f, 1.0 / sr);
+                else if (ev.event.param.param_id == 101)
+                    lpcutoff = val;
+                else if (ev.event.param.param_id == 102)
+                    lpreso = val;
+            }
+        }
+        lowpass.setCoeff(lpcutoff, lpreso, 1.0 / sr);
         if (phigh < plow)
             std::swap(plow, phigh);
         if (plow == phigh)
             phigh += 0.01;
         gendyn.timehighvalue =
-            (sr * osfactor) / numsegs_ / (440.0 * std::pow(2.0, 1.0 / 12.0 * (plow - 9.0)));
+            (sr * osfactor) / gendyn.numnodes / (440.0 * std::pow(2.0, 1.0 / 12.0 * (plow - 9.0)));
         gendyn.timelowvalue =
-            (sr * osfactor) / numsegs_ / (440.0 * std::pow(2.0, 1.0 / 12.0 * (phigh - 9.0)));
+            (sr * osfactor) / gendyn.numnodes / (440.0 * std::pow(2.0, 1.0 / 12.0 * (phigh - 9.0)));
         for (int i = 0; i < torender; ++i)
         {
             for (int j = 0; j < osfactor; ++j)
@@ -687,6 +778,9 @@ py::array_t<float> gendyn_render(Gendyn2026 &gendyn, double sr, double outdur, i
                 osbuffer[j] = gendyn.step();
             }
             float decimsample = decimator.process(osbuffer);
+            float dummysample = 0.0f;
+            StereoSimperSVF::step<StereoSimperSVF::HP>(highpass, decimsample, dummysample);
+            StereoSimperSVF::step<StereoSimperSVF::LP>(lowpass, decimsample, dummysample);
             outdata[outcounter + i] = decimsample;
         }
         outcounter += blocksize;
@@ -701,14 +795,13 @@ void init_py4(py::module_ &m, py::module_ &m_const)
     py::class_<Gendyn2026>(m, "gendyn")
         .def(py::init<>())
         .def("prepare", &Gendyn2026::prepare)
-        .def("render", &gendyn_render, "samplerate"_a = 44100.0, "duration"_a = 1.0,
-             "random_seed"_a = 917, "numsegs"_a = 8, "interpolationmode"_a = 1,
-             "timedistribution"_a = 0, "ampdistribution"_a = 0, "timedistributionspread"_a,
-             "pitchlowlimit"_a, "pitchhighlimit"_a, "ampdistributionspread"_a);
+        .def("render", &gendyn_render, "samplerate"_a = 44100.0, "duration"_a = 1.0, "events"_a);
     m.def("test_simple_lfo", &test_simple_lfo);
     m.def("encode_to_ambisonics", &encode_to_ambisonics, "input_audio"_a, "sample_rate"_a,
           "ambisonics_order"_a, "azimuth"_a, "elevation"_a);
     m.def("decode_ambisonics_to_stereo", &decode_ambisonics_to_stereo, "input_audio"_a);
+    m.def("apply_volume_envelope", &apply_volume_envelope, "input_audio"_a, "shaping"_a,
+          "sample_rate"_a, "volume_envelope"_a);
     m.def("airwindows_test", &process_airwindows);
     m.def("generate_tone", &generate_tone, "tone_type"_a, "pitch"_a, "sync"_a, "volume"_a,
           "samplerate"_a, "duration"_a);
@@ -727,9 +820,9 @@ void init_py4(py::module_ &m, py::module_ &m_const)
             [](GrainEvent &ev, int which, double frequency, double resonance, double extpar0) {
                 if (which >= 0 && which < 2)
                 {
-                    ev.filterparams[which][0] = frequency;
-                    ev.filterparams[which][1] = resonance;
-                    ev.filterparams[which][2] = extpar0;
+                    // ev.filterparams[which][0] = frequency;
+                    // ev.filterparams[which][1] = resonance;
+                    // ev.filterparams[which][2] = extpar0;
                 }
                 else
                     throw std::runtime_error("Filter index out of range");
