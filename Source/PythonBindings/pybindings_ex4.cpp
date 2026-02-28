@@ -690,6 +690,14 @@ inline std::vector<double> test_simple_lfo(int sh, xenakios::Envelope &rate_env,
 
 inline std::vector<double> test_morphing_random() { return {}; }
 
+inline void gendyn_print_params(Gendyn2026 &g)
+{
+    for (const auto &p : g.paramMetaDatas)
+    {
+        std::print("{:12} {}/{} {}\n", p.id, p.groupName, p.name, p.defaultVal);
+    }
+}
+
 py::array_t<float> gendyn_render(Gendyn2026 &gendyn, double sr, double outdur,
                                  ClapEventSequence &events)
 {
@@ -734,26 +742,26 @@ py::array_t<float> gendyn_render(Gendyn2026 &gendyn, double sr, double outdur,
             if (ev.event.header.type == CLAP_EVENT_PARAM_VALUE)
             {
                 float val = ev.event.param.value;
-                if (ev.event.param.param_id == 0)
+                if (ev.event.param.param_id == Gendyn2026::PAR_RANDSEED)
                     gendyn.rng.seed(val, 13);
-                else if (ev.event.param.param_id == 1)
+                else if (ev.event.param.param_id == Gendyn2026::PAR_INTERPOLATIONMODE)
                     gendyn.interpmode = (Gendyn2026::INTERPOLATION)val;
-                else if (ev.event.param.param_id == 2)
-                    gendyn.numnodes = val;
-                else if (ev.event.param.param_id == 3)
-                    gendyn.timedist = (Gendyn2026::RANDOMDIST)val;
-                else if (ev.event.param.param_id == 4)
-                    gendyn.ampdist = (Gendyn2026::RANDOMDIST)val;
-                else if (ev.event.param.param_id == 5)
-                    gendyn.timespread = val;
-                else if (ev.event.param.param_id == 6)
-                    gendyn.ampspread = val;
-                else if (ev.event.param.param_id == 7)
-                    gendyn.ampspread = val;
-                else if (ev.event.param.param_id == 8)
-                    plow = val;
-                else if (ev.event.param.param_id == 9)
-                    phigh = val;
+                else if (ev.event.param.param_id == Gendyn2026::PAR_NUMSEGMENTS)
+                    *gendyn.parIdToValuePtr[Gendyn2026::PAR_NUMSEGMENTS] = val;
+                else if (ev.event.param.param_id == Gendyn2026::PAR_TIMEDISTRIBUTION)
+                    *gendyn.parIdToValuePtr[Gendyn2026::PAR_TIMEDISTRIBUTION] =
+                        (Gendyn2026::RANDOMDIST)val;
+                else if (ev.event.param.param_id == Gendyn2026::PAR_AMPDISTRIBUTION)
+                    *gendyn.parIdToValuePtr[Gendyn2026::PAR_AMPDISTRIBUTION] =
+                        (Gendyn2026::RANDOMDIST)val;
+                else if (ev.event.param.param_id == Gendyn2026::PAR_TIMESPREAD)
+                    *gendyn.parIdToValuePtr[Gendyn2026::PAR_TIMESPREAD] = val;
+                else if (ev.event.param.param_id == Gendyn2026::PAR_AMPSPREAD)
+                    *gendyn.parIdToValuePtr[Gendyn2026::PAR_AMPSPREAD] = val;
+                else if (ev.event.param.param_id == Gendyn2026::PAR_PITCHMIN)
+                    *gendyn.parIdToValuePtr[Gendyn2026::PAR_PITCHMIN] = val;
+                else if (ev.event.param.param_id == Gendyn2026::PAR_PITCHMAX)
+                    *gendyn.parIdToValuePtr[Gendyn2026::PAR_PITCHMAX] = val;
                 else if (ev.event.param.param_id == 100)
                     highpass.setCoeff(val, 0.0f, 1.0 / sr);
                 else if (ev.event.param.param_id == 101)
@@ -767,10 +775,6 @@ py::array_t<float> gendyn_render(Gendyn2026 &gendyn, double sr, double outdur,
             std::swap(plow, phigh);
         if (plow == phigh)
             phigh += 0.01;
-        gendyn.timehighvalue =
-            (sr * osfactor) / gendyn.numnodes / (440.0 * std::pow(2.0, 1.0 / 12.0 * (plow - 9.0)));
-        gendyn.timelowvalue =
-            (sr * osfactor) / gendyn.numnodes / (440.0 * std::pow(2.0, 1.0 / 12.0 * (phigh - 9.0)));
         for (int i = 0; i < torender; ++i)
         {
             for (int j = 0; j < osfactor; ++j)
@@ -794,6 +798,7 @@ void init_py4(py::module_ &m, py::module_ &m_const)
     using namespace pybind11::literals;
     py::class_<Gendyn2026>(m, "gendyn")
         .def(py::init<>())
+        .def("print_params", &gendyn_print_params)
         .def("prepare", &Gendyn2026::prepare)
         .def("render", &gendyn_render, "samplerate"_a = 44100.0, "duration"_a = 1.0, "events"_a);
     m.def("test_simple_lfo", &test_simple_lfo);
