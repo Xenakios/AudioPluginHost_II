@@ -740,34 +740,29 @@ py::array_t<float> gendyn_render(Gendyn2026 &gendyn, double sr, double outdur,
             if (ev.event.header.type == CLAP_EVENT_PARAM_VALUE)
             {
                 float val = ev.event.param.value;
-                if (ev.event.param.param_id == Gendyn2026::PAR_RANDSEED)
-                    gendyn.rng.seed(val, 13);
-                else if (ev.event.param.param_id == Gendyn2026::PAR_TRIGRESET)
-                    gendyn.reset();
-                else if (ev.event.param.param_id == Gendyn2026::PAR_INTERPOLATIONMODE)
-                    gendyn.setInterpolationMode(val);
-                else if (ev.event.param.param_id == Gendyn2026::PAR_NUMSEGMENTS)
-                    *gendyn.parIdToValuePtr[Gendyn2026::PAR_NUMSEGMENTS] = val;
-                else if (ev.event.param.param_id == Gendyn2026::PAR_TIMEDISTRIBUTION)
-                    *gendyn.parIdToValuePtr[Gendyn2026::PAR_TIMEDISTRIBUTION] =
-                        (Gendyn2026::RANDOMDIST)val;
-                else if (ev.event.param.param_id == Gendyn2026::PAR_AMPDISTRIBUTION)
-                    *gendyn.parIdToValuePtr[Gendyn2026::PAR_AMPDISTRIBUTION] =
-                        (Gendyn2026::RANDOMDIST)val;
-                else if (ev.event.param.param_id == Gendyn2026::PAR_TIMESPREAD)
-                    *gendyn.parIdToValuePtr[Gendyn2026::PAR_TIMESPREAD] = val;
-                else if (ev.event.param.param_id == Gendyn2026::PAR_AMPSPREAD)
-                    *gendyn.parIdToValuePtr[Gendyn2026::PAR_AMPSPREAD] = val;
-                else if (ev.event.param.param_id == Gendyn2026::PAR_PITCHMIN)
-                    *gendyn.parIdToValuePtr[Gendyn2026::PAR_PITCHMIN] = val;
-                else if (ev.event.param.param_id == Gendyn2026::PAR_PITCHMAX)
-                    *gendyn.parIdToValuePtr[Gendyn2026::PAR_PITCHMAX] = val;
-                else if (ev.event.param.param_id == 100)
-                    highpass.setCoeff(val, 0.0f, 1.0 / sr);
-                else if (ev.event.param.param_id == 101)
-                    lpcutoff = val;
-                else if (ev.event.param.param_id == 102)
-                    lpreso = val;
+                auto it = gendyn.parIdToValuePtr.find(ev.event.param.param_id);
+                if (it != gendyn.parIdToValuePtr.end())
+                {
+                    float minv = gendyn.parIdToMetaDataPtr[ev.event.param.param_id]->minVal;
+                    float maxv = gendyn.parIdToMetaDataPtr[ev.event.param.param_id]->maxVal;
+                    val = std::clamp(val, minv, maxv);
+                    *gendyn.parIdToValuePtr[ev.event.param.param_id] = val;
+                    if (ev.event.param.param_id == Gendyn2026::PAR_RANDSEED)
+                        gendyn.rng.seed(val, 13);
+                    else if (ev.event.param.param_id == Gendyn2026::PAR_TRIGRESET)
+                        gendyn.reset();
+                    else if (ev.event.param.param_id == Gendyn2026::PAR_INTERPOLATIONMODE)
+                        gendyn.setInterpolationMode(val);
+                }
+                else
+                {
+                    if (ev.event.param.param_id == 100)
+                        highpass.setCoeff(val, 0.0f, 1.0 / sr);
+                    else if (ev.event.param.param_id == 101)
+                        lpcutoff = val;
+                    else if (ev.event.param.param_id == 102)
+                        lpreso = val;
+                }
             }
         }
         lowpass.setCoeff(lpcutoff, lpreso, 1.0 / sr);

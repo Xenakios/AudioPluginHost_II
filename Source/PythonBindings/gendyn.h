@@ -71,6 +71,7 @@ struct Gendyn2026
     alignas(16) double phase = 0.0;
     alignas(16) double phaseincrement = 0.0;
     std::vector<pmd_t> paramMetaDatas;
+    std::unordered_map<uint32_t, pmd_t *> parIdToMetaDataPtr;
     std::array<float, 32> paramValues;
     std::unordered_map<uint32_t, float *> parIdToValuePtr;
 
@@ -173,6 +174,7 @@ struct Gendyn2026
         {
             paramValues[i] = paramMetaDatas[i].defaultVal;
             parIdToValuePtr[paramMetaDatas[i].id] = &paramValues[i];
+            parIdToMetaDataPtr[paramMetaDatas[i].id] = &paramMetaDatas[i];
         }
     }
     float pitchToSamplesTime(float pitchsemis, int numnodes)
