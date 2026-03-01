@@ -248,7 +248,7 @@ template <size_t NumFilters> struct AllPassBank
         {
             phases[i] = 0.0;
             lforates[i] = 0.4 + 0.23 / NumFilters * i;
-            lfoamounts[i] = 5.0;
+            lfoamounts[i] = 15.0;
         }
     }
     float samplerate = 0.0;

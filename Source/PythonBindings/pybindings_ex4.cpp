@@ -192,7 +192,7 @@ void vartest(EnvOrDouble x)
                x);
 }
 
-inline py::array_t<float> generate_corrnoise(xenakios::Envelope &freqenv,
+inline py::array_t<float> generate_corrnoise(xenakios::Envelope &pitchenv,
                                              xenakios::Envelope &correnv, double sr,
                                              double duration)
 {
@@ -217,7 +217,9 @@ inline py::array_t<float> generate_corrnoise(xenakios::Envelope &freqenv,
     {
         size_t framestoprocess = std::min<int>(blocksize, frames - framecount);
         double tpos = framecount / sr;
-        gen.setFrequency(freqenv.getValueAtPosition(tpos));
+        float pitch = pitchenv.getValueAtPosition(tpos);
+        pitch = 440.0 * std::pow(2.0, 1.0 / 12 * (pitch - 9.0));
+        gen.setFrequency(pitch);
         gen.setCorrelation(correnv.getValueAtPosition(tpos));
         for (int i = 0; i < framestoprocess; ++i)
         {
@@ -550,7 +552,7 @@ inline py::array_t<float> encode_to_ambisonics(const py::array_t<float> &input_a
                                                double sample_rate, int amb_order,
                                                xenakios::Envelope &azimuth,
                                                xenakios::Envelope &elevation,
-                                               xenakios::Envelope &focus)
+                                               xenakios::Envelope &spreadmix, float spreadfeedback)
 {
     if (input_audio.ndim() != 2)
         throw std::runtime_error(
@@ -585,17 +587,16 @@ inline py::array_t<float> encode_to_ambisonics(const py::array_t<float> &input_a
     alignas(32) float SH1[64];
     memset(SH0, 0, sizeof(float) * 64);
     memset(SH1, 0, sizeof(float) * 64);
-    auto allpassbank = std::make_unique<AllPassBank<9>>();
+    auto allpassbank = std::make_unique<AllPassBank<16>>();
     allpassbank->samplerate = sample_rate;
-    allpassbank->basedelaytimes[0] = 401;
-    allpassbank->basedelaytimes[1] = 1381;
-    allpassbank->basedelaytimes[2] = 521;
-    allpassbank->basedelaytimes[3] = 631;
-    allpassbank->basedelaytimes[4] = 761;
-    allpassbank->basedelaytimes[5] = 887;
-    allpassbank->basedelaytimes[6] = 1031;
-    allpassbank->basedelaytimes[7] = 1153;
-    allpassbank->basedelaytimes[8] = 1297;
+
+    const int basedelays[] = {401,  443,  521,  631,  761,  887,  1031, 1153,
+                              1297, 1321, 1399, 1453, 1489, 1523, 1559, 1597};
+    for (size_t i = 0; i < 16; ++i)
+    {
+        allpassbank->basedelaytimes[i] = basedelays[i];
+    }
+
     // for (size_t i = 0; i < 9; ++i)
     //     allpassbank->filters[i].delayLength = 10000;
     StereoSimperSVF allpasses[16];
@@ -616,17 +617,12 @@ inline py::array_t<float> encode_to_ambisonics(const py::array_t<float> &input_a
         float y = 0.0;
         float z = 0.0;
         sphericalToCartesian(aziRads, eleRads, x, y, z);
-        float focusval = std::clamp(focus.getValueAtPosition(tpos), 0.0, 1.0);
+        float spread = std::clamp(spreadmix.getValueAtPosition(tpos), 0.0, 1.0);
         if (amb_order == 1)
             SHEval1(x, y, z, SH1);
         else if (amb_order == 2)
         {
             SHEval2(x, y, z, SH1);
-            for (int i = 0; i < 9; ++i)
-            {
-            }
-            // allpassbank->process(SH1, 9, focusval);
-            // apply_focus_weights(SH1, focusval);
         }
         else if (amb_order == 3)
         {
@@ -639,13 +635,14 @@ inline py::array_t<float> encode_to_ambisonics(const py::array_t<float> &input_a
         int framestoprocess = std::min(blocksize, frames - outcounter);
         for (int j = 0; j < numOutChans; ++j)
         {
+            allpassbank->filters[j].g = spreadfeedback;
             double gainstep = (SH1[j] - SH0[j]) / blocksize;
             for (int i = 0; i < framestoprocess; ++i)
             {
                 float gain = SH0[j] + gainstep * i;
                 float dummy = 0.0;
                 float dry = readbuf[outcounter + i] * gain;
-                writebufs[j][outcounter + i] = allpassbank->process(j, dry, focusval);
+                writebufs[j][outcounter + i] = allpassbank->process(j, dry, spread);
                 // float wet = dry;
                 // if (j > 0)
                 // wet = allpassbank->filters[j].process(dry);
@@ -835,7 +832,7 @@ void init_py4(py::module_ &m, py::module_ &m_const)
         .def("render", &gendyn_render, "samplerate"_a = 44100.0, "duration"_a = 1.0, "events"_a);
     m.def("test_simple_lfo", &test_simple_lfo);
     m.def("encode_to_ambisonics", &encode_to_ambisonics, "input_audio"_a, "sample_rate"_a,
-          "ambisonics_order"_a, "azimuth"_a, "elevation"_a, "focus"_a);
+          "ambisonics_order"_a, "azimuth"_a, "elevation"_a, "spreadmix"_a, "spreadfeedback"_a);
     m.def("decode_ambisonics_to_stereo", &decode_ambisonics_to_stereo, "input_audio"_a);
     m.def("apply_volume_envelope", &apply_volume_envelope, "input_audio"_a, "shaping"_a,
           "sample_rate"_a, "volume_envelope"_a);

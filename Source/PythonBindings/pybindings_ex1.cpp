@@ -60,7 +60,8 @@ class XAudioFileReader
             throw std::runtime_error("exception test");
         auto filechans = m_reader->getProperties().numChannels;
         int outchans_to_use = filechans;
-
+        if (num_samples == 0)
+            num_samples = this->get_num_frames();
         if (filechans == 1 && force_output_channels > 1)
             outchans_to_use = force_output_channels;
         if (m_readVec.size() < num_samples * outchans_to_use)
