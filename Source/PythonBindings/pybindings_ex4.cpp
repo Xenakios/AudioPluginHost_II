@@ -586,15 +586,16 @@ inline py::array_t<float> encode_to_ambisonics(const py::array_t<float> &input_a
     memset(SH0, 0, sizeof(float) * 64);
     memset(SH1, 0, sizeof(float) * 64);
     auto allpassbank = std::make_unique<AllPassBank<9>>();
-    allpassbank->filters[0].delayLength = 1381;
-    allpassbank->filters[1].delayLength = 401;
-    allpassbank->filters[2].delayLength = 521;
-    allpassbank->filters[3].delayLength = 631;
-    allpassbank->filters[4].delayLength = 761;
-    allpassbank->filters[5].delayLength = 887;
-    allpassbank->filters[6].delayLength = 1031;
-    allpassbank->filters[7].delayLength = 1153;
-    allpassbank->filters[8].delayLength = 1297;
+    allpassbank->samplerate = sample_rate;
+    allpassbank->basedelaytimes[0] = 401;
+    allpassbank->basedelaytimes[1] = 1381;
+    allpassbank->basedelaytimes[2] = 521;
+    allpassbank->basedelaytimes[3] = 631;
+    allpassbank->basedelaytimes[4] = 761;
+    allpassbank->basedelaytimes[5] = 887;
+    allpassbank->basedelaytimes[6] = 1031;
+    allpassbank->basedelaytimes[7] = 1153;
+    allpassbank->basedelaytimes[8] = 1297;
     // for (size_t i = 0; i < 9; ++i)
     //     allpassbank->filters[i].delayLength = 10000;
     StereoSimperSVF allpasses[16];
@@ -644,13 +645,15 @@ inline py::array_t<float> encode_to_ambisonics(const py::array_t<float> &input_a
                 float gain = SH0[j] + gainstep * i;
                 float dummy = 0.0;
                 float dry = readbuf[outcounter + i] * gain;
-                float wet = dry;
+                writebufs[j][outcounter + i] = allpassbank->process(j, dry, focusval);
+                // float wet = dry;
                 // if (j > 0)
-                wet = allpassbank->filters[j].process(dry);
+                // wet = allpassbank->filters[j].process(dry);
                 // StereoSimperSVF::step<StereoSimperSVF::ALL>(allpasses[j], wet, dummy);
-                writebufs[j][outcounter + i] = (1.0 - focusval) * dry + wet * focusval;
+                // writebufs[j][outcounter + i] = dry; // (1.0 - focusval) * dry + wet * focusval;
             }
         }
+
         for (int j = 0; j < numOutChans; ++j)
         {
             SH0[j] = SH1[j];

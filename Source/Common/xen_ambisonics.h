@@ -1,5 +1,5 @@
 #pragma once
-
+#include <cmath>
 // taken from the IEM plugins code
 // https://plugins.iem.at/
 
@@ -207,36 +207,33 @@ inline void focus_coeffs2nd_order(float *coeffs, float *dest, float morph)
 
 template <size_t MaxDelay> struct AllPass
 {
-    float delayBuffer[MaxDelay];
-    int index = 0;
+    float delayBuffer[MaxDelay + 1] = {0.0f};
+    float writeIndex = 0; // Still write at integer steps
+    int bufferSize = MaxDelay;
     float g = 0.5f;
-    int delayLength = 2;
-    AllPass()
-    {
-        for (size_t j = 0; j < MaxDelay; ++j)
-            delayBuffer[j] = 0.0f;
-    }
-    float process(float input)
-    {
-        //float out = delayBuffer[index];
-        //delayBuffer[index] = input;
-        //index = (index + 1) % delayLength;
-        //return out;
-        // 1. Grab the "old" sample from the buffer
-        float delayedSample = delayBuffer[index];
 
-        // 2. Standard All-Pass Equation:
-        // y[n] = -g * x[n] + x[n-d] + g * y[n-d]
+    // Use a float for delayLength to allow modulation
+    float process(float input, float currentDelay)
+    {
+        // 1. Calculate read position
+        float readPos = (float)writeIndex - currentDelay;
+        while (readPos < 0)
+            readPos += bufferSize;
+
+        // 2. Linear Interpolation
+        int i0 = (int)readPos;
+        int i1 = (i0 + 1) % bufferSize;
+        float frac = readPos - i0;
+
+        float delayedSample = delayBuffer[i0] + frac * (delayBuffer[i1] - delayBuffer[i0]);
+
+        // 3. All-pass logic (Standard Form)
         float vn = input + (g * delayedSample);
         float output = delayedSample - (g * vn);
 
-        // 3. Store the result for the next loop
-        delayBuffer[index] = vn;
-
-        // 4. Increment and wrap
-        index++;
-        if (index >= delayLength)
-            index = 0;
+        // 4. Update buffer and index
+        delayBuffer[(int)writeIndex] = vn;
+        writeIndex = (int)(writeIndex + 1) % bufferSize;
 
         return output;
     }
@@ -244,15 +241,29 @@ template <size_t MaxDelay> struct AllPass
 
 template <size_t NumFilters> struct AllPassBank
 {
-    AllPass<16384> filters[NumFilters];
-    AllPassBank() {}
-    void process(float *buf, size_t numFiltersToProcess, float mix)
+    AllPass<4096> filters[NumFilters];
+    AllPassBank()
     {
-        for (size_t i = 1; i < numFiltersToProcess; ++i)
+        for (size_t i = 0; i < NumFilters; ++i)
         {
-            float dry = buf[i];
-            float wet = filters[i].process(dry);
-            buf[i] = (1.0f - mix) * dry + mix * wet;
+            phases[i] = 0.0;
+            lforates[i] = 0.4 + 0.23 / NumFilters * i;
+            lfoamounts[i] = 5.0;
         }
+    }
+    float samplerate = 0.0;
+    float basedelaytimes[NumFilters];
+    float lforates[NumFilters];
+    float lfoamounts[NumFilters];
+    double phases[NumFilters];
+    float process(size_t filterIndex, float input, float mix)
+    {
+        float moddeltime =
+            basedelaytimes[filterIndex] + lfoamounts[filterIndex] * std::sin(phases[filterIndex]);
+        float dry = input;
+        float wet = filters[filterIndex].process(dry, moddeltime);
+        float output = (1.0f - mix) * dry + mix * wet;
+        phases[filterIndex] += (M_PI * 2 * lforates[filterIndex]) / samplerate;
+        return output;
     }
 };
