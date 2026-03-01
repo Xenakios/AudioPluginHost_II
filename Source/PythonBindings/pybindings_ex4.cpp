@@ -549,7 +549,8 @@ inline void apply_volume_envelope(py::array_t<float> input_audio, int volume_sha
 inline py::array_t<float> encode_to_ambisonics(const py::array_t<float> &input_audio,
                                                double sample_rate, int amb_order,
                                                xenakios::Envelope &azimuth,
-                                               xenakios::Envelope &elevation)
+                                               xenakios::Envelope &elevation,
+                                               xenakios::Envelope &focus)
 {
     if (input_audio.ndim() != 2)
         throw std::runtime_error(
@@ -584,6 +585,24 @@ inline py::array_t<float> encode_to_ambisonics(const py::array_t<float> &input_a
     alignas(32) float SH1[64];
     memset(SH0, 0, sizeof(float) * 64);
     memset(SH1, 0, sizeof(float) * 64);
+    auto allpassbank = std::make_unique<AllPassBank<9>>();
+    allpassbank->filters[0].delayLength = 1381;
+    allpassbank->filters[1].delayLength = 401;
+    allpassbank->filters[2].delayLength = 521;
+    allpassbank->filters[3].delayLength = 631;
+    allpassbank->filters[4].delayLength = 761;
+    allpassbank->filters[5].delayLength = 887;
+    allpassbank->filters[6].delayLength = 1031;
+    allpassbank->filters[7].delayLength = 1153;
+    allpassbank->filters[8].delayLength = 1297;
+    // for (size_t i = 0; i < 9; ++i)
+    //     allpassbank->filters[i].delayLength = 10000;
+    StereoSimperSVF allpasses[16];
+    for (size_t i = 0; i < 16; ++i)
+    {
+        allpasses[i].init();
+        allpasses[i].setCoeff(36.0 + i * 2.13, 0.9f, 1.0 / sample_rate);
+    }
 
     int outcounter = 0;
     const int blocksize = 32;
@@ -596,12 +615,24 @@ inline py::array_t<float> encode_to_ambisonics(const py::array_t<float> &input_a
         float y = 0.0;
         float z = 0.0;
         sphericalToCartesian(aziRads, eleRads, x, y, z);
+        float focusval = std::clamp(focus.getValueAtPosition(tpos), 0.0, 1.0);
         if (amb_order == 1)
             SHEval1(x, y, z, SH1);
         else if (amb_order == 2)
+        {
             SHEval2(x, y, z, SH1);
+            for (int i = 0; i < 9; ++i)
+            {
+            }
+            // allpassbank->process(SH1, 9, focusval);
+            // apply_focus_weights(SH1, focusval);
+        }
         else if (amb_order == 3)
+        {
             SHEval3(x, y, z, SH1);
+            // focus_coeffs3rd_order(SH1, focusval);
+        }
+
         for (int i = 0; i < numOutChans; ++i)
             SH1[i] *= n3d2sn3d[i];
         int framestoprocess = std::min(blocksize, frames - outcounter);
@@ -611,7 +642,13 @@ inline py::array_t<float> encode_to_ambisonics(const py::array_t<float> &input_a
             for (int i = 0; i < framestoprocess; ++i)
             {
                 float gain = SH0[j] + gainstep * i;
-                writebufs[j][outcounter + i] = readbuf[outcounter + i] * gain;
+                float dummy = 0.0;
+                float dry = readbuf[outcounter + i] * gain;
+                float wet = dry;
+                // if (j > 0)
+                wet = allpassbank->filters[j].process(dry);
+                // StereoSimperSVF::step<StereoSimperSVF::ALL>(allpasses[j], wet, dummy);
+                writebufs[j][outcounter + i] = (1.0 - focusval) * dry + wet * focusval;
             }
         }
         for (int j = 0; j < numOutChans; ++j)
@@ -795,7 +832,7 @@ void init_py4(py::module_ &m, py::module_ &m_const)
         .def("render", &gendyn_render, "samplerate"_a = 44100.0, "duration"_a = 1.0, "events"_a);
     m.def("test_simple_lfo", &test_simple_lfo);
     m.def("encode_to_ambisonics", &encode_to_ambisonics, "input_audio"_a, "sample_rate"_a,
-          "ambisonics_order"_a, "azimuth"_a, "elevation"_a);
+          "ambisonics_order"_a, "azimuth"_a, "elevation"_a, "focus"_a);
     m.def("decode_ambisonics_to_stereo", &decode_ambisonics_to_stereo, "input_audio"_a);
     m.def("apply_volume_envelope", &apply_volume_envelope, "input_audio"_a, "shaping"_a,
           "sample_rate"_a, "volume_envelope"_a);

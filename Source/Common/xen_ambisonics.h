@@ -117,3 +117,142 @@ inline void SHEval3(const float fX, const float fY, const float fZ, float *pSH)
     pSH[15] = fTmpC * fC0;
     pSH[9] = fTmpC * fS0;
 }
+
+// This assumes 'coeffs' is the output from IEM's SHEval2 (9 floats)
+inline void apply_focus_weights(float *coeffs, float morph)
+{
+    // Weights for 2nd order Max-rE (focused beam)
+    // At morph = 0.0: Omni
+    // At morph = 0.5: 1st Order
+    // At morph = 1.0: 2nd Order Max-rE (Optimal focus)
+
+    float w1, w2;
+
+    if (morph < 0.5f)
+    {
+        float t = morph * 2.0f;
+        w1 = t; // Fade in 1st order
+        w2 = 0.0f;
+    }
+    else
+    {
+        float t = (morph - 0.5f) * 2.0f;
+        // Interpolate between full 1st order and 2nd order Max-rE
+        w1 = 1.0f + t * (0.775f - 1.0f);
+        w2 = t * 0.400f;
+    }
+
+    // Apply weights to ACN channels
+    // 0 = W (stays 1.0)
+    for (int i = 1; i < 4; i++)
+        coeffs[i] *= w1; // Order 1
+    for (int i = 4; i < 9; i++)
+        coeffs[i] *= w2; // Order 2
+}
+
+inline void focus_coeffs3rd_order(float *coeffs, float morph)
+{
+    float w1 = 0.0f, w2 = 0.0f, w3 = 0.0f;
+
+    if (morph < 0.333f)
+    {
+        // Phase 1: Omni to 1st Order (Max-rE)
+        float t = morph * 3.0f;
+        w1 = t * 0.577f;
+    }
+    else if (morph < 0.666f)
+    {
+        // Phase 2: 1st Order to 2nd Order (Max-rE)
+        float t = (morph - 0.333f) * 3.0f;
+        w1 = 0.577f + t * (0.775f - 0.577f);
+        w2 = t * 0.400f;
+    }
+    else
+    {
+        // Phase 3: 2nd Order to 3rd Order (Max-rE)
+        float t = (morph - 0.666f) * 3.0f;
+        w1 = 0.775f + t * (0.861f - 0.775f);
+        w2 = 0.400f + t * (0.612f - 0.400f);
+        w3 = t * 0.323f;
+    }
+
+    // Apply weights (Assuming ACN ordering)
+    // Order 0: index 0 (Weight is always 1.0)
+    for (int i = 1; i < 4; i++)
+        coeffs[i] *= w1; // Order 1
+    for (int i = 4; i < 9; i++)
+        coeffs[i] *= w2; // Order 2
+    for (int i = 9; i < 16; i++)
+        coeffs[i] *= w3; // Order 3
+}
+
+inline void focus_coeffs2nd_order(float *coeffs, float *dest, float morph)
+{
+    const float table[4][10] = {{1, 0, 0, 0, 0, 0, 0, 0, 0},
+                                {1, 1, 1, 1, 0, 0, 0, 0, 0},
+                                {1, 1, 1, 1, 1, 1, 1, 1, 1},
+                                {1, 1, 1, 1, 1, 1, 1, 1, 1}};
+    morph *= 2.0;
+    int i0 = morph;
+    int i1 = i0 + 1;
+    float frac = morph - (int)morph;
+    for (int i = 0; i < 9; ++i)
+    {
+        float y0 = table[i0][i];
+        float y1 = table[i1][i];
+        float y2 = y0 + (y1 - y0) * frac;
+        dest[i] = coeffs[i] * y2;
+    }
+}
+
+template <size_t MaxDelay> struct AllPass
+{
+    float delayBuffer[MaxDelay];
+    int index = 0;
+    float g = 0.5f;
+    int delayLength = 2;
+    AllPass()
+    {
+        for (size_t j = 0; j < MaxDelay; ++j)
+            delayBuffer[j] = 0.0f;
+    }
+    float process(float input)
+    {
+        //float out = delayBuffer[index];
+        //delayBuffer[index] = input;
+        //index = (index + 1) % delayLength;
+        //return out;
+        // 1. Grab the "old" sample from the buffer
+        float delayedSample = delayBuffer[index];
+
+        // 2. Standard All-Pass Equation:
+        // y[n] = -g * x[n] + x[n-d] + g * y[n-d]
+        float vn = input + (g * delayedSample);
+        float output = delayedSample - (g * vn);
+
+        // 3. Store the result for the next loop
+        delayBuffer[index] = vn;
+
+        // 4. Increment and wrap
+        index++;
+        if (index >= delayLength)
+            index = 0;
+
+        return output;
+    }
+};
+
+template <size_t NumFilters> struct AllPassBank
+{
+    AllPass<16384> filters[NumFilters];
+    AllPassBank() {}
+    void process(float *buf, size_t numFiltersToProcess, float mix)
+    {
+        for (size_t i = 1; i < numFiltersToProcess; ++i)
+        {
+            float dry = buf[i];
+            float wet = filters[i].process(dry);
+            buf[i] = (1.0f - mix) * dry + mix * wet;
+        }
+    }
+};
