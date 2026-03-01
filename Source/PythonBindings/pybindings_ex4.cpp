@@ -743,10 +743,11 @@ py::array_t<float> gendyn_render(Gendyn2026 &gendyn, double sr, double outdur,
                 auto it = gendyn.parIdToValuePtr.find(ev.event.param.param_id);
                 if (it != gendyn.parIdToValuePtr.end())
                 {
-                    float minv = gendyn.parIdToMetaDataPtr[ev.event.param.param_id]->minVal;
-                    float maxv = gendyn.parIdToMetaDataPtr[ev.event.param.param_id]->maxVal;
+                    auto pmd = gendyn.parIdToMetaDataPtr[ev.event.param.param_id];
+                    float minv = pmd->minVal;
+                    float maxv = pmd->maxVal;
                     val = std::clamp(val, minv, maxv);
-                    *gendyn.parIdToValuePtr[ev.event.param.param_id] = val;
+                    *it->second = val;
                     if (ev.event.param.param_id == Gendyn2026::PAR_RANDSEED)
                         gendyn.rng.seed(val, 13);
                     else if (ev.event.param.param_id == Gendyn2026::PAR_TRIGRESET)
