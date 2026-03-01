@@ -722,8 +722,6 @@ py::array_t<float> gendyn_render(Gendyn2026 &gendyn, double sr, double outdur,
     float osbuffer[osfactor];
     events.sortEvents();
     ClapEventSequence::IteratorSampleTime eviter{events, sr};
-    float plow = 0.0f;
-    float phigh = 127.0f;
     StereoSimperSVF highpass;
     highpass.init();
     highpass.setCoeff(12.0, 0.0f, 1.0 / sr);
@@ -744,8 +742,10 @@ py::array_t<float> gendyn_render(Gendyn2026 &gendyn, double sr, double outdur,
                 float val = ev.event.param.value;
                 if (ev.event.param.param_id == Gendyn2026::PAR_RANDSEED)
                     gendyn.rng.seed(val, 13);
+                else if (ev.event.param.param_id == Gendyn2026::PAR_TRIGRESET)
+                    gendyn.reset();
                 else if (ev.event.param.param_id == Gendyn2026::PAR_INTERPOLATIONMODE)
-                    gendyn.interpmode = (Gendyn2026::INTERPOLATION)val;
+                    gendyn.setInterpolationMode(val);
                 else if (ev.event.param.param_id == Gendyn2026::PAR_NUMSEGMENTS)
                     *gendyn.parIdToValuePtr[Gendyn2026::PAR_NUMSEGMENTS] = val;
                 else if (ev.event.param.param_id == Gendyn2026::PAR_TIMEDISTRIBUTION)
@@ -771,10 +771,6 @@ py::array_t<float> gendyn_render(Gendyn2026 &gendyn, double sr, double outdur,
             }
         }
         lowpass.setCoeff(lpcutoff, lpreso, 1.0 / sr);
-        if (phigh < plow)
-            std::swap(plow, phigh);
-        if (plow == phigh)
-            phigh += 0.01;
         for (int i = 0; i < torender; ++i)
         {
             for (int j = 0; j < osfactor; ++j)

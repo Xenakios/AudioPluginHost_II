@@ -102,7 +102,8 @@ struct Gendyn2026
         PAR_AMPSPREAD,
         PAR_TIMESPREAD,
         PAR_PITCHMIN,
-        PAR_PITCHMAX
+        PAR_PITCHMAX,
+        PAR_TRIGRESET
     };
 
     Gendyn2026()
@@ -162,6 +163,12 @@ struct Gendyn2026
                                      .withRange(-48.0, 48.0)
                                      .withDefault(1.00)
                                      .withID(PAR_PITCHMAX));
+        paramMetaDatas.push_back(pmd_t()
+                                     .asInt()
+                                     .withName("Reset trigger")
+                                     .withRange(0.0, 1.0)
+                                     .withDefault(0.00)
+                                     .withID(PAR_TRIGRESET));
         for (int i = 0; i < paramMetaDatas.size(); ++i)
         {
             paramValues[i] = paramMetaDatas[i].defaultVal;
@@ -172,15 +179,25 @@ struct Gendyn2026
     {
         return (sr) / numnodes / (440.0 * std::pow(2.0, 1.0 / 12.0 * (pitchsemis - 9.0)));
     }
+    void setInterpolationMode(int m)
+    {
+        *parIdToValuePtr[PAR_INTERPOLATIONMODE] = m;
+        interpmode = (INTERPOLATION)m;
+    }
     void prepare(double samplerate)
     {
         sr = samplerate;
+        reset();
+    }
+    void reset()
+    {
         float avgpitch = (*parIdToValuePtr[PAR_PITCHMAX]) - (*parIdToValuePtr[PAR_PITCHMIN]) / 2.0;
         float timeavg = pitchToSamplesTime(avgpitch, *parIdToValuePtr[PAR_NUMSEGMENTS]);
         for (size_t i = 0; i < maxnumnodes; ++i)
         {
             nodes[i] = {timeavg, 0.0f};
         }
+        phase = 0.0;
         phaseincrement = 1.0 / nodes[0].x0;
     }
     float step()
