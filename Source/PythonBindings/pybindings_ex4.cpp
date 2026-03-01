@@ -559,7 +559,8 @@ inline py::array_t<float> encode_to_ambisonics(const py::array_t<float> &input_a
             std::format("array ndim {} incompatible, must be 2", input_audio.ndim()));
     uint32_t numInChans = input_audio.shape(0);
     if (numInChans != 1)
-        throw std::runtime_error("input audio must be mono");
+        throw std::runtime_error(
+            std::format("input audio must be mono, has {} channels", numInChans));
     int frames = input_audio.size();
     auto numOutChans = 0;
     if (amb_order == 1)
@@ -647,7 +648,8 @@ inline py::array_t<float> encode_to_ambisonics(const py::array_t<float> &input_a
                 // if (j > 0)
                 // wet = allpassbank->filters[j].process(dry);
                 // StereoSimperSVF::step<StereoSimperSVF::ALL>(allpasses[j], wet, dummy);
-                // writebufs[j][outcounter + i] = dry; // (1.0 - focusval) * dry + wet * focusval;
+                // writebufs[j][outcounter + i] = dry; // (1.0 - focusval) * dry + wet *
+                // focusval;
             }
         }
 
