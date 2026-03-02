@@ -223,10 +223,14 @@ void Galactic3::processReplacing(float **inputs, float **outputs, VstInt32 sampl
 
             for (int chan = 0; chan < 16; ++chan)
             {
-                outputs[chan][outIndex] += ambencodecoeffs[0][chan] * (outEL + outFL) * 0.25;
-                outputs[chan][outIndex] += ambencodecoeffs[1][chan] * (outGL + outHL) * 0.25;
-                outputs[chan][outIndex] += ambencodecoeffs[2][chan] * (outER + outFR) * 0.25;
-                outputs[chan][outIndex] += ambencodecoeffs[3][chan] * (outGR + outHR) * 0.25;
+                outputs[chan][outIndex] += ambencodecoeffs[0][chan] * outEL * 0.5;
+                outputs[chan][outIndex] += ambencodecoeffs[1][chan] * outER * 0.5;
+                outputs[chan][outIndex] += ambencodecoeffs[2][chan] * outFL * 0.5;
+                outputs[chan][outIndex] += ambencodecoeffs[3][chan] * outFR * 0.5;
+                outputs[chan][outIndex] += ambencodecoeffs[4][chan] * outGL * 0.5;
+                outputs[chan][outIndex] += ambencodecoeffs[5][chan] * outGR * 0.5;
+                outputs[chan][outIndex] += ambencodecoeffs[6][chan] * outHL * 0.5;
+                outputs[chan][outIndex] += ambencodecoeffs[7][chan] * outHR * 0.5;
             }
 
             bez[bez_CL] = bez[bez_BL];

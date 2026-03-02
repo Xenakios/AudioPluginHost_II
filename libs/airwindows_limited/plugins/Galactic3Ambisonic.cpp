@@ -35,10 +35,14 @@ void calculateAmbiCoeffs(float azimuthDegrees, float elevationDegrees, float *de
 Galactic3::Galactic3(audioMasterCallback audioMaster)
     : AudioEffectX(audioMaster, kNumPrograms, kNumParameters)
 {
-    calculateAmbiCoeffs(-45.0f, 0.0f, ambencodecoeffs[0]);
-    calculateAmbiCoeffs(45.0f, 0.0f, ambencodecoeffs[1]);
-    calculateAmbiCoeffs(135.0f, 0.0f, ambencodecoeffs[2]);
-    calculateAmbiCoeffs(-135.0f, 0.0f, ambencodecoeffs[3]);
+    calculateAmbiCoeffs(-45.0f, 30.0f, ambencodecoeffs[0]);
+    calculateAmbiCoeffs(45.0f, 30.0f, ambencodecoeffs[1]);
+    calculateAmbiCoeffs(135.0f, -30.0f, ambencodecoeffs[2]);
+    calculateAmbiCoeffs(-135.0f, -30.0f, ambencodecoeffs[3]);
+    calculateAmbiCoeffs(-90.0f, 30.0f, ambencodecoeffs[4]);
+    calculateAmbiCoeffs(90.0f, 30.0f, ambencodecoeffs[5]);
+    calculateAmbiCoeffs(0.0f, -45.0f, ambencodecoeffs[6]);
+    calculateAmbiCoeffs(0.0f, 45.0f, ambencodecoeffs[7]);
     A = 0.5;
     B = 0.5;
     C = 0.5;

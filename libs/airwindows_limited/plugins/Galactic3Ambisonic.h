@@ -33,6 +33,14 @@ const int kNumInputs = 2;
 const int kNumOutputs = 2;
 const unsigned long kUniqueId = 'galc'; // Change this to what the AU identity is!
 
+/*
+Experimental 3rd order Ambisonics version. This just encodes the 8 output
+taps as 3rd order Ambisonics, so the code needs to be used with 16 output channels which should
+not point to the input channels.
+The code probably needs to be tweaked for more proper operation but the results are somewhat
+encouraing already.
+*/
+
 class Galactic3 : public AudioEffectX
 {
   public:
@@ -63,7 +71,7 @@ class Galactic3 : public AudioEffectX
   private:
     char _programName[kVstMaxProgNameLen + 1];
     std::set<std::string> _canDo;
-    float ambencodecoeffs[8][16];
+    alignas(32) float ambencodecoeffs[8][16];
     double iirAL;
     double iirBL;
 
