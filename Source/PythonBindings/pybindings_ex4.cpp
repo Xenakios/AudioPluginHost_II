@@ -578,6 +578,7 @@ inline py::array_t<float> render_galactic3ambisonics(py::array_t<float> input_au
     const float *readbuf = input_audio.data(0);
     auto plug = std::make_unique<airwinconsolidated::Galactic3::Galactic3>(0);
     plug->setSampleRate(samplerate);
+    automation.sortEvents();
     ClapEventSequence::IteratorSampleTime automiter{automation, samplerate};
     const size_t blocksize = 32;
     choc::buffer::ChannelArrayBuffer<float> inbuf{2, blocksize, true};
