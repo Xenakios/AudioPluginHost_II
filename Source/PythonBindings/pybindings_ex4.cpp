@@ -590,9 +590,15 @@ inline py::array_t<float> render_galactic3ambisonics(py::array_t<float> input_au
         for (int i = 0; i < toprocess; ++i)
         {
             if (outcounter + i < frames)
+            {
                 inbuf.getSample(0, i) = readbuf[outcounter + i];
+                inbuf.getSample(1, i) = readbuf[outcounter + i];
+            }
             else
+            {
                 inbuf.getSample(0, i) = 0.0f;
+                inbuf.getSample(1, i) = 0.0f;
+            }
         }
         auto aevts = automiter.readNextEvents(blocksize);
         for (auto &ev : aevts)
