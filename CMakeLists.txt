@@ -117,6 +117,8 @@ add_library(AWLIMITED
     libs/airwindows_limited/plugins/DeRez3Proc.cpp
     libs/airwindows_limited/plugins/CrunchCoat.cpp
     libs/airwindows_limited/plugins/CrunchCoatProc.cpp
+    libs/airwindows_limited/plugins/Galactic3Ambisonic.cpp
+    libs/airwindows_limited/plugins/Galactic3AmbisonicProc.cpp
 )
 
 pybind11_add_module(xenakios 
