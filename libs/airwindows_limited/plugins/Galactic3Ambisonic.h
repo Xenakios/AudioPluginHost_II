@@ -33,7 +33,7 @@ const int kNumInputs = 2;
 const int kNumOutputs = 2;
 const unsigned long kUniqueId = 'galc'; // Change this to what the AU identity is!
 
-/*
+/* Xenakios 2026 :
 Experimental 3rd order Ambisonics version. This just encodes the 8 output
 taps as 3rd order Ambisonics, so the code needs to be used with 16 output channels which should
 not point to the input channels.

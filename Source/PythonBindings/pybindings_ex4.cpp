@@ -550,7 +550,8 @@ inline void apply_volume_envelope(py::array_t<float> input_audio, int volume_sha
 }
 
 inline py::array_t<float> render_galactic3ambisonics(py::array_t<float> input_audio,
-                                                     double samplerate)
+                                                     double samplerate,
+                                                     ClapEventSequence &automation)
 {
     if (input_audio.ndim() != 2)
         throw std::runtime_error(
@@ -577,11 +578,12 @@ inline py::array_t<float> render_galactic3ambisonics(py::array_t<float> input_au
     const float *readbuf = input_audio.data(0);
     auto plug = std::make_unique<airwinconsolidated::Galactic3::Galactic3>(0);
     plug->setSampleRate(samplerate);
+    ClapEventSequence::IteratorSampleTime automiter{automation, samplerate};
     const size_t blocksize = 32;
     choc::buffer::ChannelArrayBuffer<float> inbuf{2, blocksize, true};
     choc::buffer::ChannelArrayBuffer<float> outbuf{16, blocksize, true};
     size_t outcounter = 0;
-    
+
     while (outcounter < outlen)
     {
         auto toprocess = std::min(blocksize, outlen - outcounter);
@@ -591,6 +593,19 @@ inline py::array_t<float> render_galactic3ambisonics(py::array_t<float> input_au
                 inbuf.getSample(0, i) = readbuf[outcounter + i];
             else
                 inbuf.getSample(0, i) = 0.0f;
+        }
+        auto aevts = automiter.readNextEvents(blocksize);
+        for (auto &ev : aevts)
+        {
+            if (ev.event.header.type == CLAP_EVENT_PARAM_VALUE)
+            {
+                auto pid = ev.event.param.param_id;
+                if (pid >= 0 && pid < 6)
+                {
+                    std::print("{} {} {}\n", outcounter / samplerate, pid, ev.event.param.value);
+                    plug->setParameter(pid, ev.event.param.value);
+                }
+            }
         }
         plug->processReplacing((float **)inbuf.getView().data.channels,
                                (float **)outbuf.getView().data.channels, toprocess);
@@ -895,7 +910,7 @@ void init_py4(py::module_ &m, py::module_ &m_const)
           "ambisonics_order"_a, "azimuth"_a, "elevation"_a, "spreadmix"_a, "spreadfeedback"_a);
     m.def("decode_ambisonics_to_stereo", &decode_ambisonics_to_stereo, "input_audio"_a);
     m.def("render_galactic3ambisonics", &render_galactic3ambisonics, "input_audio"_a,
-          "samplerate"_a);
+          "samplerate"_a, "automation"_a);
 
     m.def("apply_volume_envelope", &apply_volume_envelope, "input_audio"_a, "shaping"_a,
           "sample_rate"_a, "volume_envelope"_a);
