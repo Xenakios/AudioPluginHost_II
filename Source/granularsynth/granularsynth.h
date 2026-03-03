@@ -618,6 +618,7 @@ class GranulatorVoice
     float tail_fade_len = 0.005;
     float polarity_gain = 1.0f;
     int prior_osc_type = -1;
+    EasingLUTS *eluts = nullptr;
     alignas(16) std::array<float, 16> ambcoeffs;
     enum FilterRouting
     {
@@ -846,13 +847,13 @@ class GranulatorVoice
                 if (phase < envpeakpos)
                 {
                     envgain = xenakios::mapvalue<float>(phase, 0.0, envpeakpos, 0.0f, 1.0f);
-                    envgain = easing_table[envstarttype].function(envgain);
+                    envgain = eluts->getValueLERP(envstarttype, envgain);
                 }
                 else
                 {
                     envgain =
                         xenakios::mapvalue<float>(phase, envpeakpos, grain_end_phase, 1.0f, 0.0f);
-                    envgain = easing_table[envendtype].function(envgain);
+                    envgain = eluts->getValueLERP(envendtype, envgain);
                 }
                 // envgain = std::clamp(envgain, 0.0f, 1.0f);
                 outsample *= envgain * graingain * polarity_gain;
@@ -1481,6 +1482,7 @@ class ToneGranulator
         for (int i = 0; i < numvoices; ++i)
         {
             auto v = std::make_unique<GranulatorVoice>();
+            v->eluts = &eluts;
             voices.push_back(std::move(v));
         }
         for (size_t i = 0; i < parmetadatas.size(); ++i)
@@ -1529,6 +1531,7 @@ class ToneGranulator
     std::array<size_t, 2> insertsAWTypes = {0, 0};
     std::array<sfpp::FilterModel, 2> filtersModels{sfpp::FilterModel(), sfpp::FilterModel()};
     std::array<sfpp::ModelConfig, 2> filtersConfigs{sfpp::ModelConfig(), sfpp::ModelConfig()};
+    alignas(32) EasingLUTS eluts;
     void set_filter(int which, uint8_t mainmode, uint8_t awtype, sfpp::FilterModel mo,
                     sfpp::ModelConfig conf)
     {

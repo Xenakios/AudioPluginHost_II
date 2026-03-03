@@ -29,6 +29,8 @@
 #ifndef AH_EASING_H
 #define AH_EASING_H
 
+#include <cassert>
+
 using AHFloat = float;
 
 // #if defined __cplusplus
@@ -141,6 +143,36 @@ const EasingMapping easing_table[] = {
     {"BounceEaseInOut", BounceEaseInOut},
 
     {0, 0} // Sentinel to mark end of table
+};
+
+struct EasingLUTS
+{
+    static const size_t LUTSize = 1024;
+    static const size_t numFunctions = 31;
+    float data[numFunctions][LUTSize + 1];
+    EasingLUTS()
+    {
+        for (size_t i = 0; i < numFunctions; ++i)
+        {
+            auto f = easing_table[i].function;
+            for (size_t j = 0; j < LUTSize; ++j)
+            {
+                float x = 1.0 / (LUTSize - 1) * j;
+                data[i][j] = f(x);
+            }
+            data[i][LUTSize] = data[i][LUTSize - 1];
+        }
+    }
+    float getValueLERP(size_t funcindex, float x)
+    {
+        assert(x >= 0.0f && x <= 1.0f);
+        size_t index0 = x * (LUTSize - 1);
+        size_t index1 = index0 + 1;
+        float frac = x - (int)x;
+        float y0 = data[funcindex][index0];
+        float y1 = data[funcindex][index1];
+        return y0 + (y1 - y0) * frac;
+    }
 };
 
 #endif
