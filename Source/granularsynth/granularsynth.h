@@ -15,6 +15,7 @@
 #include "sst/basic-blocks/modulators/SimpleLFO.h"
 #include "sst/basic-blocks/params/ParamMetadata.h"
 #include "containers/choc_SingleReaderSingleWriterFIFO.h"
+#include "easing.h"
 
 using namespace sst::basic_blocks::mod_matrix;
 
@@ -331,7 +332,8 @@ struct GrainEvent
     int generator_type = 0;
     float volume = 0.0f;
     float auxsend = 0.0f;
-    int envelope_type = 0;
+    uint8_t envelope_start_type = 0;
+    uint8_t envelope_end_type = 0;
     float envelope_shape = 0.5f;
     float azimuth = 0.0f;
     float elevation = 0.0f;
@@ -632,7 +634,8 @@ class GranulatorVoice
     float feedbackamt = 0.0f;
     float graingain = 0.0;
     float auxsend1 = 0.0;
-    int envtype = 0;
+    uint8_t envstarttype = 0;
+    uint8_t envendtype = 0;
     double envshape = 0.5;
 
     int grainid = 0;
@@ -765,7 +768,8 @@ class GranulatorVoice
         graingain = graingain * graingain * graingain;
         auxsend1 = std::clamp(evpars.auxsend, 0.0f, 1.0f);
 
-        envtype = std::clamp<int>(evpars.envelope_type, 0, 1);
+        envstarttype = std::clamp<uint8_t>(evpars.envelope_start_type, 0, 30);
+        envendtype = std::clamp<uint8_t>(evpars.envelope_end_type, 0, 30);
         envshape = std::clamp(evpars.envelope_shape, 0.0f, 1.0f);
 
         feedbackamt = std::clamp(evpars.filterfeedback, -0.9999f, 0.9999f);
@@ -808,7 +812,8 @@ class GranulatorVoice
             {
                 outsample = std::visit([](auto &q) { return q.step(); }, theoscillator);
                 float envgain = 0.0f;
-                if (envtype == 3)
+                /*
+                if (envstarttype == 100)
                 {
                     envgain = gain_envelope.step();
                 }
@@ -837,7 +842,19 @@ class GranulatorVoice
                     envgain = 0.5f + 0.5f * std::sin(M_PI * 2 / grain_end_phase * phase * envfreq +
                                                      (1.5f * M_PI));
                 }
-                envgain = std::clamp(envgain, 0.0f, 1.0f);
+                */
+                if (phase < envpeakpos)
+                {
+                    envgain = xenakios::mapvalue<float>(phase, 0.0, envpeakpos, 0.0f, 1.0f);
+                    envgain = easing_table[envstarttype].function(envgain);
+                }
+                else
+                {
+                    envgain =
+                        xenakios::mapvalue<float>(phase, envpeakpos, grain_end_phase, 1.0f, 0.0f);
+                    envgain = easing_table[envendtype].function(envgain);
+                }
+                // envgain = std::clamp(envgain, 0.0f, 1.0f);
                 outsample *= envgain * graingain * polarity_gain;
             }
             if (filter_routing == FR_SERIAL)
@@ -1021,7 +1038,8 @@ class ToneGranulator
         PAR_STACKRANDOMPITCH = 2500,
         PAR_STACKRANDOMSPATIALIZATION = 2600,
         PAR_STACKTIMECURVE = 2700,
-        PAR_VOLENVTYPE = 2800,
+        PAR_VOLENVEASINGSTART = 2800,
+        PAR_VOLENVEASINGEND = 2900,
         PAR_LFORATES = 100000,
         PAR_LFODEFORMS = 100100,
         PAR_LFOSHIFTS = 100200,
@@ -1247,17 +1265,28 @@ class ToneGranulator
                                    .withGroupName("Volume")
                                    .withID(PAR_ENVMORPH)
                                    .withFlags(CLAP_PARAM_IS_MODULATABLE));
+        std::unordered_map<int, std::string> easingCurveMap;
+        for (int i = 0; i < 40; ++i)
+        {
+            if (easing_table[i].name && easing_table[i].function)
+            {
+                easingCurveMap[i] = easing_table[i].name;
+            }
+            else
+                break;
+        }
         parmetadatas.push_back(pmd()
-                                   .withUnorderedMapFormatting(
-                                       {
-                                           {0, "LINEAR PEAKING"},
-                                           {1, "EXPONENTIAL PEAKING"},
-                                       },
-                                       true)
+                                   .withUnorderedMapFormatting(easingCurveMap, true)
                                    .withDefault(0.0)
-                                   .withName("Volume Envelope Type")
+                                   .withName("Vol Env Start Curve")
                                    .withGroupName("Volume")
-                                   .withID(PAR_VOLENVTYPE));
+                                   .withID(PAR_VOLENVEASINGSTART));
+        parmetadatas.push_back(pmd()
+                                   .withUnorderedMapFormatting(easingCurveMap, true)
+                                   .withDefault(0.0)
+                                   .withName("Vol Env End Curve")
+                                   .withGroupName("Volume")
+                                   .withID(PAR_VOLENVEASINGEND));
         parmetadatas.push_back(pmd()
                                    .withRange(-48.0, 48.0)
                                    .withDefault(0.0)
@@ -1612,7 +1641,8 @@ class ToneGranulator
                 float gvol = modmatrix.m.getTargetValue(
                     GranulatorModConfig::TargetIdentifier{PAR_GRAINVOLUME});
                 GrainEvent genev{0.0, gdur, pitch, gvol};
-                genev.envelope_type = *idtoparvalptr[PAR_VOLENVTYPE];
+                genev.envelope_start_type = *idtoparvalptr[PAR_VOLENVEASINGSTART];
+                genev.envelope_end_type = *idtoparvalptr[PAR_VOLENVEASINGEND];
                 genev.envelope_shape =
                     modmatrix.m.getTargetValue(GranulatorModConfig::TargetIdentifier{PAR_ENVMORPH});
                 float azimuth =

@@ -259,10 +259,11 @@ juce_add_plugin(ToneGranulatorPlugin
 
 target_sources(ToneGranulatorPlugin
     PRIVATE
+        
         Source/granularsynth/juceplugin/PluginProcessor.cpp
         Source/granularsynth/juceplugin/PluginEditor.cpp
         Source/granularsynth/js_impl.cpp
-        
+        Source/granularsynth/easing.cpp
 )   
 
 target_compile_options(ToneGranulatorPlugin PRIVATE -Werror=return-type "$<$<COMPILE_LANGUAGE:CXX>:-fno-char8_t>")
