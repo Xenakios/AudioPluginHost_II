@@ -12,6 +12,16 @@ namespace airwinconsolidated::Galactic3
 
 void Galactic3::processReplacing(float **inputs, float **outputs, VstInt32 sampleFrames)
 {
+    if (priorAmbisonicOrder != (int)G)
+    {
+        priorAmbisonicOrder = (int)G;
+        updateAmbisonicCoefficients(G);
+    }
+    int numambichannels = 4;
+    if ((int)G == 2)
+        numambichannels = 9;
+    if ((int)G == 3)
+        numambichannels = 16;
     float *in1 = inputs[0];
     float *in2 = inputs[1];
     float *out1 = outputs[0];
@@ -218,10 +228,11 @@ void Galactic3::processReplacing(float **inputs, float **outputs, VstInt32 sampl
             inputSampleR = (outER + outFR + outGR + outHR) / 8.0;
             // and take the final combined sum of outputs
 
-            for (int chan = 0; chan < 16; ++chan)
+            // ambisonic encoding
+            for (int chan = 0; chan < numambichannels; ++chan)
                 outputs[chan][outIndex] = 0.0f;
 
-            for (int chan = 0; chan < 16; ++chan)
+            for (int chan = 0; chan < numambichannels; ++chan)
             {
                 outputs[chan][outIndex] += ambencodecoeffs[0][chan] * outEL * 0.5;
                 outputs[chan][outIndex] += ambencodecoeffs[1][chan] * outER * 0.5;

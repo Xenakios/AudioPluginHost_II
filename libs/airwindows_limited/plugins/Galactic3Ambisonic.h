@@ -25,7 +25,8 @@ enum
     kParamD = 3,
     kParamE = 4,
     kParamF = 5,
-    kNumParameters = 6
+    kParamG = 6,
+    kNumParameters = 7
 }; //
 
 const int kNumPrograms = 0;
@@ -67,11 +68,12 @@ class Galactic3 : public AudioEffectX
     virtual bool parameterTextToValue(VstInt32 index, const char *text, float &value);
     virtual bool canConvertParameterTextToValue(VstInt32 index);
     virtual VstInt32 canDo(char *text);
-
+    void updateAmbisonicCoefficients(int order);
   private:
     char _programName[kVstMaxProgNameLen + 1];
     std::set<std::string> _canDo;
     alignas(32) float ambencodecoeffs[8][16];
+    int priorAmbisonicOrder = -1;
     double iirAL;
     double iirBL;
 
@@ -167,6 +169,7 @@ class Galactic3 : public AudioEffectX
     float D;
     float E;
     float F; // parameters. Always 0-1, and we scale/alter them elsewhere.
+    float G = 1;
 };
 
 #endif

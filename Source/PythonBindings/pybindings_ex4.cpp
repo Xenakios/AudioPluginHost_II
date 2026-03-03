@@ -607,7 +607,7 @@ inline py::array_t<float> render_galactic3ambisonics(py::array_t<float> input_au
             if (ev.event.header.type == CLAP_EVENT_PARAM_VALUE)
             {
                 auto pid = ev.event.param.param_id;
-                if (pid >= 0 && pid < 6)
+                if (pid >= 0 && pid < airwinconsolidated::Galactic3::kNumParameters)
                 {
                     std::print("{} {} {}\n", outcounter / samplerate, pid, ev.event.param.value);
                     plug->setParameter(pid, ev.event.param.value);

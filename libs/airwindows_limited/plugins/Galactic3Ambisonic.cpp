@@ -10,6 +10,7 @@
 #include <cstdlib>
 #include <algorithm>
 #include "../../Source/Common/xen_ambisonics.h"
+#include <print>
 
 namespace airwinconsolidated::Galactic3
 {
@@ -21,34 +22,57 @@ AudioEffect *createEffectInstance(audioMasterCallback audioMaster)
 
 template <typename T> inline T degreesToRadians(T degrees) { return degrees * (M_PI / 180.0); }
 
-void calculateAmbiCoeffs(float azimuthDegrees, float elevationDegrees, float *destarr)
+void calculateAmbiCoeffs(int aorder, float azimuthDegrees, float elevationDegrees, float *destarr)
 {
     float aziRads = degreesToRadians(azimuthDegrees);
     float eleRads = degreesToRadians(elevationDegrees);
     float x, y, z;
     sphericalToCartesian(aziRads, eleRads, x, y, z);
-    SHEval3(x, y, z, destarr);
-    for (int i = 0; i < 16; ++i)
+    int numchans = 4;
+    if (aorder == 1)
+        SHEval1(x, y, z, destarr);
+    if (aorder == 2)
+    {
+        SHEval2(x, y, z, destarr);
+        numchans = 9;
+    }
+    if (aorder == 3)
+    {
+        SHEval3(x, y, z, destarr);
+        numchans = 16;
+    }
+    for (int i = 0; i < numchans; ++i)
         destarr[i] *= n3d2sn3d[i];
+}
+
+void Galactic3::updateAmbisonicCoefficients(int order)
+{
+    // we expect this to be called very rarely, even though it's triggered by a plugin parameter for
+    // now
+    std::print("updating galactic3 ambisonic coefficients to order {}\n", order);
+    for (int i = 0; i < 8; ++i)
+        for (int j = 0; j < 16; ++j)
+            ambencodecoeffs[i][j] = 0.0f;
+    // we might want to allow other placement patterns, settable via a parameter...
+    // front left/right, higher elevation
+    calculateAmbiCoeffs(order, -45.0f, 30.0f, ambencodecoeffs[0]);
+    calculateAmbiCoeffs(order, 45.0f, 30.0f, ambencodecoeffs[1]);
+    // rear left/right, lower elevation
+    calculateAmbiCoeffs(order, 135.0f, -30.0f, ambencodecoeffs[2]);
+    calculateAmbiCoeffs(order, -135.0f, -30.0f, ambencodecoeffs[3]);
+    // side left/right, higher elevation
+    calculateAmbiCoeffs(order, -90.0f, 30.0f, ambencodecoeffs[4]);
+    calculateAmbiCoeffs(order, 90.0f, 30.0f, ambencodecoeffs[5]);
+    // front center, lower elevation
+    calculateAmbiCoeffs(order, 0.0f, -45.0f, ambencodecoeffs[6]);
+    // rear center, higher elevation
+    calculateAmbiCoeffs(order, -180.0f, 45.0f, ambencodecoeffs[7]);
 }
 
 Galactic3::Galactic3(audioMasterCallback audioMaster)
     : AudioEffectX(audioMaster, kNumPrograms, kNumParameters)
 {
-    // we might want to allow other placement patterns, settable via a parameter...
-    // front left/right, higher elevation
-    calculateAmbiCoeffs(-45.0f, 30.0f, ambencodecoeffs[0]);
-    calculateAmbiCoeffs(45.0f, 30.0f, ambencodecoeffs[1]);
-    // rear left/right, lower elevation
-    calculateAmbiCoeffs(135.0f, -30.0f, ambencodecoeffs[2]);
-    calculateAmbiCoeffs(-135.0f, -30.0f, ambencodecoeffs[3]);
-    // side left/right, higher elevation
-    calculateAmbiCoeffs(-90.0f, 30.0f, ambencodecoeffs[4]);
-    calculateAmbiCoeffs(90.0f, 30.0f, ambencodecoeffs[5]);
-    // front center, lower elevation
-    calculateAmbiCoeffs(0.0f, -45.0f, ambencodecoeffs[6]);
-    // rear center, higher elevation
-    calculateAmbiCoeffs(-180.0f, 45.0f, ambencodecoeffs[7]);
+
     A = 0.5;
     B = 0.5;
     C = 0.5;
@@ -222,6 +246,9 @@ void Galactic3::setParameter(VstInt32 index, float value)
     case kParamF:
         F = value;
         break;
+    case kParamG:
+        G = value;
+        break;
     default:
         break; // unknown parameter, shouldn't happen!
     }
@@ -248,6 +275,9 @@ float Galactic3::getParameter(VstInt32 index)
         break;
     case kParamF:
         return F;
+        break;
+    case kParamG:
+        return G;
         break;
     default:
         break; // unknown parameter, shouldn't happen!
@@ -277,6 +307,9 @@ void Galactic3::getParameterName(VstInt32 index, char *text)
     case kParamF:
         vst_strncpy(text, "Dry/Wet", kVstMaxParamStrLen);
         break;
+    case kParamG:
+        vst_strncpy(text, "Ambisonic Order", kVstMaxParamStrLen);
+        break;
     default:
         break; // unknown parameter, shouldn't happen!
     } // this is our labels for displaying in the VST host
@@ -304,6 +337,9 @@ void Galactic3::getParameterDisplay(VstInt32 index, char *text)
     case kParamF:
         float2string(F, text, kVstMaxParamStrLen);
         break;
+    case kParamG:
+        float2string(G, text, kVstMaxParamStrLen);
+        break;
     default:
         break; // unknown parameter, shouldn't happen!
     } // this displays the values and handles 'popups' where it's discrete choices
@@ -329,6 +365,9 @@ void Galactic3::getParameterLabel(VstInt32 index, char *text)
         vst_strncpy(text, "", kVstMaxParamStrLen);
         break;
     case kParamF:
+        vst_strncpy(text, "", kVstMaxParamStrLen);
+        break;
+    case kParamG:
         vst_strncpy(text, "", kVstMaxParamStrLen);
         break;
     default:
