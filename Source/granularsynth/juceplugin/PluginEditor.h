@@ -481,13 +481,14 @@ class VolumeEnvelopeComponent : public juce::Component
         g.fillAll(juce::Colours::black);
         g.setColour(juce::Colours::yellow);
         curvepath.clear();
-        int curvestart = *granul->idtoparvalptr[ToneGranulator::PAR_VOLENVEASINGSTART];
-        int curveend = *granul->idtoparvalptr[ToneGranulator::PAR_VOLENVEASINGEND];
-        float curvemorph = *granul->idtoparvalptr[ToneGranulator::PAR_ENVMORPH];
+        auto curvemorph = priormorph;
+        auto curvestart = priorstartcurve;
+        auto curveend = priorendcurve;
+        float sinfreq = getWidth() / 8.0;
         for (int i = 0; i < getWidth(); ++i)
         {
             float normx = 1.0 / getWidth() * i;
-            float sinvalue = std::sin(2 * M_PI * normx * 64.0);
+            float sinvalue = std::sin(2 * M_PI * normx * sinfreq);
             float normy = 0.0f;
             if (normx < curvemorph)
             {
@@ -508,8 +509,25 @@ class VolumeEnvelopeComponent : public juce::Component
         }
         g.strokePath(curvepath, juce::PathStrokeType(1.0f));
     }
+    void updateIfNeeded()
+    {
+        int curvestart = *granul->idtoparvalptr[ToneGranulator::PAR_VOLENVEASINGSTART];
+        int curveend = *granul->idtoparvalptr[ToneGranulator::PAR_VOLENVEASINGEND];
+        float curvemorph = *granul->idtoparvalptr[ToneGranulator::PAR_ENVMORPH];
+        if (priorstartcurve != curvestart || priorendcurve != curveend || priormorph != curvemorph)
+        {
+            priorstartcurve = curvestart;
+            priorendcurve = curveend;
+            priormorph = curvemorph;
+            repaint();
+            // DBG(priorstartcurve << " " << priorendcurve << " " << priormorph);
+        }
+    }
     ToneGranulator *granul = nullptr;
     juce::Path curvepath;
+    int priorstartcurve = 0;
+    int priorendcurve = 0;
+    float priormorph = 0.0f;
 };
 
 class ParameterGroupComponent : public juce::GroupComponent
