@@ -101,6 +101,7 @@ void AudioPluginAudioProcessor::changeProgramName(int index, const juce::String 
 //==============================================================================
 void AudioPluginAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 {
+    DBG("prepareToPlay");
     perfMeasurer.reset(sampleRate, samplesPerBlock);
     workBuffer.resize(samplesPerBlock * 32);
     granulator.prepare(sampleRate, {}, 3, 0, 0.002f, 0.002f);
@@ -153,14 +154,7 @@ void AudioPluginAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
             }
         }
     }
-    ParameterMessage parmsg;
-    while (params_from_gui_fifo.pop(parmsg))
-    {
-        if (parmsg.id > 0)
-        {
-            *granulator.idtoparvalptr[parmsg.id] = parmsg.value;
-        }
-    }
+
     ThreadMessage msg;
     while (from_gui_fifo.pop(msg))
     {
@@ -206,6 +200,14 @@ void AudioPluginAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
                 }
                 mm.m.prepare(mm.rt, granulator.m_sr, granul_block_size);
             }
+        }
+    }
+    ParameterMessage parmsg;
+    while (params_from_gui_fifo.pop(parmsg))
+    {
+        if (parmsg.id > 0)
+        {
+            *granulator.idtoparvalptr[parmsg.id] = parmsg.value;
         }
     }
     // if (prior_ambi_order != parAmbiOrder->getIndex())
@@ -354,6 +356,7 @@ void AudioPluginAudioProcessor::getStateInformation(juce::MemoryBlock &destData)
 
 void AudioPluginAudioProcessor::setStateInformation(const void *data, int sizeInBytes)
 {
+    DBG("setStateInformation");
     try
     {
         if (sizeInBytes < 1)
@@ -364,21 +367,9 @@ void AudioPluginAudioProcessor::setStateInformation(const void *data, int sizeIn
         // std::string json((char *)data, (char *)data + sizeInBytes);
         //  DBG(json);
         // auto state = choc::json::parse(json);
-        if (state.hasObjectMember("params"))
-        {
-            auto params = state["params"];
-            auto &pars = granulator.parmetadatas;
-            for (int i = 0; i < pars.size(); ++i)
-            {
-                std::string id = std::to_string(pars[i].id);
-                if (params.hasObjectMember(id))
-                {
-                    float v = params[id].getWithDefault(pars[i].defaultVal);
-                    *granulator.idtoparvalptr[pars[i].id] = v;
-                }
-            }
-        }
+
         suspendProcessing(true);
+
         if (state.hasObjectMember("filterstates"))
         {
             auto filterstates = state["filterstates"];
@@ -395,6 +386,8 @@ void AudioPluginAudioProcessor::setStateInformation(const void *data, int sizeIn
                     conf.pt = (decltype(conf.pt))filterstate["pt"].getWithDefault(0);
                     int mainmode = filterstate["mainmode"].getWithDefault(0);
                     int awtype = filterstate["awtype"].getWithDefault(0);
+                    // granulator.set_filter(i, mainmode, awtype, m, conf);
+
                     ThreadMessage msg;
                     msg.opcode = ThreadMessage::OP_FILTERTYPE;
                     msg.insertmainmode = mainmode;
@@ -406,7 +399,24 @@ void AudioPluginAudioProcessor::setStateInformation(const void *data, int sizeIn
                 }
             }
         }
-
+        if (state.hasObjectMember("params"))
+        {
+            auto params = state["params"];
+            auto &pars = granulator.parmetadatas;
+            for (int i = 0; i < pars.size(); ++i)
+            {
+                std::string id = std::to_string(pars[i].id);
+                if (params.hasObjectMember(id))
+                {
+                    float v = params[id].getWithDefault(pars[i].defaultVal);
+                    ParameterMessage parmsg;
+                    parmsg.id = pars[i].id;
+                    parmsg.value = v;
+                    params_from_gui_fifo.push(parmsg);
+                    // *granulator.idtoparvalptr[pars[i].id] = v;
+                }
+            }
+        }
         if (state.hasObjectMember("modroutings"))
         {
             auto routings = state["modroutings"];
@@ -448,13 +458,6 @@ void AudioPluginAudioProcessor::setStateInformation(const void *data, int sizeIn
 
 void AudioPluginAudioProcessor::sendExtraStatesToGUI()
 {
-    for (auto &p : granulator.parmetadatas)
-    {
-        ParameterMessage msg;
-        msg.id = p.id;
-        msg.value = *granulator.idtoparvalptr[msg.id];
-        params_to_gui_fifo.push(msg);
-    }
     {
         ThreadMessage msg;
         msg.opcode = ThreadMessage::OP_FILTERTYPE;
@@ -468,7 +471,13 @@ void AudioPluginAudioProcessor::sendExtraStatesToGUI()
             to_gui_fifo.push(msg);
         }
     }
-
+    for (auto &p : granulator.parmetadatas)
+    {
+        ParameterMessage msg;
+        msg.id = p.id;
+        msg.value = *granulator.idtoparvalptr[msg.id];
+        params_to_gui_fifo.push(msg);
+    }
     auto &mm = granulator.modmatrix;
     for (int i = 0; i < GranulatorModConfig::FixedMatrixSize; ++i)
     {
