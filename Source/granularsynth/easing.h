@@ -30,6 +30,7 @@
 #define AH_EASING_H
 
 #include <cassert>
+#include <algorithm>
 
 using AHFloat = float;
 
@@ -163,10 +164,14 @@ struct EasingLUTS
             data[i][LUTSize] = data[i][LUTSize - 1];
         }
     }
-    float getValueLERP(size_t funcindex, float x)
+    template <bool ClampInput> float getValueLERP(size_t funcindex, float x)
     {
-        assert(x >= 0.0f && x <= 1.0f);
-        size_t index0 = x * (LUTSize - 1);
+        if constexpr (ClampInput)
+            x = std::clamp(x, 0.0f, 1.0f);
+        else
+            assert(x >= 0.0f && x <= 1.0f);
+        x *= (LUTSize - 1);
+        size_t index0 = x;
         size_t index1 = index0 + 1;
         float frac = x - (int)x;
         float y0 = data[funcindex][index0];

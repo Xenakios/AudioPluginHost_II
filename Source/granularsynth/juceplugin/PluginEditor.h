@@ -485,7 +485,7 @@ class VolumeEnvelopeComponent : public juce::Component
         auto curvestart = priorstartcurve;
         auto curveend = priorendcurve;
         float sinfreq = getWidth() / 8.0;
-        auto& eluts = granul->eluts;
+        auto &eluts = granul->eluts;
         for (int i = 0; i < getWidth(); ++i)
         {
             float normx = 1.0 / getWidth() * i;
@@ -495,13 +495,13 @@ class VolumeEnvelopeComponent : public juce::Component
             {
                 normx = xenakios::mapvalue(normx, 0.0f, curvemorph, 0.0f, 1.0f);
                 // normy = easing_table[curvestart].function(normx);
-                normy = eluts.getValueLERP(curvestart, normx);
+                normy = eluts.getValueLERP<true>(curvestart, normx);
             }
             else
             {
                 normx = xenakios::mapvalue(normx, curvemorph, 1.0f, 1.0f, 0.0f);
                 // normy = easing_table[curveend].function(normx);
-                normy = eluts.getValueLERP(curveend, normx);
+                normy = eluts.getValueLERP<true>(curveend, normx);
             }
             normy *= sinvalue;
             float ycor = xenakios::mapvalue<float>(normy, -1.5f, 1.5f, getHeight(), 0);
@@ -531,7 +531,6 @@ class VolumeEnvelopeComponent : public juce::Component
     int priorstartcurve = 0;
     int priorendcurve = 0;
     float priormorph = 0.0f;
-    
 };
 
 class ParameterGroupComponent : public juce::GroupComponent

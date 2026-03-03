@@ -847,13 +847,13 @@ class GranulatorVoice
                 if (phase < envpeakpos)
                 {
                     envgain = xenakios::mapvalue<float>(phase, 0.0, envpeakpos, 0.0f, 1.0f);
-                    envgain = eluts->getValueLERP(envstarttype, envgain);
+                    envgain = eluts->getValueLERP<false>(envstarttype, envgain);
                 }
                 else
                 {
                     envgain =
                         xenakios::mapvalue<float>(phase, envpeakpos, grain_end_phase, 1.0f, 0.0f);
-                    envgain = eluts->getValueLERP(envendtype, envgain);
+                    envgain = eluts->getValueLERP<false>(envendtype, envgain);
                 }
                 // envgain = std::clamp(envgain, 0.0f, 1.0f);
                 outsample *= envgain * graingain * polarity_gain;
