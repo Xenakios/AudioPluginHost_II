@@ -4,7 +4,6 @@ void init_step_sequencer_js();
 void deinit_step_sequencer_js();
 std::vector<float> generate_from_js(std::string jscode);
 
-
 inline void updateAllFonts(juce::Component &parent, const juce::Font &newFont)
 {
     for (auto *child : parent.getChildren())
@@ -24,10 +23,11 @@ inline void updateAllFonts(juce::Component &parent, const juce::Font &newFont)
 
 //==============================================================================
 AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor(AudioPluginAudioProcessor &p)
-    : AudioProcessorEditor(&p), processorRef(p),
+    : AudioProcessorEditor(&p), processorRef(p), envcomp(&p.granulator),
       lfoTabs(juce::TabbedButtonBar::Orientation::TabsAtTop)
 {
     init_step_sequencer_js();
+    addAndMakeVisible(envcomp);
     addAndMakeVisible(oscillatorComponent);
     addAndMakeVisible(spatParamsComponent);
     addAndMakeVisible(miscParamsComponent);
@@ -166,9 +166,9 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor(AudioPluginAudi
     startTimer(50);
 }
 
-AudioPluginAudioProcessorEditor::~AudioPluginAudioProcessorEditor() 
-{ 
-    setLookAndFeel(nullptr); 
+AudioPluginAudioProcessorEditor::~AudioPluginAudioProcessorEditor()
+{
+    setLookAndFeel(nullptr);
     deinit_step_sequencer_js();
 }
 
@@ -333,6 +333,7 @@ void AudioPluginAudioProcessorEditor::showFilterMenu(int whichfilter)
 
 void AudioPluginAudioProcessorEditor::timerCallback()
 {
+    envcomp.repaint();
     infoLabel.setText(
         std::format("[CPU Load {:3.0f}%] [{}/{} voices {}/{} scheduled] [{} in {} out]",
                     processorRef.perfMeasurer.getLoadAsPercentage(),
@@ -399,6 +400,7 @@ void AudioPluginAudioProcessorEditor::resized()
     oscillatorComponent.setBounds(0, 0, 500, 125);
     volumeParamsComponent.setBounds(0, 126, 500, 125);
     timeParamsComponent.setBounds(502, 0, 500, 125);
+    envcomp.setBounds(502, timeParamsComponent.getBottom() + 1, 500, 175);
     spatParamsComponent.setBounds(0, 302, 500, 125);
     mainParamsComponent.setBounds(502, 302, 500, 125);
     insert1ParamsComponent.setBounds(1004, 0, 500, 150);
@@ -464,7 +466,6 @@ void StepSeqComponent::paint(juce::Graphics &g)
     g.setColour(juce::Colours::white);
     g.drawMultiLineText(txt, graphxpos, 20, 200);
 }
-
 
 bool StepSeqComponent::keyPressed(const juce::KeyPress &ev)
 {

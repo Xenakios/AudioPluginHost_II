@@ -472,6 +472,46 @@ struct ModulationRowComponent : public juce::Component
     DropDownComponent destDrop;
 };
 
+class VolumeEnvelopeComponent : public juce::Component
+{
+  public:
+    VolumeEnvelopeComponent(ToneGranulator *gr) : granul(gr) { curvepath.preallocateSpace(512); }
+    void paint(juce::Graphics &g) override
+    {
+        g.fillAll(juce::Colours::black);
+        g.setColour(juce::Colours::yellow);
+        curvepath.clear();
+        int curvestart = *granul->idtoparvalptr[ToneGranulator::PAR_VOLENVEASINGSTART];
+        int curveend = *granul->idtoparvalptr[ToneGranulator::PAR_VOLENVEASINGEND];
+        float curvemorph = *granul->idtoparvalptr[ToneGranulator::PAR_ENVMORPH];
+        for (int i = 0; i < getWidth(); ++i)
+        {
+            float normx = 1.0 / getWidth() * i;
+            float sinvalue = std::sin(2 * M_PI * normx * 64.0);
+            float normy = 0.0f;
+            if (normx < curvemorph)
+            {
+                normx = xenakios::mapvalue(normx, 0.0f, curvemorph, 0.0f, 1.0f);
+                normy = easing_table[curvestart].function(normx);
+            }
+            else
+            {
+                normx = xenakios::mapvalue(normx, curvemorph, 1.0f, 1.0f, 0.0f);
+                normy = easing_table[curveend].function(normx);
+            }
+            normy *= sinvalue;
+            float ycor = xenakios::mapvalue<float>(normy, -1.5f, 1.5f, getHeight(), 0);
+            if (i == 0)
+                curvepath.startNewSubPath({(float)i, ycor});
+            else
+                curvepath.lineTo({(float)i, ycor});
+        }
+        g.strokePath(curvepath, juce::PathStrokeType(1.0f));
+    }
+    ToneGranulator *granul = nullptr;
+    juce::Path curvepath;
+};
+
 class ParameterGroupComponent : public juce::GroupComponent
 {
   public:
@@ -537,6 +577,7 @@ class AudioPluginAudioProcessorEditor final : public juce::AudioProcessorEditor,
     ParameterGroupComponent stackParamsComponent{"Stacking"};
     ParameterGroupComponent insert1ParamsComponent{"Insert FX A"};
     ParameterGroupComponent insert2ParamsComponent{"Insert FX B"};
+    VolumeEnvelopeComponent envcomp;
     struct FilterInfo
     {
         sfpp::FilterModel filtermodel;
