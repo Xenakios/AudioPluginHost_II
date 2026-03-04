@@ -11,6 +11,7 @@
 #include "plugins/Hypersoft.h"
 #include "plugins/DeRez3.h"
 #include "plugins/CrunchCoat.h"
+#include "plugins/BitGlitter.h"
 #include <print>
 
 namespace sfpp = sst::filtersplusplus;
@@ -149,6 +150,7 @@ class GrainInsertFX
         result.emplace_back("AW Hypersoft", "AirWindows", 2, 5);
         result.emplace_back("AW DeRez3", "AirWindows", 2, 6);
         result.emplace_back("AW CrunchCoat", "AirWindows", 2, 7);
+        result.emplace_back("AW BitGlitter", "AirWindows", 2, 8);
         std::sort(result.begin(), result.end(), [](auto const &lhs, auto const &rhs) {
             return lhs.displayname < rhs.displayname;
         });
@@ -258,6 +260,11 @@ class GrainInsertFX
             {
                 awplugin = make_aw_safe<airwinconsolidated::CrunchCoat::CrunchCoat>(0);
                 numParams = airwinconsolidated::CrunchCoat::kNumParameters;
+            }
+            else if (m.awtype == 8)
+            {
+                awplugin = make_aw_safe<airwinconsolidated::BitGlitter::BitGlitter>(0);
+                numParams = airwinconsolidated::BitGlitter::kNumParameters;
             }
             assert(numParams < 11);
             if (awplugin)

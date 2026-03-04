@@ -119,6 +119,8 @@ add_library(AWLIMITED
     libs/airwindows_limited/plugins/CrunchCoatProc.cpp
     libs/airwindows_limited/plugins/Galactic3Ambisonic.cpp
     libs/airwindows_limited/plugins/Galactic3AmbisonicProc.cpp
+    libs/airwindows_limited/plugins/BitGlitter.cpp
+    libs/airwindows_limited/plugins/BitGlitterProc.cpp
 )
 
 pybind11_add_module(xenakios 
