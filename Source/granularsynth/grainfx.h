@@ -259,6 +259,7 @@ class GrainInsertFX
                 awplugin = make_aw_safe<airwinconsolidated::CrunchCoat::CrunchCoat>(0);
                 numParams = airwinconsolidated::CrunchCoat::kNumParameters;
             }
+            assert(numParams < 11);
             if (awplugin)
             {
                 mainmode = 2;
