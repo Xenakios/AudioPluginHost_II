@@ -163,7 +163,7 @@ void AudioPluginAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
         {
             granulator.set_filter(msg.filterindex, msg.insertmainmode, msg.awtype, msg.filtermodel,
                                   msg.filterconfig);
-            for (size_t i = 0; i < 12; ++i)
+            for (size_t i = 0; i < GranulatorVoice::maxParamsPerInsert; ++i)
             {
                 ParameterMessage omsg;
                 int parid = ToneGranulator::PAR_INSERTAFIRST + 32 * msg.filterindex + i;

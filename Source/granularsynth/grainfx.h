@@ -99,7 +99,7 @@ class GrainInsertFX
         sst::filtersplusplus::FilterModel sstmodel;
         sst::filtersplusplus::ModelConfig sstconfig;
     };
-    std::array<float, 12> paramvalues;
+    std::array<float, 10> paramvalues;
     alignas(32) sst::filtersplusplus::Filter sstfilter;
     alignas(32) std::unique_ptr<AirwinConsolidatedBase> awplugin;
     size_t mainmode = 0;
@@ -250,7 +250,13 @@ class GrainInsertFX
             }
         }
     }
-    void reset() { sstfilter.reset(); }
+    void reset()
+    {
+        if (mainmode == 1)
+            sstfilter.reset();
+        if (mainmode == 2 && awplugin)
+            awplugin->reset();
+    }
     void prepareInstance(double sampleRate, size_t ablockSize)
     {
         sr = sampleRate;

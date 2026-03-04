@@ -345,7 +345,7 @@ struct GrainEvent
     float noisecorr = 0.0f;
     float filterfeedback = 0.0f;
     float modamounts[MD_NUMDESTS];
-    float insertparams[4][12];
+    float insertparams[4][10];
 };
 
 template <typename T> inline T degreesToRadians(T degrees) { return degrees * (M_PI / 180.0); }
@@ -607,7 +607,7 @@ class GranulatorVoice
         theoscillator;
 
     static constexpr size_t numInsertSlots = 4;
-    static constexpr size_t maxParamsPerInsert = 12;
+    static constexpr size_t maxParamsPerInsert = 10;
     alignas(32) std::array<GrainInsertFX, numInsertSlots> insert_fx;
 
     int phase = 0;
@@ -1546,7 +1546,7 @@ class ToneGranulator
             v->set_insert_type(which, mainmode, awtype, mo, conf);
             if (i == 0)
             {
-                for (size_t j = 0; j < 12; ++j)
+                for (size_t j = 0; j < GranulatorVoice::maxParamsPerInsert; ++j)
                 {
                     int parid = PAR_INSERTAFIRST + 32 * which + j;
                     *idtoparvalptr[parid] = v->insert_fx[which].paramvalues[j];

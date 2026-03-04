@@ -45,8 +45,11 @@ struct AirwinConsolidatedBase
     virtual void setUniqueID(int) {}
     virtual bool canProcessReplacing() { return true; }
     virtual bool canDoubleReplacing() { return false; }
+    // this should kill reverb tails etc
+    virtual void reset() {}
+    
     virtual void programsAreChunks(bool) {}
-
+    
     virtual void processReplacing(float **inputs, float **outputs, VstInt32 sampleFrames) = 0;
     virtual void processDoubleReplacing(double **inputs, double **outputs, VstInt32 sampleFrames) = 0;
 
