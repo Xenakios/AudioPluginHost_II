@@ -26,13 +26,23 @@ class XapSlider : public juce::Component
     XapSlider(bool isHorizontal, ParamDesc pdesc, ParamDesc::FeatureState *fstate = nullptr)
         : m_pardesc(pdesc), m_fstate(fstate)
     {
-        m_value = pdesc.defaultVal;
-        m_default_value = m_value;
-        m_min_value = pdesc.minVal;
-        m_max_value = pdesc.maxVal;
+        keypress_to_step.reserve(8);
+        setParameterMetaData(pdesc, true);
+        setWantsKeyboardFocus(true);
+        addChildComponent(m_ed);
+    }
+    const ParamDesc &getParameterMetaData() const { return m_pardesc; }
+    void setParameterMetaData(ParamDesc md, bool updateCurrentValue)
+    {
+        m_pardesc = md;
+        if (updateCurrentValue)
+            m_value = m_pardesc.defaultVal;
+        m_default_value = m_pardesc.defaultVal;
+        m_min_value = m_pardesc.minVal;
+        m_max_value = m_pardesc.maxVal;
         if (m_min_value < 0.0)
             m_is_bipolar = true;
-        m_labeltxt = pdesc.name;
+        m_labeltxt = m_pardesc.name;
         m_modulation_amt = 0.0;
         m_snap_positions.resize(9);
         for (int i = 0; i < 9; ++i)
@@ -40,6 +50,7 @@ class XapSlider : public juce::Component
         m_param_step = (m_max_value - m_min_value) / 64;
         if (m_pardesc.type == ParamDesc::BOOL || m_pardesc.type == ParamDesc::INT)
             m_param_step = 1;
+        keypress_to_step.clear();
         keypress_to_step.emplace_back(
             juce::KeyPress(juce::KeyPress::leftKey, juce::ModifierKeys::noModifiers, 0),
             -m_param_step);
@@ -52,10 +63,8 @@ class XapSlider : public juce::Component
         keypress_to_step.emplace_back(
             juce::KeyPress(juce::KeyPress::rightKey, juce::ModifierKeys::shiftModifier, 0),
             m_param_step * 0.1);
-        setWantsKeyboardFocus(true);
-        addChildComponent(m_ed);
+        repaint();
     }
-    const ParamDesc &getParamDescription() const { return m_pardesc; }
     void setModulationDisplayDepth(float d, std::string units)
     {
         m_pardesc = m_pardesc.withLinearScaleFormatting(units, d);

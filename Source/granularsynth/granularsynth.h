@@ -1550,6 +1550,7 @@ class ToneGranulator
                 {
                     int parid = PAR_INSERTAFIRST + 32 * which + j;
                     *idtoparvalptr[parid] = v->insert_fx[which].paramvalues[j];
+                    idtoparmetadata[parid]->name = v->insert_fx[which].getParameterName(j);
                 }
             }
         }

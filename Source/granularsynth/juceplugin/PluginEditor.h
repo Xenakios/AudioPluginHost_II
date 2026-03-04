@@ -169,32 +169,32 @@ struct LFOComponent : public juce::Component
     {
         addAndMakeVisible(rateSlider);
         rateSlider.OnValueChanged = [this]() {
-            stateChangedCallback(rateSlider.getParamDescription().id, rateSlider.getValue());
+            stateChangedCallback(rateSlider.getParameterMetaData().id, rateSlider.getValue());
         };
 
         addAndMakeVisible(deformSlider);
         deformSlider.OnValueChanged = [this]() {
-            stateChangedCallback(deformSlider.getParamDescription().id, deformSlider.getValue());
+            stateChangedCallback(deformSlider.getParameterMetaData().id, deformSlider.getValue());
         };
 
         addAndMakeVisible(shiftSlider);
         shiftSlider.OnValueChanged = [this]() {
-            stateChangedCallback(shiftSlider.getParamDescription().id, shiftSlider.getValue());
+            stateChangedCallback(shiftSlider.getParameterMetaData().id, shiftSlider.getValue());
         };
 
         addAndMakeVisible(warpSlider);
         warpSlider.OnValueChanged = [this]() {
-            stateChangedCallback(warpSlider.getParamDescription().id, warpSlider.getValue());
+            stateChangedCallback(warpSlider.getParameterMetaData().id, warpSlider.getValue());
         };
 
         addAndMakeVisible(shapeSlider);
         shapeSlider.OnValueChanged = [this]() {
-            stateChangedCallback(shapeSlider.getParamDescription().id, shapeSlider.getValue());
+            stateChangedCallback(shapeSlider.getParameterMetaData().id, shapeSlider.getValue());
         };
 
         addAndMakeVisible(unipolarSlider);
         unipolarSlider.OnValueChanged = [this]() {
-            stateChangedCallback(unipolarSlider.getParamDescription().id,
+            stateChangedCallback(unipolarSlider.getParameterMetaData().id,
                                  unipolarSlider.getValue());
         };
     }
@@ -616,5 +616,6 @@ class AudioPluginAudioProcessorEditor final : public juce::AudioProcessorEditor,
     juce::Label infoLabel;
     std::unordered_map<uint32_t, XapSlider *> idToSlider;
     void showFilterMenu(int whichfilter);
+    void updateInsertParameterMetaDatas();
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(AudioPluginAudioProcessorEditor)
 };

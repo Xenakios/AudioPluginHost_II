@@ -106,6 +106,29 @@ class GrainInsertFX
     double sr = 0.0;
     size_t blockSize = 0;
     size_t numParams = 0;
+    std::string getParameterName(size_t index)
+    {
+        if (mainmode == 0)
+            return "No parameter";
+        if (mainmode == 1)
+        {
+            if (index == 0)
+                return "Cutoff";
+            else if (index == 1)
+                return "Resonance";
+            else if (index == 2)
+                return "Extra parameter";
+            return "No parameter";
+        }
+        if (mainmode == 2 && awplugin && index < numParams)
+        {
+            char buf[256];
+            memset(buf, 0, 256);
+            awplugin->getParameterName(index, buf);
+            return buf;
+        }
+        return "No parameter";
+    }
     std::vector<float> delaylinememory;
     GrainInsertFX()
     {

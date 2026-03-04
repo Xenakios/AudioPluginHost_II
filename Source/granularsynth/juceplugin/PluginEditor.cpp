@@ -172,6 +172,23 @@ AudioPluginAudioProcessorEditor::~AudioPluginAudioProcessorEditor()
     deinit_step_sequencer_js();
 }
 
+void AudioPluginAudioProcessorEditor::updateInsertParameterMetaDatas()
+{
+    auto f = [this](ParameterGroupComponent *g) {
+        for (auto &s : g->sliders)
+        {
+            auto id = s->getParameterMetaData().id;
+            auto pmd = processorRef.granulator.idtoparmetadata[id];
+            if (s->getParameterMetaData().name != pmd->name)
+            {
+                s->setParameterMetaData(*pmd, false);
+            }
+        }
+    };
+    f(&insert1ParamsComponent);
+    f(&insert2ParamsComponent);
+}
+
 void AudioPluginAudioProcessorEditor::handleFilterSelection(int filterindex)
 {
     DropDownComponent *c = filter1Drop.get();
@@ -190,6 +207,7 @@ void AudioPluginAudioProcessorEditor::handleFilterSelection(int filterindex)
         msg.filterconfig = it->second.sstconfig;
         processorRef.from_gui_fifo.push(msg);
     }
+    juce::Timer::callAfterDelay(250, [this]() { updateInsertParameterMetaDatas(); });
 }
 
 void AudioPluginAudioProcessorEditor::fillDropWithFilters(int filterIndex, DropDownComponent &drop,
@@ -353,7 +371,8 @@ void AudioPluginAudioProcessorEditor::timerCallback()
         auto it = idToSlider.find(parmsg.id);
         if (it != idToSlider.end())
         {
-            it->second->setValue(parmsg.value);
+            auto xs = it->second;
+            xs->setValue(parmsg.value);
         }
     }
     ThreadMessage msg;
@@ -373,6 +392,7 @@ void AudioPluginAudioProcessorEditor::timerCallback()
                     break;
                 }
             }
+            updateInsertParameterMetaDatas();
         }
         if (msg.opcode == ThreadMessage::OP_MODROUTING && msg.modslot < modRowComps.size())
         {
