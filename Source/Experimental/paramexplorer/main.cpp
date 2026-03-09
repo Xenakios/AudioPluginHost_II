@@ -14,9 +14,9 @@ class SpectroGram
 
         juce::AudioFormatManager mana;
         mana.registerBasicFormats();
-        auto filename = R"(C:\MusicAudio\sourcesamples\lareskitta01.wav)";
+        auto filename = R"(C:\MusicAudio\sourcesamples\_count.wav)";
         auto reader = mana.createReaderFor(juce::File(filename));
-        img = juce::Image(juce::Image::ARGB, reader->lengthInSamples / fftsize * 4, fftsize / 2,
+        img = juce::Image(juce::Image::ARGB, reader->lengthInSamples / fftsize * 2, fftsize / 2,
                           true);
         insigbuf.setSize(1, reader->lengthInSamples);
         insigsr = reader->sampleRate;
@@ -33,9 +33,10 @@ class SpectroGram
             (size_t)fftsize, juce::dsp::WindowingFunction<float>::blackman};
         int incnt = 0;
         juce::dsp::FFT fft{11};
+        std::fill(fftbuffer.begin(), fftbuffer.end(), 0.0);
         for (int j = 0; j < img.getWidth(); ++j)
         {
-            std::fill(fftbuffer.begin(), fftbuffer.end(), 0.0);
+            
             incnt = (double)insiglen / img.getWidth() * j;
             for (int i = 0; i < fftsize; ++i)
             {
@@ -45,7 +46,7 @@ class SpectroGram
                     fftbuffer[i] = 0.0f;
             }
             wfunc.multiplyWithWindowingTable(fftbuffer.data(), fftsize);
-            fft.performRealOnlyForwardTransform(fftbuffer.data());
+            fft.performFrequencyOnlyForwardTransform(fftbuffer.data());
             double sum = 0.0;
             for (int i = 0; i < fftsize; ++i)
             {
@@ -62,11 +63,11 @@ class SpectroGram
             int x = j;
             for (int i = 0; i < img.getHeight(); ++i)
             {
-                int index = (fftsize / 1.0 / img.getHeight()) * i;
-                float s = fftbuffer[index] * 1.0;
+                int index = (fftsize / 2.0 / img.getHeight()) * i;
+                float s = fftbuffer[index] * 0.125;
                 s = std::clamp(s, 0.0f, 1.0f);
                 // s = juce::Decibels::gainToDecibels(s);
-                s = s * s * s;
+                // s = s * s * s;
                 const float mindb = -60.0f;
                 const float maxdb = maxdisplaydb;
                 // if (s > mindb)
@@ -100,7 +101,7 @@ class MainComponent : public juce::Component
     }
     void paint(juce::Graphics &g) override
     {
-        g.setImageResamplingQuality(juce::Graphics::ResamplingQuality::highResamplingQuality);
+        // g.setImageResamplingQuality(juce::Graphics::ResamplingQuality::highResamplingQuality);
         g.drawImage(sp.img, 0, 0, getWidth(), getHeight() - 25, 0, 0, sp.img.getWidth(),
                     sp.img.getHeight());
     }
