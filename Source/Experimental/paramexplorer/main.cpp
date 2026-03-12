@@ -24,6 +24,8 @@ class SpectroGram
     int hopsize = 0;
     double insigsr = 0.0;
     std::vector<float> fftbuffer;
+    double curmindb = -60.0;
+    double curgain = 0.0;
     void setFFTSizeSamples(size_t sz)
     {
         size_t order = std::ceil(std::log2(sz));
@@ -32,7 +34,7 @@ class SpectroGram
         fftbuffer.resize(fftsize * 2);
         hopsize = fftsize / 2;
         img = juce::Image(juce::Image::ARGB, insigbuf.getNumSamples() / hopsize, fftsize / 2, true);
-        generate(0);
+        generate();
     }
     SpectroGram()
     {
@@ -48,8 +50,10 @@ class SpectroGram
         delete reader;
     }
 
-    void generate(double maxdisplaydb)
+    void generate()
     {
+        double mindisplaydb = curmindb;
+        double gain = juce::Decibels::decibelsToGain(curgain);
         img.clear(img.getBounds(), juce::Colours::black);
         const int fftsize = fft->getSize();
         fftbuffer.resize(fftsize * 2);
@@ -78,31 +82,18 @@ class SpectroGram
             {
                 int index = (fftsize / 2.0 / img.getHeight()) * i;
                 float s = (2.0 * fftbuffer[index]); // / fft->getSize();
-
+                s *= gain;
                 float db = 20.0f * std::log10(std::max(1e-7f, s));
 
                 // 2. Audacity Default Range: -60dB to 0dB
-                float minDb = -60.0f;
+                float minDb = mindisplaydb;
                 float maxDb = 0.0f;
 
                 // 3. Map dB to a 0.0 ... 1.0 visual range
                 float visualLevel = juce::jmap(db, minDb, maxDb, 0.0f, 1.0f);
                 visualLevel = std::clamp(visualLevel, 0.0f, 1.0f);
-
-                // s = std::clamp(s, 0.0f, 1.0f);
-                // s = std::pow(s, 0.333);
                 auto c = getHeatmapColour(visualLevel);
-                // s = juce::Decibels::gainToDecibels(s);
-                // s = s * s * s;
-                
-                // if (s > mindb)
-                {
-                    // s = juce::jmap(s, 0.0f, 1.0f, 0.0f, 255.0f);
-                    // uint8_t pixval = s;
-                    // juce::Colour c{pixval, pixval, pixval};
-                    img.setPixelAt(x, img.getHeight() - i, c);
-                }
-                // s = std::clamp(s, mindb, maxdb);
+                img.setPixelAt(x, img.getHeight() - i, c);
             }
         }
     }
@@ -114,12 +105,15 @@ class MainComponent : public juce::Component
   public:
     MainComponent()
     {
-        // addAndMakeVisible(slid);
+        addAndMakeVisible(slidMinLevel);
+        addAndMakeVisible(slidGain);
         addAndMakeVisible(fftSizeCombo);
         fftSizeCombo.addItem("256", 256);
+        fftSizeCombo.addItem("512", 512);
         fftSizeCombo.addItem("1024", 1024);
         fftSizeCombo.addItem("2048", 2048);
         fftSizeCombo.addItem("4096", 4096);
+        fftSizeCombo.addItem("8192", 8192);
         fftSizeCombo.addItem("16384", 16384);
         fftSizeCombo.onChange = [this]() {
             if (fftSizeCombo.getSelectedId() > 0)
@@ -127,22 +121,42 @@ class MainComponent : public juce::Component
             repaint();
         };
 
-        slid.setRange(-95.0, 0.0);
-        slid.onDragEnd = [this]() {
-            sp.generate(slid.getValue());
+        slidMinLevel.setRange(-96.0, -30.0);
+        slidMinLevel.setValue(-60.0);
+        slidMinLevel.onDragEnd = [this]() {
+            sp.curmindb = slidMinLevel.getValue();
+            sp.generate();
             repaint();
         };
-        sp.generate(0.0);
+
+        slidGain.setRange(-36.0, 0.0);
+        slidGain.setValue(0.0);
+        slidGain.onDragEnd = [this]() {
+            sp.curgain = slidGain.getValue();
+            sp.generate();
+            repaint();
+        };
+
+        sp.generate();
         setSize(1000, 500);
     }
     void paint(juce::Graphics &g) override
     {
         g.setImageResamplingQuality(juce::Graphics::ResamplingQuality::highResamplingQuality);
-        g.drawImage(sp.img, 0, 0, getWidth(), getHeight() - 25, 0, 0, sp.img.getWidth(),
+        g.drawImage(sp.img, 0, 0, getWidth(), getHeight() - 100, 0, 0, sp.img.getWidth(),
                     sp.img.getHeight());
     }
-    void resized() override { fftSizeCombo.setBounds(0, getHeight() - 25, getWidth(), 25); }
-    juce::Slider slid;
+    void resized() override
+    {
+        juce::FlexBox flex;
+        flex.flexDirection = juce::FlexBox::Direction::column;
+        flex.items.add(juce::FlexItem(fftSizeCombo).withFlex(1.0));
+        flex.items.add(juce::FlexItem(slidMinLevel).withFlex(1.0));
+        flex.items.add(juce::FlexItem(slidGain).withFlex(1.0));
+        flex.performLayout(juce::Rectangle<int>{0, getHeight() - 100, getWidth(), 100});
+    }
+    juce::Slider slidMinLevel;
+    juce::Slider slidGain;
     juce::ComboBox fftSizeCombo;
     SpectroGram sp;
 };
