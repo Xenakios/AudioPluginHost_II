@@ -1,6 +1,7 @@
 #include <juce_gui_extra/juce_gui_extra.h>
 #include <juce_dsp/juce_dsp.h>
 #include <juce_audio_formats/juce_audio_formats.h>
+#include "containers/choc_SingleReaderSingleWriterFIFO.h"
 
 inline juce::Colour getHeatmapColour(float v)
 {
@@ -16,9 +17,24 @@ inline juce::Colour getHeatmapColour(float v)
     return juce::Colours::red.interpolatedWith(juce::Colours::yellow, (v - 0.66f) / 0.34f);
 }
 
-class SpectroGram
+class SpectroGram : public juce::Thread
 {
   public:
+    enum OP
+    {
+        OP_NONE,
+        OP_START,
+        OP_DATAREADY,
+        OP_ENDTHREAD
+    };
+    struct Message
+    {
+        OP op = OP_NONE;
+        int fftsize = 0;
+        float mindb = -60.0f;
+        float gain = 0.0f;
+    };
+    choc::fifo::SingleReaderSingleWriterFIFO<Message> fifo;
     std::unique_ptr<juce::dsp::FFT> fft;
     juce::AudioBuffer<float> insigbuf;
     int hopsize = 0;
@@ -33,12 +49,13 @@ class SpectroGram
         const int fftsize = fft->getSize();
         fftbuffer.resize(fftsize * 2);
         hopsize = fftsize / 2;
+        juce::ScopedLock locker(cs);
         img = juce::Image(juce::Image::ARGB, insigbuf.getNumSamples() / hopsize, fftsize / 2, true);
-        generate();
+        // generate();
     }
-    SpectroGram()
+    SpectroGram() : juce::Thread{"spectrogramthread"}
     {
-
+        fifo.reset(1024);
         juce::AudioFormatManager mana;
         mana.registerBasicFormats();
         auto filename = R"(C:\MusicAudio\sourcesamples\_count.wav)";
@@ -49,7 +66,105 @@ class SpectroGram
         reader->read(&insigbuf, 0, reader->lengthInSamples, 0, true, true);
         delete reader;
     }
+    bool shouldExit = false;
+    void handleMessages()
+    {
+        Message msg;
+        while (fifo.pop(msg))
+        {
+            if (msg.op == OP_START)
+            {
+                DBG("got start message " << msg.gain << " " << msg.mindb << " " << msg.fftsize);
+                curgain = msg.gain;
+                curmindb = msg.mindb;
+                xpos = 0;
+                setFFTSizeSamples(msg.fftsize);
+            }
+            if (msg.op == OP_ENDTHREAD)
+            {
+                DBG("got end thread message");
+                xpos = -1;
+                shouldExit = true;
+            }
+        }
+    }
+    int xpos = -1;
+    int fftsize = 0;
+    std::unique_ptr<juce::dsp::WindowingFunction<float>> wfunc;
+    void run() override
+    {
 
+        // img.clear(img.getBounds(), juce::Colours::black);
+
+        const auto insiglen = insigbuf.getNumSamples();
+        auto insigptr = insigbuf.getReadPointer(0);
+        while (!shouldExit)
+        {
+            handleMessages();
+            if (xpos == -1)
+            {
+                juce::Thread::sleep(1);
+                continue;
+            }
+            double gain = juce::Decibels::decibelsToGain(curgain);
+            if (xpos >= 0)
+            {
+                if (xpos == 0)
+                {
+                    DBG("starting image generation");
+                    fftsize = fft->getSize();
+                    fftbuffer.resize(fftsize * 2);
+                    std::fill(fftbuffer.begin(), fftbuffer.end(), 0.0);
+
+                    wfunc = std::make_unique<juce::dsp::WindowingFunction<float>>(
+                        (size_t)fftsize, juce::dsp::WindowingFunction<float>::blackman);
+                }
+                int incnt = (double)insiglen / img.getWidth() * xpos;
+                for (int i = 0; i < fftsize; ++i)
+                {
+                    if (incnt + i < insiglen)
+                        fftbuffer[i] = insigptr[incnt + i];
+                    else
+                        fftbuffer[i] = 0.0f;
+                }
+                wfunc->multiplyWithWindowingTable(fftbuffer.data(), fftsize);
+                fft->performFrequencyOnlyForwardTransform(fftbuffer.data());
+
+                int x = xpos;
+                cs.enter();
+                for (int i = 0; i < img.getHeight(); ++i)
+                {
+                    int index = (fftsize / 2.0 / img.getHeight()) * i;
+                    float s = (2.0 * fftbuffer[index]); // / fft->getSize();
+                    s *= gain;
+                    float db = 20.0f * std::log10(std::max(1e-7f, s));
+
+                    // 2. Audacity Default Range: -60dB to 0dB
+                    float minDb = curmindb;
+                    float maxDb = 0.0f;
+
+                    // 3. Map dB to a 0.0 ... 1.0 visual range
+                    float visualLevel = juce::jmap(db, minDb, maxDb, 0.0f, 1.0f);
+                    visualLevel = std::clamp(visualLevel, 0.0f, 1.0f);
+                    auto c = getHeatmapColour(visualLevel);
+
+                    img.setPixelAt(x, img.getHeight() - i, c);
+                }
+                cs.exit();
+                ++xpos;
+                if (xpos % 16 == 0)
+                {
+                    OnDataReady();
+                }
+                if (xpos == img.getWidth())
+                {
+                    xpos = -1;
+                    DBG("ended image generation");
+                    OnDataReady();
+                }
+            }
+        }
+    }
     void generate()
     {
         double mindisplaydb = curmindb;
@@ -57,20 +172,21 @@ class SpectroGram
         img.clear(img.getBounds(), juce::Colours::black);
         const int fftsize = fft->getSize();
         fftbuffer.resize(fftsize * 2);
+        std::fill(fftbuffer.begin(), fftbuffer.end(), 0.0);
 
         auto wfunc = juce::dsp::WindowingFunction<float>{
             (size_t)fftsize, juce::dsp::WindowingFunction<float>::blackman};
         int incnt = 0;
 
-        std::fill(fftbuffer.begin(), fftbuffer.end(), 0.0);
         const auto insiglen = insigbuf.getNumSamples();
+        auto insigptr = insigbuf.getReadPointer(0);
         for (int j = 0; j < img.getWidth(); ++j)
         {
             int incnt = (double)insiglen / img.getWidth() * j;
             for (int i = 0; i < fftsize; ++i)
             {
                 if (incnt + i < insiglen)
-                    fftbuffer[i] = insigbuf.getSample(0, incnt + i);
+                    fftbuffer[i] = insigptr[incnt + i];
                 else
                     fftbuffer[i] = 0.0f;
             }
@@ -93,21 +209,38 @@ class SpectroGram
                 float visualLevel = juce::jmap(db, minDb, maxDb, 0.0f, 1.0f);
                 visualLevel = std::clamp(visualLevel, 0.0f, 1.0f);
                 auto c = getHeatmapColour(visualLevel);
+
                 img.setPixelAt(x, img.getHeight() - i, c);
             }
         }
     }
     juce::Image img;
+    std::function<void(void)> OnDataReady;
+    juce::CriticalSection cs;
 };
 
-class MainComponent : public juce::Component
+class MainComponent : public juce::Component, public juce::Timer
 {
   public:
+    choc::fifo::SingleReaderSingleWriterFIFO<SpectroGram::Message> fifo;
+    ~MainComponent()
+    {
+        SpectroGram::Message msg{SpectroGram::OP_ENDTHREAD, 0, 0, 0};
+        sp.fifo.push(msg);
+        sp.waitForThreadToExit(500);
+        DBG("ended spectrogram thread");
+    }
     MainComponent()
     {
+        fifo.reset(1024);
+        sp.OnDataReady = [this]() {
+            SpectroGram::Message msg{SpectroGram::OP_DATAREADY, 0, 0, 0};
+            fifo.push(msg);
+        };
         addAndMakeVisible(slidMinLevel);
         addAndMakeVisible(slidGain);
         addAndMakeVisible(fftSizeCombo);
+        fftSizeCombo.addSectionHeading("FFT Size");
         fftSizeCombo.addItem("256", 256);
         fftSizeCombo.addItem("512", 512);
         fftSizeCombo.addItem("1024", 1024);
@@ -116,35 +249,80 @@ class MainComponent : public juce::Component
         fftSizeCombo.addItem("8192", 8192);
         fftSizeCombo.addItem("16384", 16384);
         fftSizeCombo.onChange = [this]() {
-            if (fftSizeCombo.getSelectedId() > 0)
-                sp.setFFTSizeSamples(fftSizeCombo.getSelectedId());
-            repaint();
+            // if (fftSizeCombo.getSelectedId() > 0)
+            //     sp.setFFTSizeSamples(fftSizeCombo.getSelectedId());
+            // repaint();
+            sendStartMessage();
         };
 
+        fftSizeCombo.setSelectedId(2048);
+
+        slidMinLevel.setNumDecimalPlacesToDisplay(1);
+        slidMinLevel.setTextBoxStyle(juce::Slider::TextBoxRight, false, 50, 24);
         slidMinLevel.setRange(-96.0, -30.0);
         slidMinLevel.setValue(-60.0);
-        slidMinLevel.onDragEnd = [this]() {
-            sp.curmindb = slidMinLevel.getValue();
-            sp.generate();
-            repaint();
+        slidMinLevel.onValueChange = [this]() {
+            // sp.curmindb = slidMinLevel.getValue();
+            // sp.generate();
+            // repaint();
+            sendStartMessage();
         };
 
+        slidGain.setNumDecimalPlacesToDisplay(1);
+        slidGain.setTextBoxStyle(juce::Slider::TextBoxRight, false, 50, 24);
         slidGain.setRange(-36.0, 0.0);
         slidGain.setValue(0.0);
-        slidGain.onDragEnd = [this]() {
-            sp.curgain = slidGain.getValue();
-            sp.generate();
-            repaint();
+        slidGain.onValueChange = [this]() {
+            // sp.curgain = slidGain.getValue();
+            // sp.generate();
+            // repaint();
+            sendStartMessage();
         };
 
-        sp.generate();
-        setSize(1000, 500);
+        addAndMakeVisible(imageQualityCombo);
+        imageQualityCombo.addSectionHeading("Image quality");
+        imageQualityCombo.addItem("Low", 1);
+        imageQualityCombo.addItem("Medium", 2);
+        imageQualityCombo.addItem("High", 3);
+        imageQualityCombo.onChange = [this]() { repaint(); };
+        imageQualityCombo.setSelectedId(2);
+
+        setSize(1200, 600);
+        startTimer(100);
+        sp.startThread();
     }
+    void timerCallback() override
+    {
+        SpectroGram::Message msg;
+        while (fifo.pop(msg))
+        {
+            if (msg.op == SpectroGram::OP_DATAREADY)
+            {
+                repaint();
+            }
+        }
+    }
+    void sendStartMessage()
+    {
+        SpectroGram::Message msg;
+        msg.op = SpectroGram::OP_START;
+        msg.fftsize = fftSizeCombo.getSelectedId();
+        msg.gain = slidGain.getValue();
+        msg.mindb = slidMinLevel.getValue();
+        sp.fifo.push(msg);
+    }
+    int specxpos = 200;
     void paint(juce::Graphics &g) override
     {
-        g.setImageResamplingQuality(juce::Graphics::ResamplingQuality::highResamplingQuality);
-        g.drawImage(sp.img, 0, 0, getWidth(), getHeight() - 100, 0, 0, sp.img.getWidth(),
-                    sp.img.getHeight());
+        if (imageQualityCombo.getSelectedId() == 1)
+            g.setImageResamplingQuality(juce::Graphics::ResamplingQuality::lowResamplingQuality);
+        if (imageQualityCombo.getSelectedId() == 2)
+            g.setImageResamplingQuality(juce::Graphics::ResamplingQuality::mediumResamplingQuality);
+        if (imageQualityCombo.getSelectedId() == 3)
+            g.setImageResamplingQuality(juce::Graphics::ResamplingQuality::highResamplingQuality);
+        juce::ScopedLock locker(sp.cs);
+        g.drawImage(sp.img, specxpos, 0, getWidth() - specxpos, getHeight(), 0, 0,
+                    sp.img.getWidth(), sp.img.getHeight());
     }
     void resized() override
     {
@@ -153,11 +331,13 @@ class MainComponent : public juce::Component
         flex.items.add(juce::FlexItem(fftSizeCombo).withFlex(1.0));
         flex.items.add(juce::FlexItem(slidMinLevel).withFlex(1.0));
         flex.items.add(juce::FlexItem(slidGain).withFlex(1.0));
-        flex.performLayout(juce::Rectangle<int>{0, getHeight() - 100, getWidth(), 100});
+        flex.items.add(juce::FlexItem(imageQualityCombo).withFlex(1.0));
+        flex.performLayout(juce::Rectangle<int>{0, 0, specxpos, 100});
     }
     juce::Slider slidMinLevel;
     juce::Slider slidGain;
     juce::ComboBox fftSizeCombo;
+    juce::ComboBox imageQualityCombo;
     SpectroGram sp;
 };
 
