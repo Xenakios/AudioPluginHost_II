@@ -337,6 +337,8 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, // handle to DLL module
     return TRUE;
 }
 
+void init_py_gendyn(py::module_ &m, py::module_ &m_const);
+
 PYBIND11_MODULE(xenakios, m)
 {
     using namespace pybind11::literals;
@@ -484,6 +486,7 @@ PYBIND11_MODULE(xenakios, m)
         .def("set_point", &xenakios::Envelope::setPoint)
         .def("get_value", &xenakios::Envelope::getValueAtPosition);
     init_py4(m, m_const);
+    init_py_gendyn(m, m_const);
     /*
         py::class_<MultiModulator>(m, "MultiModulator")
         .def(py::init<double>())

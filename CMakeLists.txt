@@ -161,6 +161,7 @@ pybind11_add_module(xenakios
     Source/PythonBindings/pybindings_ex2.cpp
     Source/PythonBindings/pybindings_ex3.cpp
     Source/PythonBindings/pybindings_ex4.cpp
+    Source/PythonBindings/pybindings_gendyn.cpp
     # Source/PythonBindings/pybindings_ex5.cpp
     Source/Xaps/clap_xaudioprocessor.cpp
     Source/Host/claphost.cpp

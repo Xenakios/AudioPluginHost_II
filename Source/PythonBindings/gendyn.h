@@ -193,7 +193,7 @@ struct Gendyn2026
     void prepare(double samplerate)
     {
         sr = samplerate;
-        smoothed_num_nodes.setRateInMilliseconds(500.0, sr, 1.0);
+        smoothed_num_nodes.setRateInMilliseconds(200.0, sr, 1.0);
         reset();
     }
     void reset()
