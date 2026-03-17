@@ -168,7 +168,7 @@ pybind11_add_module(xenakios
     libs/MTS-ESP/Master/libMTSMaster.cpp
     libs/MTS-ESP/Client/libMTSClient.cpp
     libs/rtaudio/RtAudio.cpp 
-    
+    Source/granularsynth/easing.cpp
 )
 
 # Source/Experimental/xaudiograph.cpp

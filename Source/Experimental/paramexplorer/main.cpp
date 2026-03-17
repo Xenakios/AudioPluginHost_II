@@ -59,6 +59,7 @@ class SpectroGram : public juce::Thread
         juce::AudioFormatManager mana;
         mana.registerBasicFormats();
         auto filename = R"(C:\MusicAudio\sourcesamples\_count.wav)";
+        filename = R"(E:\MusicAudio\Samppeleita juuh\Make Base\BassoJousella.wav)";
         auto reader = mana.createReaderFor(juce::File(filename));
         insigbuf.setSize(1, reader->lengthInSamples);
         setFFTSizeSamples(2048);

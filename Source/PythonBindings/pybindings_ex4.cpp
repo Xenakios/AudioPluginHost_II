@@ -869,6 +869,10 @@ py::array_t<float> gendyn_render(Gendyn2026 &gendyn, double sr, double outdur,
                     *it->second = val;
                     if (ev.event.param.param_id == Gendyn2026::PAR_RANDSEED)
                         gendyn.rng.seed(val, 13);
+                    else if (ev.event.param.param_id == Gendyn2026::PAR_NUMSEGMENTS)
+                    {
+                        gendyn.smoothed_num_nodes.setTarget(val);
+                    }
                     else if (ev.event.param.param_id == Gendyn2026::PAR_TRIGRESET)
                         gendyn.reset();
                     else if (ev.event.param.param_id == Gendyn2026::PAR_INTERPOLATIONMODE)

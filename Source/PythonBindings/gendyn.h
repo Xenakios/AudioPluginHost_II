@@ -8,6 +8,8 @@
 #include "../Common/xap_utils.h"
 #include "sst/basic-blocks/dsp/Interpolators.h"
 #include "sst/basic-blocks/params/ParamMetadata.h"
+#include "sst/basic-blocks/dsp/SmoothingStrategies.h"
+
 using Xoroshiro128Plus = xenakios::Xoroshiro128Plus;
 template <typename T> T clamp(T x, T minx, T maxx)
 {
@@ -74,7 +76,8 @@ struct Gendyn2026
     std::unordered_map<uint32_t, pmd_t *> parIdToMetaDataPtr;
     std::array<float, 32> paramValues;
     std::unordered_map<uint32_t, float *> parIdToValuePtr;
-
+    using SmoothingStrategy = sst::basic_blocks::dsp::LagSmoothingStrategy;
+    SmoothingStrategy::smoothValue_t smoothed_num_nodes;
     double sr = 0.0;
 
     enum RANDOMDIST
@@ -176,6 +179,7 @@ struct Gendyn2026
             parIdToValuePtr[paramMetaDatas[i].id] = &paramValues[i];
             parIdToMetaDataPtr[paramMetaDatas[i].id] = &paramMetaDatas[i];
         }
+        SmoothingStrategy::setValueInstant(smoothed_num_nodes, 5.0);
     }
     float pitchToSamplesTime(float pitchsemis, int numnodes)
     {
@@ -189,6 +193,7 @@ struct Gendyn2026
     void prepare(double samplerate)
     {
         sr = samplerate;
+        smoothed_num_nodes.setRateInMilliseconds(500.0, sr, 1.0);
         reset();
     }
     void reset()
@@ -220,7 +225,7 @@ struct Gendyn2026
         phase += phaseincrement;
         if (phase >= 1.0)
         {
-            int numnodes = *parIdToValuePtr[PAR_NUMSEGMENTS];
+            int numnodes = smoothed_num_nodes.getValue();
 // shift/rotate node array left, the current first node will become last node
 #ifdef WASM_TEST
             tiny_rotate(&nodes[0], &nodes[1], &nodes[numnodes]);
@@ -256,6 +261,7 @@ struct Gendyn2026
             phaseincrement = 1.0 / nodes[0].x0;
             phase = 0.0;
         }
+        SmoothingStrategy::process(smoothed_num_nodes);
         return intery * 0.5f;
     }
 };
