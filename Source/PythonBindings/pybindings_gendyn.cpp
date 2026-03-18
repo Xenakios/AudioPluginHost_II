@@ -10,6 +10,82 @@
 
 namespace py = pybind11;
 
+struct AutomationEvent
+{
+    double timestamp; // seconds/beats
+    double value;     // parameter value
+    uint32_t id;      // parameter id (compatible with clap uint32_t id)
+    uint32_t flags;   // flags/extra data
+    uint16_t target;  // target synth voice/channel/effect submodule
+    bool operator<(const AutomationEvent &other) { return timestamp < other.timestamp; }
+};
+
+struct AutomationSequence
+{
+    std::vector<AutomationEvent> events;
+    AutomationSequence() { events.reserve(128); }
+    void add_event(double timestamp, uint32_t id, double value)
+    {
+        events.emplace_back(timestamp, value, id);
+    }
+    void clear() { events.clear(); }
+    void sort_events() { choc::sorting::stable_sort(events.begin(), events.end()); }
+    struct Iterator
+    {
+        /// Creates an iterator positioned at the start of the sequence.
+        Iterator(const AutomationSequence &s, double sr) : owner(s), sampleRate(sr) {}
+        Iterator(const Iterator &) = default;
+        Iterator(Iterator &&) = default;
+
+        /// Seeks the iterator to the given time
+
+        void setTime(int64_t newTimeStamp)
+        {
+            auto eventData = owner.events.data();
+
+            while (nextIndex != 0 &&
+                   eventData[nextIndex - 1].timestamp * sampleRate >= newTimeStamp)
+                --nextIndex;
+
+            while (nextIndex < owner.events.size() &&
+                   eventData[nextIndex].timestamp * sampleRate < newTimeStamp)
+                ++nextIndex;
+
+            currentTime = newTimeStamp;
+        }
+
+        /// Returns the current iterator time
+        int64_t getTime() const noexcept { return currentTime; }
+
+        /// Returns a set of events which lie between the current time, up to (but not
+        /// including) the given duration. This function then increments the iterator to
+        /// set its current time to the end of this block.
+
+        choc::span<const AutomationEvent> readNextEvents(int duration)
+        {
+            auto start = nextIndex;
+            auto eventData = owner.events.data();
+            auto end = start;
+            auto total = owner.events.size();
+            auto endTime = currentTime + duration;
+            currentTime = endTime;
+
+            while (end < total && eventData[end].timestamp * sampleRate < endTime)
+                ++end;
+
+            nextIndex = end;
+
+            return {eventData + start, eventData + end};
+        }
+
+      private:
+        const AutomationSequence &owner;
+        int64_t currentTime = 0;
+        size_t nextIndex = 0;
+        double sampleRate = 0.0;
+    };
+};
+
 inline void gendyn_print_params(Gendyn2026 &g)
 {
     for (const auto &p : g.paramMetaDatas)
@@ -19,7 +95,7 @@ inline void gendyn_print_params(Gendyn2026 &g)
 }
 
 py::array_t<float> gendyn_render(Gendyn2026 &gendyn, double sr, double outdur,
-                                 ClapEventSequence &events)
+                                 AutomationSequence &automation)
 {
     int numOutChans = 1;
     int frames = outdur * sr;
@@ -40,8 +116,8 @@ py::array_t<float> gendyn_render(Gendyn2026 &gendyn, double sr, double outdur,
     decimator.reset();
     gendyn.prepare(sr * osfactor);
     float osbuffer[osfactor];
-    events.sortEvents();
-    ClapEventSequence::IteratorSampleTime eviter{events, sr};
+    automation.sort_events();
+    AutomationSequence::Iterator eviter{automation, sr};
     StereoSimperSVF highpass;
     highpass.init();
     highpass.setCoeff(12.0, 0.0f, 1.0 / sr);
@@ -57,37 +133,35 @@ py::array_t<float> gendyn_render(Gendyn2026 &gendyn, double sr, double outdur,
         auto blockevents = eviter.readNextEvents(blocksize);
         for (auto &ev : blockevents)
         {
-            if (ev.event.header.type == CLAP_EVENT_PARAM_VALUE)
+
+            float val = ev.value;
+            auto it = gendyn.parIdToValuePtr.find(ev.id);
+            if (it != gendyn.parIdToValuePtr.end())
             {
-                float val = ev.event.param.value;
-                auto it = gendyn.parIdToValuePtr.find(ev.event.param.param_id);
-                if (it != gendyn.parIdToValuePtr.end())
+                auto pmd = gendyn.parIdToMetaDataPtr[ev.id];
+                float minv = pmd->minVal;
+                float maxv = pmd->maxVal;
+                val = std::clamp(val, minv, maxv);
+                *it->second = val;
+                if (ev.id == Gendyn2026::PAR_RANDSEED)
+                    gendyn.rng.seed(val, 13);
+                else if (ev.id == Gendyn2026::PAR_NUMSEGMENTS)
                 {
-                    auto pmd = gendyn.parIdToMetaDataPtr[ev.event.param.param_id];
-                    float minv = pmd->minVal;
-                    float maxv = pmd->maxVal;
-                    val = std::clamp(val, minv, maxv);
-                    *it->second = val;
-                    if (ev.event.param.param_id == Gendyn2026::PAR_RANDSEED)
-                        gendyn.rng.seed(val, 13);
-                    else if (ev.event.param.param_id == Gendyn2026::PAR_NUMSEGMENTS)
-                    {
-                        gendyn.smoothed_num_nodes.setTarget(val);
-                    }
-                    else if (ev.event.param.param_id == Gendyn2026::PAR_TRIGRESET)
-                        gendyn.reset();
-                    else if (ev.event.param.param_id == Gendyn2026::PAR_INTERPOLATIONMODE)
-                        gendyn.setInterpolationMode(val);
+                    gendyn.smoothed_num_nodes.setTarget(val);
                 }
-                else
-                {
-                    if (ev.event.param.param_id == 100)
-                        highpass.setCoeff(val, 0.0f, 1.0 / sr);
-                    else if (ev.event.param.param_id == 101)
-                        lpcutoff = val;
-                    else if (ev.event.param.param_id == 102)
-                        lpreso = val;
-                }
+                else if (ev.id == Gendyn2026::PAR_TRIGRESET)
+                    gendyn.reset();
+                else if (ev.id == Gendyn2026::PAR_INTERPOLATIONMODE)
+                    gendyn.setInterpolationMode(val);
+            }
+            else
+            {
+                if (ev.id == 100)
+                    highpass.setCoeff(val, 0.0f, 1.0 / sr);
+                else if (ev.id == 101)
+                    lpcutoff = val;
+                else if (ev.id == 102)
+                    lpreso = val;
             }
         }
         lowpass.setCoeff(lpcutoff, lpreso, 1.0 / sr);
@@ -112,9 +186,12 @@ py::array_t<float> gendyn_render(Gendyn2026 &gendyn, double sr, double outdur,
 void init_py_gendyn(py::module_ &m, py::module_ &m_const)
 {
     using namespace pybind11::literals;
+    py::class_<AutomationSequence>(m, "AutomationSequence")
+        .def(py::init<>())
+        .def("add_event", &AutomationSequence::add_event, "time"_a, "id"_a, "value"_a);
     py::class_<Gendyn2026>(m, "gendyn")
         .def(py::init<>())
         .def("print_params", &gendyn_print_params)
         .def("prepare", &Gendyn2026::prepare)
-        .def("render", &gendyn_render, "samplerate"_a = 44100.0, "duration"_a = 1.0, "events"_a);
+        .def("render", &gendyn_render, "samplerate"_a = 44100.0, "duration"_a = 1.0, "automation"_a);
 }
