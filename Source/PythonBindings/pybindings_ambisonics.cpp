@@ -51,9 +51,7 @@ inline py::array_t<float> decode_ambisonics_to_stereo(const py::array_t<float> &
 
 inline py::array_t<float> encode_to_ambisonics(const py::array_t<float> &input_audio,
                                                double sample_rate, int amb_order,
-                                               xenakios::Envelope &azimuth,
-                                               xenakios::Envelope &elevation,
-                                               xenakios::Envelope &spreadmix, float spreadfeedback)
+                                               xenakios::AutomationSequence &automation)
 {
     if (input_audio.ndim() != 2)
         throw std::runtime_error(
@@ -107,19 +105,33 @@ inline py::array_t<float> encode_to_ambisonics(const py::array_t<float> &input_a
         allpasses[i].init();
         allpasses[i].setCoeff(36.0 + i * 2.13, 0.9f, 1.0 / sample_rate);
     }
-
+    xenakios::AutomationSequence::Iterator automiter(automation, sample_rate);
     int outcounter = 0;
     const int blocksize = 32;
+    float aziRads = 0.0f;
+    float eleRads = 0.0f;
+    float spreadmix = 0.0f;
+    float spreadfeedback = 0.0f;
     while (outcounter < frames)
     {
         double tpos = outcounter / sample_rate;
-        float aziRads = degreesToRadians(azimuth.getValueAtPosition(tpos));
-        float eleRads = degreesToRadians(elevation.getValueAtPosition(tpos));
+        auto automevts = automiter.readNextEvents(blocksize);
+        for (auto &ev : automevts)
+        {
+            if (ev.id == 0)
+                aziRads = degreesToRadians(ev.value);
+            else if (ev.id == 1)
+                eleRads = degreesToRadians(ev.value);
+            else if (ev.id == 2)
+                spreadmix = ev.value;
+            else if (ev.id == 3)
+                spreadfeedback = ev.value;
+        }
         float x = 0.0;
         float y = 0.0;
         float z = 0.0;
         sphericalToCartesian(aziRads, eleRads, x, y, z);
-        float spread = std::clamp(spreadmix.getValueAtPosition(tpos), 0.0, 1.0);
+        float spread = std::clamp(spreadmix, 0.0f, 1.0f);
         if (amb_order == 1)
             SHEval1(x, y, z, SH1);
         else if (amb_order == 2)
@@ -244,7 +256,7 @@ void init_py_ambisonics(py::module_ &m, py::module_ &m_const)
 {
     using namespace pybind11::literals;
     m.def("encode_to_ambisonics", &encode_to_ambisonics, "input_audio"_a, "sample_rate"_a,
-          "ambisonics_order"_a, "azimuth"_a, "elevation"_a, "spreadmix"_a, "spreadfeedback"_a);
+          "ambisonics_order"_a, "automation"_a);
     m.def("decode_ambisonics_to_stereo", &decode_ambisonics_to_stereo, "input_audio"_a);
     m.def("render_galactic3ambisonics", &render_galactic3ambisonics, "input_audio"_a,
           "samplerate"_a, "automation"_a);
