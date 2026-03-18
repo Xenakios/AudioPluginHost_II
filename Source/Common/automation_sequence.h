@@ -12,10 +12,17 @@ This is a lighter way to deal with sequences of DSP automation events
 than the ClapEventSequence. We should be using this whenever possible from now on.
 */
 
+enum Flags
+{
+    ISMODULATION = 1 << 0,
+    ISLINEARLAG = 1 << 1,
+    ISFILTERLAG = 1 << 2
+};
+
 struct AutomationEvent
 {
     double timestamp; // seconds/beats
-    double value;     // parameter value
+    double value;     // parameter value, modulation amount or lag time
     uint32_t id;      // parameter id (compatible with clap uint32_t id)
     uint32_t flags;   // flags/extra data
     uint16_t target;  // target synth voice/channel/effect submodule
@@ -29,7 +36,12 @@ struct AutomationSequence
     AutomationSequence() { events.reserve(128); }
     void add_event(double timestamp, uint32_t id, double value)
     {
-        events.emplace_back(timestamp, value, id);
+        events.emplace_back(timestamp, value, id, 0);
+        is_sorted = false;
+    }
+    void add_event_as_modulation(double timestamp, uint32_t id, double amount)
+    {
+        events.emplace_back(timestamp, amount, id, ISMODULATION);
         is_sorted = false;
     }
     size_t size() const { return events.size(); }
