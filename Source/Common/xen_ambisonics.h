@@ -1,5 +1,8 @@
 #pragma once
 #include <cmath>
+
+template <typename T> inline T degreesToRadians(T degrees) { return degrees * (M_PI / 180.0); }
+
 // taken from the IEM plugins code
 // https://plugins.iem.at/
 

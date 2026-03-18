@@ -348,8 +348,6 @@ struct GrainEvent
     float insertparams[4][10];
 };
 
-template <typename T> inline T degreesToRadians(T degrees) { return degrees * (M_PI / 180.0); }
-
 struct tone_info
 {
     int index = -1;
