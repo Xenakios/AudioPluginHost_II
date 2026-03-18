@@ -1,5 +1,6 @@
 #pragma once
 #include <cmath>
+#include "sst/basic-blocks/dsp/SmoothingStrategies.h"
 
 template <typename T> inline T degreesToRadians(T degrees) { return degrees * (M_PI / 180.0); }
 
@@ -253,13 +254,22 @@ template <size_t NumFilters> struct AllPassBank
             lforates[i] = 0.4 + 0.23 / NumFilters * i;
             lfoamounts[i] = 15.0;
         }
+        SmoothingStrategy::setValueInstant(smoothed_mix, 0.0);
+    }
+    void prepare(float sr)
+    {
+        samplerate = sr;
+        smoothed_mix.setRateInMilliseconds(20.0, sr, 1.0);
     }
     float samplerate = 0.0;
     float basedelaytimes[NumFilters];
     float lforates[NumFilters];
     float lfoamounts[NumFilters];
     double phases[NumFilters];
-    float process(size_t filterIndex, float input, float mix)
+    using SmoothingStrategy = sst::basic_blocks::dsp::LagSmoothingStrategy;
+    SmoothingStrategy::smoothValue_t smoothed_mix;
+    float mix = 0.0f;
+    float process(size_t filterIndex, float input)
     {
         float moddeltime =
             basedelaytimes[filterIndex] + lfoamounts[filterIndex] * std::sin(phases[filterIndex]);

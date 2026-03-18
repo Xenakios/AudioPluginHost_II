@@ -1,8 +1,10 @@
 #pragma once
 
+#include <stdexcept>
 #include <vector>
 #include "containers/choc_NonAllocatingStableSort.h"
 #include "containers/choc_Span.h"
+
 namespace xenakios
 {
 /*
@@ -23,18 +25,28 @@ struct AutomationEvent
 struct AutomationSequence
 {
     std::vector<AutomationEvent> events;
+    bool is_sorted = false;
     AutomationSequence() { events.reserve(128); }
     void add_event(double timestamp, uint32_t id, double value)
     {
         events.emplace_back(timestamp, value, id);
+        is_sorted = false;
     }
     size_t size() const { return events.size(); }
     void clear() { events.clear(); }
-    void sort_events() { choc::sorting::stable_sort(events.begin(), events.end()); }
+    void sort_events()
+    {
+        choc::sorting::stable_sort(events.begin(), events.end());
+        is_sorted = true;
+    }
     struct Iterator
     {
         /// Creates an iterator positioned at the start of the sequence.
-        Iterator(const AutomationSequence &s, double sr) : owner(s), sampleRate(sr) {}
+        Iterator(const AutomationSequence &s, double sr) : owner(s), sampleRate(sr)
+        {
+            if (!owner.is_sorted)
+                throw std::runtime_error("AutomationSequence is not sorted");
+        }
         Iterator(const Iterator &) = default;
         Iterator(Iterator &&) = default;
 

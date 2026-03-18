@@ -88,7 +88,7 @@ inline py::array_t<float> encode_to_ambisonics(const py::array_t<float> &input_a
     memset(SH0, 0, sizeof(float) * 64);
     memset(SH1, 0, sizeof(float) * 64);
     auto allpassbank = std::make_unique<AllPassBank<16>>();
-    allpassbank->samplerate = sample_rate;
+    allpassbank->prepare(sample_rate);
 
     const int basedelays[] = {401,  443,  521,  631,  761,  887,  1031, 1153,
                               1297, 1321, 1399, 1453, 1489, 1523, 1559, 1597};
@@ -105,6 +105,7 @@ inline py::array_t<float> encode_to_ambisonics(const py::array_t<float> &input_a
         allpasses[i].init();
         allpasses[i].setCoeff(36.0 + i * 2.13, 0.9f, 1.0 / sample_rate);
     }
+    automation.sort_events();
     xenakios::AutomationSequence::Iterator automiter(automation, sample_rate);
     int outcounter = 0;
     const int blocksize = 32;
@@ -123,7 +124,7 @@ inline py::array_t<float> encode_to_ambisonics(const py::array_t<float> &input_a
             else if (ev.id == 1)
                 eleRads = degreesToRadians(ev.value);
             else if (ev.id == 2)
-                spreadmix = ev.value;
+                allpassbank->smoothed_mix.setTarget(ev.value);
             else if (ev.id == 3)
                 spreadfeedback = ev.value;
         }
@@ -147,6 +148,8 @@ inline py::array_t<float> encode_to_ambisonics(const py::array_t<float> &input_a
         for (int i = 0; i < numOutChans; ++i)
             SH1[i] *= n3d2sn3d[i];
         int framestoprocess = std::min(blocksize, frames - outcounter);
+        allpassbank->mix = allpassbank->smoothed_mix.getValue();
+        allpassbank->smoothed_mix.process();
         for (int j = 0; j < numOutChans; ++j)
         {
             allpassbank->filters[j].g = spreadfeedback;
@@ -156,7 +159,7 @@ inline py::array_t<float> encode_to_ambisonics(const py::array_t<float> &input_a
                 float gain = SH0[j] + gainstep * i;
                 float dummy = 0.0;
                 float dry = readbuf[outcounter + i] * gain;
-                writebufs[j][outcounter + i] = allpassbank->process(j, dry, spread);
+                writebufs[j][outcounter + i] = allpassbank->process(j, dry);
                 // float wet = dry;
                 // if (j > 0)
                 // wet = allpassbank->filters[j].process(dry);
