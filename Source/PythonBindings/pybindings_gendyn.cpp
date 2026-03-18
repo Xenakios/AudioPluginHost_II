@@ -58,6 +58,7 @@ py::array_t<float> gendyn_render(Gendyn2026 &gendyn, double sr, double outdur,
         auto blockevents = eviter.readNextEvents(blocksize);
         for (auto &ev : blockevents)
         {
+            // std::print("gendyn : {} {} {}\n", ev.timestamp, ev.id, ev.value);
             float val = ev.value;
             auto it = gendyn.parIdToValuePtr.find(ev.id);
             if (it != gendyn.parIdToValuePtr.end())
@@ -107,11 +108,27 @@ py::array_t<float> gendyn_render(Gendyn2026 &gendyn, double sr, double outdur,
     return output_audio;
 }
 
+inline xenakios::AutomationSequence seq_from_tuple_vec(const std::vector<py::tuple> &tups)
+{
+    xenakios::AutomationSequence result;
+    result.events.reserve(tups.size());
+    for (const auto &pt : tups)
+    {
+        double t = py::cast<double>(pt[0]);
+        uint32_t id = py::cast<uint32_t>(pt[1]);
+        double v = py::cast<double>(pt[2]);
+        result.add_event(t, id, v);
+    }
+    result.sort_events();
+    return result;
+}
+
 void init_py_gendyn(py::module_ &m, py::module_ &m_const)
 {
     using namespace pybind11::literals;
     py::class_<xenakios::AutomationSequence>(m, "AutomationSequence")
         .def(py::init<>())
+        .def(py::init([](const std::vector<py::tuple> &tups) { return seq_from_tuple_vec(tups); }))
         .def("__len__", &xenakios::AutomationSequence::size)
         .def("add_event", &xenakios::AutomationSequence::add_event, "time"_a, "id"_a, "value"_a);
     py::class_<Gendyn2026>(m, "gendyn")
