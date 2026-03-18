@@ -4,7 +4,8 @@
 #include <pybind11/numpy.h>
 #include "../Common/xen_ambisonics.h"
 #include "../Common/xap_breakpoint_envelope.h"
-#include "../Common/clap_eventsequence.h"
+// #include "../Common/clap_eventsequence.h"
+#include "../Common/automation_sequence.h"
 #include "../Common/xapdsp.h"
 #include "plugins/Galactic3Ambisonic.h"
 #include <print>
@@ -164,7 +165,7 @@ inline py::array_t<float> encode_to_ambisonics(const py::array_t<float> &input_a
 
 inline py::array_t<float> render_galactic3ambisonics(py::array_t<float> input_audio,
                                                      double samplerate,
-                                                     ClapEventSequence &automation)
+                                                     xenakios::AutomationSequence &automation)
 {
     if (input_audio.ndim() != 2)
         throw std::runtime_error(
@@ -191,8 +192,8 @@ inline py::array_t<float> render_galactic3ambisonics(py::array_t<float> input_au
     const float *readbuf = input_audio.data(0);
     auto plug = std::make_unique<airwinconsolidated::Galactic3::Galactic3>(0);
     plug->setSampleRate(samplerate);
-    automation.sortEvents();
-    ClapEventSequence::IteratorSampleTime automiter{automation, samplerate};
+    automation.sort_events();
+    xenakios::AutomationSequence::Iterator automiter{automation, samplerate};
     const size_t blocksize = 32;
     choc::buffer::ChannelArrayBuffer<float> inbuf{2, blocksize, true};
     choc::buffer::ChannelArrayBuffer<float> outbuf{16, blocksize, true};
@@ -217,14 +218,12 @@ inline py::array_t<float> render_galactic3ambisonics(py::array_t<float> input_au
         auto aevts = automiter.readNextEvents(blocksize);
         for (auto &ev : aevts)
         {
-            if (ev.event.header.type == CLAP_EVENT_PARAM_VALUE)
+
+            auto pid = ev.id;
+            if (pid >= 0 && pid < airwinconsolidated::Galactic3::kNumParameters)
             {
-                auto pid = ev.event.param.param_id;
-                if (pid >= 0 && pid < airwinconsolidated::Galactic3::kNumParameters)
-                {
-                    std::print("{} {} {}\n", outcounter / samplerate, pid, ev.event.param.value);
-                    plug->setParameter(pid, ev.event.param.value);
-                }
+                std::print("{} {} {}\n", outcounter / samplerate, pid, ev.value);
+                plug->setParameter(pid, ev.value);
             }
         }
         plug->processReplacing((float **)inbuf.getView().data.channels,
