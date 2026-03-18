@@ -3,6 +3,12 @@
 #include <vector>
 #include "containers/choc_NonAllocatingStableSort.h"
 #include "containers/choc_Span.h"
+namespace xenakios
+{
+/*
+This is a lighter way to deal with sequences of DSP automation events
+than the ClapEventSequence. We should be using this whenever possible from now on.
+*/
 
 struct AutomationEvent
 {
@@ -80,3 +86,4 @@ struct AutomationSequence
         double sampleRate = 0.0;
     };
 };
+} // namespace xenakios

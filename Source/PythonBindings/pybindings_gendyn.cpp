@@ -20,7 +20,7 @@ inline void gendyn_print_params(Gendyn2026 &g)
 }
 
 py::array_t<float> gendyn_render(Gendyn2026 &gendyn, double sr, double outdur,
-                                 AutomationSequence &automation)
+                                 xenakios::AutomationSequence &automation)
 {
     int numOutChans = 1;
     int frames = outdur * sr;
@@ -42,7 +42,7 @@ py::array_t<float> gendyn_render(Gendyn2026 &gendyn, double sr, double outdur,
     gendyn.prepare(sr * osfactor);
     float osbuffer[osfactor];
     automation.sort_events();
-    AutomationSequence::Iterator eviter{automation, sr};
+    xenakios::AutomationSequence::Iterator eviter{automation, sr};
     StereoSimperSVF highpass;
     highpass.init();
     highpass.setCoeff(12.0, 0.0f, 1.0 / sr);
@@ -110,10 +110,10 @@ py::array_t<float> gendyn_render(Gendyn2026 &gendyn, double sr, double outdur,
 void init_py_gendyn(py::module_ &m, py::module_ &m_const)
 {
     using namespace pybind11::literals;
-    py::class_<AutomationSequence>(m, "AutomationSequence")
+    py::class_<xenakios::AutomationSequence>(m, "AutomationSequence")
         .def(py::init<>())
-        .def("__len__", &AutomationSequence::size)
-        .def("add_event", &AutomationSequence::add_event, "time"_a, "id"_a, "value"_a);
+        .def("__len__", &xenakios::AutomationSequence::size)
+        .def("add_event", &xenakios::AutomationSequence::add_event, "time"_a, "id"_a, "value"_a);
     py::class_<Gendyn2026>(m, "gendyn")
         .def(py::init<>())
         .def("print_params", &gendyn_print_params)
