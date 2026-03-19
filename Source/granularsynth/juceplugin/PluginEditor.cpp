@@ -26,6 +26,12 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor(AudioPluginAudi
     : AudioProcessorEditor(&p), processorRef(p), envcomp(&p.granulator),
       lfoTabs(juce::TabbedButtonBar::Orientation::TabsAtTop)
 {
+    perfcomp = std::make_unique<PerformanceComponent>();
+    perfcomp->RequestData = [this](int &maxvoices, int &usedvoices, float &cpu) {
+        maxvoices = processorRef.granulator.voices.size();
+        usedvoices = processorRef.granulator.numVoicesUsed;
+        cpu = processorRef.perfMeasurer.getLoadAsProportion();
+    };
     init_step_sequencer_js();
     addAndMakeVisible(envcomp);
     addAndMakeVisible(oscillatorComponent);
@@ -37,7 +43,7 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor(AudioPluginAudi
     addAndMakeVisible(insert2ParamsComponent);
     addAndMakeVisible(stackParamsComponent);
     addAndMakeVisible(timeParamsComponent);
-
+    timeParamsComponent.addHeaderComponent(perfcomp.get());
     addAndMakeVisible(infoLabel);
 
     filter1Drop = std::make_unique<DropDownComponent>();

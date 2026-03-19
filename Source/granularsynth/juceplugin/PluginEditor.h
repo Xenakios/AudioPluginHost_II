@@ -557,6 +557,7 @@ class ParameterGroupComponent : public juce::GroupComponent
         {
             layout.items.add(juce::FlexItem(*headerComponents[i])
                                  .withFlex(1.0)
+                                 .withMargin(2.0)
                                  .withMinHeight(25)
                                  .withMinWidth(50)
                                  .withMaxWidth(getWidth()));
@@ -574,6 +575,31 @@ class ParameterGroupComponent : public juce::GroupComponent
     }
     std::vector<juce::Component *> headerComponents;
     std::vector<std::unique_ptr<XapSlider>> sliders;
+};
+
+class PerformanceComponent : public juce::Component, public juce::Timer
+{
+  public:
+    PerformanceComponent() { startTimer(100); }
+    void timerCallback() override { repaint(); }
+    void paint(juce::Graphics &g) override
+    {
+        g.fillAll(juce::Colours::black);
+        int maxvoices = 0;
+        int usedvoices = 0;
+        float cpu_use = 0.0f;
+        if (RequestData)
+        {
+            RequestData(maxvoices, usedvoices, cpu_use);
+            float w = (float)getWidth() / maxvoices * usedvoices;
+            g.setColour(juce::Colours::yellow);
+            g.fillRect(juce::Rectangle<float>(0.0f, 0.0f, w, 10.0f));
+            w = cpu_use * getWidth();
+            g.setColour(juce::Colours::green);
+            g.fillRect(juce::Rectangle<float>(0.0f, 12.0f, w, 10.0f));
+        }
+    }
+    std::function<void(int &, int &, float &)> RequestData;
 };
 
 class AudioPluginAudioProcessorEditor final : public juce::AudioProcessorEditor, public juce::Timer
@@ -615,6 +641,7 @@ class AudioPluginAudioProcessorEditor final : public juce::AudioProcessorEditor,
     std::vector<std::unique_ptr<StepSeqComponent>> stepcomps;
     juce::Label infoLabel;
     std::unordered_map<uint32_t, XapSlider *> idToSlider;
+    std::unique_ptr<PerformanceComponent> perfcomp;
     void showFilterMenu(int whichfilter);
     void updateInsertParameterMetaDatas();
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(AudioPluginAudioProcessorEditor)
