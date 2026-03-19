@@ -504,7 +504,7 @@ class VolumeEnvelopeComponent : public juce::Component
                 normy = eluts.getValueLERP<true>(curveend, normx);
             }
             normy *= sinvalue;
-            float ycor = xenakios::mapvalue<float>(normy, -1.25f, 1.25f, getHeight(), 0);
+            float ycor = xenakios::mapvalue<float>(normy, -1.1f, 1.1f, getHeight(), 0);
             if (i == 0)
                 curvepath.startNewSubPath({(float)i, ycor});
             else

@@ -43,7 +43,7 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor(AudioPluginAudi
     addAndMakeVisible(insert2ParamsComponent);
     addAndMakeVisible(stackParamsComponent);
     addAndMakeVisible(timeParamsComponent);
-    timeParamsComponent.addHeaderComponent(perfcomp.get());
+    mainParamsComponent.addHeaderComponent(perfcomp.get());
     addAndMakeVisible(infoLabel);
 
     filter1Drop = std::make_unique<DropDownComponent>();
@@ -426,7 +426,7 @@ void AudioPluginAudioProcessorEditor::resized()
     oscillatorComponent.setBounds(0, 0, 500, 125);
     volumeParamsComponent.setBounds(0, 126, 500, 125);
     timeParamsComponent.setBounds(502, 0, 500, 125);
-    envcomp.setBounds(502, timeParamsComponent.getBottom() + 1, 500, 175);
+    envcomp.setBounds(502, timeParamsComponent.getBottom() + 1, 175, 175);
     spatParamsComponent.setBounds(0, 302, 500, 125);
     mainParamsComponent.setBounds(502, 302, 500, 125);
     insert1ParamsComponent.setBounds(1004, 0, 500, 150);
