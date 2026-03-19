@@ -14,6 +14,7 @@
 // #include "audio/choc_AudioFileFormat_Ogg.h"
 // #include "audio/choc_AudioFileFormat_MP3.h"
 #include "audio/choc_SampleBuffers.h"
+#include "../Common/automation_sequence.h"
 #if XENPYAIRWINDOWS
 #include "AirwinRegistry.h"
 #endif
@@ -256,6 +257,96 @@ class TimeStretch
     int stretchPreset = 0;
     std::unordered_map<int, std::pair<float, float>> presetConfigs;
 };
+
+inline py::array_t<float> render_signalsmith_stretch(py::array_t<float> input_audio,
+                                                     double samplerate,
+                                                     xenakios::AutomationSequence &automation)
+{
+    if (input_audio.ndim() != 2)
+        throw std::runtime_error(
+            std::format("array ndim {} incompatible, must be 2", input_audio.ndim()));
+    uint32_t numInChans = input_audio.shape(0);
+    int numOutChans = numInChans;
+    int inframes = input_audio.size() / numInChans;
+
+    std::vector<float> stretchoutput;
+    stretchoutput.reserve(65536 * numInChans);
+    auto stretcher = std::make_unique<signalsmith::stretch::SignalsmithStretch<float>>();
+    stretcher->presetDefault(numInChans, samplerate);
+    int insamplepos = 0;
+    constexpr size_t blocksize = 512;
+    automation.sort_events();
+    xenakios::AutomationSequence::Iterator automiter{automation, samplerate};
+    double playrate = 1.0;
+    double pitch = 0.0;
+    int outframes = 0;
+    // we need to run through all the automation first to calculate
+    // how long the output audio will be
+    const double minrate = 0.25;
+    const double maxrate = 4.0;
+    while (insamplepos < inframes)
+    {
+        auto evts = automiter.readNextEvents(blocksize);
+        for (const auto &ev : evts)
+        {
+            if (ev.id == 0) // playrate
+                playrate = std::clamp(ev.value, minrate, maxrate);
+        }
+        outframes += blocksize * (1.0 / playrate);
+        insamplepos += blocksize;
+    }
+    // have some extra space
+    outframes += blocksize * 8;
+    // rewind playback states
+    automiter.setTime(0);
+    insamplepos = 0;
+    playrate = 1.0;
+    py::buffer_info binfo(
+        nullptr,                                /* Pointer to buffer */
+        sizeof(float),                          /* Size of one scalar */
+        py::format_descriptor<float>::format(), /* Python struct-style format descriptor */
+        2,                                      /* Number of dimensions */
+        {numOutChans, outframes},               /* Buffer dimensions */
+        {sizeof(float) * outframes,             /* Strides (in bytes) for each index */
+         sizeof(float)});
+    py::array_t<float> output_audio{binfo};
+    float const *buftostretch[64];
+
+    int outsamplepos = 0;
+    while (insamplepos < inframes)
+    {
+        auto evts = automiter.readNextEvents(blocksize);
+        for (auto &ev : evts)
+        {
+            if (ev.id == 0)
+                playrate = std::clamp(ev.value, minrate, maxrate);
+            if (ev.id == 1)
+            {
+                pitch = ev.value;
+                stretcher->setTransposeSemitones(pitch);
+            }
+        }
+        float *buf_from_stretch[64];
+        int numoutsamples = (1.0 / playrate) * blocksize;
+        for (int i = 0; i < 64; ++i)
+        {
+            if (i < numInChans)
+            {
+                buftostretch[i] = &input_audio.data(i)[insamplepos];
+                buf_from_stretch[i] = &output_audio.mutable_data(i)[outsamplepos];
+            }
+            else
+            {
+                buftostretch[i] = nullptr;
+                buf_from_stretch[i] = nullptr;
+            }
+        }
+        stretcher->process(buftostretch, blocksize, buf_from_stretch, numoutsamples);
+        insamplepos += blocksize;
+        outsamplepos += numoutsamples;
+    }
+    return output_audio;
+}
 
 inline void addAudioBufferEvent(ClapEventSequence &seq, double time, int32_t target,
                                 const py::array_t<double> &arr, int32_t samplerate)
@@ -624,4 +715,6 @@ void init_py1(py::module_ &m)
         });
 #endif
     m.def("fibonacci", &fibonacci, "n"_a, "keyboard_interrubtable"_a = true);
+    m.def("signalsmith_stretch", &render_signalsmith_stretch, "input_audio"_a, "samplerate"_a,
+          "automation"_a);
 }

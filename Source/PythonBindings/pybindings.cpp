@@ -351,9 +351,11 @@ PYBIND11_MODULE(xenakios, m)
     // m.def("chocLoop", &runChocLoop);
     m.def("numInputHookCallbacks", []() { return g_inputHookCount; });
 
-    init_py1(m);
+    
 
     py::module m_const = m.def_submodule("constants", "Constants");
+    init_py_gendyn(m, m_const);
+    init_py1(m);
     init_py2(m, m_const);
     init_py3(m, m_const);
 
@@ -487,7 +489,7 @@ PYBIND11_MODULE(xenakios, m)
         .def("set_point", &xenakios::Envelope::setPoint)
         .def("get_value", &xenakios::Envelope::getValueAtPosition);
     init_py4(m, m_const);
-    init_py_gendyn(m, m_const);
+    
     init_py_ambisonics(m, m_const);
     /*
         py::class_<MultiModulator>(m, "MultiModulator")
