@@ -775,13 +775,18 @@ class GranulatorVoice
         feedbacksignals[0] = 0.0;
         feedbacksignals[1] = 0.0;
     }
-    void process(float *outputs, int nframes)
+    template <bool GrainModulation = true> void process(float *outputs, int nframes)
     {
-        float aux_env_value = aux_envelope.step();
-        for (int i = 1; i < nframes; ++i)
+        float aux_env_value = 0.0f;
+        if constexpr (GrainModulation)
         {
-            aux_envelope.step();
+            aux_env_value = aux_envelope.step();
+            for (int i = 1; i < nframes; ++i)
+            {
+                aux_envelope.step();
+            }
         }
+
         std::visit(
             [this, aux_env_value](auto &q) {
                 double finalpitch = pitch_base + aux_env_value * modamounts[GrainEvent::MD_PITCH];
@@ -1918,7 +1923,7 @@ class ToneGranulator
                 {
                     ++numactive;
                     alignas(16) float voiceout[16 * granul_block_size];
-                    voices[j]->process(voiceout, granul_block_size);
+                    voices[j]->process<false>(voiceout, granul_block_size);
 
                     for (int k = 0; k < granul_block_size; ++k)
                     {
