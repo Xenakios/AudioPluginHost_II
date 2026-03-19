@@ -292,7 +292,8 @@ inline py::array_t<float> render_signalsmith_stretch(py::array_t<float> input_au
             if (ev.id == 0) // playrate
                 playrate = std::clamp(ev.value, minrate, maxrate);
         }
-        outframes += blocksize * (1.0 / playrate);
+        int insamplestouse = std::min<int>(blocksize, inframes - insamplepos);
+        outframes += insamplestouse * (1.0 / playrate);
         insamplepos += blocksize;
     }
     // have some extra space
@@ -327,7 +328,7 @@ inline py::array_t<float> render_signalsmith_stretch(py::array_t<float> input_au
             }
         }
         float *buf_from_stretch[64];
-        int numoutsamples = (1.0 / playrate) * blocksize;
+        
         for (int i = 0; i < 64; ++i)
         {
             if (i < numInChans)
@@ -341,7 +342,9 @@ inline py::array_t<float> render_signalsmith_stretch(py::array_t<float> input_au
                 buf_from_stretch[i] = nullptr;
             }
         }
-        stretcher->process(buftostretch, blocksize, buf_from_stretch, numoutsamples);
+        int insamplestouse = std::min<int>(blocksize, inframes - insamplepos);
+        int numoutsamples = (1.0 / playrate) * insamplestouse;
+        stretcher->process(buftostretch, insamplestouse, buf_from_stretch, numoutsamples);
         insamplepos += blocksize;
         outsamplepos += numoutsamples;
     }
