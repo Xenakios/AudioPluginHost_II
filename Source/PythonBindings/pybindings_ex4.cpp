@@ -4,6 +4,7 @@
 #include <pybind11/numpy.h>
 #include <pybind11/functional.h>
 #include "../Common/xap_breakpoint_envelope.h"
+#include "../Common/automation_sequence.h"
 #include "sst/basic-blocks/dsp/EllipticBlepOscillators.h"
 #include "sst/basic-blocks/dsp/DPWSawPulseOscillator.h"
 #include "sst/basic-blocks/dsp/Interpolators.h"
@@ -14,7 +15,6 @@
 #include "../granularsynth/granularsynth.h"
 #include "../cli/xcli_utils.h"
 #include "../Common/xapdsp.h"
-
 
 namespace py = pybind11;
 
@@ -328,6 +328,124 @@ inline void granulator_set_modulation(ToneGranulator &g, int modslot, int modsou
     }
 }
 
+struct SawBank
+{
+    static constexpr size_t maxnumsaws = 128;
+    alignas(32) std::array<sst::basic_blocks::dsp::EBSaw<>, maxnumsaws> oscillators;
+    alignas(32) float ambicoeffs[maxnumsaws][16];
+    size_t num_active_saws = 17;
+    double samplerate = 0.0;
+    xenakios::Xoroshiro128Plus rng;
+    SawBank() { calculateambicoeffs(0.0f, 0.0f); }
+    void calculateambicoeffs(float centerdegrees, float spread_degrees)
+    {
+        for (size_t i = 0; i < num_active_saws; ++i)
+        {
+            float offset = xenakios::mapvalue<float>(i, 0, num_active_saws - 1, -spread_degrees,
+                                                     spread_degrees);
+            float azidegrees = centerdegrees + offset;
+            float azirads = degreesToRadians(azidegrees);
+            float x = 0.0f;
+            float y = 0.0f;
+            float z = 0.0f;
+            sphericalToCartesian(azirads, 0.0f, x, y, z);
+            SHEval3(x, y, z, ambicoeffs[i]);
+            for (size_t j = 0; j < 16; ++j)
+                ambicoeffs[i][j] *= n3d2sn3d[j];
+        }
+    }
+    void prepare(double sr)
+    {
+        samplerate = sr;
+        for (size_t i = 0; i < maxnumsaws; ++i)
+        {
+            oscillators[i].setSampleRate(sr);
+            oscillators[i].setInitialPhase(rng.nextFloatInRange(-1.0f, 1.0f));
+        }
+        set_pitch(60.0f, 0.01f);
+    }
+    void set_pitch(float centernote, float spread)
+    {
+        for (size_t i = 0; i < num_active_saws; ++i)
+        {
+            float offset = xenakios::mapvalue<float>(i, 0, num_active_saws - 1, -spread, spread);
+            float pitch = centernote + offset;
+            float hz = 440.0 * std::pow(2.0, (1.0 / 12) * (pitch - 69));
+            oscillators[i].setFrequency(hz);
+        }
+    }
+    void process(float *outbuf)
+    {
+        double sum[16];
+        for (size_t i = 0; i < 16; ++i)
+            outbuf[i] = 0.0f;
+        float mixgain = 1.0 / num_active_saws;
+        for (size_t i = 0; i < num_active_saws; ++i)
+        {
+            float osc = oscillators[i].step() * mixgain;
+            for (size_t j = 0; j < 16; ++j)
+            {
+                outbuf[j] += ambicoeffs[i][j] * osc;
+            }
+        }
+    }
+};
+
+inline py::array_t<float> render_saw_bank(double samplerate, double outdur,
+                                          xenakios::AutomationSequence &automation)
+{
+    int chans = 16;
+    const size_t blocksize = 8;
+    int frames = samplerate * outdur + blocksize;
+    py::buffer_info binfo(
+        nullptr,                                /* Pointer to buffer */
+        sizeof(float),                          /* Size of one scalar */
+        py::format_descriptor<float>::format(), /* Python struct-style format descriptor */
+        2,                                      /* Number of dimensions */
+        {chans, frames},                        /* Buffer dimensions */
+        {sizeof(float) * frames,                /* Strides (in bytes) for each index */
+         sizeof(float)});
+    py::array_t<float> output_audio{binfo};
+    alignas(32) float *writebufs[16];
+    for (int i = 0; i < chans; ++i)
+        writebufs[i] = output_audio.mutable_data(i);
+    auto obank = std::make_unique<SawBank>();
+    obank->prepare(samplerate);
+    automation.sort_events();
+    xenakios::AutomationSequence::Iterator automiter(automation, samplerate);
+    int outcounter = 0;
+    float procbuf[16];
+    float centerpitch = 60.0f;
+    float pitchspread = 0.01f;
+    float azicenter = 0.0f;
+    float azispread = 0.0f;
+    while (outcounter < frames)
+    {
+        auto events = automiter.readNextEvents(blocksize);
+        for (auto &e : events)
+        {
+            if (e.id == 0)
+                centerpitch = e.value;
+            if (e.id == 1)
+                pitchspread = e.value;
+            if (e.id == 2)
+                azicenter = e.value;
+            if (e.id == 3)
+                azispread = e.value;
+        }
+        obank->calculateambicoeffs(azicenter, azispread);
+        obank->set_pitch(centerpitch, pitchspread);
+        for (size_t i = 0; i < blocksize; ++i)
+        {
+            obank->process(procbuf);
+            for (size_t j = 0; j < 16; ++j)
+                writebufs[j][outcounter + i] = procbuf[j];
+        }
+        outcounter += blocksize;
+    }
+    return output_audio;
+}
+
 inline py::array_t<float> render_granulator(ToneGranulator &gran, double samplerate,
                                             events_t evlist, std::string outputmode,
                                             double outputduration)
@@ -575,7 +693,6 @@ inline std::vector<double> test_simple_lfo(int sh, xenakios::Envelope &rate_env,
 
 inline std::vector<double> test_morphing_random() { return {}; }
 
-
 void init_py4(py::module_ &m, py::module_ &m_const)
 {
     using namespace pybind11::literals;
@@ -588,6 +705,7 @@ void init_py4(py::module_ &m, py::module_ &m_const)
     m.def("generate_fmtone", &generate_fm, "carrierfreq"_a, "modulatorfreq"_a, "modulationamont"_a,
           "feedback"_a, "samplerate"_a, "duration"_a);
     m.def("generate_corrnoise", &generate_corrnoise);
+    m.def("generate_saw_bank", &render_saw_bank, "samplerate"_a, "duration"_a, "automation"_a);
     m.def("tone_types", &osc_types);
     m.def("get_sst_filter_types", &get_sst_filter_types);
 

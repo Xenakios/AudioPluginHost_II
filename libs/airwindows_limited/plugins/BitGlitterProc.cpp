@@ -78,6 +78,33 @@ void BitGlitter::processReplacing(float **inputs, float **outputs, VstInt32 samp
 			outputSampleL = (outputSampleL * 0.5) + (heldSampleAL * 0.5);
 			//softens the edge of the derez
 		}
+		#ifdef GEMINIFIX
+		// --- ORIGINAL CPU-HEAVY BLOCK ---
+/*
+if (outputSampleL > 0) {
+    offset = outputSampleL;
+    while (offset > 0) { offset -= rezA; } 
+    outputSampleL -= offset;
+}
+*/
+
+// --- OPTIMIZED CONSTANT-TIME BLOCK ---
+// This replaces the entire 'if (outputSampleL > 0)' and 'if (outputSampleL < 0)' sections.
+
+if (rezA > 0.0) // Safety check to avoid division by zero
+{
+    // 1. Calculate how many "steps" of rezA fit into the sample
+    // 2. Multiply by rezA to get the quantized value
+    // 3. Subtract the remainder (the offset)
+    
+    double quotient = floor(outputSampleL / rezA);
+    outputSampleL = quotient * rezA;
+}
+
+// Then apply the original "Glitter" darkening/gate
+outputSampleL *= (1.0 - rezA);
+if (std::abs(outputSampleL) < rezA) outputSampleL = 0.0;*/
+#endif
 		if (outputSampleL > 0)
 		{
 			offset = outputSampleL;
