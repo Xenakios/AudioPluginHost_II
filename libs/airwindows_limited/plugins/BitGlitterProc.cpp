@@ -84,6 +84,7 @@ void BitGlitter::processReplacing(float **inputs, float **outputs, VstInt32 samp
 			while (offset > 0) {offset -= rezA;}
 			outputSampleL -= offset;
 			//it's below 0 so subtracting adds the remainder
+			// outputSampleL = offset - (floor(offset / rezA) * rezA);
 		}
 		if (outputSampleL < 0)
 		{

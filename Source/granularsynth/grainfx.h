@@ -141,7 +141,7 @@ class GrainInsertFX
     {
         std::vector<ModeInfo> result;
         result.reserve(300);
-        result.emplace_back("None", "");
+        result.emplace_back("-None-", "");
         result.emplace_back("AW BezEQ", "AirWindows", 2, 0);
         result.emplace_back("AW HipCrush", "AirWindows", 2, 1);
         result.emplace_back("AW KWoodRoom", "AirWindows", 2, 2);
