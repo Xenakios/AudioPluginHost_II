@@ -348,10 +348,11 @@ struct SawBank
                     ambicoeffs[i][j][k] = 0.0f;
             }
         set_mix(0.0f);
-        calculateambicoeffs(0.0f, 0.0f);
+        calculateambicoeffs(0.0f, 0.0f, 0.0f);
     }
-    void calculateambicoeffs(float centerdegrees, float spread_degrees)
+    void calculateambicoeffs(float centerdegrees, float spread_degrees, float elevation)
     {
+        float elevrads = degreesToRadians(elevation);
         for (size_t i = 0; i < num_active_saws; ++i)
         {
             float offset = xenakios::mapvalue<float>(i, 0, num_active_saws - 1, -spread_degrees,
@@ -361,7 +362,7 @@ struct SawBank
             float x = 0.0f;
             float y = 0.0f;
             float z = 0.0f;
-            sphericalToCartesian(azirads, 0.0f, x, y, z);
+            sphericalToCartesian(azirads, elevrads, x, y, z);
             SHEval3(x, y, z, ambicoeffs[1][i]);
             for (size_t j = 0; j < maxambicoeffs; ++j)
                 ambicoeffs[1][i][j] *= n3d2sn3d[j];
@@ -373,9 +374,16 @@ struct SawBank
         for (size_t i = 0; i < maxnumsaws; ++i)
         {
             oscillators[i].setSampleRate(sr);
+        }
+        randomize_phases();
+        set_pitch(60.0f, 0.01f);
+    }
+    void randomize_phases()
+    {
+        for (size_t i = 0; i < num_active_saws; ++i)
+        {
             oscillators[i].setInitialPhase(rng.nextFloatInRange(0.0f, 1.0f));
         }
-        set_pitch(60.0f, 0.01f);
     }
     void set_pitch(float centernote, float spread)
     {
@@ -412,18 +420,19 @@ struct SawBank
                 outbuf[j * 16 + i] = 0.0f;
         for (size_t frame = 0; frame < numframes; ++frame)
         {
+            float gaininterpos = 1.0 / numframes * frame;
             for (size_t i = 0; i < num_active_saws; ++i)
             {
                 float gain0 = oscgains[0][i];
                 float gain1 = oscgains[1][i];
-                float gain = gain0 + (gain1 - gain0) / numframes * frame;
+                float gain = gain0 + (gain1 - gain0) * gaininterpos;
                 float osc = oscillators[i].step() * gain;
                 oscgains[0][i] = gain1;
                 for (size_t j = 0; j < 16; ++j)
                 {
                     float ambigain0 = ambicoeffs[0][i][j];
                     float ambigain1 = ambicoeffs[1][i][j];
-                    float ambigain = ambigain0 + (ambigain1 - ambigain0) / numframes * frame;
+                    float ambigain = ambigain0 + (ambigain1 - ambigain0) * gaininterpos;
                     outbuf[frame * 16 + j] += ambigain * osc;
                     ambicoeffs[0][i][j] = ambigain1;
                 }
@@ -459,11 +468,15 @@ inline py::array_t<float> render_saw_bank(double samplerate, double outdur,
     float pitchspread = 0.01f;
     float azicenter = 0.0f;
     float azispread = 0.0f;
+    float elevation = 0.0f;
     float oscmix = 0.0f;
     obank->set_pitch(centerpitch, pitchspread);
-    obank->calculateambicoeffs(azicenter, azispread);
+    obank->calculateambicoeffs(azicenter, azispread, 0.0f);
     obank->set_mix(oscmix);
     float procbuf[16 * blocksize];
+    using clock = std::chrono::system_clock;
+    using ms = std::chrono::duration<double, std::milli>;
+    const auto start_time = clock::now();
     while (outcounter < frames)
     {
         auto events = automiter.readNextEvents(blocksize);
@@ -479,10 +492,14 @@ inline py::array_t<float> render_saw_bank(double samplerate, double outdur,
                 azicenter = e.value;
             if (e.id == 3)
                 azispread = e.value;
-            if (e.id == 2 || e.id == 3)
-                obank->calculateambicoeffs(azicenter, azispread);
+            if (e.id == 6)
+                elevation = e.value;
+            if (e.id == 2 || e.id == 3 || e.id == 6)
+                obank->calculateambicoeffs(azicenter, azispread, elevation);
             if (e.id == 4)
                 obank->set_mix(e.value);
+            if (e.id == 5)
+                obank->randomize_phases();
         }
         obank->process(procbuf, blocksize);
         for (size_t i = 0; i < blocksize; ++i)
@@ -492,6 +509,10 @@ inline py::array_t<float> render_saw_bank(double samplerate, double outdur,
         }
         outcounter += blocksize;
     }
+    const ms render_duration = clock::now() - start_time;
+    double rtfactor = (frames / samplerate * 1000.0) / render_duration.count();
+    std::print("render took {} milliseconds, {:.2f}x realtime\n", render_duration.count(),
+               rtfactor);
     return output_audio;
 }
 
