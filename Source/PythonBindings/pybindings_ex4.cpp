@@ -331,12 +331,25 @@ inline void granulator_set_modulation(ToneGranulator &g, int modslot, int modsou
 struct SawBank
 {
     static constexpr size_t maxnumsaws = 128;
+    static constexpr size_t maxambicoeffs = 16;
     alignas(32) std::array<sst::basic_blocks::dsp::EBSaw<>, maxnumsaws> oscillators;
-    alignas(32) float ambicoeffs[maxnumsaws][16];
+    alignas(32) float ambicoeffs[2][maxnumsaws][maxambicoeffs];
+    alignas(32) float oscgains[2][maxnumsaws];
     size_t num_active_saws = 17;
     double samplerate = 0.0;
     xenakios::Xoroshiro128Plus rng;
-    SawBank() { calculateambicoeffs(0.0f, 0.0f); }
+    SawBank()
+    {
+        for (size_t i = 0; i < 2; ++i)
+            for (size_t j = 0; j < maxnumsaws; ++j)
+            {
+                oscgains[i][j] = 0.0f;
+                for (size_t k = 0; k < maxambicoeffs; ++k)
+                    ambicoeffs[i][j][k] = 0.0f;
+            }
+        set_mix(0.0f);
+        calculateambicoeffs(0.0f, 0.0f);
+    }
     void calculateambicoeffs(float centerdegrees, float spread_degrees)
     {
         for (size_t i = 0; i < num_active_saws; ++i)
@@ -349,9 +362,9 @@ struct SawBank
             float y = 0.0f;
             float z = 0.0f;
             sphericalToCartesian(azirads, 0.0f, x, y, z);
-            SHEval3(x, y, z, ambicoeffs[i]);
-            for (size_t j = 0; j < 16; ++j)
-                ambicoeffs[i][j] *= n3d2sn3d[j];
+            SHEval3(x, y, z, ambicoeffs[1][i]);
+            for (size_t j = 0; j < maxambicoeffs; ++j)
+                ambicoeffs[1][i][j] *= n3d2sn3d[j];
         }
     }
     void prepare(double sr)
@@ -360,7 +373,7 @@ struct SawBank
         for (size_t i = 0; i < maxnumsaws; ++i)
         {
             oscillators[i].setSampleRate(sr);
-            oscillators[i].setInitialPhase(rng.nextFloatInRange(-1.0f, 1.0f));
+            oscillators[i].setInitialPhase(rng.nextFloatInRange(0.0f, 1.0f));
         }
         set_pitch(60.0f, 0.01f);
     }
@@ -374,18 +387,46 @@ struct SawBank
             oscillators[i].setFrequency(hz);
         }
     }
-    void process(float *outbuf)
+    void set_mix(float mix)
     {
-        double sum[16];
-        for (size_t i = 0; i < 16; ++i)
-            outbuf[i] = 0.0f;
-        float mixgain = 1.0 / num_active_saws;
+        mix = 0.1 + 0.9 * mix;
+        mix = std::clamp(mix, 0.1f, 1.0f);
+        double gainsum = 0.0;
         for (size_t i = 0; i < num_active_saws; ++i)
         {
-            float osc = oscillators[i].step() * mixgain;
-            for (size_t j = 0; j < 16; ++j)
+            oscgains[1][i] = 1.0f;
+            if (i < num_active_saws / 2)
+                oscgains[1][i] = mix;
+            if (i > num_active_saws / 2)
+                oscgains[1][i] = mix;
+            gainsum += oscgains[1][i];
+        }
+        double scaler = 1.0 / gainsum;
+        for (size_t i = 0; i < num_active_saws; ++i)
+            oscgains[1][i] *= scaler;
+    }
+    void process(float *outbuf, size_t numframes)
+    {
+        for (size_t i = 0; i < 16; ++i)
+            for (size_t j = 0; j < numframes; ++j)
+                outbuf[j * 16 + i] = 0.0f;
+        for (size_t frame = 0; frame < numframes; ++frame)
+        {
+            for (size_t i = 0; i < num_active_saws; ++i)
             {
-                outbuf[j] += ambicoeffs[i][j] * osc;
+                float gain0 = oscgains[0][i];
+                float gain1 = oscgains[1][i];
+                float gain = gain0 + (gain1 - gain0) / numframes * frame;
+                float osc = oscillators[i].step() * gain;
+                oscgains[0][i] = gain1;
+                for (size_t j = 0; j < 16; ++j)
+                {
+                    float ambigain0 = ambicoeffs[0][i][j];
+                    float ambigain1 = ambicoeffs[1][i][j];
+                    float ambigain = ambigain0 + (ambigain1 - ambigain0) / numframes * frame;
+                    outbuf[frame * 16 + j] += ambigain * osc;
+                    ambicoeffs[0][i][j] = ambigain1;
+                }
             }
         }
     }
@@ -395,7 +436,7 @@ inline py::array_t<float> render_saw_bank(double samplerate, double outdur,
                                           xenakios::AutomationSequence &automation)
 {
     int chans = 16;
-    const size_t blocksize = 8;
+    constexpr size_t blocksize = 16;
     int frames = samplerate * outdur + blocksize;
     py::buffer_info binfo(
         nullptr,                                /* Pointer to buffer */
@@ -414,11 +455,15 @@ inline py::array_t<float> render_saw_bank(double samplerate, double outdur,
     automation.sort_events();
     xenakios::AutomationSequence::Iterator automiter(automation, samplerate);
     int outcounter = 0;
-    float procbuf[16];
     float centerpitch = 60.0f;
     float pitchspread = 0.01f;
     float azicenter = 0.0f;
     float azispread = 0.0f;
+    float oscmix = 0.0f;
+    obank->set_pitch(centerpitch, pitchspread);
+    obank->calculateambicoeffs(azicenter, azispread);
+    obank->set_mix(oscmix);
+    float procbuf[16 * blocksize];
     while (outcounter < frames)
     {
         auto events = automiter.readNextEvents(blocksize);
@@ -428,18 +473,22 @@ inline py::array_t<float> render_saw_bank(double samplerate, double outdur,
                 centerpitch = e.value;
             if (e.id == 1)
                 pitchspread = e.value;
+            if (e.id == 0 || e.id == 1)
+                obank->set_pitch(centerpitch, pitchspread);
             if (e.id == 2)
                 azicenter = e.value;
             if (e.id == 3)
                 azispread = e.value;
+            if (e.id == 2 || e.id == 3)
+                obank->calculateambicoeffs(azicenter, azispread);
+            if (e.id == 4)
+                obank->set_mix(e.value);
         }
-        obank->calculateambicoeffs(azicenter, azispread);
-        obank->set_pitch(centerpitch, pitchspread);
+        obank->process(procbuf, blocksize);
         for (size_t i = 0; i < blocksize; ++i)
         {
-            obank->process(procbuf);
             for (size_t j = 0; j < 16; ++j)
-                writebufs[j][outcounter + i] = procbuf[j];
+                writebufs[j][outcounter + i] = procbuf[i * 16 + j];
         }
         outcounter += blocksize;
     }
