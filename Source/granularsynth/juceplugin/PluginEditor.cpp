@@ -508,22 +508,8 @@ bool StepSeqComponent::keyPressed(const juce::KeyPress &ev)
     };
     if (ev.getKeyCode() == 'R')
     {
-        try
-        {
-            auto jscode = choc::file::loadFileAsString(
-                R"(C:\develop\AudioPluginHost_mk2\Source\granularsynth\generatesteps.js)");
-            auto steps = generate_from_js(jscode, editRange.getStart(), editRange.getEnd());
-            for (size_t i = 0; i < steps.size(); ++i)
-            {
-                gr->fifo.push({StepModSource::Message::OP_SETSTEP, sindex, steps[i],
-                               (int)i + editRange.getStart()});
-            }
-            actiontaken = 2;
-        }
-        catch (std::exception &ex)
-        {
-            DBG(ex.what());
-        }
+        runJSInThread();
+        actiontaken = 2;
     }
     else if (ev.getKeyCode() == 'Y')
     {
@@ -626,6 +612,31 @@ bool StepSeqComponent::keyPressed(const juce::KeyPress &ev)
         setLoopFromSelection();
     }
     return actiontaken > 0;
+}
+
+void StepSeqComponent::runJSInThread()
+{
+    cancelButton.setVisible(true);
+    threadPool->addJob([this]() {
+        js_status.store(1);
+        try
+        {
+            auto jscode = choc::file::loadFileAsString(
+                R"(C:\develop\AudioPluginHost_mk2\Source\granularsynth\generatesteps.js)");
+            auto steps = generate_from_js(jscode, editRange.getStart(), editRange.getEnd());
+            for (size_t i = 0; i < steps.size(); ++i)
+            {
+                gr->fifo.push({StepModSource::Message::OP_SETSTEP, sindex, steps[i],
+                               (int)i + editRange.getStart()});
+            }
+        }
+        catch (std::exception &ex)
+        {
+            DBG(ex.what());
+        }
+        js_status.store(0);
+        juce::MessageManager::callAsync([this]() { cancelButton.setVisible(false); });
+    });
 }
 
 void StepSeqComponent::runExternalProgram()

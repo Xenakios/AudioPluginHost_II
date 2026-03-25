@@ -87,6 +87,12 @@ function generate_steps(steps, startstep, endstep)
 }
 )";
 
+void cancel_js()
+{
+    assert(g_jsctx);
+    g_jsctx.cancel();
+}
+
 std::vector<float> generate_from_js(std::string jscode, int startstep, int endstep)
 {
     assert(g_jsctx);

@@ -233,7 +233,9 @@ struct StepSeqComponent : public juce::Component
         repaint();
     }
     void runExternalProgram();
-
+    void runJSInThread();
+    std::atomic<int> js_status{0};
+    juce::TextButton cancelButton;
     StepSeqComponent(int seqindex, ToneGranulator *g, juce::ThreadPool *tp)
         : gr(g), sindex(seqindex), threadPool(tp)
     {
@@ -241,6 +243,14 @@ struct StepSeqComponent : public juce::Component
         editRange.setStart(0);
         editRange.setLength(g->stepModSources[sindex].looplen);
         setWantsKeyboardFocus(true);
+
+        addAndMakeVisible(cancelButton);
+        cancelButton.setButtonText("Stop JS script");
+        cancelButton.onClick = [this]() {
+            cancel_js();
+            cancelButton.setVisible(false);
+        };
+        cancelButton.setVisible(false);
 
         addAndMakeVisible(unipolarBut);
         unipolarBut.setButtonText("Unipolar");
@@ -259,7 +269,7 @@ struct StepSeqComponent : public juce::Component
     void resized() override
     {
         unipolarBut.setBounds(0, 1, graphxpos, 25);
-        // par0Slider.setBounds(0, unipolarBut.getBottom() + 1, graphxpos, 25);
+        cancelButton.setBounds(0, unipolarBut.getBottom() + 1, graphxpos, 25);
     }
     void paint(juce::Graphics &g) override;
 
