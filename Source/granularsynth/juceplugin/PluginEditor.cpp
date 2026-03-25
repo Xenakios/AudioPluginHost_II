@@ -2,7 +2,8 @@
 #include "PluginEditor.h"
 void init_step_sequencer_js();
 void deinit_step_sequencer_js();
-std::vector<float> generate_from_js(std::string jscode);
+void cancel_js();
+std::vector<float> generate_from_js(std::string jscode, int startstep, int endstep);
 
 inline void updateAllFonts(juce::Component &parent, const juce::Font &newFont)
 {
@@ -612,6 +613,34 @@ bool StepSeqComponent::keyPressed(const juce::KeyPress &ev)
         setLoopFromSelection();
     }
     return actiontaken > 0;
+}
+
+StepSeqComponent::StepSeqComponent(int seqindex, ToneGranulator *g, juce::ThreadPool *tp)
+    : gr(g), sindex(seqindex), threadPool(tp)
+{
+    rng.seed(11400714819323198485ULL, 17 + sindex * 31);
+    editRange.setStart(0);
+    editRange.setLength(g->stepModSources[sindex].looplen);
+    setWantsKeyboardFocus(true);
+
+    addAndMakeVisible(cancelButton);
+    cancelButton.setButtonText("Stop JS script");
+    cancelButton.onClick = [this]() {
+        cancel_js();
+        cancelButton.setVisible(false);
+    };
+    cancelButton.setVisible(false);
+
+    addAndMakeVisible(unipolarBut);
+    unipolarBut.setButtonText("Unipolar");
+    unipolarBut.onClick = [this]() {
+        gr->fifo.push(
+            {StepModSource::Message::OP_UNIPOLAR, sindex, 0.0f, unipolarBut.getToggleState()});
+    };
+    addAndMakeVisible(par0Slider);
+    par0Slider.setRange(0.0, 1.0);
+    par0Slider.setNumDecimalPlacesToDisplay(2);
+    par0Slider.onDragEnd = [this]() { runExternalProgram(); };
 }
 
 void StepSeqComponent::runJSInThread()

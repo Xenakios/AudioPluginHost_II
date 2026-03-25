@@ -960,9 +960,6 @@ class StepModSource
     }
 };
 
-std::vector<float> generate_from_js(std::string jscode, int startstep, int endstep);
-void cancel_js();
-
 inline double calculate_inverse(double y, double a, double b, double d)
 {
     // Ensure we don't divide by zero

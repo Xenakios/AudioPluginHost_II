@@ -236,33 +236,8 @@ struct StepSeqComponent : public juce::Component
     void runJSInThread();
     std::atomic<int> js_status{0};
     juce::TextButton cancelButton;
-    StepSeqComponent(int seqindex, ToneGranulator *g, juce::ThreadPool *tp)
-        : gr(g), sindex(seqindex), threadPool(tp)
-    {
-        rng.seed(11400714819323198485ULL, 17 + sindex * 31);
-        editRange.setStart(0);
-        editRange.setLength(g->stepModSources[sindex].looplen);
-        setWantsKeyboardFocus(true);
+    StepSeqComponent(int seqindex, ToneGranulator *g, juce::ThreadPool *tp);
 
-        addAndMakeVisible(cancelButton);
-        cancelButton.setButtonText("Stop JS script");
-        cancelButton.onClick = [this]() {
-            cancel_js();
-            cancelButton.setVisible(false);
-        };
-        cancelButton.setVisible(false);
-
-        addAndMakeVisible(unipolarBut);
-        unipolarBut.setButtonText("Unipolar");
-        unipolarBut.onClick = [this]() {
-            gr->fifo.push(
-                {StepModSource::Message::OP_UNIPOLAR, sindex, 0.0f, unipolarBut.getToggleState()});
-        };
-        addAndMakeVisible(par0Slider);
-        par0Slider.setRange(0.0, 1.0);
-        par0Slider.setNumDecimalPlacesToDisplay(2);
-        par0Slider.onDragEnd = [this]() { runExternalProgram(); };
-    }
     bool keyPressed(const juce::KeyPress &ev) override;
 
     int graphxpos = 200;
@@ -601,12 +576,18 @@ class PerformanceComponent : public juce::Component, public juce::Timer
         if (RequestData)
         {
             RequestData(maxvoices, usedvoices, cpu_use);
-            float w = (float)getWidth() / maxvoices * usedvoices;
+            float w = (float)(getWidth() - 2) / maxvoices * usedvoices * 0.5;
             g.setColour(juce::Colours::yellow);
-            g.fillRect(juce::Rectangle<float>(0.0f, 0.0f, w, 10.0f));
-            w = cpu_use * getWidth();
+            g.fillRect(juce::Rectangle<float>(0.0f, 0.0f, w, 20.0f));
+            g.setColour(juce::Colours::white);
+            g.drawText(std::format("VOICES {:2}/{:2}", usedvoices, maxvoices), 0, 0, getWidth() / 2 - 2,
+                       20, juce::Justification::centredRight);
+            w = cpu_use * (getWidth() - 2) * 0.5;
             g.setColour(juce::Colours::green);
-            g.fillRect(juce::Rectangle<float>(0.0f, 12.0f, w, 10.0f));
+            g.fillRect(juce::Rectangle<float>(getWidth() / 2.0, 0.0f, w / 2, 20.0f));
+            g.setColour(juce::Colours::white);
+            g.drawText(std::format("CPU {}%", (int)(cpu_use * 100.0)), getWidth() / 2 - 2, 0,
+                       getWidth() / 2, 20, juce::Justification::centredRight);
         }
     }
     std::function<void(int &, int &, float &)> RequestData;
