@@ -87,15 +87,19 @@ function generate_steps(steps, startstep, endstep)
 }
 )";
 
-std::vector<float> generate_from_js(std::string jscode)
+std::vector<float> generate_from_js(std::string jscode, int startstep, int endstep)
 {
     assert(g_jsctx);
     std::vector<float> result;
-    try
+    // try
     {
-        g_jsctx.run(test_script);
-        auto dest_arr = choc::value::createArray(16, [](uint32_t index) { return 0.5f; });
-        auto r = g_jsctx.invoke("generate_steps", dest_arr, 0, 16);
+        g_jsctx.run(jscode);
+        if (startstep >= endstep)
+            std::swap(startstep, endstep);
+
+        auto dest_arr =
+            choc::value::createArray(endstep - startstep, [](uint32_t index) { return 0.5f; });
+        auto r = g_jsctx.invoke("generate_steps", dest_arr, startstep, endstep);
 
         result.resize(r.size());
         for (int i = 0; i < result.size(); ++i)
@@ -103,9 +107,9 @@ std::vector<float> generate_from_js(std::string jscode)
             result[(size_t)i] = std::clamp(r[i].getWithDefault(0.0f), -1.0f, 1.0f);
         }
     }
-    catch (std::exception &ex)
+    // catch (std::exception &ex)
     {
-        std::print("{}\n", ex.what());
+        // std::print("{}\n", ex.what());
     }
     return result;
 }

@@ -499,7 +499,7 @@ bool StepSeqComponent::keyPressed(const juce::KeyPress &ev)
     int curstart = msrc.loopstartstep;
     int curlooplen = msrc.looplen;
 
-    int actionetaken = 0;
+    int actiontaken = 0;
     auto incdecstep = [this, &msrc](float step) {
         int index = editRange.getStart();
         float v = msrc.steps[index];
@@ -508,44 +508,54 @@ bool StepSeqComponent::keyPressed(const juce::KeyPress &ev)
     };
     if (ev.getKeyCode() == 'R')
     {
-        auto steps = generate_from_js("");
-        for (size_t i = 0; i < steps.size(); ++i)
+        try
         {
-            gr->fifo.push({StepModSource::Message::OP_SETSTEP, sindex, steps[i], (int)i});
+            auto jscode = choc::file::loadFileAsString(
+                R"(C:\develop\AudioPluginHost_mk2\Source\granularsynth\generatesteps.js)");
+            auto steps = generate_from_js(jscode, editRange.getStart(), editRange.getEnd());
+            for (size_t i = 0; i < steps.size(); ++i)
+            {
+                gr->fifo.push({StepModSource::Message::OP_SETSTEP, sindex, steps[i],
+                               (int)i + editRange.getStart()});
+            }
+            actiontaken = 2;
         }
-        actionetaken = 2;
+        catch (std::exception &ex)
+        {
+            DBG(ex.what());
+        }
     }
     else if (ev.getKeyCode() == 'Y')
     {
         autoSetLoop = !autoSetLoop;
-        actionetaken = 1;
+        actiontaken = 1;
     }
     else if (ev.getKeyCode() == 'P')
     {
         runExternalProgram();
-        actionetaken = 2;
+        actiontaken = 2;
     }
     else if (ev.getKeyCode() == 'T')
     {
         incdecstep(0.1f);
-        actionetaken = 2;
+        actiontaken = 2;
     }
     else if (ev.getKeyCode() == 'G')
     {
         incdecstep(-0.1f);
-        actionetaken = 2;
+        actiontaken = 2;
     }
     else if (ev.getKeyCode() == 'Z')
     {
         int curoff = msrc.loopoffset;
         curoff = (curoff + 1) % msrc.looplen;
         gr->fifo.push({StepModSource::Message::OP_OFFSET, sindex, 0.0f, curoff});
-        actionetaken = 2;
+        actiontaken = 2;
     }
     else if (ev.getKeyCode() == 'E')
     {
         setLoopFromSelection();
-        actionetaken = 2;
+        actiontaken = 2;
     }
     else if (ev.getKeyCode() == 'D' && ev.getModifiers() == juce::ModifierKeys::noModifiers)
     {
@@ -555,7 +565,7 @@ bool StepSeqComponent::keyPressed(const juce::KeyPress &ev)
             gr->fifo.push({StepModSource::Message::OP_SETSTEP, sindex,
                            rng.nextFloatInRange(-1.0f, 1.0f), index});
         }
-        actionetaken = 2;
+        actiontaken = 2;
     }
     else if (ev.getKeyCode() == 'D' && ev.getModifiers().isShiftDown())
     {
@@ -573,49 +583,49 @@ bool StepSeqComponent::keyPressed(const juce::KeyPress &ev)
             gr->fifo.push({StepModSource::Message::OP_SETSTEP, sindex, 0.0f, editRange.getStart()});
         }
 
-        actionetaken = 2;
+        actiontaken = 2;
     }
     else if (ev.getKeyCode() == 'Q' && ev.getModifiers() == juce::ModifierKeys::noModifiers)
     {
         editRange = editRange.movedToStartAt(editRange.getStart() + 1);
-        actionetaken = 1;
+        actiontaken = 1;
     }
     else if (ev.getKeyCode() == 'Q' && ev.getModifiers().isShiftDown())
     {
         if (editRange.getLength() > 1)
             editRange.setStart(editRange.getStart() + 1);
-        actionetaken = 1;
+        actiontaken = 1;
     }
     else if (ev.getKeyCode() == 'A' && ev.getModifiers() == juce::ModifierKeys::noModifiers)
     {
         editRange = editRange.movedToStartAt(editRange.getStart() - 1);
-        actionetaken = 1;
+        actiontaken = 1;
     }
     else if (ev.getKeyCode() == 'A' && ev.getModifiers().isShiftDown())
     {
         if (editRange.getStart() > 0)
             editRange.setStart(editRange.getStart() - 1);
-        actionetaken = 1;
+        actiontaken = 1;
     }
 
     else if (ev.getKeyCode() == 'W')
     {
         editRange = editRange.withLength(editRange.getLength() + 1);
-        actionetaken = 1;
+        actiontaken = 1;
     }
     else if (ev.getKeyCode() == 'S')
     {
         editRange = editRange.withLength(editRange.getLength() - 1);
-        actionetaken = 1;
+        actiontaken = 1;
     }
     editRange = juce::Range<int>{0, 4096}.constrainRange(editRange);
     if (editRange.getLength() < 1)
         editRange.setLength(1);
-    if (actionetaken == 1 && autoSetLoop)
+    if (actiontaken == 1 && autoSetLoop)
     {
         setLoopFromSelection();
     }
-    return actionetaken > 0;
+    return actiontaken > 0;
 }
 
 void StepSeqComponent::runExternalProgram()
