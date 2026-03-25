@@ -441,7 +441,7 @@ struct SawBank
     }
 };
 
-inline py::array_t<float> render_saw_bank(double samplerate, double outdur,
+inline py::array_t<float> render_saw_bank(double samplerate, double outdur, int rseed,
                                           xenakios::AutomationSequence &automation)
 {
     int chans = 16;
@@ -460,6 +460,7 @@ inline py::array_t<float> render_saw_bank(double samplerate, double outdur,
     for (int i = 0; i < chans; ++i)
         writebufs[i] = output_audio.mutable_data(i);
     auto obank = std::make_unique<SawBank>();
+    obank->rng.seed(60017, rseed);
     obank->prepare(samplerate);
     automation.sort_events();
     xenakios::AutomationSequence::Iterator automiter(automation, samplerate);
@@ -775,7 +776,8 @@ void init_py4(py::module_ &m, py::module_ &m_const)
     m.def("generate_fmtone", &generate_fm, "carrierfreq"_a, "modulatorfreq"_a, "modulationamont"_a,
           "feedback"_a, "samplerate"_a, "duration"_a);
     m.def("generate_corrnoise", &generate_corrnoise);
-    m.def("generate_saw_bank", &render_saw_bank, "samplerate"_a, "duration"_a, "automation"_a);
+    m.def("generate_saw_bank", &render_saw_bank, "samplerate"_a, "duration"_a, "rseed"_a,
+          "automation"_a);
     m.def("tone_types", &osc_types);
     m.def("get_sst_filter_types", &get_sst_filter_types);
 
