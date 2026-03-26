@@ -153,6 +153,8 @@ add_library(AWLIMITED
     libs/airwindows_limited/plugins/Galactic3AmbisonicProc.cpp
     libs/airwindows_limited/plugins/BitGlitter.cpp
     libs/airwindows_limited/plugins/BitGlitterProc.cpp
+    libs/airwindows_limited/plugins/ToTape9.cpp
+    libs/airwindows_limited/plugins/ToTape9Proc.cpp
 )
 
 pybind11_add_module(xenakios 
@@ -295,9 +297,9 @@ juce_add_plugin(ToneGranulatorPlugin
 
 target_sources(ToneGranulatorPlugin
     PRIVATE
-        
         Source/granularsynth/juceplugin/PluginProcessor.cpp
         Source/granularsynth/juceplugin/PluginEditor.cpp
+        Source/granularsynth/grainfx.cpp
         Source/granularsynth/js_impl.cpp
         Source/granularsynth/easing.cpp
 )   
