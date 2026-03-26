@@ -295,6 +295,7 @@ struct ModulationRowComponent : public juce::Component
         }
         drop.setSelectedId(0);
     }
+    using Node = DropDownComponent::Node;
     ModulationRowComponent(ToneGranulator *g) : gr(g)
     {
         addAndMakeVisible(sourceDrop);
@@ -331,7 +332,7 @@ struct ModulationRowComponent : public juce::Component
 
         addAndMakeVisible(curveDrop);
         using mcf = GranulatorModConfig;
-        using Node = DropDownComponent::Node;
+
         curveDrop.rootNode.text = "Curve";
         curveDrop.rootNode.children.push_back(Node{"Linear", GranulatorModConfig::CURVE_LINEAR});
         curveDrop.rootNode.children.push_back(
@@ -365,11 +366,27 @@ struct ModulationRowComponent : public juce::Component
         curveParEditor.onReturnKey = updatfunc;
 
         addAndMakeVisible(destDrop);
+        initDestinationDrop();
+        destDrop.setSelectedId(1);
+        destDrop.OnItemSelected = [updatfunc, this]() {
+            auto id = destDrop.selectedId;
+            if (id > 1)
+            {
+                auto pmd = gr->idtoparmetadata[destDrop.selectedId];
+                auto d = gr->modRanges[destDrop.selectedId];
+                depthSlider.setModulationDisplayDepth(d, pmd->unit);
+                updatfunc();
+            }
+        };
+    }
+    void initDestinationDrop()
+    {
+        destDrop.rootNode.children.clear();
         destDrop.rootNode.text = "Modulation target";
         destDrop.rootNode.children.push_back({"No target", 1});
         std::map<std::string, Node *> nodemap;
         destDrop.rootNode.children.reserve(128);
-        for (auto &pmd : g->parmetadatas)
+        for (auto &pmd : gr->parmetadatas)
         {
             if (pmd.flags & CLAP_PARAM_IS_MODULATABLE && !pmd.groupName.empty())
             {
@@ -380,7 +397,7 @@ struct ModulationRowComponent : public juce::Component
                 }
             }
         }
-        for (auto &pmd : g->parmetadatas)
+        for (auto &pmd : gr->parmetadatas)
         {
             if (pmd.flags & CLAP_PARAM_IS_MODULATABLE)
             {
@@ -394,17 +411,7 @@ struct ModulationRowComponent : public juce::Component
                 }
             }
         }
-        destDrop.setSelectedId(1);
-        destDrop.OnItemSelected = [updatfunc, this]() {
-            auto id = destDrop.selectedId;
-            if (id > 1)
-            {
-                auto pmd = gr->idtoparmetadata[destDrop.selectedId];
-                auto d = gr->modRanges[destDrop.selectedId];
-                depthSlider.setModulationDisplayDepth(d, pmd->unit);
-                updatfunc();
-            }
-        };
+        destDrop.setSelectedId(destDrop.getSelectedId());
     }
     void setTarget(uint32_t parid)
     {
@@ -580,8 +587,8 @@ class PerformanceComponent : public juce::Component, public juce::Timer
             g.setColour(juce::Colours::yellow);
             g.fillRect(juce::Rectangle<float>(0.0f, 0.0f, w, 20.0f));
             g.setColour(juce::Colours::white);
-            g.drawText(std::format("VOICES {:2}/{:2}", usedvoices, maxvoices), 0, 0, getWidth() / 2 - 2,
-                       20, juce::Justification::centredRight);
+            g.drawText(std::format("VOICES {:2}/{:2}", usedvoices, maxvoices), 0, 0,
+                       getWidth() / 2 - 2, 20, juce::Justification::centredRight);
             w = cpu_use * (getWidth() - 2) * 0.5;
             g.setColour(juce::Colours::green);
             g.fillRect(juce::Rectangle<float>(getWidth() / 2.0, 0.0f, w / 2, 20.0f));

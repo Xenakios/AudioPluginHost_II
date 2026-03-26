@@ -194,6 +194,10 @@ void AudioPluginAudioProcessorEditor::updateInsertParameterMetaDatas()
     };
     f(&insert1ParamsComponent);
     f(&insert2ParamsComponent);
+    for (auto &c : modRowComps)
+    {
+        c->initDestinationDrop();
+    }
 }
 
 void AudioPluginAudioProcessorEditor::handleFilterSelection(int filterindex)
