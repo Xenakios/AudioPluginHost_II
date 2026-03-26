@@ -336,6 +336,7 @@ struct GrainEvent
     uint8_t envelope_end_type = 0;
     float envelope_shape = 0.5f;
     float azimuth = 0.0f;
+    float azimuth_spread = 0.0f;
     float elevation = 0.0f;
     float sync_ratio = 1.0f;
     float pulse_width = 0.5f;
@@ -617,7 +618,7 @@ class GranulatorVoice
     float polarity_gain = 1.0f;
     int prior_osc_type = -1;
     EasingLUTS *eluts = nullptr;
-    alignas(16) std::array<float, 16> ambcoeffs;
+    alignas(16) std::array<float, 32> ambcoeffs;
     enum FilterRouting
     {
         FR_SERIAL,
@@ -717,22 +718,31 @@ class GranulatorVoice
             },
             theoscillator);
 
-        float azi = std::clamp(evpars.azimuth, -360.0f, 360.0f);
+        float azispread = std::clamp(evpars.azimuth_spread, -360.0f, 360.0f);
+        float azi0 = std::clamp(evpars.azimuth - azispread, -360.0f, 360.0f);
+        float azi1 = std::clamp(evpars.azimuth + azispread, -360.0f, 360.0f);
         float ele = std::clamp(evpars.elevation, -360.0f, 360.0f);
-        azi = degreesToRadians(azi);
+        azi0 = degreesToRadians(azi0);
+        azi1 = degreesToRadians(azi1);
         ele = degreesToRadians(ele);
 
-        float x = 0.0;
-        float y = 0.0;
-        float z = 0.0;
-        sphericalToCartesian(azi, ele, x, y, z);
-        if (ambisonic_order == 1)
-            SHEval1(x, y, z, ambcoeffs.data());
-        else if (ambisonic_order == 2)
-            SHEval2(x, y, z, ambcoeffs.data());
-        else if (ambisonic_order == 3)
-            SHEval3(x, y, z, ambcoeffs.data());
-
+        auto calc_ambicoeffs = [this](int inchan, float azimuth, float elevation) {
+            float x = 0.0;
+            float y = 0.0;
+            float z = 0.0;
+            sphericalToCartesian(azimuth, elevation, x, y, z);
+            float *coeffdata = ambcoeffs.data();
+            if (inchan == 1)
+                coeffdata = ambcoeffs.data() + 16;
+            if (ambisonic_order == 1)
+                SHEval1(x, y, z, coeffdata);
+            else if (ambisonic_order == 2)
+                SHEval2(x, y, z, coeffdata);
+            else if (ambisonic_order == 3)
+                SHEval3(x, y, z, coeffdata);
+        };
+        calc_ambicoeffs(0, azi0, ele);
+        calc_ambicoeffs(1, azi1, ele);
         phase = 0;
         float actdur = std::clamp(evpars.duration, 0.0f, 1.0f);
         actdur = actdur * actdur * actdur;
@@ -1021,6 +1031,7 @@ class ToneGranulator
         PAR_DENSITY = 400,
         PAR_PITCH = 500,
         PAR_AZIMUTH = 600,
+        PAR_AZIMUTH_SPREAD = 650,
         PAR_ELEVATION = 700,
         PAR_DURATION = 800,
         PAR_GRAINTAIL = 850,
@@ -1369,6 +1380,14 @@ class ToneGranulator
                                    .withRange(-180.0f, 180.0f)
                                    .withDefault(0.0)
                                    .withLinearScaleFormatting("°")
+                                   .withName("Azimuth Spread")
+                                   .withGroupName("Spatialization")
+                                   .withID(PAR_AZIMUTH_SPREAD)
+                                   .withFlags(CLAP_PARAM_IS_MODULATABLE));
+        parmetadatas.push_back(pmd()
+                                   .withRange(-180.0f, 180.0f)
+                                   .withDefault(0.0)
+                                   .withLinearScaleFormatting("°")
                                    .withName("Elevation")
                                    .withGroupName("Spatialization")
                                    .withID(PAR_ELEVATION)
@@ -1652,6 +1671,8 @@ class ToneGranulator
                     modmatrix.m.getTargetValue(GranulatorModConfig::TargetIdentifier{PAR_ENVMORPH});
                 float azimuth =
                     modmatrix.m.getTargetValue(GranulatorModConfig::TargetIdentifier{PAR_AZIMUTH});
+                float azimuth_spread = modmatrix.m.getTargetValue(
+                    GranulatorModConfig::TargetIdentifier{PAR_AZIMUTH_SPREAD});
                 float elevation = modmatrix.m.getTargetValue(
                     GranulatorModConfig::TargetIdentifier{PAR_ELEVATION});
                 genev.generator_type = osc_type;
@@ -1709,6 +1730,7 @@ class ToneGranulator
                     {
                         genev.pitch_semitones = pitch;
                         genev.azimuth = azimuth;
+                        genev.azimuth_spread = azimuth_spread;
                         genev.elevation = elevation;
                     }
                     else
