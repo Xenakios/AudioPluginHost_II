@@ -11,6 +11,55 @@
 #include "plugins/BitGlitter.h"
 #include "plugins/ToTape9.h"
 
+std::vector<GrainInsertFX::ModeInfo> GrainInsertFX::getAvailableModes()
+{
+    std::vector<ModeInfo> result;
+    result.reserve(300);
+    result.emplace_back("-None-", "");
+    result.emplace_back("AW BezEQ", "AirWindows", 2, 0);
+    result.emplace_back("AW HipCrush", "AirWindows", 2, 1);
+    result.emplace_back("AW KWoodRoom", "AirWindows", 2, 2);
+    result.emplace_back("AW RingModulator", "AirWindows", 2, 3);
+    // result.emplace_back("AW PrimeFIR", "AirWindows", 2, 4);
+    result.emplace_back("AW Hypersoft", "AirWindows", 2, 5);
+    result.emplace_back("AW DeRez3", "AirWindows", 2, 6);
+    result.emplace_back("AW CrunchCoat", "AirWindows", 2, 7);
+    result.emplace_back("AW BitGlitter", "AirWindows", 2, 8);
+    result.emplace_back("AW ToTape9", "AirWindows", 2, 9);
+    std::sort(result.begin(), result.end(),
+              [](auto const &lhs, auto const &rhs) { return lhs.displayname < rhs.displayname; });
+    auto models = sfpp::Filter::availableModels();
+    for (auto &mo : models)
+    {
+        auto confs = sfpp::Filter::availableModelConfigurations(mo);
+        for (auto co : confs)
+        {
+            auto [pt, st, dt, smt] = co;
+            std::string subname;
+            if (pt != sfpp::Passband::UNSUPPORTED)
+            {
+                subname += " " + sfpp::toString(pt);
+            }
+            if (st != sfpp::Slope::UNSUPPORTED)
+            {
+                subname += " " + sfpp::toString(st);
+            }
+            if (dt != sfpp::DriveMode::UNSUPPORTED)
+            {
+                subname += " " + sfpp::toString(dt);
+            }
+            if (smt != sfpp::FilterSubModel::UNSUPPORTED)
+            {
+                subname += " " + sfpp::toString(smt);
+            }
+            result.emplace_back(sfpp::toString(mo) + " " + subname, sfpp::toString(mo), 1, 0, mo,
+                                co);
+        }
+    }
+
+    return result;
+}
+
 void GrainInsertFX::setMode(ModeInfo m)
 {
     assert(sr > 0);
