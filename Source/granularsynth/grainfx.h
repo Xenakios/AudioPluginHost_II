@@ -119,6 +119,8 @@ class GrainInsertFX
                 return "Resonance";
             else if (index == 2)
                 return "Extra parameter";
+            else if (index == 3)
+                return "Cutoff spread";
             return "No parameter";
         }
         if (mainmode == 2 && awplugin && index < numParams)
@@ -134,7 +136,7 @@ class GrainInsertFX
     GrainInsertFX()
     {
         std::fill(paramvalues.begin(), paramvalues.end(), 0.0f);
-        delaylinememory.resize(4096);
+        delaylinememory.resize(8192);
     }
 
     static std::vector<ModeInfo> getAvailableModes()
@@ -197,21 +199,21 @@ class GrainInsertFX
         if (m.mainmode == 1)
         {
             mainmode = 1;
-            numParams = 3;
+            numParams = 4;
             paramvalues[0] = 1.0;
             paramvalues[1] = 0.0;
             paramvalues[2] = 0.0;
+            paramvalues[3] = 0.5;
             auto reqdelaysize =
                 sst::filtersplusplus::Filter::requiredDelayLinesSizes(m.sstmodel, m.sstconfig);
-            // std::print("filter {} requires {} samples of delay line\n", finfo.address,
-            // reqdelaysize);
-            if (reqdelaysize > delaylinememory.size())
-                delaylinememory.resize(reqdelaysize);
+
+            if (reqdelaysize * 4 > delaylinememory.size())
+                delaylinememory.resize(reqdelaysize * 4);
             sstfilter.setFilterModel(m.sstmodel);
             sstfilter.setModelConfiguration(m.sstconfig);
             sstfilter.setSampleRateAndBlockSize(sr, blockSize);
-            sstfilter.setMono();
-            sstfilter.provideDelayLine(0, delaylinememory.data());
+            sstfilter.setStereo();
+            sstfilter.provideAllDelayLines(delaylinememory.data());
             if (!sstfilter.prepareInstance())
             {
                 std::print("could not prepare filter {}\n", m.displayname);
@@ -313,7 +315,10 @@ class GrainInsertFX
     {
         if (mainmode == 1)
         {
-            sstfilter.makeCoefficients(0, paramvalues[0], paramvalues[1], paramvalues[2]);
+            sstfilter.makeCoefficients(0, paramvalues[0] - paramvalues[3], paramvalues[1],
+                                       paramvalues[2]);
+            sstfilter.makeCoefficients(1, paramvalues[0] + paramvalues[3], paramvalues[1],
+                                       paramvalues[2]);
             sstfilter.prepareBlock();
         }
         else if (mainmode == 2)
@@ -335,10 +340,10 @@ class GrainInsertFX
         case 1:
         {
             float outLeft = 0.0f;
-            float outright = 0.0f;
-            sstfilter.processStereoSample(inleft, inright, outLeft, outright);
+            float outRight = 0.0f;
+            sstfilter.processStereoSample(inleft, inright, outLeft, outRight);
             inleft = outLeft;
-            inright = outright;
+            inright = outRight;
             break;
         }
         case 2:
