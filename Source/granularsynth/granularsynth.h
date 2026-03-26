@@ -871,12 +871,13 @@ class GranulatorVoice
                 // envgain = std::clamp(envgain, 0.0f, 1.0f);
                 outsample *= envgain * graingain * polarity_gain;
             }
+            float outsample0 = outsample;
+            float outsample1 = outsample;
             if (filter_routing == FR_SERIAL)
             {
                 for (size_t insertIndex = 0; insertIndex < 2; ++insertIndex)
                 {
-                    outsample =
-                        insert_fx[insertIndex].processMonoSample(outsample + feedbacksignals[0]);
+                    insert_fx[insertIndex].processStereo(outsample0, outsample1);
                 }
                 // feedbacksignals[0] = outsample * feedbackamt;
             }
@@ -913,7 +914,9 @@ class GranulatorVoice
             }
             for (int chan = 0; chan < num_outputchans; ++chan)
             {
-                outputs[i * 16 + chan] = outsample * ambcoeffs[chan] * fadegain;
+                outputs[i * 16 + chan] = 0.0f;
+                outputs[i * 16 + chan] += outsample0 * ambcoeffs[chan] * fadegain;
+                outputs[i * 16 + chan] += outsample1 * ambcoeffs[chan + 16] * fadegain;
             }
         }
         for (auto &f : insert_fx)

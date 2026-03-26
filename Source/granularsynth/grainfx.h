@@ -304,6 +304,8 @@ class GrainInsertFX
         else if (mainmode == 2)
         {
             assert(awplugin);
+            // we might be clamped properly before this but adding this for safety now
+            v = std::clamp(v, 0.0f, 1.0f);
             awplugin->setParameter(index, v);
         }
     }
@@ -321,31 +323,38 @@ class GrainInsertFX
             // variable per setParameter, but we might want to avoid setting all the
             // parameters if not really needed...
             for (size_t i = 0; i < numParams; ++i)
-                awplugin->setParameter(i, paramvalues[i]);
+                awplugin->setParameter(i, std::clamp(paramvalues[i], 0.0f, 1.0f));
         }
     }
-    float processMonoSample(float insample)
+    void processStereo(float &inleft, float &inright)
     {
         switch (mainmode)
         {
         case 0:
-            return insample;
+            break;
         case 1:
-            return sstfilter.processMonoSample(insample);
+        {
+            float outLeft = 0.0f;
+            float outright = 0.0f;
+            sstfilter.processStereoSample(inleft, inright, outLeft, outright);
+            inleft = outLeft;
+            inright = outright;
+            break;
+        }
         case 2:
         {
             assert(awplugin);
-            float input0 = insample;
-            float input1 = insample;
+            float input0 = inleft;
+            float input1 = inright;
             float *inputs[2] = {&input0, &input1};
             float output0 = 0.0f;
             float output1 = 0.0f;
             float *outputs[2] = {&output0, &output1};
             awplugin->processReplacing(inputs, outputs, 1);
-            return (output0 + output1) * 0.5f;
+            inleft = output0;
+            inright = output1;
         }
         }
-        return 0.0f;
     };
     void concludeBlock()
     {
