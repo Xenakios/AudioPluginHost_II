@@ -1,3 +1,5 @@
+// 2 3.86 950
+
 function generate_steps(steps, startstep, endstep, par0, par1, par2, par3) {
     x0 = 0.4;
     for (var i = 0; i < par2; i++) {

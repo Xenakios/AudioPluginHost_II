@@ -592,7 +592,7 @@ class PerformanceComponent : public juce::Component, public juce::Timer
                        getWidth() / 2 - 2, 20, juce::Justification::centredRight);
             w = cpu_use * (getWidth() - 2) * 0.5;
             g.setColour(juce::Colours::green);
-            g.fillRect(juce::Rectangle<float>(getWidth() / 2.0, 0.0f, w / 2, 20.0f));
+            g.fillRect(juce::Rectangle<float>(getWidth() / 2.0, 0.0f, w, 20.0f));
             g.setColour(juce::Colours::white);
             g.drawText(std::format("CPU {}%", (int)(cpu_use * 100.0)), getWidth() / 2 - 2, 0,
                        getWidth() / 2, 20, juce::Justification::centredRight);

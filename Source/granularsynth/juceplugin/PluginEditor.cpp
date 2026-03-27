@@ -661,26 +661,18 @@ void StepSeqComponent::runJSInThread()
     js_status.store(1);
     cancelButton.setVisible(true);
     auto tokens = juce::StringArray::fromTokens(scriptParamsEditor.getText(), true);
-    float par0 = 0.0f;
-    float par1 = 0.0f;
-    float par2 = 0.0f;
-    float par3 = 0.0f;
-    if (tokens.size() >= 1)
-        par0 = tokens[0].getFloatValue();
-    if (tokens.size() >= 2)
-        par1 = tokens[1].getFloatValue();
-    if (tokens.size() >= 3)
-        par2 = tokens[2].getFloatValue();
-    if (tokens.size() >= 3)
-        par3 = tokens[3].getFloatValue();
-    threadPool->addJob([this, par0, par1, par2, par3]() {
+    std::array<float, 4> params = {0, 0, 0, 0};
+    for (int i = 0; i < params.size(); ++i)
+        if (i < tokens.size())
+            params[i] = tokens[i].getFloatValue();
+    threadPool->addJob([this, params]() {
         try
         {
             auto jscode = choc::file::loadFileAsString(
                 R"(C:\develop\AudioPluginHost_mk2\Source\granularsynth\generatesteps.js)");
             auto steps = gr->stepModSources[sindex].steps;
-            steps = generate_from_js(jscode, steps, editRange.getStart(), editRange.getEnd(), par0,
-                                     par1, par2, par3);
+            steps = generate_from_js(jscode, steps, editRange.getStart(), editRange.getEnd(),
+                                     params[0], params[1], params[2], params[3]);
             for (size_t i = 0; i < steps.size(); ++i)
             {
                 gr->fifo.push({StepModSource::Message::OP_SETSTEP, sindex, steps[i],
