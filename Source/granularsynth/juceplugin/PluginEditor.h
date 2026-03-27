@@ -641,6 +641,8 @@ class AudioPluginAudioProcessorEditor final : public juce::AudioProcessorEditor,
     juce::Label infoLabel;
     std::unordered_map<uint32_t, XapSlider *> idToSlider;
     std::unique_ptr<PerformanceComponent> perfcomp;
+    std::unique_ptr<juce::TextButton> recordButton;
+    
     void showFilterMenu(int whichfilter);
     void updateInsertParameterMetaDatas();
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(AudioPluginAudioProcessorEditor)

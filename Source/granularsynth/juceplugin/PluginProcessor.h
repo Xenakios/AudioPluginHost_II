@@ -1,9 +1,9 @@
 #pragma once
 
 #include <juce_audio_processors/juce_audio_processors.h>
+#include <juce_audio_formats/juce_audio_formats.h>
 #include "../granularsynth.h"
 #include "containers/choc_SingleReaderSingleWriterFIFO.h"
-
 
 struct ParameterMessage
 {
@@ -74,7 +74,12 @@ class AudioPluginAudioProcessor final : public juce::AudioProcessor
     choc::fifo::SingleReaderSingleWriterFIFO<ThreadMessage> to_gui_fifo;
     juce::AudioProcessLoadMeasurer perfMeasurer;
     juce::ThreadPool tpool{juce::ThreadPool::Options{"granulatorworker", 1}};
-
+    juce::TimeSliceThread sliceThread{"granulatortimeslicethread"};
+    void startRecording();
+    void stopRecording();
+    std::atomic<bool> isRecording{false};
+    std::unique_ptr<juce::AudioFormatWriter::ThreadedWriter> threadedWriter;
+    juce::AudioBuffer<float> recordBuffer;
   private:
     alignas(32) std::vector<float> workBuffer;
     alignas(32) choc::fifo::SingleReaderSingleWriterFIFO<std::array<float, 16>> buffer_adapter;

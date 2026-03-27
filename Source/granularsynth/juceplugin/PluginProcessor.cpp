@@ -13,6 +13,7 @@ AudioPluginAudioProcessor::AudioPluginAudioProcessor()
 #endif
       )
 {
+    sliceThread.startThread();
     buffer_adapter.reset(1024);
     from_gui_fifo.reset(1024);
     params_from_gui_fifo.reset(1024);
@@ -45,7 +46,31 @@ AudioPluginAudioProcessor::AudioPluginAudioProcessor()
 
 AudioPluginAudioProcessor::~AudioPluginAudioProcessor() {}
 
-//==============================================================================
+void AudioPluginAudioProcessor::startRecording()
+{
+    isRecording = false;
+    juce::WavAudioFormat wavformat;
+    juce::File outfile{R"(C:\MusicAudio\Dome\granulatorlivebounces)"};
+    outfile = outfile.getNonexistentChildFile("recording", ".wav");
+    std::unique_ptr<juce::OutputStream> ostream = std::make_unique<juce::FileOutputStream>(outfile);
+    auto writer = wavformat.createWriterFor(ostream, juce::AudioFormatWriterOptions()
+                                                         .withSampleRate(44100)
+                                                         .withBitsPerSample(32)
+                                                         .withNumChannels(16));
+    if (writer)
+    {
+        threadedWriter = std::make_unique<juce::AudioFormatWriter::ThreadedWriter>(
+            writer.release(), sliceThread, 65536);
+        isRecording = true;
+    }
+}
+
+void AudioPluginAudioProcessor::stopRecording()
+{
+    isRecording = false;
+    threadedWriter = nullptr;
+}
+
 const juce::String AudioPluginAudioProcessor::getName() const { return JucePlugin_Name; }
 
 bool AudioPluginAudioProcessor::acceptsMidi() const
@@ -102,6 +127,7 @@ void AudioPluginAudioProcessor::changeProgramName(int index, const juce::String 
 void AudioPluginAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 {
     DBG("prepareToPlay");
+    recordBuffer.setSize(16, samplesPerBlock);
     perfMeasurer.reset(sampleRate, samplesPerBlock);
     workBuffer.resize(samplesPerBlock * 32);
     granulator.prepare(sampleRate, {}, 3, 0, 0.002f, 0.002f);
@@ -250,19 +276,26 @@ void AudioPluginAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
             buffer_adapter.push(adapter_block);
         }
     }
+
     buffer.clear();
     auto channelDatas = buffer.getArrayOfWritePointers();
+    auto recordDatas = recordBuffer.getArrayOfWritePointers();
     if (totalNumOutputChannels == 2)
     {
         const float midGain = 1.414f;
-        // const float midGain = 1.0f;
         for (int j = 0; j < buffer.getNumSamples(); ++j)
         {
             buffer_adapter.pop(adapter_block);
+            for (int k = 0; k < 16; ++k)
+                recordDatas[k][j] = adapter_block[k];
             float m = adapter_block[0] * midGain;
             float s = adapter_block[1];
             channelDatas[0][j] = std::clamp((m + s) * 0.5f, -1.0f, 1.0f);
             channelDatas[1][j] = std::clamp((m - s) * 0.5f, -1.0f, 1.0f);
+        }
+        if (isRecording && threadedWriter)
+        {
+            threadedWriter->write(recordDatas, buffer.getNumSamples());
         }
     }
     if (totalNumOutputChannels == 16)
