@@ -65,6 +65,12 @@ void init_step_sequencer_js()
     if (!g_jsctx)
     {
         g_jsctx = choc::javascript::createQuickJSContext();
+        g_jsctx.registerFunction("sleep", [](choc::javascript::ArgumentList args) {
+            auto ms = args.get(0, 0);
+            if (ms > 0 && ms < 10001)
+                std::this_thread::sleep_for(std::chrono::milliseconds(ms));
+            return choc::value::Value();
+        });
     }
 }
 
@@ -75,17 +81,6 @@ void deinit_step_sequencer_js()
         g_jsctx = choc::javascript::Context{};
     }
 }
-
-const char *test_script = R"(
-function generate_steps(steps, startstep, endstep)
-{
-    for (var i=startstep;i<endstep;i++)
-    {
-        steps[i] = -1.0+2.0*Math.random();
-    }
-    return steps;
-}
-)";
 
 void cancel_js()
 {
@@ -103,7 +98,7 @@ std::vector<float> generate_from_js(std::string jscode, std::vector<float> curre
         g_jsctx.run(jscode);
         if (startstep >= endstep)
             std::swap(startstep, endstep);
-
+        // std::print("gnerating steps with js {}\n", startstep);
         auto dest_arr = choc::value::createArray(
             currentsteps.size(), [&currentsteps](uint32_t index) { return currentsteps[index]; });
         auto r = g_jsctx.invoke("generate_steps", dest_arr, startstep, endstep);
