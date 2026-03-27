@@ -1,4 +1,9 @@
-function generate_steps(steps, startstep, endstep, par0, par1) {
+function generate_steps(steps, startstep, endstep, par0, par1, par2, par3) {
+    x0 = 0.4;
+    for (var i = 0; i < par2; i++) {
+        x1 = par1 * x0 * (1.0 - x0);
+        x0 = x1;
+    }
     for (var i = startstep; i < endstep; i++) {
         // steps[i] = -1.0 + 2.0 * Math.random();
         if (par0 == 0)
@@ -9,6 +14,11 @@ function generate_steps(steps, startstep, endstep, par0, par1) {
             } else {
                 steps[i] = -1.0;
             }
+        }
+        if (par0 == 2) {
+            x1 = par1 * x0 * (1.0 - x0);
+            steps[i] = -1.0 + 2.0 * x0;
+            x0 = x1;
         }
     }
     // sleep(1000);

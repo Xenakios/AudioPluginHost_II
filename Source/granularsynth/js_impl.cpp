@@ -89,7 +89,8 @@ void cancel_js()
 }
 
 std::vector<float> generate_from_js(std::string jscode, std::vector<float> currentsteps,
-                                    int startstep, int endstep, float par0, float par1)
+                                    int startstep, int endstep, float par0, float par1, float par2,
+                                    float par3)
 {
     assert(g_jsctx);
 
@@ -101,7 +102,8 @@ std::vector<float> generate_from_js(std::string jscode, std::vector<float> curre
         // std::print("gnerating steps with js {}\n", startstep);
         auto dest_arr = choc::value::createArray(
             currentsteps.size(), [&currentsteps](uint32_t index) { return currentsteps[index]; });
-        auto r = g_jsctx.invoke("generate_steps", dest_arr, startstep, endstep, par0, par1);
+        auto r =
+            g_jsctx.invoke("generate_steps", dest_arr, startstep, endstep, par0, par1, par2, par3);
 
         for (int i = 0; i < r.size(); ++i)
         {

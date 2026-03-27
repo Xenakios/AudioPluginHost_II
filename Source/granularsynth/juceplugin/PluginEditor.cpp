@@ -4,7 +4,8 @@ void init_step_sequencer_js();
 void deinit_step_sequencer_js();
 void cancel_js();
 std::vector<float> generate_from_js(std::string jscode, std::vector<float> currentsteps,
-                                    int startstep, int endstep, float par0, float par1);
+                                    int startstep, int endstep, float par0, float par1, float par2,
+                                    float par3);
 
 inline void updateAllFonts(juce::Component &parent, const juce::Font &newFont)
 {
@@ -662,18 +663,24 @@ void StepSeqComponent::runJSInThread()
     auto tokens = juce::StringArray::fromTokens(scriptParamsEditor.getText(), true);
     float par0 = 0.0f;
     float par1 = 0.0f;
+    float par2 = 0.0f;
+    float par3 = 0.0f;
     if (tokens.size() >= 1)
         par0 = tokens[0].getFloatValue();
     if (tokens.size() >= 2)
         par1 = tokens[1].getFloatValue();
-    threadPool->addJob([this, par0, par1]() {
+    if (tokens.size() >= 3)
+        par2 = tokens[2].getFloatValue();
+    if (tokens.size() >= 3)
+        par3 = tokens[3].getFloatValue();
+    threadPool->addJob([this, par0, par1, par2, par3]() {
         try
         {
             auto jscode = choc::file::loadFileAsString(
                 R"(C:\develop\AudioPluginHost_mk2\Source\granularsynth\generatesteps.js)");
             auto steps = gr->stepModSources[sindex].steps;
             steps = generate_from_js(jscode, steps, editRange.getStart(), editRange.getEnd(), par0,
-                                     par1);
+                                     par1, par2, par3);
             for (size_t i = 0; i < steps.size(); ++i)
             {
                 gr->fifo.push({StepModSource::Message::OP_SETSTEP, sindex, steps[i],
