@@ -11,6 +11,7 @@
 #include "plugins/BitGlitter.h"
 #include "plugins/ToTape9.h"
 #include "plugins/Donut.h"
+#include "plugins/GlitchShifter.h"
 
 std::vector<GrainInsertFX::ModeInfo> GrainInsertFX::getAvailableModes()
 {
@@ -28,6 +29,7 @@ std::vector<GrainInsertFX::ModeInfo> GrainInsertFX::getAvailableModes()
     result.emplace_back("AW BitGlitter", "AirWindows", 2, 8);
     result.emplace_back("AW ToTape9", "AirWindows", 2, 9);
     result.emplace_back("AW Donut", "AirWindows", 2, 10);
+    result.emplace_back("AW GlitchShifter", "AirWindows", 2, 11);
     std::sort(result.begin(), result.end(),
               [](auto const &lhs, auto const &rhs) { return lhs.displayname < rhs.displayname; });
     auto models = sfpp::Filter::availableModels();
@@ -152,6 +154,11 @@ void GrainInsertFX::setMode(ModeInfo m)
         {
             awplugin = make_aw_safe<airwinconsolidated::Donut::Donut>(0);
             numParams = airwinconsolidated::Donut::kNumParameters;
+        }
+        else if (m.awtype == 11)
+        {
+            awplugin = make_aw_safe<airwinconsolidated::GlitchShifter::GlitchShifter>(0);
+            numParams = airwinconsolidated::GlitchShifter::kNumParameters;
         }
         assert(numParams < 11);
         if (awplugin)

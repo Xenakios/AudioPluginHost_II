@@ -157,6 +157,8 @@ add_library(AWLIMITED
     libs/airwindows_limited/plugins/ToTape9Proc.cpp
     libs/airwindows_limited/plugins/Donut.cpp
     libs/airwindows_limited/plugins/DonutProc.cpp
+    libs/airwindows_limited/plugins/GlitchShifter.cpp
+    libs/airwindows_limited/plugins/GlitchShifterProc.cpp
 )
 
 pybind11_add_module(xenakios 
