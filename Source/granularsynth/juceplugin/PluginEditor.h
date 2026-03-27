@@ -256,6 +256,7 @@ struct StepSeqComponent : public juce::Component
 
     juce::ToggleButton unipolarBut;
     juce::Slider par0Slider;
+    juce::TextEditor scriptParamsEditor;
     bool autoSetLoop = false;
     ToneGranulator *gr = nullptr;
     uint32_t sindex = 0;

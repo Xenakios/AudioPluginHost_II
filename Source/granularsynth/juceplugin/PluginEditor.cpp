@@ -4,7 +4,7 @@ void init_step_sequencer_js();
 void deinit_step_sequencer_js();
 void cancel_js();
 std::vector<float> generate_from_js(std::string jscode, std::vector<float> currentsteps,
-                                    int startstep, int endstep);
+                                    int startstep, int endstep, float par0, float par1);
 
 inline void updateAllFonts(juce::Component &parent, const juce::Font &newFont)
 {
@@ -514,8 +514,14 @@ bool StepSeqComponent::keyPressed(const juce::KeyPress &ev)
     };
     if (ev.getKeyCode() == 'R')
     {
-        runJSInThread();
-        actiontaken = 2;
+        scriptParamsEditor.setVisible(true);
+        scriptParamsEditor.setBounds(graphxpos + 1, 1, 150, 25);
+        scriptParamsEditor.grabKeyboardFocus();
+        scriptParamsEditor.onReturnKey = [this]() {
+            scriptParamsEditor.setVisible(false);
+            runJSInThread();
+        };
+        scriptParamsEditor.onEscapeKey = [this]() { scriptParamsEditor.setVisible(false); };
     }
     else if (ev.getKeyCode() == 'Y')
     {
@@ -623,6 +629,7 @@ bool StepSeqComponent::keyPressed(const juce::KeyPress &ev)
 StepSeqComponent::StepSeqComponent(int seqindex, ToneGranulator *g, juce::ThreadPool *tp)
     : gr(g), sindex(seqindex), threadPool(tp)
 {
+    addChildComponent(scriptParamsEditor);
     rng.seed(11400714819323198485ULL, 17 + sindex * 31);
     editRange.setStart(0);
     editRange.setLength(g->stepModSources[sindex].looplen);
@@ -650,15 +657,23 @@ StepSeqComponent::StepSeqComponent(int seqindex, ToneGranulator *g, juce::Thread
 
 void StepSeqComponent::runJSInThread()
 {
+    js_status.store(1);
     cancelButton.setVisible(true);
-    threadPool->addJob([this]() {
-        js_status.store(1);
+    auto tokens = juce::StringArray::fromTokens(scriptParamsEditor.getText(), true);
+    float par0 = 0.0f;
+    float par1 = 0.0f;
+    if (tokens.size() >= 1)
+        par0 = tokens[0].getFloatValue();
+    if (tokens.size() >= 2)
+        par1 = tokens[1].getFloatValue();
+    threadPool->addJob([this, par0, par1]() {
         try
         {
             auto jscode = choc::file::loadFileAsString(
                 R"(C:\develop\AudioPluginHost_mk2\Source\granularsynth\generatesteps.js)");
             auto steps = gr->stepModSources[sindex].steps;
-            steps = generate_from_js(jscode, steps, editRange.getStart(), editRange.getEnd());
+            steps = generate_from_js(jscode, steps, editRange.getStart(), editRange.getEnd(), par0,
+                                     par1);
             for (size_t i = 0; i < steps.size(); ++i)
             {
                 gr->fifo.push({StepModSource::Message::OP_SETSTEP, sindex, steps[i],
