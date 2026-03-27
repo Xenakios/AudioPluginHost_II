@@ -3,7 +3,8 @@
 void init_step_sequencer_js();
 void deinit_step_sequencer_js();
 void cancel_js();
-std::vector<float> generate_from_js(std::string jscode, int startstep, int endstep);
+std::vector<float> generate_from_js(std::string jscode, std::vector<float> currentsteps,
+                                    int startstep, int endstep);
 
 inline void updateAllFonts(juce::Component &parent, const juce::Font &newFont)
 {
@@ -656,7 +657,8 @@ void StepSeqComponent::runJSInThread()
         {
             auto jscode = choc::file::loadFileAsString(
                 R"(C:\develop\AudioPluginHost_mk2\Source\granularsynth\generatesteps.js)");
-            auto steps = generate_from_js(jscode, editRange.getStart(), editRange.getEnd());
+            auto steps = gr->stepModSources[sindex].steps;
+            steps = generate_from_js(jscode, steps, editRange.getStart(), editRange.getEnd());
             for (size_t i = 0; i < steps.size(); ++i)
             {
                 gr->fifo.push({StepModSource::Message::OP_SETSTEP, sindex, steps[i],
