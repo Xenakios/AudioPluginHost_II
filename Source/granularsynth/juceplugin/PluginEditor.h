@@ -344,6 +344,12 @@ struct ModulationRowComponent : public juce::Component
         curveDrop.rootNode.children.push_back(Node{"x^3", GranulatorModConfig::CURVE_CUBE});
         curveDrop.rootNode.children.push_back(Node{"EXPSIN 1", GranulatorModConfig::CURVE_EXPSIN1});
         curveDrop.rootNode.children.push_back(Node{"EXPSIN 2", GranulatorModConfig::CURVE_EXPSIN2});
+        curveDrop.rootNode.children.push_back(
+            Node{"HARMONICS 3 OCTAVES", GranulatorModConfig::CURVE_HARMONICSERIES3OCTAVES});
+        curveDrop.rootNode.children.push_back(
+            Node{"HARMONICS 4 OCTAVES", GranulatorModConfig::CURVE_HARMONICSERIES4OCTAVES});
+        curveDrop.rootNode.children.push_back(
+            Node{"HARMONICS 5 OCTAVES", GranulatorModConfig::CURVE_HARMONICSERIES5OCTAVES});
         Node xornode{"XOR"};
         for (int i = 0; i < 4; ++i)
         {
@@ -642,7 +648,7 @@ class AudioPluginAudioProcessorEditor final : public juce::AudioProcessorEditor,
     std::unordered_map<uint32_t, XapSlider *> idToSlider;
     std::unique_ptr<PerformanceComponent> perfcomp;
     std::unique_ptr<juce::TextButton> recordButton;
-    
+
     void showFilterMenu(int whichfilter);
     void updateInsertParameterMetaDatas();
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(AudioPluginAudioProcessorEditor)

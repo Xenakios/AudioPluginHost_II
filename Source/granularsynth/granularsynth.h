@@ -78,7 +78,10 @@ struct GranulatorModConfig
         CURVE_XOR8,
         CURVE_BITMIRROR,
         CURVE_BIPOLARTOUNIPOLAR,
-        CURVE_UNIPOLARTOBIPOLAR
+        CURVE_UNIPOLARTOBIPOLAR,
+        CURVE_HARMONICSERIES3OCTAVES,
+        CURVE_HARMONICSERIES4OCTAVES,
+        CURVE_HARMONICSERIES5OCTAVES
     };
     static float xor_curve(float x, uint16_t a)
     {
@@ -119,6 +122,14 @@ struct GranulatorModConfig
             amplitude = norm * norm * norm;
         return amplitude * std::sin(2 * M_PI * norm * frequency);
     }
+    static float harmseries(float x, int octaves)
+    {
+        int numpartials = std::pow(2, octaves);
+        x = std::clamp(x, -1.0f, 1.0f);
+        x = (x + 1.0f) * 0.5f;
+        x = 1.0 + (numpartials - 1) * x;
+        return std::log2(std::floor(x)) / octaves;
+    }
     static std::function<float(float)> getCurveOperator(CurveIdentifier id)
     {
         switch (id.id)
@@ -155,6 +166,12 @@ struct GranulatorModConfig
             return [](auto x) { return std::clamp(-1.0f + 2.0f * x, -1.0f, 1.0f); };
         case CURVE_BIPOLARTOUNIPOLAR:
             return [](auto x) { return std::clamp((x + 1.0f) * 0.5f, 0.0f, 1.0f); };
+        case CURVE_HARMONICSERIES3OCTAVES:
+            return [](auto x) { return harmseries(x, 3); };
+        case CURVE_HARMONICSERIES4OCTAVES:
+            return [](auto x) { return harmseries(x, 4); };
+        case CURVE_HARMONICSERIES5OCTAVES:
+            return [](auto x) { return harmseries(x, 5); };
         }
 
         return [](auto x) { return x; };
