@@ -582,9 +582,16 @@ class NoiseGen
             heldvalue = sst::basic_blocks::dsp::correlated_noise_o2mk2_supplied_value(
                 history[0], history[1], correlation.getValue(), bpdist(rng));
         }
+        uint8_t phaseinteger = 255 * phase;
+        uint8_t oscinteger = (heldvalue + 1.0 * 0.5) * 255;
+        // oscinteger = oscinteger ^ phaseinteger;
+        oscinteger = phaseinteger ^ oscinteger;
+        float outvalue = -1.0f + (oscinteger / 255.0) * 2.0f;
+        outvalue = std::clamp(outvalue, -1.0f, 1.0f);
+        // outvalue = heldvalue;
         SmoothingStrategy::process(phaseinc);
         SmoothingStrategy::process(correlation);
-        return heldvalue;
+        return outvalue;
     }
     void reset()
     {
