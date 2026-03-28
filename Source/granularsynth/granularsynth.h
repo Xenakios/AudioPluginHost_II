@@ -62,6 +62,8 @@ struct GranulatorModConfig
         CURVE_LINEAR = 1,
         CURVE_SQUARE,
         CURVE_CUBE,
+        CURVE_STEPS2,
+        CURVE_STEPS3,
         CURVE_STEPS4,
         CURVE_STEPS5,
         CURVE_STEPS6,
@@ -140,6 +142,10 @@ struct GranulatorModConfig
             return [](auto x) { return x * x; };
         case CURVE_CUBE:
             return [](auto x) { return x * x * x; };
+        case CURVE_STEPS2:
+            return [id](auto x) { return std::round(x * 2) / 2; };
+        case CURVE_STEPS3:
+            return [id](auto x) { return std::round(x * 3) / 3; };
         case CURVE_STEPS4:
             return [id](auto x) { return std::round(x * 4) / 4; };
         case CURVE_STEPS5:
@@ -704,7 +710,10 @@ class GranulatorVoice
                 theoscillator = NoiseGen();
             std::visit([this](auto &q) { q.setSampleRate(sr); }, theoscillator);
         }
-        pitch_base = std::clamp(evpars.pitch_semitones, -48.0f, 64.0f);
+        pitch_base = evpars.pitch_semitones;
+        if (newosctype == 6)
+            pitch_base += 12.0;
+        pitch_base = std::clamp(pitch_base, -48.0f, 64.0f);
         auto syncratio = std::clamp(evpars.sync_ratio, 1.0f, 16.0f);
         auto pw = evpars.pulse_width; // osc implementation clamps itself to 0..1
         auto fmhz = evpars.fm_frequency_hz;
