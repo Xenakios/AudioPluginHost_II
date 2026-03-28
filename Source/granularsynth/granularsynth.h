@@ -367,6 +367,7 @@ struct GrainEvent
     float fm_amount = 0.0f;
     float fm_feedback = 0.0f;
     float noisecorr = 0.0f;
+    float noiseimode = 0.0f;
     float filterfeedback = 0.0f;
     float modamounts[MD_NUMDESTS];
     float insertparams[4][10];
@@ -579,16 +580,24 @@ class NoiseGen
         if (phase >= 1.0)
         {
             phase -= 1.0;
-            heldvalue = sst::basic_blocks::dsp::correlated_noise_o2mk2_supplied_value(
+            lastvalue = nextvalue;
+            nextvalue = sst::basic_blocks::dsp::correlated_noise_o2mk2_supplied_value(
                 history[0], history[1], correlation.getValue(), bpdist(rng));
         }
-        uint8_t phaseinteger = 255 * phase;
-        uint8_t oscinteger = (heldvalue + 1.0 * 0.5) * 255;
-        // oscinteger = oscinteger ^ phaseinteger;
-        oscinteger = phaseinteger ^ oscinteger;
-        float outvalue = -1.0f + (oscinteger / 255.0) * 2.0f;
+        float outvalue = lastvalue;
+        if (imode == 1)
+        {
+            outvalue = lastvalue + (nextvalue - lastvalue) * phase;
+        }
+        if (imode == 2)
+        {
+            uint8_t phaseinteger = 255 * phase;
+            uint8_t oscinteger = (nextvalue + 1.0 * 0.5) * 255;
+            // oscinteger = oscinteger ^ phaseinteger;
+            oscinteger = phaseinteger ^ oscinteger;
+            outvalue = -1.0f + (oscinteger / 255.0) * 2.0f;
+        }
         outvalue = std::clamp(outvalue, -1.0f, 1.0f);
-        // outvalue = heldvalue;
         SmoothingStrategy::process(phaseinc);
         SmoothingStrategy::process(correlation);
         return outvalue;
@@ -598,7 +607,8 @@ class NoiseGen
         history[0] = 0.0f;
         history[1] = 0.0f;
         phase = 0.0;
-        heldvalue = 0.0;
+        lastvalue = 0.0f;
+        nextvalue = 0.0;
         SmoothingStrategy::resetFirstRun(phaseinc);
         SmoothingStrategy::resetFirstRun(correlation);
     }
@@ -619,7 +629,9 @@ class NoiseGen
     alignas(16) std::minstd_rand0 rng;
     alignas(16) float history[2] = {0.0f, 0.0f};
     alignas(16) std::uniform_real_distribution<float> bpdist{-1.0, 1.0f};
-    float heldvalue = 0.0;
+    float lastvalue = 0.0;
+    float nextvalue = 0.0;
+    int imode = 0;
     double sr = 0.0;
     double frequency = 1.0;
     alignas(16) double phase = 0.0;
@@ -728,8 +740,9 @@ class GranulatorVoice
         fmmodamount = std::pow(fmmodamount, 3.0f) * 128.0f;
         auto fmfeedback = std::clamp(evpars.fm_feedback, -1.0f, 1.0f);
         auto noisecorr = std::clamp(evpars.noisecorr, -1.0f, 1.0f);
+        auto noisemode = evpars.noiseimode;
         std::visit(
-            [syncratio, pw, fmhz, fmfeedback, fmmodamount, noisecorr, this](auto &q) {
+            [syncratio, pw, fmhz, fmfeedback, fmmodamount, noisecorr, noisemode, this](auto &q) {
                 q.reset();
                 q.setSyncRatio(syncratio);
                 // handle extra parameters of osc types
@@ -747,6 +760,7 @@ class GranulatorVoice
                 {
                     q.setRandSeed(grainid);
                     q.setCorrelation(noisecorr);
+                    q.imode = noisemode;
                 }
             },
             theoscillator);
@@ -1085,6 +1099,7 @@ class ToneGranulator
         PAR_ENVMORPH = 1900,
         PAR_GRAINVOLUME = 2000,
         PAR_NOISECORRELATION = 2100,
+        PAR_NOISEMODE = 2150,
         PAR_STACKCOUNT = 2300,
         PAR_STACKTIMESPAN = 2400,
         PAR_STACKRANDOMPITCH = 2500,
@@ -1387,6 +1402,14 @@ class ToneGranulator
                                    .withGroupName("Oscillator")
                                    .withID(PAR_NOISECORRELATION)
                                    .withFlags(CLAP_PARAM_IS_MODULATABLE));
+        parmetadatas.push_back(pmd()
+                                   .asInt()
+                                   .withRange(0.0, 3.0)
+                                   .withDefault(0.0)
+                                   .withLinearScaleFormatting("", 1.0f)
+                                   .withName("Noise Interpolation")
+                                   .withGroupName("Oscillator")
+                                   .withID(PAR_NOISEMODE));
         for (size_t i = 0; i < GranulatorVoice::numInsertSlots; ++i)
         {
             auto groupname = std::format("Insert {}", char('A' + i));
@@ -1726,6 +1749,7 @@ class ToneGranulator
                 genev.pulse_width = pulse_width;
                 genev.noisecorr = modmatrix.m.getTargetValue(
                     GranulatorModConfig::TargetIdentifier{PAR_NOISECORRELATION});
+                genev.noiseimode = *idtoparvalptr[PAR_NOISEMODE];
                 genev.sync_ratio =
                     std::pow(2.0, modmatrix.m.getTargetValue(
                                       GranulatorModConfig::TargetIdentifier{PAR_OSC_SYNC}));
