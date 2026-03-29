@@ -351,6 +351,13 @@ template <bool TaperEnabled> struct SimpleEnvelope
     alignas(16) double phase = 0.0;
     alignas(16) int taper_phase = 0;
     alignas(16) int taper_len = 0;
+    enum InterpolationMode
+    {
+        IM_NONE,
+        IM_LINEAR,
+        IM_SPLINE
+    };
+    int interpmode = IM_SPLINE;
     SimpleEnvelope()
     {
         std::fill(steps.begin(), steps.end(), 0.0f);
@@ -368,17 +375,20 @@ template <bool TaperEnabled> struct SimpleEnvelope
         phase = 0.0;
         steplen = (double)dursamples / (maxnumsteps - 1);
     }
-    float get_splinei_value(float xpos)
+    float get_value(float xpos)
     {
         xpos = std::clamp(xpos, 0.0f, 1.0f);
         xpos *= maxnumsteps;
         int index = xpos;
         float y0 = steps[index];
+        if (interpmode == IM_NONE)
+            return y0;
         float y1 = steps[index + 1];
-        float y2 = steps[index + 2];
         float mu = xpos - index;
+        if (interpmode == IM_LINEAR)
+            return y0 + (y1 - y0) * mu;
+        float y2 = steps[index + 2];
         return std::clamp(sst::basic_blocks::dsp::quad_bspline(y0, y1, y2, mu), -1.0f, 1.0f);
-        return 0.0f;
     }
     double step()
     {
@@ -618,7 +628,7 @@ class GranulatorVoice
         if constexpr (GrainModulation)
         {
             double normphase = (double)phase / grain_end_phase;
-            aux_env_value = aux_envelope.get_splinei_value(normphase);
+            aux_env_value = aux_envelope.get_value(normphase);
         }
 
         std::visit(
@@ -943,6 +953,13 @@ class ToneGranulator
     std::array<float, 128> modSourceValues;
     std::unordered_map<int, int> midiCCMap;
     alignas(16) std::atomic<int> numVoicesUsed;
+    void set_aux_envelope_interpolation_mode(int m)
+    {
+        for (auto &v : voices)
+        {
+            v->aux_envelope.interpmode = m;
+        }
+    }
     void handleStepSequencerMessages()
     {
         StepModSource::Message msg;

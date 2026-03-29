@@ -477,24 +477,35 @@ class VolumeEnvelopeComponent : public juce::Component
     VolumeEnvelopeComponent(ToneGranulator *gr, bool auxenv) : granul(gr), auxenvmode(auxenv)
     {
         curvepath.preallocateSpace(512);
-        
     }
     void mouseDown(const juce::MouseEvent &ev) override
     {
         if (!auxenvmode)
             return;
-        int stepindex = 7.0 / getWidth() * ev.x;
-        if (stepindex >= 0 && stepindex < 7)
+        if (ev.mods.isRightButtonDown())
         {
-            float val = juce::jmap<float>(ev.y, 0, getHeight(), 1.0, -1.0);
-            StepModSource::Message msg;
-            msg.opcode = StepModSource::Message::OP_SETSTEP;
-            msg.fval0 = val;
-            msg.dest = 1000;
-            msg.ival0 = stepindex;
-            granul->fifo.push(msg);
+            juce::PopupMenu menu;
+            menu.addSectionHeader("Interpolation mode");
+            menu.addItem("None", [this]() { granul->set_aux_envelope_interpolation_mode(0); });
+            menu.addItem("Linear", [this]() { granul->set_aux_envelope_interpolation_mode(1); });
+            menu.addItem("Spline", [this]() { granul->set_aux_envelope_interpolation_mode(2); });
+            menu.showMenuAsync(juce::PopupMenu::Options{});
         }
-        repaint();
+        else
+        {
+            int stepindex = 7.0 / getWidth() * ev.x;
+            if (stepindex >= 0 && stepindex < 7)
+            {
+                float val = juce::jmap<float>(ev.y, 0, getHeight(), 1.0, -1.0);
+                StepModSource::Message msg;
+                msg.opcode = StepModSource::Message::OP_SETSTEP;
+                msg.fval0 = val;
+                msg.dest = 1000;
+                msg.ival0 = stepindex;
+                granul->fifo.push(msg);
+            }
+        }
+        juce::Timer::callAfterDelay(100, [this]() { repaint(); });
     }
     void mouseWheelMove(const juce::MouseEvent &event,
                         const juce::MouseWheelDetails &wheel) override
@@ -505,9 +516,9 @@ class VolumeEnvelopeComponent : public juce::Component
         if (stepindex >= 0 && stepindex < 7)
         {
             float delta = wheel.deltaY * 0.2;
-            //test_table[stepindex] += delta;
-            //if (stepindex == 6)
-            //    test_table[stepindex + 1] = test_table[stepindex];
+            // test_table[stepindex] += delta;
+            // if (stepindex == 6)
+            //     test_table[stepindex + 1] = test_table[stepindex];
         }
         repaint();
     }
@@ -545,7 +556,7 @@ class VolumeEnvelopeComponent : public juce::Component
             }
             else
             {
-                normy = auxenv.get_splinei_value(normx);
+                normy = auxenv.get_value(normx);
                 normy *= 1.0;
             }
 
