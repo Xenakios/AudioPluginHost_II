@@ -474,7 +474,44 @@ struct ModulationRowComponent : public juce::Component
 class VolumeEnvelopeComponent : public juce::Component
 {
   public:
-    VolumeEnvelopeComponent(ToneGranulator *gr) : granul(gr) { curvepath.preallocateSpace(512); }
+    VolumeEnvelopeComponent(ToneGranulator *gr) : granul(gr)
+    {
+        curvepath.preallocateSpace(512);
+        std::fill(test_table.begin(), test_table.end(), 0.0f);
+        test_table[0] = 0.0;
+        test_table[1] = 0.0;
+        test_table[2] = 1.0;
+        test_table[3] = 0.0;
+        test_table[4] = 0.0;
+    }
+    void mouseDown(const juce::MouseEvent &ev) override
+    {
+        int stepindex = 7.0 / getWidth() * ev.x;
+        if (stepindex >= 0 && stepindex < 7)
+        {
+            float val = juce::jmap<float>(ev.y, 0, getHeight(), 1.0, -1.0);
+            test_table[stepindex] = val;
+            if (stepindex == 6)
+            {
+                //test_table[stepindex + 1] = test_table[stepindex];
+                //test_table[stepindex + 2] = test_table[stepindex];
+            }
+        }
+        repaint();
+    }
+    void mouseWheelMove(const juce::MouseEvent &event,
+                        const juce::MouseWheelDetails &wheel) override
+    {
+        int stepindex = 7.0 / getWidth() * event.x;
+        if (stepindex >= 0 && stepindex < 7)
+        {
+            float delta = wheel.deltaY * 0.2;
+            test_table[stepindex] += delta;
+            if (stepindex == 6)
+                test_table[stepindex + 1] = test_table[stepindex];
+        }
+        repaint();
+    }
     void paint(juce::Graphics &g) override
     {
         g.fillAll(juce::Colours::black);
@@ -490,6 +527,7 @@ class VolumeEnvelopeComponent : public juce::Component
             float normx = 1.0 / getWidth() * i;
             float sinvalue = std::sin(2 * M_PI * normx * sinfreq);
             float normy = 0.0f;
+            /*
             if (normx < curvemorph)
             {
                 normx = xenakios::mapvalue(normx, 0.0f, curvemorph, 0.0f, 1.0f);
@@ -502,7 +540,9 @@ class VolumeEnvelopeComponent : public juce::Component
                 // normy = easing_table[curveend].function(normx);
                 normy = eluts.getValueLERP<true>(curveend, normx);
             }
-            normy *= sinvalue;
+            */
+            normy = cubic_interpolate(normx * 7.0);
+            normy *= 1.0;
             float ycor = xenakios::mapvalue<float>(normy, -1.1f, 1.1f, getHeight(), 0);
             if (i == 0)
                 curvepath.startNewSubPath({(float)i, ycor});
@@ -510,6 +550,26 @@ class VolumeEnvelopeComponent : public juce::Component
                 curvepath.lineTo({(float)i, ycor});
         }
         g.strokePath(curvepath, juce::PathStrokeType(1.0f));
+        g.setColour(juce::Colours::white);
+        for (int i = 0; i < 7; ++i)
+        {
+            float x0 = getWidth() / 7.0 * i;
+            float x1 = getWidth() / 7.0 * (i + 1);
+            float y = juce::jmap<float>(test_table[i], -1.0f, 1.0, getHeight(), 0);
+            g.drawLine(x0, y, x1, y, 2.0f);
+        }
+    }
+    float cubic_interpolate(float x)
+    {
+        int index = x;
+        float y0 = test_table[index + 0];
+        float y1 = test_table[index + 1];
+        float y2 = test_table[index + 2];
+        float y3 = test_table[index + 3];
+        float mu = x - index;
+        return sst::basic_blocks::dsp::quad_bspline(y0, y1, y2, mu);
+        // return sst::basic_blocks::dsp::cubic_ipol(y0, y1, y2, y3, mu);
+        return y0 + (y1 - y0) * mu;
     }
     void updateIfNeeded()
     {
@@ -530,6 +590,7 @@ class VolumeEnvelopeComponent : public juce::Component
     int priorstartcurve = 0;
     int priorendcurve = 0;
     float priormorph = 0.0f;
+    std::array<float, 16> test_table;
 };
 
 class ParameterGroupComponent : public juce::GroupComponent
