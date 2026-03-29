@@ -697,6 +697,21 @@ class GranulatorVoice
             }
             else if (filter_routing == FR_ALLPARALLEL)
             {
+                float signalstoinserts[4][2];
+                float summedinserts[2] = {0.0f, 0.0f};
+                for (size_t insertindex = 0; insertindex < numInsertSlots; ++insertindex)
+                {
+                    if (insert_fx[insertindex].mainmode != GrainInsertFX::GFXNONE)
+                    {
+                        signalstoinserts[insertindex][0] = outsample0;
+                        signalstoinserts[insertindex][1] = outsample1;
+                        insert_fx[insertindex].processStereo(signalstoinserts[insertindex][0],
+                                                             signalstoinserts[insertindex][1]);
+                        summedinserts[0] += signalstoinserts[insertindex][0];
+                        summedinserts[1] += signalstoinserts[insertindex][1];
+                    }
+                }
+
                 /*
                 float split = outsample;
                 split = filters[0].processMonoSample(split + feedbacksignals[0]);

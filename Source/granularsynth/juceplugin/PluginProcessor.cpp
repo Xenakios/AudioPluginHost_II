@@ -130,7 +130,7 @@ void AudioPluginAudioProcessor::prepareToPlay(double sampleRate, int samplesPerB
     recordBuffer.setSize(16, samplesPerBlock);
     perfMeasurer.reset(sampleRate, samplesPerBlock);
     workBuffer.resize(samplesPerBlock * 32);
-    granulator.prepare(sampleRate, {}, 3, 0, 0.002f, 0.002f);
+    granulator.prepare(sampleRate, {}, 3, GranulatorVoice::FR_ALLSERIAL, 0.002f, 0.002f);
 }
 
 void AudioPluginAudioProcessor::releaseResources() {}

@@ -544,7 +544,8 @@ inline py::array_t<float> render_granulator(ToneGranulator &gran, double sampler
     }
     if (chans == 0)
         throw std::runtime_error("invalid audio output mode");
-    gran.prepare(samplerate, std::move(evlist), ambiorder, 0, 0.002, 0.002);
+    gran.prepare(samplerate, std::move(evlist), ambiorder, GranulatorVoice::FR_ALLSERIAL, 0.002,
+                 0.002);
     if (gran.events_to_switch.empty() && outputduration == 0.0)
         throw std::runtime_error("grain event list empty after events were erased");
     // we can't know the exact tail amount needed until processing...
