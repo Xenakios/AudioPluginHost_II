@@ -311,7 +311,7 @@ struct GrainEvent
     float fm_feedback = 0.0f;
     float noisecorr = 0.0f;
     float noiseimode = 0.0f;
-    float filterfeedback = 0.0f;
+
     float modamounts[MD_NUMDESTS];
     float insertparams[4][10];
 };
@@ -428,17 +428,16 @@ class GranulatorVoice
     alignas(16) std::array<float, 32> ambcoeffs;
     enum FilterRouting
     {
-        FR_SERIAL,
-        FR_PARALLEL
+        FR_ALLOFF,
+        FR_ALLSERIAL,
+        FR_ALLPARALLEL
     };
-    FilterRouting filter_routing = FR_SERIAL;
+    FilterRouting filter_routing = FR_ALLSERIAL;
 
-    alignas(16) std::array<double, 2> feedbacksignals = {0.0, 0.0};
     alignas(16) SimpleEnvelope<true> gain_envelope;
     alignas(16) SimpleEnvelope<false> aux_envelope;
     alignas(16) float modamounts[GrainEvent::MD_NUMDESTS];
     float pitch_base = 0.0f;
-    float feedbackamt = 0.0f;
     float graingain = 0.0;
     float auxsend1 = 0.0;
     uint8_t envstarttype = 0;
@@ -599,10 +598,6 @@ class GranulatorVoice
         envstarttype = std::clamp<uint8_t>(evpars.envelope_start_type, 0, 30);
         envendtype = std::clamp<uint8_t>(evpars.envelope_end_type, 0, 30);
         envshape = std::clamp(evpars.envelope_shape, 0.0f, 1.0f);
-
-        feedbackamt = std::clamp(evpars.filterfeedback, -0.9999f, 0.9999f);
-        feedbacksignals[0] = 0.0;
-        feedbacksignals[1] = 0.0;
     }
     template <bool GrainModulation = true> void process(float *outputs, int nframes)
     {
@@ -692,7 +687,7 @@ class GranulatorVoice
             }
             float outsample0 = outsample;
             float outsample1 = outsample;
-            if (filter_routing == FR_SERIAL)
+            if (filter_routing == FR_ALLSERIAL)
             {
                 for (size_t insertIndex = 0; insertIndex < 2; ++insertIndex)
                 {
@@ -700,7 +695,7 @@ class GranulatorVoice
                 }
                 // feedbacksignals[0] = outsample * feedbackamt;
             }
-            else if (filter_routing == FR_PARALLEL)
+            else if (filter_routing == FR_ALLPARALLEL)
             {
                 /*
                 float split = outsample;
@@ -1728,7 +1723,7 @@ class ToneGranulator
                 while (ev &&
                        std::floor(ev->time_position * m_sr) < playposframes + granul_block_size)
                 {
-                    bool wasfound = false;
+                    bool voicewasfound = false;
                     for (int j = 0; j < voices.size(); ++j)
                     {
                         if (!voices[j]->active)
@@ -1742,13 +1737,14 @@ class ToneGranulator
                             voices[j]->tail_len = taillen;
                             voices[j]->tail_fade_len = std::clamp(taillen * 0.5, 0.002, 1.0);
                             voices[j]->start(*ev);
-                            wasfound = true;
+                            voicewasfound = true;
                             ++graincount;
                             break;
                         }
                     }
+                    // flag scheduled event for removal
                     ev->time_position = -1.0;
-                    if (!wasfound)
+                    if (!voicewasfound)
                     {
                         ++missedgrains;
                     }
