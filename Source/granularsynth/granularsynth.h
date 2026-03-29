@@ -570,7 +570,7 @@ class GranulatorVoice
         for (size_t i = 0; i < 2; ++i)
         {
             insert_fx[i].reset();
-            if (insert_fx[i].mainmode == 1)
+            if (insert_fx[i].mainmode == GrainInsertFX::GFXSSTFILTER)
             {
                 float filtpitch =
                     xenakios::mapvalue(evpars.insertparams[i][0], 0.0f, 1.0f, -48.0f, 72.0f);
@@ -581,11 +581,11 @@ class GranulatorVoice
                     xenakios::mapvalue(evpars.insertparams[i][3], 0.0f, 1.0f, -24.0f, 24.0f);
                 insert_fx[i].paramvalues[3] = std::clamp(filtpitchspread, -24.0f, 24.0f);
             }
-            else if (insert_fx[i].mainmode == 2)
+            else if (insert_fx[i].mainmode == GrainInsertFX::GFXAIRWINDOWS)
             {
-                for (size_t j = 0; j < GranulatorVoice::maxParamsPerInsert; ++j)
+                for (size_t j = 0; j < insert_fx[i].numParams; ++j)
                 {
-                    insert_fx[i].paramvalues[j] = std::clamp(evpars.insertparams[i][j], 0.0f, 1.0f);
+                    insert_fx[i].paramvalues[j] = evpars.insertparams[i][j];
                 }
             }
         }

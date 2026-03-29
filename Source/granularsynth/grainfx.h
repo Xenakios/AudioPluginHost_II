@@ -94,15 +94,21 @@ class GrainInsertFX
     std::array<float, 10> paramvalues;
     alignas(32) sst::filtersplusplus::Filter sstfilter;
     alignas(32) std::unique_ptr<AirwinConsolidatedBase> awplugin;
-    size_t mainmode = 0;
+    enum GFXMAINMODE
+    {
+        GFXNONE,
+        GFXSSTFILTER,
+        GFXAIRWINDOWS
+    };
+    size_t mainmode = GFXNONE;
     double sr = 0.0;
     size_t blockSize = 0;
     size_t numParams = 0;
     std::string getParameterName(size_t index)
     {
-        if (mainmode == 0)
+        if (mainmode == GFXNONE)
             return "No parameter";
-        if (mainmode == 1)
+        if (mainmode == GFXSSTFILTER)
         {
             if (index == 0)
                 return "Cutoff";
@@ -114,7 +120,7 @@ class GrainInsertFX
                 return "Cutoff spread";
             return "No parameter";
         }
-        if (mainmode == 2 && awplugin && index < numParams)
+        if (mainmode == GFXAIRWINDOWS && awplugin && index < numParams)
         {
             char buf[256];
             memset(buf, 0, 256);
@@ -150,11 +156,11 @@ class GrainInsertFX
     {
         assert(index < numParams);
         paramvalues[index] = v;
-        if (mainmode == 1)
+        if (mainmode == GFXSSTFILTER)
         {
             sstfilter.makeCoefficients(0, paramvalues[0], paramvalues[1], paramvalues[2]);
         }
-        else if (mainmode == 2)
+        else if (mainmode == GFXAIRWINDOWS)
         {
             assert(awplugin);
             // we might be clamped properly before this but adding this for safety now
@@ -164,7 +170,7 @@ class GrainInsertFX
     }
     void prepareBlock()
     {
-        if (mainmode == 1)
+        if (mainmode == GFXSSTFILTER)
         {
             sstfilter.makeCoefficients(0, paramvalues[0] - paramvalues[3], paramvalues[1],
                                        paramvalues[2]);
@@ -172,7 +178,7 @@ class GrainInsertFX
                                        paramvalues[2]);
             sstfilter.prepareBlock();
         }
-        else if (mainmode == 2)
+        else if (mainmode == GFXAIRWINDOWS)
         {
             assert(awplugin);
             // airwindows plugins probably just do a switch case and assign of a
@@ -186,9 +192,9 @@ class GrainInsertFX
     {
         switch (mainmode)
         {
-        case 0:
+        case GFXNONE:
             break;
-        case 1:
+        case GFXSSTFILTER:
         {
             float outLeft = 0.0f;
             float outRight = 0.0f;
@@ -197,7 +203,7 @@ class GrainInsertFX
             inright = outRight;
             break;
         }
-        case 2:
+        case GFXAIRWINDOWS:
         {
             assert(awplugin);
             float input0 = inleft;
@@ -214,7 +220,7 @@ class GrainInsertFX
     };
     void concludeBlock()
     {
-        if (mainmode == 1)
+        if (mainmode == GFXSSTFILTER)
             sstfilter.concludeBlock();
     }
 };

@@ -18,18 +18,18 @@ std::vector<GrainInsertFX::ModeInfo> GrainInsertFX::getAvailableModes()
     std::vector<ModeInfo> result;
     result.reserve(300);
     result.emplace_back("-None-", "");
-    result.emplace_back("AW BezEQ", "AirWindows", 2, 0);
-    result.emplace_back("AW HipCrush", "AirWindows", 2, 1);
-    result.emplace_back("AW KWoodRoom", "AirWindows", 2, 2);
-    result.emplace_back("AW RingModulator", "AirWindows", 2, 3);
+    result.emplace_back("AW BezEQ", "AirWindows", GFXAIRWINDOWS, 0);
+    result.emplace_back("AW HipCrush", "AirWindows", GFXAIRWINDOWS, 1);
+    result.emplace_back("AW KWoodRoom", "AirWindows", GFXAIRWINDOWS, 2);
+    result.emplace_back("AW RingModulator", "AirWindows", GFXAIRWINDOWS, 3);
     // result.emplace_back("AW PrimeFIR", "AirWindows", 2, 4);
-    result.emplace_back("AW Hypersoft", "AirWindows", 2, 5);
-    result.emplace_back("AW DeRez3", "AirWindows", 2, 6);
-    result.emplace_back("AW CrunchCoat", "AirWindows", 2, 7);
-    result.emplace_back("AW BitGlitter", "AirWindows", 2, 8);
-    result.emplace_back("AW ToTape9", "AirWindows", 2, 9);
-    result.emplace_back("AW Donut", "AirWindows", 2, 10);
-    result.emplace_back("AW GlitchShifter", "AirWindows", 2, 11);
+    result.emplace_back("AW Hypersoft", "AirWindows", GFXAIRWINDOWS, 5);
+    result.emplace_back("AW DeRez3", "AirWindows", GFXAIRWINDOWS, 6);
+    result.emplace_back("AW CrunchCoat", "AirWindows", GFXAIRWINDOWS, 7);
+    result.emplace_back("AW BitGlitter", "AirWindows", GFXAIRWINDOWS, 8);
+    result.emplace_back("AW ToTape9", "AirWindows", GFXAIRWINDOWS, 9);
+    result.emplace_back("AW Donut", "AirWindows", GFXAIRWINDOWS, 10);
+    result.emplace_back("AW GlitchShifter", "AirWindows", GFXAIRWINDOWS, 11);
     std::sort(result.begin(), result.end(),
               [](auto const &lhs, auto const &rhs) { return lhs.displayname < rhs.displayname; });
     auto models = sfpp::Filter::availableModels();
@@ -56,8 +56,8 @@ std::vector<GrainInsertFX::ModeInfo> GrainInsertFX::getAvailableModes()
             {
                 subname += " " + sfpp::toString(smt);
             }
-            result.emplace_back(sfpp::toString(mo) + " " + subname, sfpp::toString(mo), 1, 0, mo,
-                                co);
+            result.emplace_back(sfpp::toString(mo) + " " + subname, sfpp::toString(mo),
+                                GFXSSTFILTER, 0, mo, co);
         }
     }
 
@@ -67,13 +67,13 @@ std::vector<GrainInsertFX::ModeInfo> GrainInsertFX::getAvailableModes()
 void GrainInsertFX::setMode(ModeInfo m)
 {
     assert(sr > 0);
-    if (m.mainmode == 0)
+    if (m.mainmode == GFXNONE)
     {
         std::fill(paramvalues.begin(), paramvalues.end(), 0.0f);
         mainmode = 0;
         numParams = 0;
     }
-    if (m.mainmode == 1)
+    if (m.mainmode == GFXSSTFILTER)
     {
         mainmode = 1;
         numParams = 4;
@@ -98,7 +98,7 @@ void GrainInsertFX::setMode(ModeInfo m)
     }
     if (m.mainmode == 2)
     {
-        mainmode = 0;
+        mainmode = GFXNONE;
         numParams = 0;
         if (m.awtype == 0)
         {
@@ -163,7 +163,7 @@ void GrainInsertFX::setMode(ModeInfo m)
         assert(numParams < 11);
         if (awplugin)
         {
-            mainmode = 2;
+            mainmode = GFXAIRWINDOWS;
             awplugin->setNumInputs(2);
             awplugin->setNumOutputs(2);
             awplugin->setSampleRate(sr);
