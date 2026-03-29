@@ -477,6 +477,22 @@ class VolumeEnvelopeComponent : public juce::Component
     VolumeEnvelopeComponent(ToneGranulator *gr, bool auxenv) : granul(gr), auxenvmode(auxenv)
     {
         curvepath.preallocateSpace(512);
+        rng.seed(65537, 90004);
+    }
+    xenakios::Xoroshiro128Plus rng;
+    void generate_steps(int mode)
+    {
+        for (int i = 0; i < 7; ++i)
+        {
+            float val = rng.nextFloatInRange(-1.0f, 1.0f);
+            StepModSource::Message msg;
+            msg.opcode = StepModSource::Message::OP_SETSTEP;
+            msg.fval0 = val;
+            msg.dest = 1000;
+            msg.ival0 = i;
+            granul->fifo.push(msg);
+        }
+        juce::Timer::callAfterDelay(100, [this]() { repaint(); });
     }
     void mouseDown(const juce::MouseEvent &ev) override
     {
@@ -489,6 +505,8 @@ class VolumeEnvelopeComponent : public juce::Component
             menu.addItem("None", [this]() { granul->set_aux_envelope_interpolation_mode(0); });
             menu.addItem("Linear", [this]() { granul->set_aux_envelope_interpolation_mode(1); });
             menu.addItem("Spline", [this]() { granul->set_aux_envelope_interpolation_mode(2); });
+            menu.addSectionHeader("Generate");
+            menu.addItem("Random Uniform", [this]() { generate_steps(0); });
             menu.showMenuAsync(juce::PopupMenu::Options{});
         }
         else
