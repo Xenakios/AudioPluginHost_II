@@ -344,8 +344,8 @@ inline int osc_name_to_index(std::string name)
 
 template <bool TaperEnabled> struct SimpleEnvelope
 {
-    static constexpr int maxnumsteps = 5;
-    std::array<float, maxnumsteps> steps;
+    static constexpr int maxnumsteps = 7;
+    alignas(32) std::array<float, maxnumsteps + 5> steps;
     alignas(16) int curstep = 0;
     alignas(16) double steplen = 0.0;
     alignas(16) double phase = 0.0;
@@ -353,6 +353,7 @@ template <bool TaperEnabled> struct SimpleEnvelope
     alignas(16) int taper_len = 0;
     SimpleEnvelope()
     {
+        std::fill(steps.begin(), steps.end(), 0.0f);
         steps[0] = 1.0f;
         steps[1] = 0.75f;
         steps[2] = 0.5f;
@@ -366,6 +367,18 @@ template <bool TaperEnabled> struct SimpleEnvelope
         curstep = 0;
         phase = 0.0;
         steplen = (double)dursamples / (maxnumsteps - 1);
+    }
+    float get_splinei_value(float xpos)
+    {
+        xpos = std::clamp(xpos, 0.0f, 1.0f);
+        xpos *= maxnumsteps;
+        int index = xpos;
+        float y0 = steps[index];
+        float y1 = steps[index + 1];
+        float y2 = steps[index + 2];
+        float mu = xpos - index;
+        return std::clamp(sst::basic_blocks::dsp::quad_bspline(y0, y1, y2, mu), -1.0f, 1.0f);
+        return 0.0f;
     }
     double step()
     {
@@ -434,8 +447,8 @@ class GranulatorVoice
     };
     FilterRouting filter_routing = FR_ALLSERIAL;
 
-    alignas(16) SimpleEnvelope<true> gain_envelope;
-    alignas(16) SimpleEnvelope<false> aux_envelope;
+    alignas(32) SimpleEnvelope<true> gain_envelope;
+    alignas(32) SimpleEnvelope<false> aux_envelope;
     alignas(16) float modamounts[GrainEvent::MD_NUMDESTS];
     float pitch_base = 0.0f;
     float graingain = 0.0;
@@ -604,10 +617,11 @@ class GranulatorVoice
         float aux_env_value = 0.0f;
         if constexpr (GrainModulation)
         {
-            aux_env_value = aux_envelope.step();
+            double normphase = (double)phase / grain_end_phase;
+            aux_env_value = aux_envelope.get_splinei_value(normphase);
             for (int i = 1; i < nframes; ++i)
             {
-                aux_envelope.step();
+                // aux_envelope.step();
             }
         }
 
@@ -886,6 +900,7 @@ class ToneGranulator
         PAR_STACKTIMECURVE = 2700,
         PAR_VOLENVEASINGSTART = 2800,
         PAR_VOLENVEASINGEND = 2900,
+        PAR_AUXENVTOPITCHAMT = 3000,
         PAR_LFORATES = 100000,
         PAR_LFODEFORMS = 100100,
         PAR_LFOSHIFTS = 100200,
@@ -919,6 +934,8 @@ class ToneGranulator
 
     alignas(32) std::array<float, 8> stepModValues;
     alignas(32) std::array<StepModSource, 8> stepModSources;
+    // we can share this between voices as we don't need it stateful, at least for now
+    SimpleEnvelope<false> voiceaux_envelope;
     struct ModSourceInfo
     {
         std::string name;
@@ -935,6 +952,14 @@ class ToneGranulator
         StepModSource::Message msg;
         while (fifo.pop(msg))
         {
+            if (msg.dest == 1000 && msg.opcode == StepModSource::Message::OP_SETSTEP)
+            {
+                for (auto &v : voices)
+                {
+                    v->aux_envelope.steps[msg.ival0] = msg.fval0;
+                }
+                // voiceaux_envelope.steps[msg.ival0] = msg.fval0;
+            }
             if (msg.dest < stepModSources.size())
             {
                 auto &ms = stepModSources[msg.dest];
@@ -1140,6 +1165,14 @@ class ToneGranulator
                                    .withName("Pitch")
                                    .withGroupName("Oscillator")
                                    .withID(PAR_PITCH)
+                                   .withFlags(CLAP_PARAM_IS_MODULATABLE));
+        parmetadatas.push_back(pmd()
+                                   .withRange(-12.0, 12.0)
+                                   .withDefault(0.0)
+                                   .withLinearScaleFormatting("ST")
+                                   .withName("Aux Env To Pitch Amount")
+                                   .withGroupName("Oscillator")
+                                   .withID(PAR_AUXENVTOPITCHAMT)
                                    .withFlags(CLAP_PARAM_IS_MODULATABLE));
         parmetadatas.push_back(pmd()
                                    .withRange(0.0, 4.0)
@@ -1422,14 +1455,14 @@ class ToneGranulator
     {
         for (auto &v : voices)
         {
-            v->aux_envelope.steps = env;
+            // v->aux_envelope.steps = env;
         }
     }
     void set_voice_gain_envelope(std::array<float, SimpleEnvelope<false>::maxnumsteps> env)
     {
         for (auto &v : voices)
         {
-            v->gain_envelope.steps = env;
+            // v->gain_envelope.steps = env;
         }
     }
     float next_samplerate = 0.0f;
@@ -1543,7 +1576,7 @@ class ToneGranulator
                     }
                 }
 
-                genev.modamounts[GrainEvent::MD_PITCH] = grain_pitch_mod;
+                genev.modamounts[GrainEvent::MD_PITCH] = *idtoparvalptr[PAR_AUXENVTOPITCHAMT];
                 int numToSchedule = std::clamp(*idtoparvalptr[PAR_STACKCOUNT], 1.0f, 16.0f);
                 float pitchrand = std::clamp(*idtoparvalptr[PAR_STACKRANDOMPITCH], 0.0f, 1.0f);
                 pitchrand = 12.0f * std::pow(pitchrand, 2.0f);
@@ -1787,7 +1820,7 @@ class ToneGranulator
                 {
                     ++numactive;
                     alignas(16) float voiceout[16 * granul_block_size];
-                    voices[j]->process<false>(voiceout, granul_block_size);
+                    voices[j]->process<true>(voiceout, granul_block_size);
 
                     for (int k = 0; k < granul_block_size; ++k)
                     {

@@ -26,8 +26,8 @@ inline void updateAllFonts(juce::Component &parent, const juce::Font &newFont)
 
 //==============================================================================
 AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor(AudioPluginAudioProcessor &p)
-    : AudioProcessorEditor(&p), processorRef(p), envcomp(&p.granulator),
-      lfoTabs(juce::TabbedButtonBar::Orientation::TabsAtTop)
+    : AudioProcessorEditor(&p), processorRef(p), envcomp(&p.granulator, false),
+      auxenvcomp(&p.granulator, true), lfoTabs(juce::TabbedButtonBar::Orientation::TabsAtTop)
 {
     perfcomp = std::make_unique<PerformanceComponent>();
     perfcomp->RequestData = [this](int &maxvoices, int &usedvoices, float &cpu) {
@@ -37,6 +37,8 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor(AudioPluginAudi
     };
     init_step_sequencer_js();
     addAndMakeVisible(envcomp);
+    addAndMakeVisible(auxenvcomp);
+
     addAndMakeVisible(oscillatorComponent);
     addAndMakeVisible(spatParamsComponent);
     addAndMakeVisible(miscParamsComponent);
@@ -447,7 +449,10 @@ void AudioPluginAudioProcessorEditor::resized()
     oscillatorComponent.setBounds(0, 0, 500, 125);
     volumeParamsComponent.setBounds(0, 126, 500, 125);
     timeParamsComponent.setBounds(502, 0, 500, 125);
+
     envcomp.setBounds(502, timeParamsComponent.getBottom() + 1, 175, 175);
+    auxenvcomp.setBounds(envcomp.getRight() + 2, timeParamsComponent.getBottom() + 1, 175, 175);
+
     spatParamsComponent.setBounds(0, 302, 500, 125);
     mainParamsComponent.setBounds(502, 302, 500, 125);
     insert1ParamsComponent.setBounds(1004, 0, 500, 150);

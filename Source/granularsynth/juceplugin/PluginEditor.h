@@ -474,7 +474,7 @@ struct ModulationRowComponent : public juce::Component
 class VolumeEnvelopeComponent : public juce::Component
 {
   public:
-    VolumeEnvelopeComponent(ToneGranulator *gr) : granul(gr)
+    VolumeEnvelopeComponent(ToneGranulator *gr, bool auxenv) : granul(gr), auxenvmode(auxenv)
     {
         curvepath.preallocateSpace(512);
         std::fill(test_table.begin(), test_table.end(), 0.0f);
@@ -486,15 +486,23 @@ class VolumeEnvelopeComponent : public juce::Component
     }
     void mouseDown(const juce::MouseEvent &ev) override
     {
+        if (!auxenvmode)
+            return;
         int stepindex = 7.0 / getWidth() * ev.x;
         if (stepindex >= 0 && stepindex < 7)
         {
             float val = juce::jmap<float>(ev.y, 0, getHeight(), 1.0, -1.0);
+            StepModSource::Message msg;
+            msg.opcode = StepModSource::Message::OP_SETSTEP;
+            msg.fval0 = val;
+            msg.dest = 1000;
+            msg.ival0 = stepindex;
+            granul->fifo.push(msg);
             test_table[stepindex] = val;
             if (stepindex == 6)
             {
-                //test_table[stepindex + 1] = test_table[stepindex];
-                //test_table[stepindex + 2] = test_table[stepindex];
+                // test_table[stepindex + 1] = test_table[stepindex];
+                // test_table[stepindex + 2] = test_table[stepindex];
             }
         }
         repaint();
@@ -502,6 +510,8 @@ class VolumeEnvelopeComponent : public juce::Component
     void mouseWheelMove(const juce::MouseEvent &event,
                         const juce::MouseWheelDetails &wheel) override
     {
+        if (!auxenvmode)
+            return;
         int stepindex = 7.0 / getWidth() * event.x;
         if (stepindex >= 0 && stepindex < 7)
         {
@@ -527,22 +537,28 @@ class VolumeEnvelopeComponent : public juce::Component
             float normx = 1.0 / getWidth() * i;
             float sinvalue = std::sin(2 * M_PI * normx * sinfreq);
             float normy = 0.0f;
-            /*
-            if (normx < curvemorph)
+            if (!auxenvmode)
             {
-                normx = xenakios::mapvalue(normx, 0.0f, curvemorph, 0.0f, 1.0f);
-                // normy = easing_table[curvestart].function(normx);
-                normy = eluts.getValueLERP<true>(curvestart, normx);
+                if (normx < curvemorph)
+                {
+                    normx = xenakios::mapvalue(normx, 0.0f, curvemorph, 0.0f, 1.0f);
+                    // normy = easing_table[curvestart].function(normx);
+                    normy = eluts.getValueLERP<true>(curvestart, normx);
+                }
+                else
+                {
+                    normx = xenakios::mapvalue(normx, curvemorph, 1.0f, 1.0f, 0.0f);
+                    // normy = easing_table[curveend].function(normx);
+                    normy = eluts.getValueLERP<true>(curveend, normx);
+                }
+                normy *= sinvalue;
             }
             else
             {
-                normx = xenakios::mapvalue(normx, curvemorph, 1.0f, 1.0f, 0.0f);
-                // normy = easing_table[curveend].function(normx);
-                normy = eluts.getValueLERP<true>(curveend, normx);
+                normy = cubic_interpolate(normx * 7.0);
+                normy *= 1.0;
             }
-            */
-            normy = cubic_interpolate(normx * 7.0);
-            normy *= 1.0;
+
             float ycor = xenakios::mapvalue<float>(normy, -1.1f, 1.1f, getHeight(), 0);
             if (i == 0)
                 curvepath.startNewSubPath({(float)i, ycor});
@@ -550,13 +566,16 @@ class VolumeEnvelopeComponent : public juce::Component
                 curvepath.lineTo({(float)i, ycor});
         }
         g.strokePath(curvepath, juce::PathStrokeType(1.0f));
-        g.setColour(juce::Colours::white);
-        for (int i = 0; i < 7; ++i)
+        if (auxenvmode)
         {
-            float x0 = getWidth() / 7.0 * i;
-            float x1 = getWidth() / 7.0 * (i + 1);
-            float y = juce::jmap<float>(test_table[i], -1.0f, 1.0, getHeight(), 0);
-            g.drawLine(x0, y, x1, y, 2.0f);
+            g.setColour(juce::Colours::white);
+            for (int i = 0; i < 7; ++i)
+            {
+                float x0 = getWidth() / 7.0 * i;
+                float x1 = getWidth() / 7.0 * (i + 1);
+                float y = juce::jmap<float>(test_table[i], -1.0f, 1.0, getHeight(), 0);
+                g.drawLine(x0, y, x1, y, 2.0f);
+            }
         }
     }
     float cubic_interpolate(float x)
@@ -590,6 +609,7 @@ class VolumeEnvelopeComponent : public juce::Component
     int priorstartcurve = 0;
     int priorendcurve = 0;
     float priormorph = 0.0f;
+    bool auxenvmode = false;
     std::array<float, 16> test_table;
 };
 
@@ -691,6 +711,7 @@ class AudioPluginAudioProcessorEditor final : public juce::AudioProcessorEditor,
     ParameterGroupComponent insert1ParamsComponent{"Insert FX A"};
     ParameterGroupComponent insert2ParamsComponent{"Insert FX B"};
     VolumeEnvelopeComponent envcomp;
+    VolumeEnvelopeComponent auxenvcomp;
     struct FilterInfo
     {
         sfpp::FilterModel filtermodel;
