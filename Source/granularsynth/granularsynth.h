@@ -358,7 +358,7 @@ template <bool TaperEnabled> struct SimpleEnvelope
         steps[1] = 0.75f;
         steps[2] = 0.5f;
         steps[3] = 0.25f;
-        steps[4] = 0.25;
+        steps[4] = 0.0;
     }
     void start(int dursamples)
     {
@@ -619,10 +619,6 @@ class GranulatorVoice
         {
             double normphase = (double)phase / grain_end_phase;
             aux_env_value = aux_envelope.get_splinei_value(normphase);
-            for (int i = 1; i < nframes; ++i)
-            {
-                // aux_envelope.step();
-            }
         }
 
         std::visit(
@@ -957,6 +953,8 @@ class ToneGranulator
                 for (auto &v : voices)
                 {
                     v->aux_envelope.steps[msg.ival0] = msg.fval0;
+                    if (msg.ival0 == 6)
+                        v->aux_envelope.steps[7] = msg.fval0;
                 }
                 // voiceaux_envelope.steps[msg.ival0] = msg.fval0;
             }

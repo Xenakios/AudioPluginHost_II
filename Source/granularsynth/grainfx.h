@@ -91,7 +91,8 @@ class GrainInsertFX
         sst::filtersplusplus::FilterModel sstmodel;
         sst::filtersplusplus::ModelConfig sstconfig;
     };
-    std::array<float, 10> paramvalues;
+    alignas(16) std::array<float, 10> paramvalues;
+    alignas(16) std::array<float, 10> parammodvalues;
     alignas(32) sst::filtersplusplus::Filter sstfilter;
     alignas(32) std::unique_ptr<AirwinConsolidatedBase> awplugin;
     enum GFXMAINMODE
@@ -133,6 +134,7 @@ class GrainInsertFX
     GrainInsertFX()
     {
         std::fill(paramvalues.begin(), paramvalues.end(), 0.0f);
+        std::fill(parammodvalues.begin(), parammodvalues.end(), 0.0f);
         delaylinememory.resize(8192);
     }
 

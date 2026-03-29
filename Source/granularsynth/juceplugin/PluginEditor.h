@@ -477,12 +477,7 @@ class VolumeEnvelopeComponent : public juce::Component
     VolumeEnvelopeComponent(ToneGranulator *gr, bool auxenv) : granul(gr), auxenvmode(auxenv)
     {
         curvepath.preallocateSpace(512);
-        std::fill(test_table.begin(), test_table.end(), 0.0f);
-        test_table[0] = 0.0;
-        test_table[1] = 0.0;
-        test_table[2] = 1.0;
-        test_table[3] = 0.0;
-        test_table[4] = 0.0;
+        
     }
     void mouseDown(const juce::MouseEvent &ev) override
     {
@@ -498,12 +493,6 @@ class VolumeEnvelopeComponent : public juce::Component
             msg.dest = 1000;
             msg.ival0 = stepindex;
             granul->fifo.push(msg);
-            test_table[stepindex] = val;
-            if (stepindex == 6)
-            {
-                // test_table[stepindex + 1] = test_table[stepindex];
-                // test_table[stepindex + 2] = test_table[stepindex];
-            }
         }
         repaint();
     }
@@ -516,9 +505,9 @@ class VolumeEnvelopeComponent : public juce::Component
         if (stepindex >= 0 && stepindex < 7)
         {
             float delta = wheel.deltaY * 0.2;
-            test_table[stepindex] += delta;
-            if (stepindex == 6)
-                test_table[stepindex + 1] = test_table[stepindex];
+            //test_table[stepindex] += delta;
+            //if (stepindex == 6)
+            //    test_table[stepindex + 1] = test_table[stepindex];
         }
         repaint();
     }
@@ -532,6 +521,7 @@ class VolumeEnvelopeComponent : public juce::Component
         auto curveend = priorendcurve;
         float sinfreq = getWidth() / 8.0;
         auto &eluts = granul->eluts;
+        auto &auxenv = granul->voices[0]->aux_envelope;
         for (int i = 0; i < getWidth(); ++i)
         {
             float normx = 1.0 / getWidth() * i;
@@ -555,7 +545,7 @@ class VolumeEnvelopeComponent : public juce::Component
             }
             else
             {
-                normy = cubic_interpolate(normx * 7.0);
+                normy = auxenv.get_splinei_value(normx);
                 normy *= 1.0;
             }
 
@@ -573,7 +563,7 @@ class VolumeEnvelopeComponent : public juce::Component
             {
                 float x0 = getWidth() / 7.0 * i;
                 float x1 = getWidth() / 7.0 * (i + 1);
-                float y = juce::jmap<float>(test_table[i], -1.0f, 1.0, getHeight(), 0);
+                float y = juce::jmap<float>(auxenv.steps[i], -1.0f, 1.0, getHeight(), 0);
                 g.drawLine(x0, y, x1, y, 2.0f);
             }
         }
@@ -581,6 +571,7 @@ class VolumeEnvelopeComponent : public juce::Component
     float cubic_interpolate(float x)
     {
         int index = x;
+        auto &test_table = granul->voices[0]->aux_envelope.steps;
         float y0 = test_table[index + 0];
         float y1 = test_table[index + 1];
         float y2 = test_table[index + 2];
@@ -610,7 +601,6 @@ class VolumeEnvelopeComponent : public juce::Component
     int priorendcurve = 0;
     float priormorph = 0.0f;
     bool auxenvmode = false;
-    std::array<float, 16> test_table;
 };
 
 class ParameterGroupComponent : public juce::GroupComponent
