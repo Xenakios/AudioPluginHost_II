@@ -482,7 +482,8 @@ class VolumeEnvelopeComponent : public juce::Component
     xenakios::Xoroshiro128Plus rng;
     void generate_steps(int mode)
     {
-        for (int i = 0; i < 7; ++i)
+        auto numsteps = SimpleEnvelope<false>::maxnumsteps;
+        for (int i = 0; i < numsteps; ++i)
         {
             float val = rng.nextFloatInRange(-1.0f, 1.0f);
             StepModSource::Message msg;
@@ -503,6 +504,7 @@ class VolumeEnvelopeComponent : public juce::Component
     {
         if (!auxenvmode)
             return;
+        auto numsteps = SimpleEnvelope<false>::maxnumsteps;
         if (ev.mods.isRightButtonDown())
         {
             juce::PopupMenu menu;
@@ -516,8 +518,8 @@ class VolumeEnvelopeComponent : public juce::Component
         }
         else
         {
-            int stepindex = 7.0 / getWidth() * ev.x;
-            if (stepindex >= 0 && stepindex < 7)
+            int stepindex = numsteps / (float)getWidth() * ev.x;
+            if (stepindex >= 0 && stepindex < numsteps)
             {
                 float val = juce::jmap<float>(ev.y, 0, getHeight(), 1.1, -1.1);
                 StepModSource::Message msg;
@@ -535,8 +537,9 @@ class VolumeEnvelopeComponent : public juce::Component
     {
         if (!auxenvmode)
             return;
-        int stepindex = 7.0 / getWidth() * event.x;
-        if (stepindex >= 0 && stepindex < 7)
+        auto numsteps = SimpleEnvelope<false>::maxnumsteps;
+        int stepindex = numsteps / (float)getWidth() * event.x;
+        if (stepindex >= 0 && stepindex < numsteps)
         {
             float delta = wheel.deltaY * 0.2;
             auto &auxenv = granul->voices[0]->aux_envelope;
@@ -598,10 +601,11 @@ class VolumeEnvelopeComponent : public juce::Component
         if (auxenvmode)
         {
             g.setColour(juce::Colours::white);
-            for (int i = 0; i < 7; ++i)
+            auto numsteps = SimpleEnvelope<false>::maxnumsteps;
+            for (int i = 0; i < numsteps; ++i)
             {
-                float x0 = getWidth() / 7.0 * i;
-                float x1 = getWidth() / 7.0 * (i + 1);
+                float x0 = (float)getWidth() / numsteps * i;
+                float x1 = (float)getWidth() / numsteps * (i + 1);
                 float y = juce::jmap<float>(auxenv.steps[i], -1.1f, 1.1f, getHeight(), 0);
                 g.drawLine(x0, y, x1, y, 2.0f);
             }

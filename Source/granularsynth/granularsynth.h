@@ -344,7 +344,7 @@ inline int osc_name_to_index(std::string name)
 
 template <bool TaperEnabled> struct SimpleEnvelope
 {
-    static constexpr int maxnumsteps = 7;
+    static constexpr int maxnumsteps = 10;
     alignas(32) std::array<float, maxnumsteps + 5> steps;
     alignas(16) int curstep = 0;
     alignas(16) double steplen = 0.0;
@@ -971,11 +971,16 @@ class ToneGranulator
         {
             if (msg.dest == 1000 && msg.opcode == StepModSource::Message::OP_SETSTEP)
             {
+                const auto numsteps = SimpleEnvelope<false>::maxnumsteps;
                 for (auto &v : voices)
                 {
                     v->aux_envelope.steps[msg.ival0] = msg.fval0;
-                    if (msg.ival0 == 6)
-                        v->aux_envelope.steps[7] = msg.fval0;
+                    if (msg.ival0 == numsteps - 1)
+                    {
+                        // steps array has extra space for interpolation
+                        v->aux_envelope.steps[numsteps] = msg.fval0;
+                        v->aux_envelope.steps[numsteps + 1] = msg.fval0;
+                    }
                 }
                 // voiceaux_envelope.steps[msg.ival0] = msg.fval0;
             }
