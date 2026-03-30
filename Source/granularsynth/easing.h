@@ -101,6 +101,13 @@ inline AHFloat Linear50ThenHold(AHFloat p)
     return 1.0;
 }
 
+inline AHFloat Linear25ThenHold(AHFloat p)
+{
+    if (p < 0.25)
+        return p * 4.0;
+    return 1.0;
+}
+
 typedef struct
 {
     const char *name;
@@ -109,6 +116,8 @@ typedef struct
 
 const EasingMapping easing_table[] = {
     {"Linear", LinearInterpolation},
+    {"Linear 25% And Hold", Linear25ThenHold},
+    {"Linear 50% And Hold", Linear50ThenHold},
 
     {"QuadraticEaseIn", QuadraticEaseIn},
     {"QuadraticEaseOut", QuadraticEaseOut},
@@ -149,14 +158,13 @@ const EasingMapping easing_table[] = {
     {"BounceEaseIn", BounceEaseIn},
     {"BounceEaseOut", BounceEaseOut},
     {"BounceEaseInOut", BounceEaseInOut},
-    {"Linear 50% And Hold", Linear50ThenHold},
     {0, 0} // Sentinel to mark end of table
 };
 
 struct EasingLUTS
 {
     static const size_t LUTSize = 1024;
-    static const size_t numFunctions = 32;
+    static const size_t numFunctions = 33;
     float data[numFunctions][LUTSize + 1];
     EasingLUTS()
     {

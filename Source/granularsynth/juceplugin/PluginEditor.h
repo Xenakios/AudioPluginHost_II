@@ -494,6 +494,11 @@ class VolumeEnvelopeComponent : public juce::Component
         }
         juce::Timer::callAfterDelay(100, [this]() { repaint(); });
     }
+    void set_interpolation_mode(int m)
+    {
+        granul->set_aux_envelope_interpolation_mode(m);
+        juce::Timer::callAfterDelay(100, [this]() { repaint(); });
+    }
     void mouseDown(const juce::MouseEvent &ev) override
     {
         if (!auxenvmode)
@@ -502,9 +507,9 @@ class VolumeEnvelopeComponent : public juce::Component
         {
             juce::PopupMenu menu;
             menu.addSectionHeader("Interpolation mode");
-            menu.addItem("None", [this]() { granul->set_aux_envelope_interpolation_mode(0); });
-            menu.addItem("Linear", [this]() { granul->set_aux_envelope_interpolation_mode(1); });
-            menu.addItem("Spline", [this]() { granul->set_aux_envelope_interpolation_mode(2); });
+            menu.addItem("None", [this]() { set_interpolation_mode(0); });
+            menu.addItem("Linear", [this]() { set_interpolation_mode(1); });
+            menu.addItem("Spline", [this]() { set_interpolation_mode(2); });
             menu.addSectionHeader("Generate");
             menu.addItem("Random Uniform", [this]() { generate_steps(0); });
             menu.showMenuAsync(juce::PopupMenu::Options{});
@@ -592,7 +597,7 @@ class VolumeEnvelopeComponent : public juce::Component
             {
                 float x0 = getWidth() / 7.0 * i;
                 float x1 = getWidth() / 7.0 * (i + 1);
-                float y = juce::jmap<float>(auxenv.steps[i], -1.0f, 1.0, getHeight(), 0);
+                float y = juce::jmap<float>(auxenv.steps[i], -1.1f, 1.1f, getHeight(), 0);
                 g.drawLine(x0, y, x1, y, 2.0f);
             }
         }
