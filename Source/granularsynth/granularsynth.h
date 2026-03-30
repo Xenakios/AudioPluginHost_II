@@ -514,7 +514,10 @@ class GranulatorVoice
                 theoscillator = FMOsc();
             else if (newosctype == 6)
                 theoscillator = NoiseGen();
-            std::visit([this](auto &q) { q.setSampleRate(sr); }, theoscillator);
+            std::visit([this](auto &q) { 
+                q.setSampleRate(sr); 
+                q.setFrequencySmoothingRateMS(5.0);
+            }, theoscillator);
         }
         pitch_base = evpars.pitch_semitones;
         if (newosctype == 6)
@@ -625,6 +628,7 @@ class GranulatorVoice
     template <bool GrainModulation = true> void process(float *outputs, int nframes)
     {
         float aux_env_value = 0.0f;
+        // if (std::abs(modamounts[GrainEvent::MD_PITCH]) > 0.0f)
         if constexpr (GrainModulation)
         {
             double normphase = (double)phase / grain_end_phase;
@@ -1591,7 +1595,9 @@ class ToneGranulator
                     }
                 }
 
-                genev.modamounts[GrainEvent::MD_PITCH] = *idtoparvalptr[PAR_AUXENVTOPITCHAMT];
+                genev.modamounts[GrainEvent::MD_PITCH] = modmatrix.m.getTargetValue(
+                    GranulatorModConfig::TargetIdentifier{PAR_AUXENVTOPITCHAMT});
+
                 int numToSchedule = std::clamp(*idtoparvalptr[PAR_STACKCOUNT], 1.0f, 16.0f);
                 float pitchrand = std::clamp(*idtoparvalptr[PAR_STACKRANDOMPITCH], 0.0f, 1.0f);
                 pitchrand = 12.0f * std::pow(pitchrand, 2.0f);

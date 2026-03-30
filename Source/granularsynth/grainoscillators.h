@@ -25,6 +25,7 @@ struct FMOsc
         // carrierPhaseInc = calculatePhaseIncrement(carrierFreq);
         // modulatorPhaseInc = calculatePhaseIncrement(modulatorFreq);
     }
+    void setFrequencySmoothingRateMS(float ms) {}
     float step()
     {
         double modulatorOutput = SmoothingStrategy::getValue(modIndex) *
@@ -119,6 +120,7 @@ class NoiseGen
         SmoothingStrategy::setValueInstant(phaseinc, 0.0);
         SmoothingStrategy::setValueInstant(correlation, 0.0);
     }
+    void setFrequencySmoothingRateMS(float ms) {}
     float step()
     {
         phase += phaseinc.getValue();
