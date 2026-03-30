@@ -17,15 +17,11 @@ struct FMOsc
         SmoothingStrategy::setValueInstant(modulatorFeedbackAmount, 0.0);
     }
 
-    void setSampleRate(double hz)
+    void setSampleRate(double hz) { sampleRate = hz; }
+    void setFrequencySmoothingRateMS(float ms)
     {
-        sampleRate = hz;
-        // modulatorPhaseInc.setRateInMilliseconds(250.0, sampleRate, 1.0);
-        // carrierPhaseInc.setRateInMilliseconds(500.0, sampleRate, 1.0);
-        // carrierPhaseInc = calculatePhaseIncrement(carrierFreq);
-        // modulatorPhaseInc = calculatePhaseIncrement(modulatorFreq);
+        carrierPhaseInc.setRateInMilliseconds(ms, sampleRate, 1.0);
     }
-    void setFrequencySmoothingRateMS(float ms) {}
     float step()
     {
         double modulatorOutput = SmoothingStrategy::getValue(modIndex) *
@@ -120,7 +116,7 @@ class NoiseGen
         SmoothingStrategy::setValueInstant(phaseinc, 0.0);
         SmoothingStrategy::setValueInstant(correlation, 0.0);
     }
-    void setFrequencySmoothingRateMS(float ms) {}
+    void setFrequencySmoothingRateMS(float ms) { phaseinc.setRateInMilliseconds(ms, sr, 1.0); }
     float step()
     {
         phase += phaseinc.getValue();
@@ -177,12 +173,7 @@ class NoiseGen
         phaseinc.setTarget(1.0 / sr * freq);
     }
     void setCorrelation(double c) { correlation.setTarget(c); }
-    void setSampleRate(double hz)
-    {
-        sr = hz;
-        // correlation.setRateInMilliseconds(100.0, sr, 1.0);
-        // phaseinc.setRateInMilliseconds(500.0, sr, 1.0);
-    }
+    void setSampleRate(double hz) { sr = hz; }
     void setRandSeed(unsigned int s) { rng.seed(s); }
     void setSyncRatio(double) {}
     alignas(16) std::minstd_rand0 rng;
