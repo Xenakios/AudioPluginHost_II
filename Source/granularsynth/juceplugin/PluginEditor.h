@@ -564,6 +564,7 @@ class VolumeEnvelopeComponent : public juce::Component
         float sinfreq = getWidth() / 8.0;
         auto &eluts = granul->eluts;
         auto &auxenv = granul->voices[0]->aux_envelope;
+
         for (int i = 0; i < getWidth(); ++i)
         {
             float normx = 1.0 / getWidth() * i;
@@ -587,7 +588,7 @@ class VolumeEnvelopeComponent : public juce::Component
             }
             else
             {
-                normy = auxenv.get_value(normx);
+                normy = auxenv.get_value(normx, priorauxwarp);
                 normy *= 1.0;
             }
 
@@ -629,11 +630,14 @@ class VolumeEnvelopeComponent : public juce::Component
         int curvestart = *granul->idtoparvalptr[ToneGranulator::PAR_VOLENVEASINGSTART];
         int curveend = *granul->idtoparvalptr[ToneGranulator::PAR_VOLENVEASINGEND];
         float curvemorph = *granul->idtoparvalptr[ToneGranulator::PAR_ENVMORPH];
-        if (priorstartcurve != curvestart || priorendcurve != curveend || priormorph != curvemorph)
+        float warp = *granul->idtoparvalptr[ToneGranulator::PAR_AUXENVTIMEWARP];
+        if (priorstartcurve != curvestart || priorendcurve != curveend ||
+            priormorph != curvemorph || priorauxwarp != warp)
         {
             priorstartcurve = curvestart;
             priorendcurve = curveend;
             priormorph = curvemorph;
+            priorauxwarp = warp;
             repaint();
             // DBG(priorstartcurve << " " << priorendcurve << " " << priormorph);
         }
@@ -643,6 +647,7 @@ class VolumeEnvelopeComponent : public juce::Component
     int priorstartcurve = 0;
     int priorendcurve = 0;
     float priormorph = 0.0f;
+    float priorauxwarp = 0.0f;
     bool auxenvmode = false;
 };
 

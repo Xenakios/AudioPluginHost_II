@@ -301,6 +301,7 @@ struct GrainEvent
     uint8_t envelope_start_type = 0;
     uint8_t envelope_end_type = 0;
     float envelope_shape = 0.5f;
+    float auxenvtimewarp = 0.0f;
     float azimuth = 0.0f;
     float azimuth_spread = 0.0f;
     float elevation = 0.0f;
@@ -375,9 +376,19 @@ template <bool TaperEnabled> struct SimpleEnvelope
         phase = 0.0;
         steplen = (double)dursamples / (maxnumsteps - 1);
     }
-    float get_value(float xpos)
+    float get_value(float xpos, float xwarp)
     {
         xpos = std::clamp(xpos, 0.0f, 1.0f);
+        if (xwarp < 0.0f)
+        {
+            float ex = xenakios::mapvalue(xwarp, -1.0f, 0.0f, 4.0f, 1.0f);
+            xpos = std::pow(xpos, ex);
+        }
+        else
+        {
+            float ex = xenakios::mapvalue(xwarp, 0.0f, 1.0f, 1.0f, 4.0f);
+            xpos = 1.0f - std::pow(1.0f - xpos, ex);
+        }
         xpos *= maxnumsteps;
         int index = xpos;
         float y0 = steps[index];
@@ -466,7 +477,7 @@ class GranulatorVoice
     uint8_t envstarttype = 0;
     uint8_t envendtype = 0;
     double envshape = 0.5;
-
+    float auxenvtimewarp = 0.0;
     int grainid = 0;
     int ambisonic_order = 1;
     int num_outputchans = 0;
@@ -593,6 +604,7 @@ class GranulatorVoice
         grain_end_phase = sr * actdur;
         gain_envelope.start(grain_end_phase);
         aux_envelope.start(grain_end_phase);
+        auxenvtimewarp = evpars.auxenvtimewarp;
 
         for (size_t i = 0; i < 2; ++i)
         {
@@ -634,7 +646,7 @@ class GranulatorVoice
         if constexpr (GrainModulation)
         {
             double normphase = (double)phase / grain_end_phase;
-            aux_env_value = aux_envelope.get_value(normphase);
+            aux_env_value = aux_envelope.get_value(normphase, auxenvtimewarp);
         }
 
         std::visit(
@@ -911,6 +923,7 @@ class ToneGranulator
         PAR_VOLENVEASINGSTART = 2800,
         PAR_VOLENVEASINGEND = 2900,
         PAR_AUXENVTOPITCHAMT = 3000,
+        PAR_AUXENVTIMEWARP = 3050,
         PAR_LFORATES = 100000,
         PAR_LFODEFORMS = 100100,
         PAR_LFOSHIFTS = 100200,
@@ -1197,6 +1210,14 @@ class ToneGranulator
                                    .withName("Aux Env To Pitch Amount")
                                    .withGroupName("Oscillator")
                                    .withID(PAR_AUXENVTOPITCHAMT)
+                                   .withFlags(CLAP_PARAM_IS_MODULATABLE));
+        parmetadatas.push_back(pmd()
+                                   .withRange(-1.0, 1.0)
+                                   .withDefault(0.0)
+                                   .withLinearScaleFormatting("")
+                                   .withName("Aux Env Time Warp")
+                                   .withGroupName("Oscillator")
+                                   .withID(PAR_AUXENVTIMEWARP)
                                    .withFlags(CLAP_PARAM_IS_MODULATABLE));
         parmetadatas.push_back(pmd()
                                    .withRange(0.0, 4.0)
@@ -1611,6 +1632,8 @@ class ToneGranulator
 
                 genev.modamounts[GrainEvent::MD_PITCH] = modmatrix.m.getTargetValue(
                     GranulatorModConfig::TargetIdentifier{PAR_AUXENVTOPITCHAMT});
+                genev.auxenvtimewarp = modmatrix.m.getTargetValue(
+                    GranulatorModConfig::TargetIdentifier{PAR_AUXENVTIMEWARP});
 
                 int numToSchedule = std::clamp(*idtoparvalptr[PAR_STACKCOUNT], 1.0f, 16.0f);
                 float pitchrand = std::clamp(*idtoparvalptr[PAR_STACKRANDOMPITCH], 0.0f, 1.0f);

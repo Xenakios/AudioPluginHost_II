@@ -381,6 +381,7 @@ void AudioPluginAudioProcessorEditor::showFilterMenu(int whichfilter)
 void AudioPluginAudioProcessorEditor::timerCallback()
 {
     envcomp.updateIfNeeded();
+    auxenvcomp.updateIfNeeded();
     infoLabel.setText(
         std::format("[CPU Load {:3.0f}%] [{}/{} voices {}/{} scheduled] [{} in {} out]",
                     processorRef.perfMeasurer.getLoadAsPercentage(),
