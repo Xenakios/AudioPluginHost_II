@@ -388,7 +388,7 @@ template <bool TaperEnabled> struct SimpleEnvelope
         if (interpmode == IM_LINEAR)
             return y0 + (y1 - y0) * mu;
         float y2 = steps[index + 2];
-        return std::clamp(sst::basic_blocks::dsp::quad_bspline(y0, y1, y2, mu), -1.0f, 1.0f);
+        return sst::basic_blocks::dsp::quad_bspline(y0, y1, y2, mu);
     }
     double step()
     {
@@ -514,10 +514,12 @@ class GranulatorVoice
                 theoscillator = FMOsc();
             else if (newosctype == 6)
                 theoscillator = NoiseGen();
-            std::visit([this](auto &q) { 
-                q.setSampleRate(sr); 
-                q.setFrequencySmoothingRateMS(5.0);
-            }, theoscillator);
+            std::visit(
+                [this](auto &q) {
+                    q.setSampleRate(sr);
+                    q.setFrequencySmoothingRateMS(5.0);
+                },
+                theoscillator);
         }
         pitch_base = evpars.pitch_semitones;
         if (newosctype == 6)
@@ -874,9 +876,6 @@ class ToneGranulator
     std::unordered_map<uint32_t, pmd *> idtoparmetadata;
     std::unordered_map<uint32_t, float> modRanges;
     std::unordered_map<int, int> shapeParToActualShape;
-    float grain_pitch_mod = 0.0;
-    float pulse_width = 0.5;
-
     choc::fifo::SingleReaderSingleWriterFIFO<StepModSource::Message> fifo;
     int osc_type = 4;
     enum PARAMS
@@ -899,6 +898,7 @@ class ToneGranulator
         PAR_FMDEPTH = 1600,
         PAR_FMFEEDBACK = 1700,
         PAR_OSC_SYNC = 1800,
+        PAR_OSC_PW = 1850,
         PAR_ENVMORPH = 1900,
         PAR_GRAINVOLUME = 2000,
         PAR_NOISECORRELATION = 2100,
@@ -1199,6 +1199,14 @@ class ToneGranulator
                                    .withLinearScaleFormatting("ST", 12.0f)
                                    .withName("OSC Sync")
                                    .withID(PAR_OSC_SYNC)
+                                   .withGroupName("Oscillator")
+                                   .withFlags(CLAP_PARAM_IS_MODULATABLE));
+        parmetadatas.push_back(pmd()
+                                   .withRange(0.0, 1.0)
+                                   .withDefault(0.5)
+                                   .withLinearScaleFormatting("%", 100.0f)
+                                   .withName("OSC PW")
+                                   .withID(PAR_OSC_PW)
                                    .withGroupName("Oscillator")
                                    .withFlags(CLAP_PARAM_IS_MODULATABLE));
         parmetadatas.push_back(pmd()
@@ -1577,7 +1585,8 @@ class ToneGranulator
                     modmatrix.m.getTargetValue(GranulatorModConfig::TargetIdentifier{PAR_FMDEPTH});
                 genev.fm_feedback = modmatrix.m.getTargetValue(
                     GranulatorModConfig::TargetIdentifier{PAR_FMFEEDBACK});
-                genev.pulse_width = pulse_width;
+                genev.pulse_width =
+                    modmatrix.m.getTargetValue(GranulatorModConfig::TargetIdentifier{PAR_OSC_PW});
                 genev.noisecorr = modmatrix.m.getTargetValue(
                     GranulatorModConfig::TargetIdentifier{PAR_NOISECORRELATION});
                 genev.noiseimode = *idtoparvalptr[PAR_NOISEMODE];

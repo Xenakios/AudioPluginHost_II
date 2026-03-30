@@ -519,7 +519,7 @@ class VolumeEnvelopeComponent : public juce::Component
             int stepindex = 7.0 / getWidth() * ev.x;
             if (stepindex >= 0 && stepindex < 7)
             {
-                float val = juce::jmap<float>(ev.y, 0, getHeight(), 1.0, -1.0);
+                float val = juce::jmap<float>(ev.y, 0, getHeight(), 1.1, -1.1);
                 StepModSource::Message msg;
                 msg.opcode = StepModSource::Message::OP_SETSTEP;
                 msg.fval0 = val;
@@ -539,9 +539,14 @@ class VolumeEnvelopeComponent : public juce::Component
         if (stepindex >= 0 && stepindex < 7)
         {
             float delta = wheel.deltaY * 0.2;
-            // test_table[stepindex] += delta;
-            // if (stepindex == 6)
-            //     test_table[stepindex + 1] = test_table[stepindex];
+            auto &auxenv = granul->voices[0]->aux_envelope;
+            float val = auxenv.steps[stepindex] + delta;
+            StepModSource::Message msg;
+            msg.opcode = StepModSource::Message::OP_SETSTEP;
+            msg.fval0 = val;
+            msg.dest = 1000;
+            msg.ival0 = stepindex;
+            granul->fifo.push(msg);
         }
         repaint();
     }

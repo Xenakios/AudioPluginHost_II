@@ -446,8 +446,8 @@ void AudioPluginAudioProcessorEditor::paint(juce::Graphics &g)
 
 void AudioPluginAudioProcessorEditor::resized()
 {
-    oscillatorComponent.setBounds(0, 0, 500, 125);
-    volumeParamsComponent.setBounds(0, 126, 500, 125);
+    oscillatorComponent.setBounds(0, 0, 500, 150);
+    volumeParamsComponent.setBounds(0, 151, 500, 125);
     timeParamsComponent.setBounds(502, 0, 500, 125);
 
     envcomp.setBounds(502, timeParamsComponent.getBottom() + 1, 175, 175);
