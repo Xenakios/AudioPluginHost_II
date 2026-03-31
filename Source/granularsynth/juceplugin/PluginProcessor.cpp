@@ -179,6 +179,16 @@ void AudioPluginAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
                     juce::jmap<float>(msg.getControllerValue(), 0, 127, 0.0, 1.0);
             }
         }
+        if (msg.isNoteOn())
+        {
+            granulator.midiNoteModSource.activate_note(msg.getNoteNumber(), msg.getVelocity());
+            DBG(granulator.midiNoteModSource.getDebugString());
+        }
+        if (msg.isNoteOff())
+        {
+            granulator.midiNoteModSource.deactivate_note(msg.getNoteNumber());
+            DBG(granulator.midiNoteModSource.getDebugString());
+        }
     }
 
     ThreadMessage msg;

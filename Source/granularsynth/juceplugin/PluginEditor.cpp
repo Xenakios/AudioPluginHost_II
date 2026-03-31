@@ -388,13 +388,15 @@ void AudioPluginAudioProcessorEditor::timerCallback()
     envcomp.updateIfNeeded();
     auxenvcomp.updateIfNeeded();
     infoLabel.setText(
-        std::format("[CPU Load {:3.0f}%] [{}/{} voices {}/{} scheduled] [{} in {} out]",
+        std::format("[CPU Load {:3.0f}%] [{}/{} voices {}/{} scheduled] [{} in {} out] [{}]",
                     processorRef.perfMeasurer.getLoadAsPercentage(),
                     processorRef.granulator.numVoicesUsed.load(), processorRef.granulator.numvoices,
                     processorRef.granulator.scheduledGrains.size(),
                     processorRef.granulator.scheduledGrains.capacity(),
                     processorRef.getTotalNumInputChannels(),
-                    processorRef.getTotalNumOutputChannels()),
+                    processorRef.getTotalNumOutputChannels(),
+                    processorRef.granulator.midiNoteModValue),
+
         juce::dontSendNotification);
     for (auto &c : stepcomps)
     {

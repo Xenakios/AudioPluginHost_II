@@ -793,6 +793,55 @@ class GranulatorVoice
 
 using events_t = std::vector<GrainEvent>;
 
+class MidiNoteModSource
+{
+  public:
+    struct Message
+    {
+        uint8_t note = 60;
+        uint8_t velo = 127;
+        uint8_t aftertouch = 0;
+    };
+    std::vector<Message> current_messages;
+    int curstep = 0;
+    MidiNoteModSource() { current_messages.reserve(128); }
+    std::string getDebugString()
+    {
+        if (current_messages.empty())
+            return "NO MESSAGES";
+        std::string result;
+        for (auto &e : current_messages)
+            result += std::format("{} {} {} ", e.note, e.velo, e.aftertouch);
+        return result;
+    }
+    void activate_note(uint8_t note, uint8_t velo)
+    {
+        if (current_messages.size() < current_messages.capacity())
+        {
+            current_messages.emplace_back(note, velo);
+        }
+    }
+    void deactivate_note(uint8_t note)
+    {
+        std::erase_if(current_messages, [note](Message &msg) { return msg.note == note; });
+        if (curstep >= current_messages.size())
+            curstep = current_messages.size() - 1;
+        if (curstep < 0)
+            curstep = 0;
+    }
+    float next()
+    {
+        if (current_messages.size() == 0)
+            return 0.0f;
+        float result = current_messages[curstep].note;
+        result = xenakios::mapvalue(result, 0.0f, 127.0f, -1.0f, 1.0f);
+        ++curstep;
+        if (curstep == current_messages.size())
+            curstep = 0;
+        return result;
+    }
+};
+
 class StepModSource
 {
   public:
@@ -950,13 +999,19 @@ class ToneGranulator
         STEPS5,
         STEPS6,
         STEPS7,
+        MIDINOTE,
+        MIDIVELO,
+        MIDIAT,
         MIDICCSTART,
-        MIDICCEND = MIDICCSTART + 64
+        MIDICCEND = MIDICCSTART + 64,
+
     };
     float dummyTargetValue = 0.0f;
 
     alignas(32) std::array<float, 8> stepModValues;
     alignas(32) std::array<StepModSource, 8> stepModSources;
+    alignas(32) MidiNoteModSource midiNoteModSource;
+    float midiNoteModValue = 0.0f;
     // we can share this between voices as we don't need it stateful, at least for now
     SimpleEnvelope<false> voiceaux_envelope;
     struct ModSourceInfo
@@ -1423,9 +1478,7 @@ class ToneGranulator
                 modRanges[parmetadatas[i].id] = range;
             }
         }
-        // we want these for stereo testing now...
-        // modRanges[PAR_AZIMUTH] = 30.0f;
-        // modRanges[PAR_ELEVATION] = 30.0f;
+
         for (int i = 0; i < numvoices; ++i)
         {
             auto v = std::make_unique<GranulatorVoice>();
@@ -1444,6 +1497,7 @@ class ToneGranulator
         modmatrix.m.bindTargetBaseValue(GranulatorModConfig::TargetIdentifier{(int)1},
                                         dummyTargetValue);
 
+        modSources.reserve(64);
         modSources.emplace_back("Off", "", GranulatorModConfig::SourceIdentifier{0});
         for (uint32_t i = 0; i < GranulatorModMatrix::numLfos; ++i)
         {
@@ -1455,17 +1509,19 @@ class ToneGranulator
             modSources.emplace_back(std::format("StepSeq {}", i + 1), "Step Sequencer",
                                     GranulatorModConfig::SourceIdentifier{STEPS0 + i});
         }
-
+        modSources.emplace_back("MIDI KEY", "MIDI NOTES",
+                                GranulatorModConfig::SourceIdentifier{MIDINOTE});
         for (uint32_t i = 0; i < 8; ++i)
         {
-            modSources.emplace_back(std::format("MIDI CC {}", i + 21), "MIDI",
+            modSources.emplace_back(std::format("MIDI CC {}", i + 21), "MIDI CC",
                                     GranulatorModConfig::SourceIdentifier{i + MIDICCSTART});
         }
         for (uint32_t i = 0; i < 8; ++i)
         {
-            modSources.emplace_back(std::format("MIDI CC {}", i + 41), "MIDI",
+            modSources.emplace_back(std::format("MIDI CC {}", i + 41), "MIDI CC",
                                     GranulatorModConfig::SourceIdentifier{i + 8 + MIDICCSTART});
         }
+
         for (auto &v : modSourceValues)
             v = 0.0f;
         for (uint32_t i = 0; i < modSources.size(); ++i)
@@ -1697,6 +1753,7 @@ class ToneGranulator
                 {
                     stepModValues[sm] = stepModSources[sm].next();
                 }
+                midiNoteModValue = midiNoteModSource.next();
                 scheduledIndex = 0;
                 if (false)
                 {
@@ -1790,6 +1847,7 @@ class ToneGranulator
             }
             for (size_t i = 0; i < stepModSources.size(); ++i)
                 modSourceValues[STEPS0 + i] = stepModValues[i];
+            modSourceValues[MIDINOTE] = midiNoteModValue;
             modmatrix.m.process();
             if (!self_generate)
             {
