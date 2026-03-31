@@ -1575,6 +1575,7 @@ class ToneGranulator
         }
         num_out_chans = aotonumchans[order];
     }
+    std::atomic<float> auxenvwarpmodulated = 0.0f;
     void generate_grain()
     {
         double actgrate =
@@ -1632,8 +1633,8 @@ class ToneGranulator
 
                 genev.modamounts[GrainEvent::MD_PITCH] = modmatrix.m.getTargetValue(
                     GranulatorModConfig::TargetIdentifier{PAR_AUXENVTOPITCHAMT});
-                genev.auxenvtimewarp = modmatrix.m.getTargetValue(
-                    GranulatorModConfig::TargetIdentifier{PAR_AUXENVTIMEWARP});
+
+                genev.auxenvtimewarp = auxenvwarpmodulated;
 
                 int numToSchedule = std::clamp(*idtoparvalptr[PAR_STACKCOUNT], 1.0f, 16.0f);
                 float pitchrand = std::clamp(*idtoparvalptr[PAR_STACKRANDOMPITCH], 0.0f, 1.0f);
@@ -1756,6 +1757,8 @@ class ToneGranulator
             thread_op = 0;
         }
         osc_type = *idtoparvalptr[ToneGranulator::PAR_OSCTYPE];
+        auxenvwarpmodulated =
+            modmatrix.m.getTargetValue(GranulatorModConfig::TargetIdentifier{PAR_AUXENVTIMEWARP});
         float taillen = *idtoparvalptr[PAR_GRAINTAIL];
         taillen = 0.002 + 0.998 * std::pow(taillen, 3.0);
         handleStepSequencerMessages();

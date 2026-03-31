@@ -630,7 +630,8 @@ class VolumeEnvelopeComponent : public juce::Component
         int curvestart = *granul->idtoparvalptr[ToneGranulator::PAR_VOLENVEASINGSTART];
         int curveend = *granul->idtoparvalptr[ToneGranulator::PAR_VOLENVEASINGEND];
         float curvemorph = *granul->idtoparvalptr[ToneGranulator::PAR_ENVMORPH];
-        float warp = *granul->idtoparvalptr[ToneGranulator::PAR_AUXENVTIMEWARP];
+        //float warp = *granul->idtoparvalptr[ToneGranulator::PAR_AUXENVTIMEWARP];
+        float warp = granul->auxenvwarpmodulated;
         if (priorstartcurve != curvestart || priorendcurve != curveend ||
             priormorph != curvemorph || priorauxwarp != warp)
         {
