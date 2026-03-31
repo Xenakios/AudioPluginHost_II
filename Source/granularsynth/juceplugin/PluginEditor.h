@@ -385,6 +385,8 @@ struct ModulationRowComponent : public juce::Component
                 updatfunc();
             }
         };
+        addAndMakeVisible(slotLabel);
+        slotLabel.setJustificationType(juce::Justification::centred);
     }
     void initDestinationDrop()
     {
@@ -433,10 +435,12 @@ struct ModulationRowComponent : public juce::Component
 
     void resized() override
     {
+        slotLabel.setText(juce::String(modslotindex + 1), juce::dontSendNotification);
         auto layout = juce::FlexBox(juce::FlexBox::Direction::row, juce::FlexBox::Wrap::noWrap,
                                     juce::FlexBox::AlignContent::spaceAround,
                                     juce::FlexBox::AlignItems::stretch,
                                     juce::FlexBox::JustifyContent::flexStart);
+        layout.items.add(juce::FlexItem(slotLabel).withFlex(0.15));
         layout.items.add(juce::FlexItem(sourceDrop).withFlex(0.5));
         layout.items.add(juce::FlexItem(viaDrop).withFlex(0.5));
         layout.items.add(juce::FlexItem(depthSlider).withFlex(2.0));
@@ -458,7 +462,7 @@ struct ModulationRowComponent : public juce::Component
     };
     std::function<void(CallbackParams)> stateChangedCallback;
     int modslotindex = -1;
-
+    juce::Label slotLabel;
     DropDownComponent sourceDrop;
     DropDownComponent viaDrop;
     XapSlider depthSlider{true, ParamDesc()
@@ -760,11 +764,7 @@ class AudioPluginAudioProcessorEditor final : public juce::AudioProcessorEditor,
     ParameterGroupComponent insert2ParamsComponent{"Insert FX B"};
     VolumeEnvelopeComponent envcomp;
     VolumeEnvelopeComponent auxenvcomp;
-    struct FilterInfo
-    {
-        sfpp::FilterModel filtermodel;
-        sfpp::ModelConfig filterconfig;
-    };
+
     std::map<int64_t, GrainInsertFX::ModeInfo> filterInfoMap;
     std::unique_ptr<DropDownComponent> filter1Drop;
     std::unique_ptr<DropDownComponent> filter2Drop;
@@ -773,6 +773,7 @@ class AudioPluginAudioProcessorEditor final : public juce::AudioProcessorEditor,
     std::vector<std::unique_ptr<ModulationRowComponent>> modRowComps;
     std::vector<std::unique_ptr<LFOComponent>> lfocomps;
     juce::TabbedComponent lfoTabs;
+    // juce::TabbedComponent insertsTabs;
     std::vector<std::unique_ptr<StepSeqComponent>> stepcomps;
     juce::Label infoLabel;
     std::unordered_map<uint32_t, XapSlider *> idToSlider;

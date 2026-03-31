@@ -184,9 +184,12 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor(AudioPluginAudi
     }
 
     addAndMakeVisible(lfoTabs);
-    //lfoTabs.getTabbedButtonBar().setColour(juce::TabbedButtonBar::ColourIds::tabOutlineColourId,
-    //                                       juce::Colours::yellowgreen);
+    // lfoTabs.getTabbedButtonBar().setColour(juce::TabbedButtonBar::ColourIds::tabOutlineColourId,
+    //                                        juce::Colours::yellowgreen);
     lfoTabs.setCurrentTabIndex(0);
+
+    // addAndMakeVisible(insertsTabs);
+
     // setLookAndFeel(&lnf);
     // updateAllFonts(*this, lnf.myFont);
     setSize(1500, 880);
@@ -465,10 +468,15 @@ void AudioPluginAudioProcessorEditor::resized()
     lfoTabs.setBounds(0, mainParamsComponent.getBottom() + 1, getWidth(), 110);
 
     int yoffs = lfoTabs.getBottom() + 1;
+    juce::FlexBox modrowflex;
+    modrowflex.flexDirection = juce::FlexBox::Direction::column;
+    modrowflex.flexWrap = juce::FlexBox::Wrap::wrap;
     for (int i = 0; i < modRowComps.size(); ++i)
     {
-        modRowComps[i]->setBounds(1, yoffs + i * 26, getWidth() - 2, 25);
+        modrowflex.items.add(
+            juce::FlexItem(*modRowComps[i]).withFlex(1).withMinHeight(25).withMargin(1));
     }
+    modrowflex.performLayout(juce::Rectangle<int>{0, yoffs, getWidth(), 170});
     infoLabel.setBounds(0, getHeight() - 25, getWidth(), 24);
 }
 
