@@ -171,19 +171,21 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor(AudioPluginAudi
         idToSlider[ToneGranulator::PAR_LFOWARPS + i] = &lfoc->warpSlider;
         idToSlider[ToneGranulator::PAR_LFOSHAPES + i] = &lfoc->shapeSlider;
         idToSlider[ToneGranulator::PAR_LFOUNIPOLARS + i] = &lfoc->unipolarSlider;
-        lfoTabs.addTab("LFO " + juce::String(i + 1), juce::Colours::lightgrey, lfoc.get(), false);
+        lfoTabs.addTab("LFO " + juce::String(i + 1), juce::Colours::darkgrey, lfoc.get(), false);
         lfocomps.push_back(std::move(lfoc));
     }
     for (int i = 0; i < 8; ++i)
     {
         auto stepcomp =
             std::make_unique<StepSeqComponent>(i, &processorRef.granulator, &processorRef.tpool);
-        lfoTabs.addTab("STEP SEQ " + juce::String(i + 1), juce::Colours::lightgrey, stepcomp.get(),
+        lfoTabs.addTab("STEP SEQ " + juce::String(i + 1), juce::Colours::darkgrey, stepcomp.get(),
                        false);
         stepcomps.push_back(std::move(stepcomp));
     }
 
     addAndMakeVisible(lfoTabs);
+    //lfoTabs.getTabbedButtonBar().setColour(juce::TabbedButtonBar::ColourIds::tabOutlineColourId,
+    //                                       juce::Colours::yellowgreen);
     lfoTabs.setCurrentTabIndex(0);
     // setLookAndFeel(&lnf);
     // updateAllFonts(*this, lnf.myFont);
@@ -447,8 +449,8 @@ void AudioPluginAudioProcessorEditor::paint(juce::Graphics &g)
 
 void AudioPluginAudioProcessorEditor::resized()
 {
-    oscillatorComponent.setBounds(0, 0, 500, 150);
-    volumeParamsComponent.setBounds(0, 151, 500, 125);
+    oscillatorComponent.setBounds(0, 0, 500, 175);
+    volumeParamsComponent.setBounds(0, oscillatorComponent.getBottom() + 1, 500, 125);
     timeParamsComponent.setBounds(502, 0, 500, 125);
 
     envcomp.setBounds(502, timeParamsComponent.getBottom() + 1, 175, 175);
