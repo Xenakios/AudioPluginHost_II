@@ -233,10 +233,12 @@ target_compile_options(TestingProgram PRIVATE -Werror=return-type)
 add_executable(enosccli
     Source/Experimental/enosc_cli.cpp
     Source/granularsynth/js_impl.cpp
+    Source/granularsynth/easing.cpp
 )
-target_compile_definitions(enosccli PRIVATE NOMINMAX)
+target_compile_definitions(enosccli PRIVATE NOMINMAX _USE_MATH_DEFINES=1)
 target_include_directories(enosccli PRIVATE libs/metamodule-core-modules/4ms/core)
 target_link_libraries(enosccli PRIVATE fmt)
+target_compile_options(enosccli PRIVATE -Werror=return-type)
 # Source/Experimental/xaudiograph.cpp
 # target_compile_definitions(TestingProgram PRIVATE XENPYTHONBINDINGS=0 NOJUCE=1 _USE_MATH_DEFINES=1 __WINDOWS_WASAPI__)
 # target_link_libraries(TestingProgram PRIVATE airwin-registry)
