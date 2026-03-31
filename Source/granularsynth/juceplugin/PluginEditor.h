@@ -627,20 +627,29 @@ class VolumeEnvelopeComponent : public juce::Component
     }
     void updateIfNeeded()
     {
-        int curvestart = *granul->idtoparvalptr[ToneGranulator::PAR_VOLENVEASINGSTART];
-        int curveend = *granul->idtoparvalptr[ToneGranulator::PAR_VOLENVEASINGEND];
-        float curvemorph = *granul->idtoparvalptr[ToneGranulator::PAR_ENVMORPH];
-        //float warp = *granul->idtoparvalptr[ToneGranulator::PAR_AUXENVTIMEWARP];
-        float warp = granul->auxenvwarpmodulated;
-        if (priorstartcurve != curvestart || priorendcurve != curveend ||
-            priormorph != curvemorph || priorauxwarp != warp)
+        if (!auxenvmode)
         {
-            priorstartcurve = curvestart;
-            priorendcurve = curveend;
-            priormorph = curvemorph;
-            priorauxwarp = warp;
-            repaint();
-            // DBG(priorstartcurve << " " << priorendcurve << " " << priormorph);
+            int curvestart = *granul->idtoparvalptr[ToneGranulator::PAR_VOLENVEASINGSTART];
+            int curveend = *granul->idtoparvalptr[ToneGranulator::PAR_VOLENVEASINGEND];
+            float curvemorph = *granul->idtoparvalptr[ToneGranulator::PAR_ENVMORPH];
+            if (priorstartcurve != curvestart || priorendcurve != curveend ||
+                priormorph != curvemorph)
+            {
+                priorstartcurve = curvestart;
+                priorendcurve = curveend;
+                priormorph = curvemorph;
+                repaint();
+                // DBG(priorstartcurve << " " << priorendcurve << " " << priormorph);
+            }
+        }
+        else
+        {
+            float warp = granul->auxenvwarpmodulated;
+            if (warp != priorauxwarp)
+            {
+                priorauxwarp = warp;
+                repaint();
+            }
         }
     }
     ToneGranulator *granul = nullptr;
