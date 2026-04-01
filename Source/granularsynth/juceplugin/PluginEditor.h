@@ -676,7 +676,6 @@ class ModSourcesDebugComponent : public juce::Component
     {
         persisted_events.reserve(4096);
         vblankAttachment = std::make_unique<juce::VBlankAttachment>(this, [this]() {
-            // This lambda runs on the Message Thread, perfectly in sync with the screen
             updateGrainData();
             repaint();
         });

@@ -30,7 +30,7 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor(AudioPluginAudi
       auxenvcomp(&p.granulator, true), lfoTabs(juce::TabbedButtonBar::Orientation::TabsAtTop),
       msDebug(&p.granulator)
 {
-    
+
     perfcomp = std::make_unique<PerformanceComponent>();
     perfcomp->RequestData = [this](int &maxvoices, int &usedvoices, float &cpu) {
         maxvoices = processorRef.granulator.voices.size();
@@ -771,14 +771,21 @@ void ModSourcesDebugComponent::paint(juce::Graphics &g)
         g.drawLine(xcor, 0.0f, xcor, ycor, 3.9);
     }
         */
-    g.setColour(juce::Colours::white);
+    // g.setColour(juce::Colours::white);
     float w = getWidth();
     double enginetime = gr->playposframes / gr->m_sr;
     for (auto &e : persisted_events)
     {
+
+        float hue = juce::jmap<float>(e.pitch, -48.0f, 64.0f, 0.0f, 0.8f);
+        float alpha = juce::jmap<float>(e.gain, 0.0f, 1.0f, 0.0f, 1.0f);
+        g.setColour(juce::Colour::fromHSV(hue, 0.8f, 1.0f, alpha));
         float xcor = w - ((enginetime - e.timepos) / timespantoshow * w);
         float ycor = juce::jmap<float>(e.pitch, -48.0, 64.0, getHeight(), 0.0);
         float gw = getWidth() / timespantoshow * e.duration;
         g.fillEllipse(xcor, ycor, gw, 5.0);
+        g.setColour(juce::Colours::yellow);
+        ycor = juce::jmap<float>(e.azimuthdegrees, -180.0, 180.0, getHeight(), 0.0);
+        g.fillRect(xcor, ycor, 4.0f, 4.0f);
     }
 }

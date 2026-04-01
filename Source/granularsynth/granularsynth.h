@@ -955,6 +955,9 @@ class ToneGranulator
         double timepos = 0.0;
         float pitch = 0.0;
         float duration = 0.001;
+        float gain = 0.0f;
+        float azimuthdegrees = 0.0f;
+        float elevationdegrees = 0.0f;
     };
     choc::fifo::SingleReaderSingleWriterFIFO<GrainVisualizerMessage> visualizer_fifo;
     int osc_type = 4;
@@ -1932,6 +1935,9 @@ class ToneGranulator
                             vmsg.timepos = ev->time_position;
                             vmsg.pitch = voices[j]->pitch_base;
                             vmsg.duration = voices[j]->grain_end_phase / m_sr;
+                            vmsg.gain = voices[j]->graingain;
+                            vmsg.azimuthdegrees = ev->azimuth;
+                            vmsg.elevationdegrees = ev->elevation;
                             visualizer_fifo.push(vmsg);
                             ++graincount;
                             break;
