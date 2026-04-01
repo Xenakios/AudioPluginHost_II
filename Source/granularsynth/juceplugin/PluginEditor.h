@@ -671,19 +671,28 @@ class ModSourcesDebugComponent : public juce::Component
     ToneGranulator *gr = nullptr;
     std::vector<ToneGranulator::GrainVisualizerMessage> persisted_events;
     double timespantoshow = 8.0;
+    int throttlecounter = 0;
     std::unique_ptr<juce::VBlankAttachment> vblankAttachment;
     ModSourcesDebugComponent(ToneGranulator *g) : gr(g)
     {
         persisted_events.reserve(4096);
         vblankAttachment = std::make_unique<juce::VBlankAttachment>(this, [this]() {
             updateGrainData();
-            repaint();
+#ifdef JUCE_DEBUG
+            if (throttlecounter % 4 == 0)
+                repaint();
+            ++throttlecounter;
+#else
+                repaint();
+#endif
         });
     }
     void paint(juce::Graphics &g) override;
     bool is_extended_size = false;
     void mouseDown(const juce::MouseEvent &ev) override
     {
+        if (!ev.mods.isRightButtonDown())
+            return;
         juce::PopupMenu menu;
         menu.addSectionHeader("Time span to show");
         menu.addItem("1 second", [this]() { timespantoshow = 1.0; });

@@ -484,7 +484,7 @@ void AudioPluginAudioProcessorEditor::resized()
     }
     modrowflex.performLayout(juce::Rectangle<int>{0, yoffs, getWidth(), 170});
     infoLabel.setBounds(0, getHeight() - 25, getWidth(), 24);
-    int vish = 150;
+    int vish = 140;
     if (msDebug.is_extended_size)
         vish = 400;
     msDebug.setBounds(1, getHeight() - vish - 25, getWidth() - 2, vish);
