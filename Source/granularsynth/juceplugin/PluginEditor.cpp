@@ -27,8 +27,10 @@ inline void updateAllFonts(juce::Component &parent, const juce::Font &newFont)
 //==============================================================================
 AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor(AudioPluginAudioProcessor &p)
     : AudioProcessorEditor(&p), processorRef(p), envcomp(&p.granulator, false),
-      auxenvcomp(&p.granulator, true), lfoTabs(juce::TabbedButtonBar::Orientation::TabsAtTop)
+      auxenvcomp(&p.granulator, true), lfoTabs(juce::TabbedButtonBar::Orientation::TabsAtTop),
+      msDebug(&p.granulator)
 {
+    addAndMakeVisible(msDebug);
     perfcomp = std::make_unique<PerformanceComponent>();
     perfcomp->RequestData = [this](int &maxvoices, int &usedvoices, float &cpu) {
         maxvoices = processorRef.granulator.voices.size();
@@ -385,8 +387,14 @@ void AudioPluginAudioProcessorEditor::showFilterMenu(int whichfilter)
 
 void AudioPluginAudioProcessorEditor::timerCallback()
 {
+    msDebug.repaint();
     envcomp.updateIfNeeded();
     auxenvcomp.updateIfNeeded();
+    std::string modccvalstxt;
+    for (int i = 0; i < 29; ++i)
+        modccvalstxt += std::format(
+            "{:.1f} ", processorRef.granulator.modSourceValues[ToneGranulator::STEPS0 + i]);
+    modccvalstxt.clear();
     infoLabel.setText(
         std::format("[CPU Load {:3.0f}%] [{}/{} voices {}/{} scheduled] [{} in {} out] [{}]",
                     processorRef.perfMeasurer.getLoadAsPercentage(),
@@ -394,8 +402,7 @@ void AudioPluginAudioProcessorEditor::timerCallback()
                     processorRef.granulator.scheduledGrains.size(),
                     processorRef.granulator.scheduledGrains.capacity(),
                     processorRef.getTotalNumInputChannels(),
-                    processorRef.getTotalNumOutputChannels(),
-                    processorRef.granulator.midiNoteModValue),
+                    processorRef.getTotalNumOutputChannels(), modccvalstxt),
 
         juce::dontSendNotification);
     for (auto &c : stepcomps)
@@ -480,6 +487,7 @@ void AudioPluginAudioProcessorEditor::resized()
     }
     modrowflex.performLayout(juce::Rectangle<int>{0, yoffs, getWidth(), 170});
     infoLabel.setBounds(0, getHeight() - 25, getWidth(), 24);
+    msDebug.setBounds(1,getHeight()-75,getWidth()-2,50);
 }
 
 void StepSeqComponent::paint(juce::Graphics &g)

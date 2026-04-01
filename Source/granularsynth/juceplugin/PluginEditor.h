@@ -665,6 +665,24 @@ class VolumeEnvelopeComponent : public juce::Component
     bool auxenvmode = false;
 };
 
+class ModSourcesDebugComponent : public juce::Component
+{
+  public:
+    ToneGranulator *gr = nullptr;
+    ModSourcesDebugComponent(ToneGranulator *g) : gr(g) {}
+    void paint(juce::Graphics &g) override
+    {
+        g.fillAll(juce::Colours::black);
+        g.setColour(juce::Colours::green);
+        for (int i = 0; i < 40; ++i)
+        {
+            float xcor = i * 4;
+            float ycor = juce::jmap<float>(gr->modSourceValues[i], -1.0f, 1.0, getHeight(), 0.0);
+            g.drawLine(xcor, 0.0f, xcor, ycor, 3.9);
+        }
+    }
+};
+
 class ParameterGroupComponent : public juce::GroupComponent
 {
   public:
@@ -779,7 +797,7 @@ class AudioPluginAudioProcessorEditor final : public juce::AudioProcessorEditor,
     std::unordered_map<uint32_t, XapSlider *> idToSlider;
     std::unique_ptr<PerformanceComponent> perfcomp;
     std::unique_ptr<juce::TextButton> recordButton;
-
+    ModSourcesDebugComponent msDebug;
     void showFilterMenu(int whichfilter);
     void updateInsertParameterMetaDatas();
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(AudioPluginAudioProcessorEditor)

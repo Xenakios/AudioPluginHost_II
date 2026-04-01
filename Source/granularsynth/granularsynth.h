@@ -1523,6 +1523,10 @@ class ToneGranulator
         }
         modSources.emplace_back("MIDI KEY", "MIDI NOTES",
                                 GranulatorModConfig::SourceIdentifier{MIDINOTE});
+        modSources.emplace_back("MIDI VELOCITY", "MIDI NOTES",
+                                GranulatorModConfig::SourceIdentifier{MIDIVELO});
+        modSources.emplace_back("MIDI AFTERTOUCH", "MIDI NOTES",
+                                GranulatorModConfig::SourceIdentifier{MIDIAT});
         for (uint32_t i = 0; i < 8; ++i)
         {
             modSources.emplace_back(std::format("MIDI CC {}", i + 21), "MIDI CC",
@@ -1538,6 +1542,8 @@ class ToneGranulator
             v = 0.0f;
         for (uint32_t i = 0; i < modSources.size(); ++i)
         {
+            // std::print("{} binding {} {} to {}\n", i, modSources[i].id.src, modSources[i].name,
+            //            (void *)&modSourceValues[i]);
             modmatrix.m.bindSourceValue(modSources[i].id, modSourceValues[i]);
         }
         init_filter_infos();
