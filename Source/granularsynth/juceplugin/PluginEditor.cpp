@@ -790,9 +790,11 @@ void ModSourcesDebugComponent::paint(juce::Graphics &g)
         // g.fillRect(xcor, ycor, 4.0f, 4.0f);
     }
     g.setColour(juce::Colours::white);
-    g.drawEllipse(0.0f, 0.0f, 400.0f, (float)getHeight(), 2.0f);
-    float halfW = 400.0f / 2.0f;
-    float halfH = getHeight() / 2.0;
+    float ellipW = 400.0f;
+    float h = ellipW / M_PI;
+    g.drawEllipse(0.0f, 0.0f, ellipW, h, 2.0f);
+    float halfW = ellipW / 2.0f;
+    float halfH = h / 2.0;
     float centerX = halfW;
     float centerY = halfH;
     for (auto &e : persisted_events)
