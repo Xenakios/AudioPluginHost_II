@@ -804,6 +804,7 @@ class MidiNoteModSource
     };
     std::vector<Message> current_messages;
     int curstep = 0;
+    bool sustain = false;
     MidiNoteModSource() { current_messages.reserve(128); }
     std::string getDebugString()
     {
@@ -814,6 +815,15 @@ class MidiNoteModSource
             result += std::format("{} {} {} ", e.note, e.velo, e.aftertouch);
         return result;
     }
+    void set_sustain(bool newsustain)
+    {
+        if (!newsustain)
+        {
+            current_messages.clear();
+            curstep = 0;
+        }
+        sustain = newsustain;
+    }
     void activate_note(uint8_t note, uint8_t velo)
     {
         if (current_messages.size() < current_messages.capacity())
@@ -823,6 +833,8 @@ class MidiNoteModSource
     }
     void deactivate_note(uint8_t note)
     {
+        if (sustain)
+            return;
         std::erase_if(current_messages, [note](Message &msg) { return msg.note == note; });
         if (curstep >= current_messages.size())
             curstep = current_messages.size() - 1;

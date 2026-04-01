@@ -179,6 +179,14 @@ void AudioPluginAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
                     juce::jmap<float>(msg.getControllerValue(), 0, 127, 0.0, 1.0);
             }
         }
+        if (msg.isSustainPedalOn())
+        {
+            granulator.midiNoteModSource.set_sustain(true);
+        }
+        if (msg.isSustainPedalOff())
+        {
+            granulator.midiNoteModSource.set_sustain(false);
+        }
         if (msg.isNoteOn())
         {
             granulator.midiNoteModSource.activate_note(msg.getNoteNumber(), msg.getVelocity());
