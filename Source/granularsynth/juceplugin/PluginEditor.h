@@ -669,17 +669,49 @@ class ModSourcesDebugComponent : public juce::Component
 {
   public:
     ToneGranulator *gr = nullptr;
-    ModSourcesDebugComponent(ToneGranulator *g) : gr(g) {}
-    void paint(juce::Graphics &g) override
+    std::vector<ToneGranulator::GrainVisualizerMessage> persisted_events;
+    int event_counter = 0;
+    double timespantoshow = 10.0;
+    std::unique_ptr<juce::VBlankAttachment> vblankAttachment;
+    ModSourcesDebugComponent(ToneGranulator *g) : gr(g)
     {
-        g.fillAll(juce::Colours::black);
-        g.setColour(juce::Colours::green);
-        for (int i = 0; i < 40; ++i)
+        persisted_events.reserve(4096);
+        vblankAttachment = std::make_unique<juce::VBlankAttachment>(this, [this]() {
+            // This lambda runs on the Message Thread, perfectly in sync with the screen
+            updateGrainData();
+            repaint();
+        });
+        // startTimerHz(60);
+    }
+    void paint(juce::Graphics &g) override;
+    bool is_extended_size = false;
+    void mouseDown(const juce::MouseEvent &ev) override
+    {
+        juce::PopupMenu menu;
+        menu.addSectionHeader("Time span to show");
+        menu.addItem("1 second", [this]() { timespantoshow = 1.0; });
+        menu.addItem("2 seconds", [this]() { timespantoshow = 2.0; });
+        menu.addItem("4 seconds", [this]() { timespantoshow = 4.0; });
+        menu.addItem("8 seconds", [this]() { timespantoshow = 8.0; });
+        menu.addItem("16 seconds", [this]() { timespantoshow = 16.0; });
+        menu.addItem("Toggle size", [this]() {
+            is_extended_size = !is_extended_size;
+            getParentComponent()->resized();
+        });
+        menu.showMenuAsync(juce::PopupMenu::Options{});
+    }
+    void updateGrainData()
+    {
+        ToneGranulator::GrainVisualizerMessage msg;
+        while (gr->visualizer_fifo.pop(msg))
         {
-            float xcor = i * 4;
-            float ycor = juce::jmap<float>(gr->modSourceValues[i], -1.0f, 1.0, getHeight(), 0.0);
-            g.drawLine(xcor, 0.0f, xcor, ycor, 3.9);
+            persisted_events.push_back(msg);
         }
+        double enginetime = gr->playposframes / gr->m_sr;
+        std::erase_if(persisted_events, [this, enginetime](auto const &ev) {
+            return ev.timepos+ev.duration < enginetime - timespantoshow;
+        });
+        // repaint();
     }
 };
 

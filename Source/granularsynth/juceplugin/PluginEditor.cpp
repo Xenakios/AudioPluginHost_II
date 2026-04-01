@@ -30,7 +30,7 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor(AudioPluginAudi
       auxenvcomp(&p.granulator, true), lfoTabs(juce::TabbedButtonBar::Orientation::TabsAtTop),
       msDebug(&p.granulator)
 {
-    addAndMakeVisible(msDebug);
+    
     perfcomp = std::make_unique<PerformanceComponent>();
     perfcomp->RequestData = [this](int &maxvoices, int &usedvoices, float &cpu) {
         maxvoices = processorRef.granulator.voices.size();
@@ -194,6 +194,7 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor(AudioPluginAudi
 
     // setLookAndFeel(&lnf);
     // updateAllFonts(*this, lnf.myFont);
+    addAndMakeVisible(msDebug);
     setSize(1500, 880);
     startTimer(50);
 }
@@ -387,22 +388,18 @@ void AudioPluginAudioProcessorEditor::showFilterMenu(int whichfilter)
 
 void AudioPluginAudioProcessorEditor::timerCallback()
 {
-    msDebug.repaint();
+
     envcomp.updateIfNeeded();
     auxenvcomp.updateIfNeeded();
-    std::string modccvalstxt;
-    for (int i = 0; i < 29; ++i)
-        modccvalstxt += std::format(
-            "{:.1f} ", processorRef.granulator.modSourceValues[ToneGranulator::STEPS0 + i]);
-    modccvalstxt.clear();
+
     infoLabel.setText(
-        std::format("[CPU Load {:3.0f}%] [{}/{} voices {}/{} scheduled] [{} in {} out] [{}]",
+        std::format("[CPU Load {:3.0f}%] [{}/{} voices {}/{} scheduled] [{} in {} out] ",
                     processorRef.perfMeasurer.getLoadAsPercentage(),
                     processorRef.granulator.numVoicesUsed.load(), processorRef.granulator.numvoices,
                     processorRef.granulator.scheduledGrains.size(),
                     processorRef.granulator.scheduledGrains.capacity(),
                     processorRef.getTotalNumInputChannels(),
-                    processorRef.getTotalNumOutputChannels(), modccvalstxt),
+                    processorRef.getTotalNumOutputChannels()),
 
         juce::dontSendNotification);
     for (auto &c : stepcomps)
@@ -487,7 +484,10 @@ void AudioPluginAudioProcessorEditor::resized()
     }
     modrowflex.performLayout(juce::Rectangle<int>{0, yoffs, getWidth(), 170});
     infoLabel.setBounds(0, getHeight() - 25, getWidth(), 24);
-    msDebug.setBounds(1,getHeight()-75,getWidth()-2,50);
+    int vish = 150;
+    if (msDebug.is_extended_size)
+        vish = 400;
+    msDebug.setBounds(1, getHeight() - vish - 25, getWidth() - 2, vish);
 }
 
 void StepSeqComponent::paint(juce::Graphics &g)
@@ -757,4 +757,28 @@ void StepSeqComponent::runExternalProgram()
             DBG(data);
         }
     });
+}
+
+void ModSourcesDebugComponent::paint(juce::Graphics &g)
+{
+    g.fillAll(juce::Colours::black);
+    /*
+    g.setColour(juce::Colours::green);
+    for (int i = 0; i < 40; ++i)
+    {
+        float xcor = i * 4;
+        float ycor = juce::jmap<float>(gr->modSourceValues[i], -1.0f, 1.0, getHeight(), 0.0);
+        g.drawLine(xcor, 0.0f, xcor, ycor, 3.9);
+    }
+        */
+    g.setColour(juce::Colours::white);
+    float w = getWidth();
+    double enginetime = gr->playposframes / gr->m_sr;
+    for (auto &e : persisted_events)
+    {
+        float xcor = w - ((enginetime - e.timepos) / timespantoshow * w);
+        float ycor = juce::jmap<float>(e.pitch, -48.0, 64.0, getHeight(), 0.0);
+        float gw = getWidth() / timespantoshow * e.duration;
+        g.fillEllipse(xcor, ycor, gw, 5.0);
+    }
 }

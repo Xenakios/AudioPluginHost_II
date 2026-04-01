@@ -950,6 +950,13 @@ class ToneGranulator
     std::unordered_map<uint32_t, float> modRanges;
     std::unordered_map<int, int> shapeParToActualShape;
     choc::fifo::SingleReaderSingleWriterFIFO<StepModSource::Message> fifo;
+    struct GrainVisualizerMessage
+    {
+        double timepos = 0.0;
+        float pitch = 0.0;
+        float duration = 0.001;
+    };
+    choc::fifo::SingleReaderSingleWriterFIFO<GrainVisualizerMessage> visualizer_fifo;
     int osc_type = 4;
     enum PARAMS
     {
@@ -1115,6 +1122,7 @@ class ToneGranulator
         */
     ToneGranulator() : m_sr(44100.0), modmatrix(44100.0)
     {
+        visualizer_fifo.reset(2048);
         shapeParToActualShape[0] = GranulatorModMatrix::lfo_t::SINE;
         shapeParToActualShape[1] = GranulatorModMatrix::lfo_t::PULSE;
         shapeParToActualShape[2] = GranulatorModMatrix::lfo_t::SAW_TRI_RAMP;
@@ -1593,10 +1601,7 @@ class ToneGranulator
         }
     }
     float next_samplerate = 0.0f;
-    int next_filter_routing = -1;
     int next_ambisonics_order = -1;
-    std::string next_filt0type;
-    std::string next_filt1type;
 
     void prepare(float samplerate, events_t evlist, int ambisonics_order, int filter_routing,
                  float tail_len, float tail_fade_len)
@@ -1923,6 +1928,11 @@ class ToneGranulator
                             voices[j]->tail_fade_len = std::clamp(taillen * 0.5, 0.002, 1.0);
                             voices[j]->start(*ev);
                             voicewasfound = true;
+                            GrainVisualizerMessage vmsg;
+                            vmsg.timepos = ev->time_position;
+                            vmsg.pitch = voices[j]->pitch_base;
+                            vmsg.duration = voices[j]->grain_end_phase / m_sr;
+                            visualizer_fifo.push(vmsg);
                             ++graincount;
                             break;
                         }
