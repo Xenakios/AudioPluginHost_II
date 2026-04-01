@@ -473,6 +473,9 @@ class GranulatorVoice
     alignas(16) float modamounts[GrainEvent::MD_NUMDESTS];
     float pitch_base = 0.0f;
     float graingain = 0.0;
+    float used_azi0 = 0.0f;
+    float used_azi1 = 0.0f;
+    float used_ele = 0.0f;
     float auxsend1 = 0.0;
     uint8_t envstarttype = 0;
     uint8_t envendtype = 0;
@@ -573,9 +576,12 @@ class GranulatorVoice
             theoscillator);
 
         float azispread = std::clamp(evpars.azimuth_spread, -360.0f, 360.0f);
-        float azi0 = std::clamp(evpars.azimuth - azispread, -360.0f, 360.0f);
-        float azi1 = std::clamp(evpars.azimuth + azispread, -360.0f, 360.0f);
+        float azi0 = std::clamp(-evpars.azimuth - azispread, -360.0f, 360.0f);
+        float azi1 = std::clamp(-evpars.azimuth + azispread, -360.0f, 360.0f);
         float ele = std::clamp(evpars.elevation, -360.0f, 360.0f);
+        used_azi0 = azi0;
+        used_azi1 = azi1;
+        used_ele = ele;
         azi0 = degreesToRadians(azi0);
         azi1 = degreesToRadians(azi1);
         ele = degreesToRadians(ele);
@@ -956,8 +962,10 @@ class ToneGranulator
         float pitch = 0.0;
         float duration = 0.001;
         float gain = 0.0f;
-        float azimuthdegrees = 0.0f;
+        float azimuth0degrees = 0.0f;
+        float azimuth1degrees = 0.0f;
         float elevationdegrees = 0.0f;
+        float visualfade = 1.0f;
     };
     choc::fifo::SingleReaderSingleWriterFIFO<GrainVisualizerMessage> visualizer_fifo;
     int osc_type = 4;
@@ -1936,7 +1944,8 @@ class ToneGranulator
                             vmsg.pitch = voices[j]->pitch_base;
                             vmsg.duration = voices[j]->grain_end_phase / m_sr;
                             vmsg.gain = voices[j]->graingain;
-                            vmsg.azimuthdegrees = ev->azimuth;
+                            vmsg.azimuth0degrees = voices[j]->used_azi0;
+                            vmsg.azimuth1degrees = voices[j]->used_azi1;
                             vmsg.elevationdegrees = ev->elevation;
                             visualizer_fifo.push(vmsg);
                             ++graincount;

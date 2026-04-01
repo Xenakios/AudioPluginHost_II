@@ -772,20 +772,64 @@ void ModSourcesDebugComponent::paint(juce::Graphics &g)
     }
         */
     // g.setColour(juce::Colours::white);
-    float w = getWidth();
+    float xoffs = 400.0f;
+    float w = getWidth() - xoffs;
     double enginetime = gr->playposframes / gr->m_sr;
     for (auto &e : persisted_events)
     {
-
         float hue = juce::jmap<float>(e.pitch, -48.0f, 64.0f, 0.0f, 0.8f);
         float alpha = juce::jmap<float>(e.gain, 0.0f, 1.0f, 0.0f, 1.0f);
         g.setColour(juce::Colour::fromHSV(hue, 0.8f, 1.0f, alpha));
         float xcor = w - ((enginetime - e.timepos) / timespantoshow * w);
         float ycor = juce::jmap<float>(e.pitch, -48.0, 64.0, getHeight(), 0.0);
         float gw = getWidth() / timespantoshow * e.duration;
+        xcor = std::clamp<float>(xcor + xoffs, xoffs, getWidth());
         g.fillEllipse(xcor, ycor, gw, 5.0);
-        g.setColour(juce::Colours::yellow);
-        ycor = juce::jmap<float>(e.azimuthdegrees, -180.0, 180.0, getHeight(), 0.0);
-        g.fillRect(xcor, ycor, 4.0f, 4.0f);
+        // g.setColour(juce::Colours::yellow);
+        // ycor = juce::jmap<float>(e.azimuthdegrees, -180.0, 180.0, getHeight(), 0.0);
+        // g.fillRect(xcor, ycor, 4.0f, 4.0f);
+    }
+    g.setColour(juce::Colours::white);
+    g.drawEllipse(0.0f, 0.0f, 400.0f, (float)getHeight(), 2.0f);
+    float halfW = 400.0f / 2.0f;
+    float halfH = getHeight() / 2.0;
+    float centerX = halfW;
+    float centerY = halfH;
+    for (auto &e : persisted_events)
+    {
+        g.setColour(juce::Colours::lightblue.withAlpha(e.visualfade));
+        /*
+
+        float xcor = juce::jmap<float>(e.azimuthdegrees, -180.0f, 180.0f, 2.0f, 396.0f);
+        float ycor =
+            juce::jmap<float>(e.elevationdegrees, -90.0f, 90.0f, getHeight() - 4.0f, 2.0f);
+        g.fillEllipse(xcor, ycor, 5.0, 5.0);
+        */
+        // Corrected Conversion
+        if (e.visualfade > 0.01)
+        {
+            float radElev = juce::degreesToRadians(e.elevationdegrees);
+            float cosElev = std::cos(radElev);
+
+            // Map Azimuth (-180 to 180) and Elevation (-90 to 90) to the ellipse
+            // Azimuth 0 is Center, Elevation 0 is Center
+            float xOffset = (e.azimuth0degrees / 180.0f) * halfW * cosElev;
+            float yOffset = (e.elevationdegrees / 90.0f) * halfH;
+
+            float pixelX = centerX + xOffset;
+            float pixelY = centerY - yOffset; // Subtract because Y is down in JUCE
+            g.fillEllipse(pixelX - 6.0f, pixelY - 6.0f, 12.0f, 12.0f);
+            if (e.azimuth0degrees != e.azimuth1degrees)
+            {
+                xOffset = (e.azimuth1degrees / 180.0f) * halfW * cosElev;
+                yOffset = (e.elevationdegrees / 90.0f) * halfH;
+
+                pixelX = centerX + xOffset;
+                pixelY = centerY - yOffset; // Subtract because Y is down in JUCE
+                g.setColour(juce::Colours::lightgreen.withAlpha(e.visualfade));
+                g.fillEllipse(pixelX - 6.0f, pixelY - 6.0f, 12.0f, 12.0f);
+            }
+            e.visualfade = e.visualfade * 0.93;
+        }
     }
 }
