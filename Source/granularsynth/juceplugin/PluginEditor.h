@@ -670,8 +670,7 @@ class ModSourcesDebugComponent : public juce::Component
   public:
     ToneGranulator *gr = nullptr;
     std::vector<ToneGranulator::GrainVisualizerMessage> persisted_events;
-    int event_counter = 0;
-    double timespantoshow = 10.0;
+    double timespantoshow = 8.0;
     std::unique_ptr<juce::VBlankAttachment> vblankAttachment;
     ModSourcesDebugComponent(ToneGranulator *g) : gr(g)
     {
@@ -681,7 +680,6 @@ class ModSourcesDebugComponent : public juce::Component
             updateGrainData();
             repaint();
         });
-        // startTimerHz(60);
     }
     void paint(juce::Graphics &g) override;
     bool is_extended_size = false;
@@ -709,9 +707,8 @@ class ModSourcesDebugComponent : public juce::Component
         }
         double enginetime = gr->playposframes / gr->m_sr;
         std::erase_if(persisted_events, [this, enginetime](auto const &ev) {
-            return ev.timepos+ev.duration < enginetime - timespantoshow;
+            return ev.timepos + ev.duration < enginetime - timespantoshow;
         });
-        // repaint();
     }
 };
 
