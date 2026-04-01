@@ -813,7 +813,7 @@ void ModSourcesDebugComponent::paint(juce::Graphics &g)
 
             // Map Azimuth (-180 to 180) and Elevation (-90 to 90) to the ellipse
             // Azimuth 0 is Center, Elevation 0 is Center
-            float xOffset = (e.azimuth0degrees / 180.0f) * halfW * cosElev;
+            float xOffset = (-e.azimuth0degrees / 180.0f) * halfW * cosElev;
             float yOffset = (e.elevationdegrees / 90.0f) * halfH;
 
             float pixelX = centerX + xOffset;
@@ -821,7 +821,7 @@ void ModSourcesDebugComponent::paint(juce::Graphics &g)
             g.fillEllipse(pixelX - 6.0f, pixelY - 6.0f, 12.0f, 12.0f);
             if (e.azimuth0degrees != e.azimuth1degrees)
             {
-                xOffset = (e.azimuth1degrees / 180.0f) * halfW * cosElev;
+                xOffset = (-e.azimuth1degrees / 180.0f) * halfW * cosElev;
                 yOffset = (e.elevationdegrees / 90.0f) * halfH;
 
                 pixelX = centerX + xOffset;
@@ -832,4 +832,13 @@ void ModSourcesDebugComponent::paint(juce::Graphics &g)
             e.visualfade = e.visualfade * 0.93;
         }
     }
+    g.setColour(juce::Colours::white);
+    int mins = static_cast<int>(enginetime / 60.0);
+    int secs = static_cast<int>(std::fmod(enginetime, 60.0));
+    int ms = static_cast<int>(std::fmod(enginetime * 1000.0, 1000.0));
+
+    // 2. Format with leading zeros
+    juce::String timeText = juce::String::formatted("%02d:%02d.%03d", mins, secs, ms);
+    g.setFont(18.0f);
+    g.drawText(timeText, xoffs, 1.0f, 200, 25, juce::Justification::left);
 }
