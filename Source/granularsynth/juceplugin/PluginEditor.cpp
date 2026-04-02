@@ -791,7 +791,7 @@ void ModSourcesDebugComponent::paint(juce::Graphics &g)
     }
     g.setColour(juce::Colours::white);
     float ellipW = 400.0f;
-    float h = ellipW / M_PI;
+    float h = ellipW / 2;
     g.drawEllipse(0.0f, 0.0f, ellipW, h, 2.0f);
     float halfW = ellipW / 2.0f;
     float halfH = h / 2.0;
@@ -807,9 +807,10 @@ void ModSourcesDebugComponent::paint(juce::Graphics &g)
             juce::jmap<float>(e.elevationdegrees, -90.0f, 90.0f, getHeight() - 4.0f, 2.0f);
         g.fillEllipse(xcor, ycor, 5.0, 5.0);
         */
-        // Corrected Conversion
+
         if (e.visualfade > 0.01)
         {
+#ifdef FOOPROJECTION
             float radElev = juce::degreesToRadians(e.elevationdegrees);
             float cosElev = std::cos(radElev);
 
@@ -821,7 +822,8 @@ void ModSourcesDebugComponent::paint(juce::Graphics &g)
             float pixelX = centerX + xOffset;
             float pixelY = centerY - yOffset; // Subtract because Y is down in JUCE
             g.fillEllipse(pixelX - 6.0f, pixelY - 6.0f, 12.0f, 12.0f);
-            if (e.azimuth0degrees != e.azimuth1degrees)
+
+            if (false) // (e.azimuth0degrees != e.azimuth1degrees)
             {
                 xOffset = (-e.azimuth1degrees / 180.0f) * halfW * cosElev;
                 yOffset = (e.elevationdegrees / 90.0f) * halfH;
@@ -831,6 +833,21 @@ void ModSourcesDebugComponent::paint(juce::Graphics &g)
                 g.setColour(juce::Colours::lightgreen.withAlpha(e.visualfade));
                 g.fillEllipse(pixelX - 6.0f, pixelY - 6.0f, 12.0f, 12.0f);
             }
+#else
+            float radAzi = juce::degreesToRadians(-e.azimuth0degrees);
+            float radElev = juce::degreesToRadians(-e.elevationdegrees);
+            const float sqr2 = std::sqrt(2.0);
+            const float halfPI = M_PI * 0.5;
+            float x = 2.0 * sqr2 * std::cos(radElev) * std::sin(radAzi / 2.0) /
+                      (std::sqrt(1.0 + std::cos(radElev) * std::cos(radAzi / 2.0)));
+            float y = sqr2 * std::sin(radElev) /
+                      (std::sqrt(1.0 + std::cos(radElev) * std::cos(radAzi / 2.0)));
+            float pixelX = centerX + (x * 0.35 * halfW);
+            float pixelY = centerY + (y * 0.7 * halfH);
+            float alpha = e.visualfade * e.gain;
+            g.setColour(juce::Colours::lightgreen.withAlpha(alpha));
+            g.fillEllipse(pixelX - 6.0f, pixelY - 6.0f, 12.0f, 12.0f);
+#endif
             e.visualfade = e.visualfade * 0.93;
         }
     }
@@ -841,6 +858,7 @@ void ModSourcesDebugComponent::paint(juce::Graphics &g)
 
     // 2. Format with leading zeros
     juce::String timeText = juce::String::formatted("%02d:%02d.%03d", mins, secs, ms);
+    timeText += " " + juce::String(persisted_events.size()) + " events in history";
     g.setFont(18.0f);
-    g.drawText(timeText, xoffs, 1.0f, 200, 25, juce::Justification::left);
+    g.drawText(timeText, xoffs, 1.0f, getWidth() - xoffs, 25, juce::Justification::left);
 }
