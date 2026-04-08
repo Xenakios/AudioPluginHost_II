@@ -372,6 +372,23 @@ void AudioPluginAudioProcessor::getStateInformation(juce::MemoryBlock &destData)
     }
     state.setMember("filterstates", filterstates);
 
+    auto stepseqstates = choc::value::createEmptyArray();
+    for (size_t i = 0; i < granulator.stepModSources.size(); ++i)
+    {
+        auto &ss = granulator.stepModSources[i];
+        auto seqstate = choc::value::createObject("seqstate");
+        auto seqsteps = choc::value::createEmptyArray();
+        for (size_t j = 0; j < 128; ++j)
+        {
+            seqsteps.addArrayElement(ss.steps[j]);
+        }
+        seqstate.setMember("steps", seqsteps);
+        seqstate.setMember("startstep", ss.loopstartstep);
+        seqstate.setMember("looplen", ss.looplen);
+        stepseqstates.addArrayElement(seqstate);
+    }
+    state.setMember("stepseqstates", stepseqstates);
+
     auto modroutings = choc::value::createEmptyArray();
     auto &mm = granulator.modmatrix;
     for (int i = 0; i < GranulatorModConfig::FixedMatrixSize; ++i)
@@ -420,7 +437,30 @@ void AudioPluginAudioProcessor::setStateInformation(const void *data, int sizeIn
         // auto state = choc::json::parse(json);
 
         suspendProcessing(true);
-
+        if (state.hasObjectMember("stepseqstates"))
+        {
+            auto stepseqstate = state["stepseqstates"];
+            for (size_t i = 0; i < stepseqstate.size(); ++i)
+            {
+                if (i >= granulator.stepModSources.size())
+                    break;
+                auto &ss = granulator.stepModSources[i];
+                auto seqstate = stepseqstate[(int)i];
+                auto steps = seqstate["steps"];
+                for (size_t j = 0; j < steps.size(); ++j)
+                {
+                    if (j < 128)
+                    {
+                        StepModSource::Message msg;
+                        msg.opcode = StepModSource::Message::OP_SETSTEP;
+                        msg.dest = i;
+                        msg.ival0 = j;
+                        msg.fval0 = steps[(int)j].getWithDefault(0.0f);
+                        granulator.fifo.push(msg);
+                    }
+                }
+            }
+        }
         if (state.hasObjectMember("filterstates"))
         {
             auto filterstates = state["filterstates"];

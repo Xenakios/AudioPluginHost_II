@@ -1151,7 +1151,7 @@ class ToneGranulator
             midiCCMap[21 + i] = MIDICCSTART + i;
             midiCCMap[41 + i] = MIDICCSTART + 8 + i;
         }
-        fifo.reset(1024);
+        fifo.reset(2048);
         scheduledGrains.reserve(2048);
         for (auto &v : stepModValues)
             v = 0.0f;
