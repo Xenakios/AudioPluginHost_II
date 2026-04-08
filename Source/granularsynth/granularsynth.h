@@ -876,6 +876,7 @@ class StepModSource
         PM_FWREVLOOP,
         PM_RANDOM,
         PM_SHUFFLERANDOM,
+        PM_RANDOMWALK1,
         NUMPLAYMODES
     };
     static constexpr size_t maxSteps = 4096;
@@ -922,6 +923,8 @@ class StepModSource
             return "Random";
         if (m == PM_SHUFFLERANDOM)
             return "Random no repeat";
+        if (m == PM_RANDOMWALK1)
+            return "Random walk type 1";
         return "Unknown";
     }
     StepModSource()
@@ -972,6 +975,21 @@ class StepModSource
             int index = rng.nextInt32InRange(loopstartstep, loopstartstep + looplen);
             result = steps[index];
             curstepforgui = index;
+        }
+        else if (playmode == PM_RANDOMWALK1)
+        {
+            int newstep = laststep;
+            if (rng.nextFloat() < 0.5)
+                newstep -= 1;
+            else
+                newstep += 1;
+            if (newstep < 0)
+                newstep = looplen - 1;
+            if (newstep >= looplen)
+                newstep = 0;
+            result = steps[loopstartstep + newstep];
+            laststep = newstep;
+            curstepforgui = loopstartstep + newstep;
         }
         else if (playmode == PM_SHUFFLERANDOM)
         {
