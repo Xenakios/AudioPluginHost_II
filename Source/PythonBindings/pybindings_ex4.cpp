@@ -612,13 +612,13 @@ void process_airwindows(int index)
     // AirWindows plugins
     if (index == 0)
     {
-        plugin = make_aw_safe<airwinconsolidated::BezEQ::BezEQ>(amc);
-        numParams = airwinconsolidated::BezEQ::kNumParameters;
+        // plugin = make_aw_safe<airwinconsolidated::BezEQ::BezEQ>(amc);
+        //  numParams = airwinconsolidated::BezEQ::kNumParameters;
     }
     if (index == 1)
     {
-        plugin = make_aw_safe<airwinconsolidated::HipCrush::HipCrush>(amc);
-        numParams = airwinconsolidated::HipCrush::kNumParameters;
+        // plugin = make_aw_safe<airwinconsolidated::HipCrush::HipCrush>(amc);
+        // numParams = airwinconsolidated::HipCrush::kNumParameters;
     }
 
     if (!plugin)

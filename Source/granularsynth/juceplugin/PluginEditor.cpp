@@ -759,6 +759,35 @@ void StepSeqComponent::runExternalProgram()
     });
 }
 
+/* Google Gemini produced this for the Hammer projection
+
+const float sqrt2 = 1.41421356f;
+float cosElev = std::cos(radElev);
+float cosHalfAzi = std::cos(radAzi * 0.5f);
+
+// The term inside the sqrt can theoretically be slightly negative
+// due to float precision errors at the very edge (180 deg).
+float inner = 1.0f + cosElev * cosHalfAzi;
+float d = std::sqrt(std::max(0.0f, inner));
+
+// Safety: prevent division by zero at the singularity
+if (d < 0.001f) d = 0.001f;
+
+float x = (2.0f * sqrt2 * cosElev * std::sin(radAzi * 0.5f)) / d;
+float y = (sqrt2 * std::sin(radElev)) / d;
+
+// Mapping to your 2:1 Ellipse bounds
+// This ensures that the dot stays perfectly within the visual ellipse
+float scaleX = halfW / (2.0f * sqrt2);
+float scaleY = halfH / sqrt2;
+
+float pixelX = centerX + (x * scaleX);
+float pixelY = centerY - (y * scaleY);
+
+g.setColour(juce::Colours::lightgreen.withAlpha(e.visualfade));
+g.fillEllipse(pixelX - 6.0f, pixelY - 6.0f, 12.0f, 12.0f);
+*/
+
 void ModSourcesDebugComponent::paint(juce::Graphics &g)
 {
     g.fillAll(juce::Colours::black);
@@ -792,11 +821,12 @@ void ModSourcesDebugComponent::paint(juce::Graphics &g)
     g.setColour(juce::Colours::white);
     float ellipW = 400.0f;
     float h = ellipW / 2;
-    g.drawEllipse(0.0f, 0.0f, ellipW, h, 2.0f);
+
     float halfW = ellipW / 2.0f;
     float halfH = h / 2.0;
     float centerX = halfW;
-    float centerY = halfH;
+    float centerY = getHeight() / 2.0;
+    g.drawEllipse(0.0f, centerY - halfH, ellipW, h, 2.0f);
     for (auto &e : persisted_events)
     {
         g.setColour(juce::Colours::lightblue.withAlpha(e.visualfade));
@@ -842,8 +872,10 @@ void ModSourcesDebugComponent::paint(juce::Graphics &g)
                       (std::sqrt(1.0 + std::cos(radElev) * std::cos(radAzi / 2.0)));
             float y = sqr2 * std::sin(radElev) /
                       (std::sqrt(1.0 + std::cos(radElev) * std::cos(radAzi / 2.0)));
-            float pixelX = centerX + (x * 0.35 * halfW);
-            float pixelY = centerY + (y * 0.7 * halfH);
+            float scaleX = halfW / (2.0f * sqr2);
+            float scaleY = halfH / sqr2;
+            float pixelX = centerX + (x * scaleX);
+            float pixelY = centerY + (y * scaleY);
             float alpha = e.visualfade * e.gain;
             g.setColour(juce::Colours::lightgreen.withAlpha(alpha));
             g.fillEllipse(pixelX - 6.0f, pixelY - 6.0f, 12.0f, 12.0f);

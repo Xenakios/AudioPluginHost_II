@@ -482,6 +482,7 @@ class GranulatorVoice
     double envshape = 0.5;
     float auxenvtimewarp = 0.0;
     int grainid = 0;
+    bool doambnormalization = false;
     int ambisonic_order = 1;
     int num_outputchans = 0;
 
@@ -600,6 +601,11 @@ class GranulatorVoice
                 SHEval2(x, y, z, coeffdata);
             else if (ambisonic_order == 3)
                 SHEval3(x, y, z, coeffdata);
+            if (doambnormalization)
+            {
+                for (int i = 0; i < 16; ++i)
+                    coeffdata[i] *= n3d2sn3d[i];
+            }
         };
         calc_ambicoeffs(0, azi0, ele);
         calc_ambicoeffs(1, azi1, ele);
@@ -973,6 +979,7 @@ class ToneGranulator
     {
         PAR_MAINVOLUME = 100,
         PAR_AMBORDER = 200,
+        PAR_AMBUSENORMALIZATION = 250,
         PAR_OSCTYPE = 300,
         PAR_DENSITY = 400,
         PAR_PITCH = 500,
@@ -1205,6 +1212,12 @@ class ToneGranulator
                                    .withName("Spatialization mode")
                                    .withGroupName("Spatialization")
                                    .withID(PAR_AMBORDER));
+        parmetadatas.push_back(pmd()
+                                   .asOnOffBool()
+                                   .withDefault(0)
+                                   .withName("Spatialization coeffs normalization")
+                                   .withGroupName("Spatialization")
+                                   .withID(PAR_AMBUSENORMALIZATION));
         parmetadatas.push_back(pmd()
                                    .withUnorderedMapFormatting({{0, "SINE"},
                                                                 {1, "SEMISINE"},
@@ -1856,6 +1869,7 @@ class ToneGranulator
         bool self_generate = false;
         if (events.size() == 0)
             self_generate = true;
+        bool doambcoeffsnormalization = *idtoparvalptr[PAR_AMBUSENORMALIZATION];
         int bufframecount = 0;
         while (bufframecount < nframes)
         {
@@ -1935,6 +1949,7 @@ class ToneGranulator
                             else
                                 voices[j]->polarity_gain = -1.0f;
                             voices[j]->grainid = graincount;
+                            voices[j]->doambnormalization = doambcoeffsnormalization;
                             voices[j]->tail_len = taillen;
                             voices[j]->tail_fade_len = std::clamp(taillen * 0.5, 0.002, 1.0);
                             voices[j]->start(*ev);
