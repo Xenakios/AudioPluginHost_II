@@ -459,6 +459,14 @@ void AudioPluginAudioProcessor::setStateInformation(const void *data, int sizeIn
                         granulator.fifo.push(msg);
                     }
                 }
+                StepModSource::Message msg;
+                msg.opcode = StepModSource::Message::OP_LOOPSTART;
+                msg.dest = i;
+                msg.ival0 = seqstate["startstep"].getWithDefault(0);
+                granulator.fifo.push(msg);
+                msg.opcode = StepModSource::Message::OP_LOOPLEN;
+                msg.ival0 = seqstate["looplen"].getWithDefault(1);
+                granulator.fifo.push(msg);
             }
         }
         if (state.hasObjectMember("filterstates"))

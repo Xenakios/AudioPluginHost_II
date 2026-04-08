@@ -869,9 +869,20 @@ class MidiNoteModSource
 class StepModSource
 {
   public:
+    enum PlayMode
+    {
+        PM_FORWARDLOOP,
+        PM_REVERSELOOP,
+        PM_FWREVLOOP,
+        PM_RANDOM,
+        PM_SHUFFLERANDOM
+    };
     static constexpr size_t maxSteps = 4096;
     int curstep = 0;
     int looppos = 0;
+    int laststep = 0;
+    int playdirection = 1;
+    PlayMode playmode = PM_FWREVLOOP;
     std::atomic<int> curstepforgui;
     int numactivesteps = 0;
     int loopstartstep = 0;
@@ -879,6 +890,7 @@ class StepModSource
     int loopoffset = 0;
     std::atomic<bool> unipolar{false};
     std::vector<float> steps;
+    xenakios::Xoroshiro128Plus rng;
     struct Message
     {
         enum Opcode
@@ -897,16 +909,55 @@ class StepModSource
         int ival0 = 0;
     };
 
-    StepModSource() { steps.resize(maxSteps); }
+    StepModSource()
+    {
+        rng.seed(98765, 334466);
+        steps.resize(maxSteps);
+    }
 
     float next()
     {
         if (steps.empty())
             return 0.0f;
-        curstep = loopstartstep + ((looppos + loopoffset) % looplen);
-        float result = steps[curstep];
-        curstepforgui = curstep;
-        looppos = (looppos + 1) % looplen;
+        float result = 0.0f;
+        if (playmode == PM_FORWARDLOOP || playmode == PM_REVERSELOOP || playmode == PM_FWREVLOOP)
+        {
+            result = steps[curstep];
+            curstepforgui = curstep;
+            looppos = looppos + playdirection;
+            if (playmode == PM_FWREVLOOP && looppos >= looplen)
+            {
+                playdirection = -1;
+                looppos -= 2;
+            }
+            else if (playmode == PM_FWREVLOOP && looppos < 0)
+            {
+                playdirection = 1;
+                looppos = 1;
+            }
+            looppos = std::clamp(looppos, 0, numactivesteps - 1);
+            curstep = loopstartstep + ((looppos + loopoffset) % looplen);
+        }
+        else if (playmode == PM_SHUFFLERANDOM)
+        {
+            int sanity = 0;
+            int foundindex = 0;
+            while (true)
+            {
+                foundindex = rng.nextInt32InRange(loopstartstep, loopstartstep + looplen);
+                if (foundindex != laststep)
+                {
+                    result = steps[foundindex];
+                    break;
+                }
+                ++sanity;
+                if (sanity == 16)
+                    break;
+            }
+            curstepforgui = foundindex;
+            laststep = foundindex;
+        }
+
         if (unipolar.load())
             result = (result + 1.0f) * 0.5f;
         return result;
