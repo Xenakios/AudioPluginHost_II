@@ -875,14 +875,15 @@ class StepModSource
         PM_REVERSELOOP,
         PM_FWREVLOOP,
         PM_RANDOM,
-        PM_SHUFFLERANDOM
+        PM_SHUFFLERANDOM,
+        NUMPLAYMODES
     };
     static constexpr size_t maxSteps = 4096;
     int curstep = 0;
     int looppos = 0;
     int laststep = 0;
     int playdirection = 1;
-    PlayMode playmode = PM_FWREVLOOP;
+    PlayMode playmode = PM_FORWARDLOOP;
     std::atomic<int> curstepforgui;
     int numactivesteps = 0;
     int loopstartstep = 0;
@@ -901,14 +902,28 @@ class StepModSource
             OP_LOOPLEN,
             OP_SETSTEP,
             OP_UNIPOLAR,
-            OP_OFFSET
+            OP_OFFSET,
+            OP_PLAYMODE
         };
         Opcode opcode = OP_NOOP;
         uint32_t dest = 0;
         float fval0 = 0.0f;
         int ival0 = 0;
     };
-
+    static std::string getPlayModeName(int m)
+    {
+        if (m == PM_FORWARDLOOP)
+            return "Forward";
+        if (m == PM_REVERSELOOP)
+            return "Reverse";
+        if (m == PM_FWREVLOOP)
+            return "Forward/Reverse";
+        if (m == PM_RANDOM)
+            return "Random";
+        if (m == PM_SHUFFLERANDOM)
+            return "Random no repeat";
+        return "Unknown";
+    }
     StepModSource()
     {
         rng.seed(98765, 334466);
@@ -1163,6 +1178,11 @@ class ToneGranulator
                     {
                         ms.steps[msg.ival0] = msg.fval0;
                     }
+                }
+                else if (msg.opcode == StepModSource::Message::OP_PLAYMODE)
+                {
+                    ms.playmode = (StepModSource::PlayMode)msg.ival0;
+                    ms.playdirection = 1;
                 }
                 if (ms.curstep < ms.loopstartstep || ms.curstep > ms.loopstartstep + ms.looplen)
                 {

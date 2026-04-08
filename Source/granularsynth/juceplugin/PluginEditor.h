@@ -237,7 +237,24 @@ struct StepSeqComponent : public juce::Component
     std::atomic<int> js_status{0};
     juce::TextButton cancelButton;
     StepSeqComponent(int seqindex, ToneGranulator *g, juce::ThreadPool *tp);
-
+    void mouseDown(const juce::MouseEvent &ev) override
+    {
+        if (!ev.mods.isRightButtonDown())
+            return;
+        juce::PopupMenu menu;
+        menu.addSectionHeader("Play mode");
+        for (int i = 0; i < StepModSource::NUMPLAYMODES; ++i)
+        {
+            menu.addItem(StepModSource::getPlayModeName(i), [i, this]() {
+                StepModSource::Message msg;
+                msg.opcode = StepModSource::Message::OP_PLAYMODE;
+                msg.dest = sindex;
+                msg.ival0 = i;
+                gr->fifo.push(msg);
+            });
+        }
+        menu.showMenuAsync(juce::PopupMenu::Options{});
+    }
     bool keyPressed(const juce::KeyPress &ev) override;
 
     int graphxpos = 200;
