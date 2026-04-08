@@ -940,18 +940,38 @@ class StepModSource
             result = steps[curstep];
             curstepforgui = curstep;
             looppos = looppos + playdirection;
-            if (playmode == PM_FWREVLOOP && looppos >= looplen)
+            if (playmode == PM_FORWARDLOOP)
             {
-                playdirection = -1;
-                looppos -= 2;
+                if (looppos >= looplen)
+                    looppos = 0;
             }
-            else if (playmode == PM_FWREVLOOP && looppos < 0)
+            else if (playmode == PM_REVERSELOOP)
             {
-                playdirection = 1;
-                looppos = 1;
+                if (looppos < 0)
+                    looppos = looplen - 1;
             }
+            else if (playmode == PM_FWREVLOOP)
+            {
+                if (looppos >= looplen)
+                {
+                    playdirection = -1;
+                    looppos = looplen - 2;
+                }
+                if (looppos < 0)
+                {
+                    playdirection = 1;
+                    looppos = 1;
+                }
+            }
+
             looppos = std::clamp(looppos, 0, numactivesteps - 1);
             curstep = loopstartstep + ((looppos + loopoffset) % looplen);
+        }
+        else if (playmode == PM_RANDOM)
+        {
+            int index = rng.nextInt32InRange(loopstartstep, loopstartstep + looplen);
+            result = steps[index];
+            curstepforgui = index;
         }
         else if (playmode == PM_SHUFFLERANDOM)
         {
@@ -1183,6 +1203,8 @@ class ToneGranulator
                 {
                     ms.playmode = (StepModSource::PlayMode)msg.ival0;
                     ms.playdirection = 1;
+                    if (ms.playmode == StepModSource::PM_REVERSELOOP)
+                        ms.playdirection = -1;
                 }
                 if (ms.curstep < ms.loopstartstep || ms.curstep > ms.loopstartstep + ms.looplen)
                 {
