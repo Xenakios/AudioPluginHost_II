@@ -139,12 +139,7 @@ struct GranulatorModConfig
         case CURVE_LINEAR:
             return [](auto x) { return x; };
         case CURVE_SQUARE:
-            return [](auto x) {
-                float storedsign = 1.0f;
-                if (x < 0.0f)
-                    storedsign = -1.0f;
-                return (x * x) * storedsign;
-            };
+            return [](auto x) { return std::abs(x) * x; };
         case CURVE_CUBE:
             return [](auto x) { return x * x * x; };
         case CURVE_STEPS2:
@@ -170,7 +165,7 @@ struct GranulatorModConfig
         case CURVE_XOR3:
             return [](auto x) { return xor_curve(x, 25027); };
         case CURVE_XOR4:
-            return [](auto x) { return xor_curve(x, 255); };
+            return [](auto x) { return xor_curve(x, 10001); };
         case CURVE_BITMIRROR:
             return [](auto x) { return bit_reversal_curve(x); };
         case CURVE_UNIPOLARTOBIPOLAR:
