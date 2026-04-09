@@ -829,7 +829,7 @@ void ModSourcesDebugComponent::paint(juce::Graphics &g)
     g.drawEllipse(0.0f, centerY - halfH, ellipW, h, 2.0f);
     for (auto &e : persisted_events)
     {
-        g.setColour(juce::Colours::lightblue.withAlpha(e.visualfade));
+        // g.setColour(juce::Colours::lightblue.withAlpha(e.visualfade));
         /*
 
         float xcor = juce::jmap<float>(e.azimuthdegrees, -180.0f, 180.0f, 2.0f, 396.0f);
@@ -876,8 +876,11 @@ void ModSourcesDebugComponent::paint(juce::Graphics &g)
             float scaleY = halfH / sqr2;
             float pixelX = centerX + (x * scaleX);
             float pixelY = centerY + (y * scaleY);
-            float alpha = e.visualfade * e.gain;
-            g.setColour(juce::Colours::lightgreen.withAlpha(alpha));
+            // float alpha = e.visualfade * e.gain;
+            float hue = juce::jmap<float>(e.pitch, -48.0f, 64.0f, 0.0f, 0.8f);
+            float alpha = juce::jmap<float>(e.gain * e.visualfade, 0.0f, 1.0f, 0.0f, 1.0f);
+            g.setColour(juce::Colour::fromHSV(hue, 0.8f, 1.0f, alpha));
+            // g.setColour(juce::Colours::lightgreen.withAlpha(alpha));
             g.fillEllipse(pixelX - 6.0f, pixelY - 6.0f, 12.0f, 12.0f);
 #endif
             e.visualfade = e.visualfade * 0.93;
