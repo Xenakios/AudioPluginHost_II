@@ -1057,6 +1057,7 @@ class ToneGranulator
     alignas(16) sst::basic_blocks::dsp::OnePoleLag<float, true> gainlag;
     alignas(16) xenakios::Xoroshiro128Plus rng;
     alignas(32) GranulatorModMatrix modmatrix;
+    std::atomic<float> compensationgainforgui{0.0f};
     using pmd = sst::basic_blocks::params::ParamMetaData;
     std::vector<pmd> parmetadatas;
     std::vector<float> paramvalues;
@@ -1965,7 +1966,7 @@ class ToneGranulator
             // next_tail_len,
             //            next_tail_fade_len);
             gainlag.setRateInMilliseconds(1000.0, m_sr, 1.0);
-            gainlag.setTarget(0.0);
+            gainlag.snapTo(0.0);
             graingen_phase = 0.0;
             graingen_phase_prior = 2.0;
             thread_op = 0;
@@ -2118,13 +2119,14 @@ class ToneGranulator
                     }
                 }
             }
-            double compengain = 0.0;
+            double compengain = 1.0;
             if (numactive > 0)
                 compengain = 1.0 / std::sqrt(numactive);
             float maingain =
                 modmatrix.m.getTargetValue(GranulatorModConfig::TargetIdentifier{PAR_MAINVOLUME});
             maingain = std::clamp(maingain, -96.0f, 0.0f);
             maingain = xenakios::decibelsToGain(maingain);
+
             gainlag.setTarget(compengain * maingain);
             for (int k = 0; k < granul_block_size; ++k)
             {
@@ -2136,6 +2138,7 @@ class ToneGranulator
                         mixsum[chan][k] * gain;
                 }
             }
+            compensationgainforgui = gainlag.getValue();
             bufframecount += granul_block_size;
             playposframes += granul_block_size;
         }

@@ -886,6 +886,9 @@ void ModSourcesDebugComponent::paint(juce::Graphics &g)
             e.visualfade = e.visualfade * 0.93;
         }
     }
+    g.setColour(juce::Colours::yellow);
+    h = gr->compensationgainforgui * getHeight();
+    g.fillRect(juce::Rectangle<float>{0.0f, (float)getHeight()-h, 10.0f, h});
     g.setColour(juce::Colours::white);
     int mins = static_cast<int>(enginetime / 60.0);
     int secs = static_cast<int>(std::fmod(enginetime, 60.0));
