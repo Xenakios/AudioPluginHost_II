@@ -139,7 +139,12 @@ struct GranulatorModConfig
         case CURVE_LINEAR:
             return [](auto x) { return x; };
         case CURVE_SQUARE:
-            return [](auto x) { return x * x; };
+            return [](auto x) {
+                float storedsign = 1.0f;
+                if (x < 0.0f)
+                    storedsign = -1.0f;
+                return (x * x) * storedsign;
+            };
         case CURVE_CUBE:
             return [](auto x) { return x * x * x; };
         case CURVE_STEPS2:

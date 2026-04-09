@@ -887,8 +887,10 @@ void ModSourcesDebugComponent::paint(juce::Graphics &g)
         }
     }
     g.setColour(juce::Colours::yellow);
-    h = gr->compensationgainforgui * getHeight();
-    g.fillRect(juce::Rectangle<float>{0.0f, (float)getHeight()-h, 10.0f, h});
+    h = juce::Decibels::gainToDecibels(gr->compensationgainforgui.load());
+    h = std::clamp(h, -40.0f, 0.0f);
+    h = juce::jmap<float>(h, -40.0, 0.0, 0.0, getHeight());
+    g.fillRect(juce::Rectangle<float>{0.0f, (float)getHeight() - h, 10.0f, h});
     g.setColour(juce::Colours::white);
     int mins = static_cast<int>(enginetime / 60.0);
     int secs = static_cast<int>(std::fmod(enginetime, 60.0));

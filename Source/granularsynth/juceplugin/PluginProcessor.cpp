@@ -385,6 +385,7 @@ void AudioPluginAudioProcessor::getStateInformation(juce::MemoryBlock &destData)
         seqstate.setMember("steps", seqsteps);
         seqstate.setMember("startstep", ss.loopstartstep);
         seqstate.setMember("looplen", ss.looplen);
+        seqstate.setMember("playmode", (int)ss.playmode);
         stepseqstates.addArrayElement(seqstate);
     }
     state.setMember("stepseqstates", stepseqstates);
@@ -466,6 +467,9 @@ void AudioPluginAudioProcessor::setStateInformation(const void *data, int sizeIn
                 granulator.fifo.push(msg);
                 msg.opcode = StepModSource::Message::OP_LOOPLEN;
                 msg.ival0 = seqstate["looplen"].getWithDefault(1);
+                granulator.fifo.push(msg);
+                msg.opcode = StepModSource::Message::OP_PLAYMODE;
+                msg.ival0 = seqstate["playmode"].getWithDefault(0);
                 granulator.fifo.push(msg);
             }
         }
