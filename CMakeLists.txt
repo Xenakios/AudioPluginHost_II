@@ -285,9 +285,9 @@ target_compile_definitions(AWLIMITED PUBLIC _USE_MATH_DEFINES=1)
 
 juce_add_plugin(ToneGranulatorPlugin
     VERSION 0.1                               # Set this if the plugin version is different to the project version
-    # ICON_BIG ...                              # ICON_* arguments specify a path to an image file to use as an icon for the Standalone
+    ICON_BIG Assets/tgicon01.png                              # ICON_* arguments specify a path to an image file to use as an icon for the Standalone
     # ICON_SMALL ...
-    # COMPANY_NAME ...                          # Specify the name of the plugin's author
+    COMPANY_NAME "Xenakios"                          # Specify the name of the plugin's author
     # IS_SYNTH TRUE/FALSE                       # Is this a synth or an effect?
     NEEDS_MIDI_INPUT TRUE               # Does the plugin need midi input?
     NEEDS_MIDI_OUTPUT FALSE              # Does the plugin need midi output?
