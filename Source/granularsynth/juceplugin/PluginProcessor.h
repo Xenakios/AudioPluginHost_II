@@ -5,6 +5,15 @@
 #include "../granularsynth.h"
 #include "containers/choc_SingleReaderSingleWriterFIFO.h"
 
+inline bool is_debug()
+{
+#ifdef JUCE_DEBUG
+    return true;
+#else
+    return false;
+#endif
+}
+
 struct ParameterMessage
 {
     uint32_t id = 0;
@@ -80,6 +89,7 @@ class AudioPluginAudioProcessor final : public juce::AudioProcessor
     std::atomic<bool> isRecording{false};
     std::unique_ptr<juce::AudioFormatWriter::ThreadedWriter> threadedWriter;
     juce::AudioBuffer<float> recordBuffer;
+
   private:
     alignas(32) std::vector<float> workBuffer;
     alignas(32) choc::fifo::SingleReaderSingleWriterFIFO<std::array<float, 16>> buffer_adapter;

@@ -759,34 +759,69 @@ void StepSeqComponent::runExternalProgram()
     });
 }
 
-/* Google Gemini produced this for the Hammer projection
+void ModSourcesDebugComponent::paintAmbisonicFieldHammerProjection(juce::Graphics &g)
+{
+    g.setColour(juce::Colours::white);
+    float ellipW = 400.0f;
+    float h = ellipW / 2;
 
-const float sqrt2 = 1.41421356f;
-float cosElev = std::cos(radElev);
-float cosHalfAzi = std::cos(radAzi * 0.5f);
+    float halfW = ellipW / 2.0f;
+    float halfH = h / 2.0;
+    float centerX = halfW;
+    float centerY = getHeight() / 2.0;
+    g.drawEllipse(0.0f, centerY - halfH, ellipW, h, 2.0f);
 
-// The term inside the sqrt can theoretically be slightly negative
-// due to float precision errors at the very edge (180 deg).
-float inner = 1.0f + cosElev * cosHalfAzi;
-float d = std::sqrt(std::max(0.0f, inner));
+    for (auto &e : persisted_events)
+    {
+        if (e.visualfade > 0.01)
+        {
+            auto drawgrain = [this, halfW, halfH, centerX, centerY, &g, &e](int chan) {
+                const float sqrt2 = 1.41421356f;
+                float radAzi = juce::degreesToRadians(-e.azimuth0degrees);
+                if (chan == 1)
+                    radAzi = juce::degreesToRadians(-e.azimuth1degrees);
+                float radElev = juce::degreesToRadians(e.elevationdegrees);
+                float cosElev = std::cos(radElev);
+                float cosHalfAzi = std::cos(radAzi * 0.5f);
 
-// Safety: prevent division by zero at the singularity
-if (d < 0.001f) d = 0.001f;
+                // The term inside the sqrt can theoretically be slightly negative
+                // due to float precision errors at the very edge (180 deg).
+                float inner = 1.0f + cosElev * cosHalfAzi;
+                float d = std::sqrt(std::max(0.0f, inner));
 
-float x = (2.0f * sqrt2 * cosElev * std::sin(radAzi * 0.5f)) / d;
-float y = (sqrt2 * std::sin(radElev)) / d;
+                // Safety: prevent division by zero at the singularity
+                if (d < 0.001f)
+                    d = 0.001f;
 
-// Mapping to your 2:1 Ellipse bounds
-// This ensures that the dot stays perfectly within the visual ellipse
-float scaleX = halfW / (2.0f * sqrt2);
-float scaleY = halfH / sqrt2;
+                float x = (2.0f * sqrt2 * cosElev * std::sin(radAzi * 0.5f)) / d;
+                float y = (sqrt2 * std::sin(radElev)) / d;
 
-float pixelX = centerX + (x * scaleX);
-float pixelY = centerY - (y * scaleY);
+                // Mapping to your 2:1 Ellipse bounds
+                // This ensures that the dot stays perfectly within the visual ellipse
+                float scaleX = halfW / (2.0f * sqrt2);
+                float scaleY = halfH / sqrt2;
 
-g.setColour(juce::Colours::lightgreen.withAlpha(e.visualfade));
-g.fillEllipse(pixelX - 6.0f, pixelY - 6.0f, 12.0f, 12.0f);
-*/
+                float pixelX = centerX + (x * scaleX);
+                float pixelY = centerY - (y * scaleY);
+                if (chan == 0)
+                    g.setColour(juce::Colours::lightgreen.withAlpha(e.visualfade));
+                else
+                    g.setColour(juce::Colours::lightcyan.withAlpha(e.visualfade));
+                g.fillEllipse(pixelX - 6.0f, pixelY - 6.0f, 12.0f, 12.0f);
+            };
+            if (std::abs(e.azimuth0degrees - e.azimuth1degrees) > 0.0f)
+            {
+                drawgrain(0);
+                drawgrain(1);
+            }
+            else
+            {
+                drawgrain(0);
+            }
+            e.visualfade = e.visualfade * visualfadecoefficient;
+        }
+    }
+}
 
 void ModSourcesDebugComponent::paint(juce::Graphics &g)
 {
@@ -818,76 +853,9 @@ void ModSourcesDebugComponent::paint(juce::Graphics &g)
         // ycor = juce::jmap<float>(e.azimuthdegrees, -180.0, 180.0, getHeight(), 0.0);
         // g.fillRect(xcor, ycor, 4.0f, 4.0f);
     }
-    g.setColour(juce::Colours::white);
-    float ellipW = 400.0f;
-    float h = ellipW / 2;
-
-    float halfW = ellipW / 2.0f;
-    float halfH = h / 2.0;
-    float centerX = halfW;
-    float centerY = getHeight() / 2.0;
-    g.drawEllipse(0.0f, centerY - halfH, ellipW, h, 2.0f);
-    for (auto &e : persisted_events)
-    {
-        // g.setColour(juce::Colours::lightblue.withAlpha(e.visualfade));
-        /*
-
-        float xcor = juce::jmap<float>(e.azimuthdegrees, -180.0f, 180.0f, 2.0f, 396.0f);
-        float ycor =
-            juce::jmap<float>(e.elevationdegrees, -90.0f, 90.0f, getHeight() - 4.0f, 2.0f);
-        g.fillEllipse(xcor, ycor, 5.0, 5.0);
-        */
-
-        if (e.visualfade > 0.01)
-        {
-#ifdef FOOPROJECTION
-            float radElev = juce::degreesToRadians(e.elevationdegrees);
-            float cosElev = std::cos(radElev);
-
-            // Map Azimuth (-180 to 180) and Elevation (-90 to 90) to the ellipse
-            // Azimuth 0 is Center, Elevation 0 is Center
-            float xOffset = (-e.azimuth0degrees / 180.0f) * halfW * cosElev;
-            float yOffset = (e.elevationdegrees / 90.0f) * halfH;
-
-            float pixelX = centerX + xOffset;
-            float pixelY = centerY - yOffset; // Subtract because Y is down in JUCE
-            g.fillEllipse(pixelX - 6.0f, pixelY - 6.0f, 12.0f, 12.0f);
-
-            if (false) // (e.azimuth0degrees != e.azimuth1degrees)
-            {
-                xOffset = (-e.azimuth1degrees / 180.0f) * halfW * cosElev;
-                yOffset = (e.elevationdegrees / 90.0f) * halfH;
-
-                pixelX = centerX + xOffset;
-                pixelY = centerY - yOffset; // Subtract because Y is down in JUCE
-                g.setColour(juce::Colours::lightgreen.withAlpha(e.visualfade));
-                g.fillEllipse(pixelX - 6.0f, pixelY - 6.0f, 12.0f, 12.0f);
-            }
-#else
-            float radAzi = juce::degreesToRadians(-e.azimuth0degrees);
-            float radElev = juce::degreesToRadians(-e.elevationdegrees);
-            const float sqr2 = std::sqrt(2.0);
-            const float halfPI = M_PI * 0.5;
-            float x = 2.0 * sqr2 * std::cos(radElev) * std::sin(radAzi / 2.0) /
-                      (std::sqrt(1.0 + std::cos(radElev) * std::cos(radAzi / 2.0)));
-            float y = sqr2 * std::sin(radElev) /
-                      (std::sqrt(1.0 + std::cos(radElev) * std::cos(radAzi / 2.0)));
-            float scaleX = halfW / (2.0f * sqr2);
-            float scaleY = halfH / sqr2;
-            float pixelX = centerX + (x * scaleX);
-            float pixelY = centerY + (y * scaleY);
-            // float alpha = e.visualfade * e.gain;
-            float hue = juce::jmap<float>(e.pitch, -48.0f, 64.0f, 0.0f, 0.8f);
-            float alpha = juce::jmap<float>(e.gain * e.visualfade, 0.0f, 1.0f, 0.0f, 1.0f);
-            g.setColour(juce::Colour::fromHSV(hue, 0.8f, 1.0f, alpha));
-            // g.setColour(juce::Colours::lightgreen.withAlpha(alpha));
-            g.fillEllipse(pixelX - 6.0f, pixelY - 6.0f, 12.0f, 12.0f);
-#endif
-            e.visualfade = e.visualfade * 0.93;
-        }
-    }
+    paintAmbisonicFieldHammerProjection(g);
     g.setColour(juce::Colours::yellow);
-    h = juce::Decibels::gainToDecibels(gr->compensationgainforgui.load());
+    float h = juce::Decibels::gainToDecibels(gr->compensationgainforgui.load());
     h = std::clamp(h, -40.0f, 0.0f);
     h = juce::jmap<float>(h, -40.0, 0.0, 0.0, getHeight());
     g.fillRect(juce::Rectangle<float>{0.0f, (float)getHeight() - h, 10.0f, h});

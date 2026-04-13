@@ -689,22 +689,31 @@ class ModSourcesDebugComponent : public juce::Component
     std::vector<ToneGranulator::GrainVisualizerMessage> persisted_events;
     double timespantoshow = 8.0;
     int throttlecounter = 0;
+    float visualfadecoefficient = 1.0;
     std::unique_ptr<juce::VBlankAttachment> vblankAttachment;
     ModSourcesDebugComponent(ToneGranulator *g) : gr(g)
     {
+        if (!is_debug())
+            visualfadecoefficient = 0.93;
+        else
+            visualfadecoefficient = std::pow(0.93, 4);
         persisted_events.reserve(4096);
         vblankAttachment = std::make_unique<juce::VBlankAttachment>(this, [this]() {
             updateGrainData();
-#ifdef JUCE_DEBUG
-            if (throttlecounter % 4 == 0)
+            if (is_debug())
+            {
+                if (throttlecounter % 4 == 0)
+                    repaint();
+                ++throttlecounter;
+            }
+            else
+            {
                 repaint();
-            ++throttlecounter;
-#else
-                repaint();
-#endif
+            }
         });
     }
     void paint(juce::Graphics &g) override;
+    void paintAmbisonicFieldHammerProjection(juce::Graphics &g);
     bool is_extended_size = false;
     void mouseDown(const juce::MouseEvent &ev) override
     {
@@ -772,6 +781,7 @@ class ParameterGroupComponent : public juce::GroupComponent
                                  .withFlex(1.0)
                                  .withMargin(2.0)
                                  .withMinHeight(20)
+                                 .withMaxHeight(40)
                                  .withMinWidth(50)
                                  .withMaxWidth(getWidth()));
         }
