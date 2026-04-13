@@ -21,6 +21,8 @@ using namespace sst::basic_blocks::mod_matrix;
 
 const int granul_block_size = 8;
 
+template <typename T> inline int sgn(T val) { return (T(0) < val) - (val < T(0)); }
+
 struct GranulatorModConfig
 {
     struct SourceIdentifier
@@ -83,7 +85,8 @@ struct GranulatorModConfig
         CURVE_UNIPOLARTOBIPOLAR,
         CURVE_HARMONICSERIES3OCTAVES,
         CURVE_HARMONICSERIES4OCTAVES,
-        CURVE_HARMONICSERIES5OCTAVES
+        CURVE_HARMONICSERIES5OCTAVES,
+        CURVE_TOPOWER16
     };
     static float xor_curve(float x, uint16_t a)
     {
@@ -142,6 +145,8 @@ struct GranulatorModConfig
             return [](auto x) { return std::abs(x) * x; };
         case CURVE_CUBE:
             return [](auto x) { return x * x * x; };
+        case CURVE_TOPOWER16:
+            return [](auto x) { return std::pow(x, 16) * sgn(x); };
         case CURVE_STEPS2:
             return [id](auto x) { return std::round(x * 2) / 2; };
         case CURVE_STEPS3:
@@ -575,10 +580,13 @@ class GranulatorVoice
             },
             theoscillator);
 
-        float azispread = std::clamp(evpars.azimuth_spread, -360.0f, 360.0f);
-        float azi0 = std::clamp(-evpars.azimuth - azispread, -360.0f, 360.0f);
-        float azi1 = std::clamp(-evpars.azimuth + azispread, -360.0f, 360.0f);
-        float ele = std::clamp(evpars.elevation, -360.0f, 360.0f);
+        float azispread = std::clamp(evpars.azimuth_spread, -180.0f, 180.0f);
+        // float azi0 = std::clamp(-evpars.azimuth - azispread, -360.0f, 360.0f);
+        float azi0 = wrap_value(-180.0f, -evpars.azimuth - azispread, 180.0f);
+        // float azi1 = std::clamp(-evpars.azimuth + azispread, -360.0f, 360.0f);
+        float azi1 = wrap_value(-180.0f, -evpars.azimuth + azispread, 180.0f);
+        // float ele = std::clamp(evpars.elevation, -360.0f, 360.0f);
+        float ele = wrap_value(-180.0f, evpars.elevation, 180.0f);
         used_azi0 = azi0;
         used_azi1 = azi1;
         used_ele = ele;
@@ -1163,7 +1171,7 @@ class ToneGranulator
         float val = 0.0f;
     };
     std::vector<ModSourceInfo> modSources;
-    std::array<float, 128> modSourceValues;
+    alignas(16) std::array<float, 128> modSourceValues;
     std::unordered_map<int, int> midiCCMap;
     alignas(16) std::atomic<int> numVoicesUsed;
     void set_aux_envelope_interpolation_mode(int m)
