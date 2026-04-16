@@ -360,6 +360,7 @@ struct ModulationRowComponent : public juce::Component
         curveDrop.rootNode.children.push_back(Node{"x^2", GranulatorModConfig::CURVE_SQUARE});
         curveDrop.rootNode.children.push_back(Node{"x^3", GranulatorModConfig::CURVE_CUBE});
         curveDrop.rootNode.children.push_back(Node{"x^16", GranulatorModConfig::CURVE_TOPOWER16});
+        
         curveDrop.rootNode.children.push_back(Node{"EXPSIN 1", GranulatorModConfig::CURVE_EXPSIN1});
         curveDrop.rootNode.children.push_back(Node{"EXPSIN 2", GranulatorModConfig::CURVE_EXPSIN2});
         curveDrop.rootNode.children.push_back(

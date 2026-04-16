@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 4.1)
+cmake_minimum_required(VERSION 4.3)
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
@@ -161,6 +161,8 @@ add_library(AWLIMITED
     libs/airwindows_limited/plugins/GlitchShifterProc.cpp
 )
 
+target_compile_features(AWLIMITED PUBLIC cxx_std_23)
+
 pybind11_add_module(xenakios 
     Source/PythonBindings/pybindings.cpp
     Source/PythonBindings/pybindings_ex1.cpp
@@ -262,12 +264,6 @@ add_executable(grainserver
 target_compile_definitions(grainserver PRIVATE _WIN64 NOJUCE=1 _USE_MATH_DEFINES=1 NOMINMAX __WINDOWS_WASAPI__ __WINDOWS_MM__ WIN32_LEAN_AND_MEAN _WINSOCK_DEPRECATED_NO_WARNINGS)
 target_compile_options(grainserver PRIVATE -Werror=return-type)
 target_link_libraries(grainserver PRIVATE winmm.lib)
-# cmaj testing
-add_executable(CMajorTester 
-    Source/Experimental/cmajtester.cpp 
-    )
-target_compile_definitions(CMajorTester PRIVATE NOJUCE=1 _USE_MATH_DEFINES=1 __WINDOWS_WASAPI__)
-target_link_libraries(CMajorTester PRIVATE c:/develop/cmajlang/cmajor/tools/CmajDLL/exports.def)
 
 # te testing
 

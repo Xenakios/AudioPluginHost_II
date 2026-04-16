@@ -826,6 +826,7 @@ void ModSourcesDebugComponent::paintAmbisonicFieldHammerProjection(juce::Graphic
 void ModSourcesDebugComponent::paint(juce::Graphics &g)
 {
     g.fillAll(juce::Colours::black);
+    
     /*
     g.setColour(juce::Colours::green);
     for (int i = 0; i < 40; ++i)
