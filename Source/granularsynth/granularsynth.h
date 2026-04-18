@@ -1085,6 +1085,11 @@ class ToneGranulator
         float elevationdegrees = 0.0f;
         float visualfade = 1.0f;
     };
+    struct GrainVisualizerSettings
+    {
+        double timespantoshow = 8.0;
+    };
+    GrainVisualizerSettings gvsettings;
     choc::fifo::SingleReaderSingleWriterFIFO<GrainVisualizerMessage> visualizer_fifo;
     int osc_type = 4;
     enum PARAMS
@@ -1148,7 +1153,8 @@ class ToneGranulator
         STEPS5,
         STEPS6,
         STEPS7,
-        MIDINOTE,
+        MACROSTART,
+        MIDINOTE = MACROSTART + 16,
         MIDIVELO,
         MIDIAT,
         MIDICCSTART,
@@ -1171,7 +1177,7 @@ class ToneGranulator
         float val = 0.0f;
     };
     std::vector<ModSourceInfo> modSources;
-    alignas(16) std::array<float, 128> modSourceValues;
+    alignas(16) std::array<float, 256> modSourceValues;
     std::unordered_map<int, int> midiCCMap;
     alignas(16) std::atomic<int> numVoicesUsed;
     void set_aux_envelope_interpolation_mode(int m)
@@ -1671,6 +1677,11 @@ class ToneGranulator
         {
             modSources.emplace_back(std::format("StepSeq {}", i + 1), "Step Sequencer",
                                     GranulatorModConfig::SourceIdentifier{STEPS0 + i});
+        }
+        for (uint32_t i = 0; i < 16; ++i)
+        {
+            modSources.emplace_back(std::format("Macro {}", i + 1), "Macro Parameter",
+                                    GranulatorModConfig::SourceIdentifier{MACROSTART + i});
         }
         modSources.emplace_back("MIDI KEY", "MIDI NOTES",
                                 GranulatorModConfig::SourceIdentifier{MIDINOTE});

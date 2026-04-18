@@ -19,6 +19,18 @@ AudioPluginAudioProcessor::AudioPluginAudioProcessor()
     params_from_gui_fifo.reset(1024);
     params_to_gui_fifo.reset(1024);
     to_gui_fifo.reset(1024);
+    dirtyStateParam =
+        new juce::AudioParameterFloat({"dirtystateparam", 1}, "Internal parameter", 0.0, 1.0, 0.0);
+    addParameter(dirtyStateParam);
+    for (int i = 0; i < 16; ++i)
+    {
+        juce::String id = "MACRO" + juce::String(i);
+        juce::String name = "MACRO " + juce::String(i);
+        auto par = new juce::AudioParameterFloat({id, 1}, name, -1.0, 1.0, 0.0);
+        addParameter(par);
+    }
+    // to be decided if we want to actually have the full mirrored paraneters
+    /*
     for (int i = 0; i < granulator.parmetadatas.size(); ++i)
     {
         const auto &pmd = granulator.parmetadatas[i];
@@ -42,6 +54,7 @@ AudioPluginAudioProcessor::AudioPluginAudioProcessor()
             jucepartoindex[(juce::AudioProcessorParameter *)par] = pmd.id;
         }
     }
+    */
 }
 
 AudioPluginAudioProcessor::~AudioPluginAudioProcessor() {}
@@ -152,6 +165,13 @@ bool AudioPluginAudioProcessor::isBusesLayoutSupported(const BusesLayout &layout
     return true;
 }
 
+void AudioPluginAudioProcessor::setStateDirtyHack()
+{
+    dirtyStateParam->beginChangeGesture();
+    dirtyStateParam->setValueNotifyingHost(*dirtyStateParam == 0.0f ? 0.001f : 0.0f);
+    dirtyStateParam->endChangeGesture();
+}
+
 void AudioPluginAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
                                              juce::MidiBuffer &midiMessages)
 {
@@ -198,7 +218,7 @@ void AudioPluginAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
             DBG(granulator.midiNoteModSource.getDebugString());
         }
     }
-
+    bool statechanged = false;
     ThreadMessage msg;
     while (from_gui_fifo.pop(msg))
     {
@@ -215,6 +235,7 @@ void AudioPluginAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
                 omsg.value = *granulator.idtoparvalptr[parid];
                 params_to_gui_fifo.push(omsg);
             }
+            statechanged = true;
         }
 
         auto &mm = granulator.modmatrix;
@@ -244,8 +265,15 @@ void AudioPluginAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
                 }
                 mm.m.prepare(mm.rt, granulator.m_sr, granul_block_size);
             }
+            statechanged = true;
         }
     }
+    if (statechanged)
+    {
+        setStateDirtyHack();
+        // updateHostDisplay(juce::AudioProcessor::ChangeDetails().withNonParameterStateChanged(true));
+    }
+
     ParameterMessage parmsg;
     while (params_from_gui_fifo.pop(parmsg))
     {
@@ -263,6 +291,12 @@ void AudioPluginAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
         if (prior_ambi_order == 0)
             granulator.set_ambisonics_order(1);
         */
+    }
+    const auto &pars = getParameters();
+    for (int i = 0; i < 16; ++i)
+    {
+        auto rpar = dynamic_cast<juce::AudioParameterFloat *>(pars[i + 1]);
+        granulator.modSourceValues[ToneGranulator::MACROSTART + i] = *rpar;
     }
     /*
     const auto &pars = getParameters();
@@ -349,7 +383,7 @@ void AudioPluginAudioProcessor::getStateInformation(juce::MemoryBlock &destData)
 {
     auto state = choc::value::createObject("state");
     auto mainparams = choc::value::createObject("params");
-    auto &pmds = granulator.parmetadatas;
+    const auto &pmds = granulator.parmetadatas;
     for (int i = 0; i < pmds.size(); ++i)
     {
         std::string id = std::to_string(pmds[i].id);
@@ -357,6 +391,7 @@ void AudioPluginAudioProcessor::getStateInformation(juce::MemoryBlock &destData)
         mainparams.setMember(id, v);
     }
     state.setMember("params", mainparams);
+    state.setMember("gvs_timespan", granulator.gvsettings.timespantoshow);
     auto filterstates = choc::value::createEmptyArray();
     for (int i = 0; i < 2; ++i)
     {
@@ -438,6 +473,7 @@ void AudioPluginAudioProcessor::setStateInformation(const void *data, int sizeIn
         // auto state = choc::json::parse(json);
 
         suspendProcessing(true);
+        granulator.gvsettings.timespantoshow = state["gvs_timespan"].getWithDefault(8.0);
         if (state.hasObjectMember("stepseqstates"))
         {
             auto stepseqstate = state["stepseqstates"];

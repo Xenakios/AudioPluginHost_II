@@ -93,9 +93,10 @@ class AudioPluginAudioProcessor final : public juce::AudioProcessor
   private:
     alignas(32) std::vector<float> workBuffer;
     alignas(32) choc::fifo::SingleReaderSingleWriterFIFO<std::array<float, 16>> buffer_adapter;
+    void setStateDirtyHack();
     int prior_ambi_order = -1;
     std::unordered_map<juce::AudioProcessorParameter *, int> jucepartoindex;
-
+    juce::AudioParameterFloat* dirtyStateParam = nullptr;
     void sendExtraStatesToGUI();
     //==============================================================================
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(AudioPluginAudioProcessor)

@@ -827,7 +827,7 @@ void ModSourcesDebugComponent::paint(juce::Graphics &g)
 {
     g.fillAll(juce::Colours::black);
 
-    /*
+    
     g.setColour(juce::Colours::green);
     for (int i = 0; i < 40; ++i)
     {
@@ -835,7 +835,7 @@ void ModSourcesDebugComponent::paint(juce::Graphics &g)
         float ycor = juce::jmap<float>(gr->modSourceValues[i], -1.0f, 1.0, getHeight(), 0.0);
         g.drawLine(xcor, 0.0f, xcor, ycor, 3.9);
     }
-        */
+        
     // g.setColour(juce::Colours::white);
     float xoffs = 400.0f;
     float w = getWidth() - xoffs;

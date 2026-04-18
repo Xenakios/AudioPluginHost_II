@@ -696,6 +696,7 @@ class ModSourcesDebugComponent : public juce::Component
     std::unique_ptr<juce::VBlankAttachment> vblankAttachment;
     ModSourcesDebugComponent(ToneGranulator *g) : gr(g)
     {
+        timespantoshow = gr->gvsettings.timespantoshow;
         pitchGradient.clearColours();
         pitchGradient.addColour(0.00, juce::Colours::red);
         pitchGradient.addColour(0.25, juce::Colours::green);
@@ -743,6 +744,7 @@ class ModSourcesDebugComponent : public juce::Component
     }
     void updateGrainData()
     {
+        gr->gvsettings.timespantoshow = timespantoshow;
         ToneGranulator::GrainVisualizerMessage msg;
         while (gr->visualizer_fifo.pop(msg))
         {
