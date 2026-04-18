@@ -826,7 +826,7 @@ void ModSourcesDebugComponent::paintAmbisonicFieldHammerProjection(juce::Graphic
 void ModSourcesDebugComponent::paint(juce::Graphics &g)
 {
     g.fillAll(juce::Colours::black);
-    
+
     /*
     g.setColour(juce::Colours::green);
     for (int i = 0; i < 40; ++i)
@@ -842,11 +842,13 @@ void ModSourcesDebugComponent::paint(juce::Graphics &g)
     double enginetime = gr->playposframes / gr->m_sr;
     for (auto &e : persisted_events)
     {
-        float hue = juce::jmap<float>(e.pitch, -48.0f, 64.0f, 0.0f, 0.8f);
-        float alpha = juce::jmap<float>(e.gain, 0.0f, 1.0f, 0.0f, 1.0f);
-        g.setColour(juce::Colour::fromHSV(hue, 0.8f, 1.0f, alpha));
+        // float hue = juce::jmap<float>(e.pitch, -48.0f, 64.0f, 0.0f, 0.8f);
+        // float alpha =  juce::jmap<float>(e.gain, 0.0f, 1.0f, 0.0f, 1.0f);
+        // g.setColour(juce::Colour::fromHSV(hue, 0.8f, 1.0f, alpha));
+        float normpitch = juce::jmap<float>(e.pitch, -48.0f, 64.0f, 0.0f, 1.0f);
+        g.setColour(pitchGradient.getColourAtPosition(normpitch));
         float xcor = w - ((enginetime - e.timepos) / timespantoshow * w);
-        float ycor = juce::jmap<float>(e.pitch, -48.0, 64.0, getHeight(), 0.0);
+        float ycor = juce::jmap<float>(e.pitch, -48.0, 64.0, getHeight() - 5.0, 0.0);
         float gw = getWidth() / timespantoshow * e.duration;
         xcor = std::clamp<float>(xcor + xoffs, xoffs, getWidth());
         g.fillEllipse(xcor, ycor, gw, 5.0);

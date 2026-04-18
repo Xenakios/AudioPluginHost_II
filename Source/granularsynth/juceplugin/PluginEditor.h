@@ -360,7 +360,7 @@ struct ModulationRowComponent : public juce::Component
         curveDrop.rootNode.children.push_back(Node{"x^2", GranulatorModConfig::CURVE_SQUARE});
         curveDrop.rootNode.children.push_back(Node{"x^3", GranulatorModConfig::CURVE_CUBE});
         curveDrop.rootNode.children.push_back(Node{"x^16", GranulatorModConfig::CURVE_TOPOWER16});
-        
+
         curveDrop.rootNode.children.push_back(Node{"EXPSIN 1", GranulatorModConfig::CURVE_EXPSIN1});
         curveDrop.rootNode.children.push_back(Node{"EXPSIN 2", GranulatorModConfig::CURVE_EXPSIN2});
         curveDrop.rootNode.children.push_back(
@@ -692,9 +692,16 @@ class ModSourcesDebugComponent : public juce::Component
     double timespantoshow = 8.0;
     int throttlecounter = 0;
     float visualfadecoefficient = 1.0;
+    juce::ColourGradient pitchGradient;
     std::unique_ptr<juce::VBlankAttachment> vblankAttachment;
     ModSourcesDebugComponent(ToneGranulator *g) : gr(g)
     {
+        pitchGradient.clearColours();
+        pitchGradient.addColour(0.00, juce::Colours::red);
+        pitchGradient.addColour(0.25, juce::Colours::green);
+        pitchGradient.addColour(0.50, juce::Colours::yellow);
+        pitchGradient.addColour(0.75, juce::Colours::cyan);
+        pitchGradient.addColour(1.00, juce::Colours::white);
         if (!is_debug())
             visualfadecoefficient = 0.93;
         else
