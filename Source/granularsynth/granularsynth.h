@@ -366,11 +366,10 @@ template <bool TaperEnabled> struct SimpleEnvelope
     SimpleEnvelope()
     {
         std::fill(steps.begin(), steps.end(), 0.0f);
-        steps[0] = 1.0f;
-        steps[1] = 0.75f;
-        steps[2] = 0.5f;
-        steps[3] = 0.25f;
-        steps[4] = 0.0;
+        for (size_t i = 0; i < maxnumsteps; ++i)
+        {
+            steps[i] = xenakios::mapvalue<float>(i, 0, maxnumsteps - 1, -1.0, 1.0);
+        }
     }
     void start(int dursamples)
     {

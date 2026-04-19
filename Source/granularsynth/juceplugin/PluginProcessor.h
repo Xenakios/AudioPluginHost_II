@@ -89,7 +89,8 @@ class AudioPluginAudioProcessor final : public juce::AudioProcessor
     std::atomic<bool> isRecording{false};
     std::unique_ptr<juce::AudioFormatWriter::ThreadedWriter> threadedWriter;
     juce::AudioBuffer<float> recordBuffer;
-
+    choc::value::Value getState();
+    void setState(choc::value::ValueView state);
   private:
     alignas(32) std::vector<float> workBuffer;
     alignas(32) choc::fifo::SingleReaderSingleWriterFIFO<std::array<float, 16>> buffer_adapter;

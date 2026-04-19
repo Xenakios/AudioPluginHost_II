@@ -378,8 +378,7 @@ juce::AudioProcessorEditor *AudioPluginAudioProcessor::createEditor()
     return new AudioPluginAudioProcessorEditor(*this);
 }
 
-//==============================================================================
-void AudioPluginAudioProcessor::getStateInformation(juce::MemoryBlock &destData)
+choc::value::Value AudioPluginAudioProcessor::getState()
 {
     auto state = choc::value::createObject("state");
     auto mainparams = choc::value::createObject("params");
@@ -445,17 +444,133 @@ void AudioPluginAudioProcessor::getStateInformation(juce::MemoryBlock &destData)
             modroutings.addArrayElement(routingstate);
         }
     }
-    // state.setMember("version", 666);
     state.setMember("modroutings", modroutings);
+    return state;
+}
 
+void AudioPluginAudioProcessor::setState(choc::value::ValueView state)
+{
+    suspendProcessing(true);
+    granulator.gvsettings.timespantoshow = state["gvs_timespan"].getWithDefault(8.0);
+    if (state.hasObjectMember("stepseqstates"))
+    {
+        auto stepseqstate = state["stepseqstates"];
+        for (size_t i = 0; i < stepseqstate.size(); ++i)
+        {
+            if (i >= granulator.stepModSources.size())
+                break;
+            auto &ss = granulator.stepModSources[i];
+            auto seqstate = stepseqstate[(int)i];
+            auto steps = seqstate["steps"];
+            for (size_t j = 0; j < steps.size(); ++j)
+            {
+                if (j < 128)
+                {
+                    StepModSource::Message msg;
+                    msg.opcode = StepModSource::Message::OP_SETSTEP;
+                    msg.dest = i;
+                    msg.ival0 = j;
+                    msg.fval0 = steps[(int)j].getWithDefault(0.0f);
+                    granulator.fifo.push(msg);
+                }
+            }
+            StepModSource::Message msg;
+            msg.opcode = StepModSource::Message::OP_LOOPSTART;
+            msg.dest = i;
+            msg.ival0 = seqstate["startstep"].getWithDefault(0);
+            granulator.fifo.push(msg);
+            msg.opcode = StepModSource::Message::OP_LOOPLEN;
+            msg.ival0 = seqstate["looplen"].getWithDefault(1);
+            granulator.fifo.push(msg);
+            msg.opcode = StepModSource::Message::OP_PLAYMODE;
+            msg.ival0 = seqstate["playmode"].getWithDefault(0);
+            granulator.fifo.push(msg);
+        }
+    }
+    if (state.hasObjectMember("filterstates"))
+    {
+        auto filterstates = state["filterstates"];
+        for (int i = 0; i < filterstates.size(); ++i)
+        {
+            auto filterstate = filterstates[i];
+            if (i < 2)
+            {
+                sfpp::FilterModel m = (sfpp::FilterModel)filterstate["model"].getWithDefault(0);
+                sfpp::ModelConfig conf;
+                conf.dt = (decltype(conf.dt))filterstate["dt"].getWithDefault(0);
+                conf.st = (decltype(conf.st))filterstate["st"].getWithDefault(0);
+                conf.mt = (decltype(conf.mt))filterstate["mt"].getWithDefault(0);
+                conf.pt = (decltype(conf.pt))filterstate["pt"].getWithDefault(0);
+                int mainmode = filterstate["mainmode"].getWithDefault(0);
+                int awtype = filterstate["awtype"].getWithDefault(0);
+                // granulator.set_filter(i, mainmode, awtype, m, conf);
+
+                ThreadMessage msg;
+                msg.opcode = ThreadMessage::OP_FILTERTYPE;
+                msg.insertmainmode = mainmode;
+                msg.awtype = awtype;
+                msg.filterindex = i;
+                msg.filtermodel = m;
+                msg.filterconfig = conf;
+                from_gui_fifo.push(msg);
+            }
+        }
+    }
+    if (state.hasObjectMember("params"))
+    {
+        auto params = state["params"];
+        auto &pars = granulator.parmetadatas;
+        for (int i = 0; i < pars.size(); ++i)
+        {
+            std::string id = std::to_string(pars[i].id);
+            if (params.hasObjectMember(id))
+            {
+                float v = params[id].getWithDefault(pars[i].defaultVal);
+                ParameterMessage parmsg;
+                parmsg.id = pars[i].id;
+                parmsg.value = v;
+                params_from_gui_fifo.push(parmsg);
+                // *granulator.idtoparvalptr[pars[i].id] = v;
+            }
+        }
+    }
+    if (state.hasObjectMember("modroutings"))
+    {
+        auto routings = state["modroutings"];
+        auto &mm = granulator.modmatrix;
+        for (int i = 0; i < GranulatorModConfig::FixedMatrixSize; ++i)
+        {
+            mm.rt.updateActiveAt(i, false);
+        }
+        for (int i = 0; i < routings.size(); ++i)
+        {
+            auto rstate = routings[i];
+            int slot = rstate["slot"].get<int>();
+            if (slot >= 0 && slot < GranulatorModConfig::FixedMatrixSize)
+            {
+                mm.rt.updateActiveAt(slot, true);
+                uint32_t src = rstate["source"].getWithDefault(0);
+                uint32_t srcvia = rstate["via"].getWithDefault(0);
+                int curve = rstate["curve"].getWithDefault(1);
+                float d = rstate["depth"].get<float>();
+                int dest = rstate["dest"].getWithDefault(1);
+                mm.rt.updateRoutingAt(slot, GranulatorModConfig::SourceIdentifier{src},
+                                      GranulatorModConfig::SourceIdentifier{srcvia},
+                                      GranulatorModConfig::MyCurve{curve},
+                                      GranulatorModConfig::TargetIdentifier{dest}, d);
+                if (srcvia == 0)
+                    mm.rt.routes[slot].sourceVia = std::nullopt;
+            }
+        }
+        mm.m.prepare(mm.rt, granulator.m_sr, granul_block_size);
+    }
+}
+
+void AudioPluginAudioProcessor::getStateInformation(juce::MemoryBlock &destData)
+{
+    auto state = getState();
     auto sdata = state.serialise();
-
-    // DBG("choc serialized data size is " << sdata.data.size());
-    // auto dump = getHexDump(sdata.data.data(), sdata.data.size());
-    // DBG(dump);
-    // auto json = choc::json::toString(state);
     destData.append(sdata.data.data(), sdata.data.size());
-    // DBG(json);
 }
 
 void AudioPluginAudioProcessor::setStateInformation(const void *data, int sizeInBytes)
@@ -467,125 +582,7 @@ void AudioPluginAudioProcessor::setStateInformation(const void *data, int sizeIn
             return;
         choc::value::InputData idata{(const uint8_t *)data, (const uint8_t *)data + sizeInBytes};
         auto state = choc::value::Value::deserialise(idata);
-
-        // std::string json((char *)data, (char *)data + sizeInBytes);
-        //  DBG(json);
-        // auto state = choc::json::parse(json);
-
-        suspendProcessing(true);
-        granulator.gvsettings.timespantoshow = state["gvs_timespan"].getWithDefault(8.0);
-        if (state.hasObjectMember("stepseqstates"))
-        {
-            auto stepseqstate = state["stepseqstates"];
-            for (size_t i = 0; i < stepseqstate.size(); ++i)
-            {
-                if (i >= granulator.stepModSources.size())
-                    break;
-                auto &ss = granulator.stepModSources[i];
-                auto seqstate = stepseqstate[(int)i];
-                auto steps = seqstate["steps"];
-                for (size_t j = 0; j < steps.size(); ++j)
-                {
-                    if (j < 128)
-                    {
-                        StepModSource::Message msg;
-                        msg.opcode = StepModSource::Message::OP_SETSTEP;
-                        msg.dest = i;
-                        msg.ival0 = j;
-                        msg.fval0 = steps[(int)j].getWithDefault(0.0f);
-                        granulator.fifo.push(msg);
-                    }
-                }
-                StepModSource::Message msg;
-                msg.opcode = StepModSource::Message::OP_LOOPSTART;
-                msg.dest = i;
-                msg.ival0 = seqstate["startstep"].getWithDefault(0);
-                granulator.fifo.push(msg);
-                msg.opcode = StepModSource::Message::OP_LOOPLEN;
-                msg.ival0 = seqstate["looplen"].getWithDefault(1);
-                granulator.fifo.push(msg);
-                msg.opcode = StepModSource::Message::OP_PLAYMODE;
-                msg.ival0 = seqstate["playmode"].getWithDefault(0);
-                granulator.fifo.push(msg);
-            }
-        }
-        if (state.hasObjectMember("filterstates"))
-        {
-            auto filterstates = state["filterstates"];
-            for (int i = 0; i < filterstates.size(); ++i)
-            {
-                auto filterstate = filterstates[i];
-                if (i < 2)
-                {
-                    sfpp::FilterModel m = (sfpp::FilterModel)filterstate["model"].getWithDefault(0);
-                    sfpp::ModelConfig conf;
-                    conf.dt = (decltype(conf.dt))filterstate["dt"].getWithDefault(0);
-                    conf.st = (decltype(conf.st))filterstate["st"].getWithDefault(0);
-                    conf.mt = (decltype(conf.mt))filterstate["mt"].getWithDefault(0);
-                    conf.pt = (decltype(conf.pt))filterstate["pt"].getWithDefault(0);
-                    int mainmode = filterstate["mainmode"].getWithDefault(0);
-                    int awtype = filterstate["awtype"].getWithDefault(0);
-                    // granulator.set_filter(i, mainmode, awtype, m, conf);
-
-                    ThreadMessage msg;
-                    msg.opcode = ThreadMessage::OP_FILTERTYPE;
-                    msg.insertmainmode = mainmode;
-                    msg.awtype = awtype;
-                    msg.filterindex = i;
-                    msg.filtermodel = m;
-                    msg.filterconfig = conf;
-                    from_gui_fifo.push(msg);
-                }
-            }
-        }
-        if (state.hasObjectMember("params"))
-        {
-            auto params = state["params"];
-            auto &pars = granulator.parmetadatas;
-            for (int i = 0; i < pars.size(); ++i)
-            {
-                std::string id = std::to_string(pars[i].id);
-                if (params.hasObjectMember(id))
-                {
-                    float v = params[id].getWithDefault(pars[i].defaultVal);
-                    ParameterMessage parmsg;
-                    parmsg.id = pars[i].id;
-                    parmsg.value = v;
-                    params_from_gui_fifo.push(parmsg);
-                    // *granulator.idtoparvalptr[pars[i].id] = v;
-                }
-            }
-        }
-        if (state.hasObjectMember("modroutings"))
-        {
-            auto routings = state["modroutings"];
-            auto &mm = granulator.modmatrix;
-            for (int i = 0; i < GranulatorModConfig::FixedMatrixSize; ++i)
-            {
-                mm.rt.updateActiveAt(i, false);
-            }
-            for (int i = 0; i < routings.size(); ++i)
-            {
-                auto rstate = routings[i];
-                int slot = rstate["slot"].get<int>();
-                if (slot >= 0 && slot < GranulatorModConfig::FixedMatrixSize)
-                {
-                    mm.rt.updateActiveAt(slot, true);
-                    uint32_t src = rstate["source"].getWithDefault(0);
-                    uint32_t srcvia = rstate["via"].getWithDefault(0);
-                    int curve = rstate["curve"].getWithDefault(1);
-                    float d = rstate["depth"].get<float>();
-                    int dest = rstate["dest"].getWithDefault(1);
-                    mm.rt.updateRoutingAt(slot, GranulatorModConfig::SourceIdentifier{src},
-                                          GranulatorModConfig::SourceIdentifier{srcvia},
-                                          GranulatorModConfig::MyCurve{curve},
-                                          GranulatorModConfig::TargetIdentifier{dest}, d);
-                    if (srcvia == 0)
-                        mm.rt.routes[slot].sourceVia = std::nullopt;
-                }
-            }
-            mm.m.prepare(mm.rt, granulator.m_sr, granul_block_size);
-        }
+        setState(state.getView());
     }
     catch (std::exception &ex)
     {
