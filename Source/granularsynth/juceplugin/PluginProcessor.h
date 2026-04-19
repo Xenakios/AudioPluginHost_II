@@ -50,6 +50,7 @@ using namespace std::literals;
 
 static constexpr auto masterVolume = "ignore_param_mastervolume"sv;
 static constexpr auto modulationRouting = "ignore_modulationrouting"sv;
+static constexpr auto dashboardsettings = "ignore_dashboard"sv;
 } // namespace StateIgnoreStrings
 
 class AudioPluginAudioProcessor final : public juce::AudioProcessor

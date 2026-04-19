@@ -451,7 +451,11 @@ choc::value::Value AudioPluginAudioProcessor::getState()
 void AudioPluginAudioProcessor::setState(choc::value::ValueView state)
 {
     suspendProcessing(true);
-    granulator.gvsettings.timespantoshow = state["gvs_timespan"].getWithDefault(8.0);
+    if (!state[StateIgnoreStrings::dashboardsettings].getWithDefault(false))
+    {
+        granulator.gvsettings.timespantoshow = state["gvs_timespan"].getWithDefault(8.0);
+    }
+        
     if (state.hasObjectMember("stepseqstates"))
     {
         auto stepseqstate = state["stepseqstates"];
