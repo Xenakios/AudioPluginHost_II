@@ -30,9 +30,6 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor(AudioPluginAudi
       auxenvcomp(&p.granulator, true), lfoTabs(juce::TabbedButtonBar::Orientation::TabsAtTop),
       msDebug(&p.granulator)
 {
-    addAndMakeVisible(presetButton);
-    presetButton.setButtonText("Presets...");
-    presetButton.onClick = [this]() { showPresetsMenu(); };
     perfcomp = std::make_unique<PerformanceComponent>();
     perfcomp->RequestData = [this](int &maxvoices, int &usedvoices, float &cpu) {
         maxvoices = processorRef.granulator.voices.size();
@@ -229,41 +226,6 @@ void AudioPluginAudioProcessorEditor::loadSnapShot(int index)
     }
     processorRef.suspendProcessing(false);
     juce::Timer::callAfterDelay(100, [this]() { processorRef.sendExtraStatesToGUI(); });
-}
-
-void AudioPluginAudioProcessorEditor::showPresetsMenu()
-{
-    juce::PopupMenu menu;
-    juce::PopupMenu savemenu;
-    juce::PopupMenu loadmenu;
-    for (int i = 0; i < 64; ++i)
-    {
-        savemenu.addItem(juce::String(i + 1), [this, i]() {
-            auto state = processorRef.getState();
-            std::ofstream ostream(std::format(
-                R"(C:\develop\AudioPluginHost_mk2\audio\granulatorpresets\{}.json)", i + 1));
-            choc::json::writeAsJSON(ostream, state, true);
-        });
-        loadmenu.addItem(juce::String(i + 1), [this, i]() {
-            try
-            {
-                auto jsontxt = choc::file::loadFileAsString(std::format(
-                    R"(C:\develop\AudioPluginHost_mk2\audio\granulatorpresets\{}.json)", i + 1));
-                auto state = choc::json::parseValue(jsontxt);
-                state.setMember(StateIgnoreStrings::masterVolume, true);
-                processorRef.setState(state);
-            }
-            catch (std::exception &ex)
-            {
-                DBG(ex.what());
-            }
-            processorRef.suspendProcessing(false);
-            juce::Timer::callAfterDelay(100, [this]() { processorRef.sendExtraStatesToGUI(); });
-        });
-    }
-    menu.addSubMenu("Save", savemenu);
-    menu.addSubMenu("Load", loadmenu);
-    menu.showMenuAsync(juce::PopupMenu::Options{});
 }
 
 AudioPluginAudioProcessorEditor::~AudioPluginAudioProcessorEditor()
@@ -551,7 +513,7 @@ void AudioPluginAudioProcessorEditor::resized()
     }
     modrowflex.performLayout(juce::Rectangle<int>{0, yoffs, getWidth(), 170});
     infoLabel.setBounds(0, getHeight() - 25, getWidth() - 71, 24);
-    presetButton.setBounds(getRight() - 70, getHeight() - 25, 69, 24);
+
     int vish = 140;
     if (msDebug.is_extended_size)
         vish = 400;
