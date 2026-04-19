@@ -869,6 +869,8 @@ class AudioPluginAudioProcessorEditor final : public juce::AudioProcessorEditor,
     // juce::TabbedComponent insertsTabs;
     std::vector<std::unique_ptr<StepSeqComponent>> stepcomps;
     juce::Label infoLabel;
+    juce::TextButton presetButton;
+    void showPresetsMenu();
     std::unordered_map<uint32_t, XapSlider *> idToSlider;
     std::unique_ptr<PerformanceComponent> perfcomp;
     std::unique_ptr<juce::TextButton> recordButton;

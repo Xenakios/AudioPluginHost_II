@@ -30,7 +30,9 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor(AudioPluginAudi
       auxenvcomp(&p.granulator, true), lfoTabs(juce::TabbedButtonBar::Orientation::TabsAtTop),
       msDebug(&p.granulator)
 {
-
+    addAndMakeVisible(presetButton);
+    presetButton.setButtonText("Presets...");
+    presetButton.onClick = [this]() { showPresetsMenu(); };
     perfcomp = std::make_unique<PerformanceComponent>();
     perfcomp->RequestData = [this](int &maxvoices, int &usedvoices, float &cpu) {
         maxvoices = processorRef.granulator.voices.size();
@@ -197,6 +199,40 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor(AudioPluginAudi
     addAndMakeVisible(msDebug);
     setSize(1500, 880);
     startTimer(50);
+}
+
+void AudioPluginAudioProcessorEditor::showPresetsMenu()
+{
+    juce::PopupMenu menu;
+    juce::PopupMenu savemenu;
+    juce::PopupMenu loadmenu;
+    for (int i = 0; i < 64; ++i)
+    {
+        savemenu.addItem(juce::String(i + 1), [this, i]() {
+            auto state = processorRef.getState();
+            std::ofstream ostream(std::format(
+                R"(C:\develop\AudioPluginHost_mk2\audio\granulatorpresets\{}.json)", i + 1));
+            choc::json::writeAsJSON(ostream, state, true);
+        });
+        loadmenu.addItem(juce::String(i + 1), [this, i]() {
+            try
+            {
+                auto jsontxt = choc::file::loadFileAsString(std::format(
+                    R"(C:\develop\AudioPluginHost_mk2\audio\granulatorpresets\{}.json)", i + 1));
+                auto state = choc::json::parseValue(jsontxt);
+                processorRef.setState(state);
+            }
+            catch (std::exception &ex)
+            {
+                DBG(ex.what());
+            }
+            processorRef.suspendProcessing(false);
+            juce::Timer::callAfterDelay(100, [this]() { processorRef.sendExtraStatesToGUI(); });
+        });
+    }
+    menu.addSubMenu("Save", savemenu);
+    menu.addSubMenu("Load", loadmenu);
+    menu.showMenuAsync(juce::PopupMenu::Options{});
 }
 
 AudioPluginAudioProcessorEditor::~AudioPluginAudioProcessorEditor()
@@ -483,7 +519,8 @@ void AudioPluginAudioProcessorEditor::resized()
             juce::FlexItem(*modRowComps[i]).withFlex(1).withMinHeight(25).withMargin(1));
     }
     modrowflex.performLayout(juce::Rectangle<int>{0, yoffs, getWidth(), 170});
-    infoLabel.setBounds(0, getHeight() - 25, getWidth(), 24);
+    infoLabel.setBounds(0, getHeight() - 25, getWidth() - 71, 24);
+    presetButton.setBounds(getRight() - 70, getHeight() - 25, 69, 24);
     int vish = 140;
     if (msDebug.is_extended_size)
         vish = 400;
@@ -827,7 +864,6 @@ void ModSourcesDebugComponent::paint(juce::Graphics &g)
 {
     g.fillAll(juce::Colours::black);
 
-    
     g.setColour(juce::Colours::green);
     for (int i = 0; i < 40; ++i)
     {
@@ -835,7 +871,7 @@ void ModSourcesDebugComponent::paint(juce::Graphics &g)
         float ycor = juce::jmap<float>(gr->modSourceValues[i], -1.0f, 1.0, getHeight(), 0.0);
         g.drawLine(xcor, 0.0f, xcor, ycor, 3.9);
     }
-        
+
     // g.setColour(juce::Colours::white);
     float xoffs = 400.0f;
     float w = getWidth() - xoffs;
