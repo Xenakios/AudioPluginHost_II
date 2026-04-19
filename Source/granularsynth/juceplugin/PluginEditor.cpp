@@ -913,6 +913,7 @@ void DashBoardComponent::paint(juce::Graphics &g)
     // 2. Format with leading zeros
     juce::String timeText = juce::String::formatted("%02d:%02d.%03d", mins, secs, ms);
     timeText += " " + juce::String(persisted_events.size()) + " events in history";
+    timeText += " " + juce::String(gr->parmetadatas.size()) + " parameters";
     g.setFont(18.0f);
     g.drawText(timeText, xoffs, 1.0f, getWidth() - xoffs, 25, juce::Justification::left);
 }
