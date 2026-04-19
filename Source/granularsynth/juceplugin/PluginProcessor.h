@@ -44,6 +44,14 @@ struct ThreadMessage
     sfpp::ModelConfig filterconfig;
 };
 
+namespace StateIgnoreStrings
+{
+using namespace std::literals;
+
+static constexpr auto masterVolume = "ignore_param_mastervolume"sv;
+static constexpr auto modulationRouting = "ignore_modulationrouting"sv;
+} // namespace StateIgnoreStrings
+
 class AudioPluginAudioProcessor final : public juce::AudioProcessor
 {
   public:
@@ -92,14 +100,15 @@ class AudioPluginAudioProcessor final : public juce::AudioProcessor
     choc::value::Value getState();
     void setState(choc::value::ValueView state);
     void sendExtraStatesToGUI();
+
   private:
     alignas(32) std::vector<float> workBuffer;
     alignas(32) choc::fifo::SingleReaderSingleWriterFIFO<std::array<float, 16>> buffer_adapter;
     void setStateDirtyHack();
     int prior_ambi_order = -1;
     std::unordered_map<juce::AudioProcessorParameter *, int> jucepartoindex;
-    juce::AudioParameterFloat* dirtyStateParam = nullptr;
-    
+    juce::AudioParameterFloat *dirtyStateParam = nullptr;
+
     //==============================================================================
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(AudioPluginAudioProcessor)
 };

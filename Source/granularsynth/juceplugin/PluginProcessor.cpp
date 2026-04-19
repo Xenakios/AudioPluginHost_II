@@ -520,7 +520,7 @@ void AudioPluginAudioProcessor::setState(choc::value::ValueView state)
     {
         auto params = state["params"];
         auto &pars = granulator.parmetadatas;
-        bool ignoreMasterVolume = state["ignoreparam_mastervolume"].getWithDefault(false);
+        bool ignoreMasterVolume = state[StateIgnoreStrings::masterVolume].getWithDefault(false);
         for (int i = 0; i < pars.size(); ++i)
         {
             if (ignoreMasterVolume && pars[i].id == ToneGranulator::PAR_MAINVOLUME)
