@@ -90,7 +90,7 @@ class AudioPluginAudioProcessor final : public juce::AudioProcessor
     std::unique_ptr<juce::AudioFormatWriter::ThreadedWriter> threadedWriter;
     juce::AudioBuffer<float> recordBuffer;
     choc::value::Value getState();
-    void setState(choc::value::ValueView state, bool ignoreMasterVolume);
+    void setState(choc::value::ValueView state);
     void sendExtraStatesToGUI();
   private:
     alignas(32) std::vector<float> workBuffer;

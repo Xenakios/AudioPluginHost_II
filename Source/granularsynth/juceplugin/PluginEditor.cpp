@@ -220,7 +220,8 @@ void AudioPluginAudioProcessorEditor::loadSnapShot(int index)
         auto jsontxt = choc::file::loadFileAsString(std::format(
             R"(C:\develop\AudioPluginHost_mk2\audio\granulatorpresets\{}.json)", index + 1));
         auto state = choc::json::parseValue(jsontxt);
-        processorRef.setState(state, true);
+        state.setMember("ignoreparam_mastervolume", true);
+        processorRef.setState(state);
     }
     catch (std::exception &ex)
     {
@@ -249,7 +250,8 @@ void AudioPluginAudioProcessorEditor::showPresetsMenu()
                 auto jsontxt = choc::file::loadFileAsString(std::format(
                     R"(C:\develop\AudioPluginHost_mk2\audio\granulatorpresets\{}.json)", i + 1));
                 auto state = choc::json::parseValue(jsontxt);
-                processorRef.setState(state, true);
+                state.setMember("ignoreparam_mastervolume", true);
+                processorRef.setState(state);
             }
             catch (std::exception &ex)
             {
