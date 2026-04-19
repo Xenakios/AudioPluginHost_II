@@ -28,7 +28,7 @@ inline void updateAllFonts(juce::Component &parent, const juce::Font &newFont)
 AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor(AudioPluginAudioProcessor &p)
     : AudioProcessorEditor(&p), processorRef(p), envcomp(&p.granulator, false),
       auxenvcomp(&p.granulator, true), lfoTabs(juce::TabbedButtonBar::Orientation::TabsAtTop),
-      msDebug(&p.granulator)
+      dashBoardComponent(&p.granulator)
 {
     perfcomp = std::make_unique<PerformanceComponent>();
     perfcomp->RequestData = [this](int &maxvoices, int &usedvoices, float &cpu) {
@@ -197,7 +197,7 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor(AudioPluginAudi
 
     // setLookAndFeel(&lnf);
     // updateAllFonts(*this, lnf.myFont);
-    addAndMakeVisible(msDebug);
+    addAndMakeVisible(dashBoardComponent);
     setSize(1500, 880);
     startTimer(50);
 }
@@ -515,9 +515,9 @@ void AudioPluginAudioProcessorEditor::resized()
     infoLabel.setBounds(0, getHeight() - 25, getWidth() - 71, 24);
 
     int vish = 140;
-    if (msDebug.is_extended_size)
+    if (dashBoardComponent.is_extended_size)
         vish = 400;
-    msDebug.setBounds(1, getHeight() - vish - 25, getWidth() - 2, vish);
+    dashBoardComponent.setBounds(1, getHeight() - vish - 25, getWidth() - 2, vish);
 }
 
 void StepSeqComponent::paint(juce::Graphics &g)
@@ -789,7 +789,7 @@ void StepSeqComponent::runExternalProgram()
     });
 }
 
-void ModSourcesDebugComponent::paintAmbisonicFieldHammerProjection(juce::Graphics &g)
+void DashBoardComponent::paintAmbisonicFieldHammerProjection(juce::Graphics &g)
 {
     g.setColour(juce::Colours::white);
     float ellipW = 400.0f;
@@ -853,7 +853,7 @@ void ModSourcesDebugComponent::paintAmbisonicFieldHammerProjection(juce::Graphic
     }
 }
 
-void ModSourcesDebugComponent::paint(juce::Graphics &g)
+void DashBoardComponent::paint(juce::Graphics &g)
 {
     g.fillAll(juce::Colours::black);
 

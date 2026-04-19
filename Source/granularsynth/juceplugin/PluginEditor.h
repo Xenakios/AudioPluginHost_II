@@ -747,7 +747,7 @@ class VolumeEnvelopeComponent : public juce::Component
     bool auxenvmode = false;
 };
 
-class ModSourcesDebugComponent : public juce::Component
+class DashBoardComponent : public juce::Component
 {
   public:
     ToneGranulator *gr = nullptr;
@@ -758,7 +758,7 @@ class ModSourcesDebugComponent : public juce::Component
     bool showModulatorValues = false;
     juce::ColourGradient pitchGradient;
     std::unique_ptr<juce::VBlankAttachment> vblankAttachment;
-    ModSourcesDebugComponent(ToneGranulator *g) : gr(g)
+    DashBoardComponent(ToneGranulator *g) : gr(g)
     {
         timespantoshow = gr->gvsettings.timespantoshow;
         pitchGradient.clearColours();
@@ -943,7 +943,7 @@ class AudioPluginAudioProcessorEditor final : public juce::AudioProcessorEditor,
     std::unique_ptr<PerformanceComponent> perfcomp;
     std::unique_ptr<juce::TextButton> recordButton;
     PresetsComponent presetsComponent;
-    ModSourcesDebugComponent msDebug;
+    DashBoardComponent dashBoardComponent;
     void showFilterMenu(int whichfilter);
     void updateInsertParameterMetaDatas();
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(AudioPluginAudioProcessorEditor)
