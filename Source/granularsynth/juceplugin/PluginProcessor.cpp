@@ -448,7 +448,7 @@ choc::value::Value AudioPluginAudioProcessor::getState()
     return state;
 }
 
-void AudioPluginAudioProcessor::setState(choc::value::ValueView state)
+void AudioPluginAudioProcessor::setState(choc::value::ValueView state, bool ignoreMasterVolume)
 {
     suspendProcessing(true);
     granulator.gvsettings.timespantoshow = state["gvs_timespan"].getWithDefault(8.0);
@@ -522,6 +522,8 @@ void AudioPluginAudioProcessor::setState(choc::value::ValueView state)
         auto &pars = granulator.parmetadatas;
         for (int i = 0; i < pars.size(); ++i)
         {
+            if (ignoreMasterVolume && pars[i].id == ToneGranulator::PAR_MAINVOLUME)
+                continue;
             std::string id = std::to_string(pars[i].id);
             if (params.hasObjectMember(id))
             {
@@ -582,7 +584,7 @@ void AudioPluginAudioProcessor::setStateInformation(const void *data, int sizeIn
             return;
         choc::value::InputData idata{(const uint8_t *)data, (const uint8_t *)data + sizeInBytes};
         auto state = choc::value::Value::deserialise(idata);
-        setState(state.getView());
+        setState(state.getView(), false);
     }
     catch (std::exception &ex)
     {

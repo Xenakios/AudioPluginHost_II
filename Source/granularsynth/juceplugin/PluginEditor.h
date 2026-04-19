@@ -59,7 +59,8 @@ struct PresetsComponent : public juce::Component
         flex.flexWrap = juce::FlexBox::Wrap::wrap;
         for (auto &b : buttons)
         {
-            flex.items.add(juce::FlexItem(*b).withFlex(1.0).withMinWidth(40.0f));
+            flex.items.add(
+                juce::FlexItem(*b).withFlex(1.0).withMinWidth(40.0f).withMaxWidth(40.0f));
         }
         flex.performLayout(getLocalBounds());
     }
@@ -67,8 +68,7 @@ struct PresetsComponent : public juce::Component
     {
         for (int i = 0; i < buttons.size(); ++i)
         {
-            buttons[i]->setColour(juce::TextButton::ColourIds::buttonColourId,
-                                  defaultButtonColor);
+            buttons[i]->setColour(juce::TextButton::ColourIds::buttonColourId, defaultButtonColor);
             if (i == lastLoaded)
                 buttons[i]->setColour(juce::TextButton::ColourIds::buttonColourId,
                                       juce::Colours::orange);
