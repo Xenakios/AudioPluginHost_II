@@ -34,18 +34,23 @@ struct PresetsComponent : public juce::Component
                 auto mods = juce::ModifierKeys::getCurrentModifiers();
                 if (mods.isCommandDown())
                 {
+                    lastSaved = i;
                     if (OnSave)
                         OnSave(i);
                 }
                 else
                 {
+                    lastLoaded = i;
                     if (OnLoad)
                         OnLoad(i);
                 }
+                updateButtonColors();
             };
             addAndMakeVisible(*but);
             buttons.push_back(std::move(but));
         }
+        defaultButtonColor =
+            buttons.front()->findColour(juce::TextButton::ColourIds::buttonColourId);
     }
     void resized() override
     {
@@ -58,8 +63,25 @@ struct PresetsComponent : public juce::Component
         }
         flex.performLayout(getLocalBounds());
     }
+    void updateButtonColors()
+    {
+        for (int i = 0; i < buttons.size(); ++i)
+        {
+            buttons[i]->setColour(juce::TextButton::ColourIds::buttonColourId,
+                                  defaultButtonColor);
+            if (i == lastLoaded)
+                buttons[i]->setColour(juce::TextButton::ColourIds::buttonColourId,
+                                      juce::Colours::orange);
+            if (i == lastSaved)
+                buttons[i]->setColour(juce::TextButton::ColourIds::buttonColourId,
+                                      juce::Colours::red);
+        }
+    }
     std::function<void(int)> OnSave;
     std::function<void(int)> OnLoad;
+    int lastSaved = -1;
+    int lastLoaded = -1;
+    juce::Colour defaultButtonColor;
     std::vector<std::unique_ptr<juce::TextButton>> buttons;
 };
 
