@@ -22,6 +22,47 @@ class MyCustomLNF : public juce::LookAndFeel_V4
     }
 };
 
+struct PresetsComponent : public juce::Component
+{
+    PresetsComponent()
+    {
+        for (int i = 0; i < 64; ++i)
+        {
+            auto but = std::make_unique<juce::TextButton>();
+            but->setButtonText(juce::String(i + 1));
+            but->onClick = [this, i]() {
+                auto mods = juce::ModifierKeys::getCurrentModifiers();
+                if (mods.isCommandDown())
+                {
+                    if (OnSave)
+                        OnSave(i);
+                }
+                else
+                {
+                    if (OnLoad)
+                        OnLoad(i);
+                }
+            };
+            addAndMakeVisible(*but);
+            buttons.push_back(std::move(but));
+        }
+    }
+    void resized() override
+    {
+        juce::FlexBox flex;
+        flex.flexDirection = juce::FlexBox::Direction::row;
+        flex.flexWrap = juce::FlexBox::Wrap::wrap;
+        for (auto &b : buttons)
+        {
+            flex.items.add(juce::FlexItem(*b).withFlex(1.0).withMinWidth(40.0f));
+        }
+        flex.performLayout(getLocalBounds());
+    }
+    std::function<void(int)> OnSave;
+    std::function<void(int)> OnLoad;
+    std::vector<std::unique_ptr<juce::TextButton>> buttons;
+};
+
 struct DropDownComponent : public juce::Component
 {
 
@@ -731,11 +772,11 @@ class ModSourcesDebugComponent : public juce::Component
             return;
         juce::PopupMenu menu;
         menu.addSectionHeader("Time span to show");
-        menu.addItem("1 second", [this]() { timespantoshow = 1.0; });
-        menu.addItem("2 seconds", [this]() { timespantoshow = 2.0; });
-        menu.addItem("4 seconds", [this]() { timespantoshow = 4.0; });
-        menu.addItem("8 seconds", [this]() { timespantoshow = 8.0; });
-        menu.addItem("16 seconds", [this]() { timespantoshow = 16.0; });
+        menu.addItem("1 second", [this]() { gr->gvsettings.timespantoshow = 1.0; });
+        menu.addItem("2 seconds", [this]() { gr->gvsettings.timespantoshow = 2.0; });
+        menu.addItem("4 seconds", [this]() { gr->gvsettings.timespantoshow = 4.0; });
+        menu.addItem("8 seconds", [this]() { gr->gvsettings.timespantoshow = 8.0; });
+        menu.addItem("16 seconds", [this]() { gr->gvsettings.timespantoshow = 16.0; });
         menu.addItem("Toggle size", [this]() {
             is_extended_size = !is_extended_size;
             getParentComponent()->resized();
@@ -744,7 +785,7 @@ class ModSourcesDebugComponent : public juce::Component
     }
     void updateGrainData()
     {
-        gr->gvsettings.timespantoshow = timespantoshow;
+        timespantoshow = gr->gvsettings.timespantoshow;
         ToneGranulator::GrainVisualizerMessage msg;
         while (gr->visualizer_fifo.pop(msg))
         {
@@ -871,9 +912,12 @@ class AudioPluginAudioProcessorEditor final : public juce::AudioProcessorEditor,
     juce::Label infoLabel;
     juce::TextButton presetButton;
     void showPresetsMenu();
+    void saveSnapShot(int index);
+    void loadSnapShot(int index);
     std::unordered_map<uint32_t, XapSlider *> idToSlider;
     std::unique_ptr<PerformanceComponent> perfcomp;
     std::unique_ptr<juce::TextButton> recordButton;
+    PresetsComponent presetsComponent;
     ModSourcesDebugComponent msDebug;
     void showFilterMenu(int whichfilter);
     void updateInsertParameterMetaDatas();

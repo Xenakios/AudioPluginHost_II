@@ -187,6 +187,10 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor(AudioPluginAudi
         stepcomps.push_back(std::move(stepcomp));
     }
 
+    presetsComponent.OnSave = [this](int index) { saveSnapShot(index); };
+    presetsComponent.OnLoad = [this](int index) { loadSnapShot(index); };
+    lfoTabs.addTab("PRESETS", juce::Colours::darkgrey, &presetsComponent, false);
+
     addAndMakeVisible(lfoTabs);
     // lfoTabs.getTabbedButtonBar().setColour(juce::TabbedButtonBar::ColourIds::tabOutlineColourId,
     //                                        juce::Colours::yellowgreen);
@@ -199,6 +203,31 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor(AudioPluginAudi
     addAndMakeVisible(msDebug);
     setSize(1500, 880);
     startTimer(50);
+}
+
+void AudioPluginAudioProcessorEditor::saveSnapShot(int index)
+{
+    auto state = processorRef.getState();
+    std::ofstream ostream(std::format(
+        R"(C:\develop\AudioPluginHost_mk2\audio\granulatorpresets\{}.json)", index + 1));
+    choc::json::writeAsJSON(ostream, state, true);
+}
+
+void AudioPluginAudioProcessorEditor::loadSnapShot(int index)
+{
+    try
+    {
+        auto jsontxt = choc::file::loadFileAsString(std::format(
+            R"(C:\develop\AudioPluginHost_mk2\audio\granulatorpresets\{}.json)", index + 1));
+        auto state = choc::json::parseValue(jsontxt);
+        processorRef.setState(state);
+    }
+    catch (std::exception &ex)
+    {
+        DBG(ex.what());
+    }
+    processorRef.suspendProcessing(false);
+    juce::Timer::callAfterDelay(100, [this]() { processorRef.sendExtraStatesToGUI(); });
 }
 
 void AudioPluginAudioProcessorEditor::showPresetsMenu()
