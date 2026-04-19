@@ -755,6 +755,7 @@ class ModSourcesDebugComponent : public juce::Component
     double timespantoshow = 8.0;
     int throttlecounter = 0;
     float visualfadecoefficient = 1.0;
+    bool showModulatorValues = false;
     juce::ColourGradient pitchGradient;
     std::unique_ptr<juce::VBlankAttachment> vblankAttachment;
     ModSourcesDebugComponent(ToneGranulator *g) : gr(g)
@@ -799,10 +800,13 @@ class ModSourcesDebugComponent : public juce::Component
         menu.addItem("4 seconds", [this]() { gr->gvsettings.timespantoshow = 4.0; });
         menu.addItem("8 seconds", [this]() { gr->gvsettings.timespantoshow = 8.0; });
         menu.addItem("16 seconds", [this]() { gr->gvsettings.timespantoshow = 16.0; });
+        menu.addSectionHeader("Options");
         menu.addItem("Toggle size", [this]() {
             is_extended_size = !is_extended_size;
             getParentComponent()->resized();
         });
+        menu.addItem("Show modulator values", true, showModulatorValues,
+                     [this]() { showModulatorValues = !showModulatorValues; });
         menu.showMenuAsync(juce::PopupMenu::Options{});
     }
     void updateGrainData()

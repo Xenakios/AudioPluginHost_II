@@ -582,13 +582,13 @@ void StepSeqComponent::paint(juce::Graphics &g)
 
         if (v < 0.0)
         {
-            float h = juce::jmap<float>(v, -1.0, 0.0, getHeight() / 2, 0.0);
+            float h = juce::jmap<float>(v, -1.0, 0.0, getHeight() / 2.0, 0.0);
             g.fillRect(xcor, getHeight() / 2.0, 15.0, h);
         }
         else
         {
 
-            float h = juce::jmap<float>(v, 0.0, 1.0, 0.0, getHeight() / 2);
+            float h = juce::jmap<float>(v, 0.0, 1.0, 0.0, getHeight() / 2.0);
             g.fillRect(xcor, getHeight() / 2.0 - h, 15.0, h);
         }
     }
@@ -895,14 +895,27 @@ void ModSourcesDebugComponent::paint(juce::Graphics &g)
 {
     g.fillAll(juce::Colours::black);
 
-    g.setColour(juce::Colours::green);
-    for (int i = 0; i < 40; ++i)
+    if (showModulatorValues)
     {
-        float xcor = i * 4;
-        float ycor = juce::jmap<float>(gr->modSourceValues[i], -1.0f, 1.0, getHeight(), 0.0);
-        g.drawLine(xcor, 0.0f, xcor, ycor, 3.9);
-    }
+        float barw = 16.0;
+        g.setColour(juce::Colours::green);
+        for (int i = 0; i < ToneGranulator::MIDICCEND - 32; ++i)
+        {
+            float xcor = i * barw;
+            float v = gr->modSourceValues[i];
+            if (v < 0.0)
+            {
+                float h = juce::jmap<float>(v, -1.0, 0.0, getHeight() / 2.0, 0.0);
+                g.fillRect(xcor, getHeight() / 2.0, barw - 1.0f, h);
+            }
+            else
+            {
 
+                float h = juce::jmap<float>(v, 0.0, 1.0, 0.0, getHeight() / 2.0);
+                g.fillRect(xcor, getHeight() / 2.0 - h, barw - 1.0f, h);
+            }
+        }
+    }
     // g.setColour(juce::Colours::white);
     float xoffs = 400.0f;
     float w = getWidth() - xoffs;
