@@ -432,6 +432,13 @@ struct ModulationRowComponent : public juce::Component
             Node{"HARMONICS 4 OCTAVES", GranulatorModConfig::CURVE_HARMONICSERIES4OCTAVES});
         curveDrop.rootNode.children.push_back(
             Node{"HARMONICS 5 OCTAVES", GranulatorModConfig::CURVE_HARMONICSERIES5OCTAVES});
+        Node peakingnode{"PEAKING"};
+        for (int i = 0; i < 4; ++i)
+        {
+            peakingnode.children.push_back(
+                Node{std::format("PEAKING {}", i + 1), GranulatorModConfig::CURVE_PEAKING1 + i});
+        }
+        curveDrop.rootNode.children.emplace_back(peakingnode);
         Node xornode{"XOR"};
         for (int i = 0; i < 4; ++i)
         {

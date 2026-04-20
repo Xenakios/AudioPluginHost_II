@@ -86,8 +86,24 @@ struct GranulatorModConfig
         CURVE_HARMONICSERIES3OCTAVES,
         CURVE_HARMONICSERIES4OCTAVES,
         CURVE_HARMONICSERIES5OCTAVES,
-        CURVE_TOPOWER16
+        CURVE_TOPOWER16,
+        CURVE_PEAKING1,
+        CURVE_PEAKING2,
+        CURVE_PEAKING3,
+        CURVE_PEAKING4
     };
+    static float peaking_curve(float x, float y)
+    {
+        x = std::clamp(x, -1.0f, 1.0f);
+        if (x < 0.0f)
+        {
+            x += 1.0f;
+            x = 1.0f - std::pow(1.0f - x, y);
+            return -1.0f + 2.0f * x;
+        }
+        x = 1.0f - std::pow(x, y);
+        return -1.0f + 2.0f * x;
+    }
     static float xor_curve(float x, uint16_t a)
     {
         x = std::clamp(x, -1.0f, 1.0f);
@@ -183,6 +199,14 @@ struct GranulatorModConfig
             return [](auto x) { return harmseries(x, 4); };
         case CURVE_HARMONICSERIES5OCTAVES:
             return [](auto x) { return harmseries(x, 5); };
+        case CURVE_PEAKING1:
+            return [](auto x) { return peaking_curve(x, 1.0f); };
+        case CURVE_PEAKING2:
+            return [](auto x) { return peaking_curve(x, 2.0f); };
+        case CURVE_PEAKING3:
+            return [](auto x) { return peaking_curve(x, 3.0f); };
+        case CURVE_PEAKING4:
+            return [](auto x) { return peaking_curve(x, 4.0f); };
         }
 
         return [](auto x) { return x; };

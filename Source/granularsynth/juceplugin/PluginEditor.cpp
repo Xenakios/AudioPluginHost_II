@@ -886,10 +886,10 @@ void DashBoardComponent::paint(juce::Graphics &g)
     for (auto &e : persisted_events)
     {
         // float hue = juce::jmap<float>(e.pitch, -48.0f, 64.0f, 0.0f, 0.8f);
-        // float alpha =  juce::jmap<float>(e.gain, 0.0f, 1.0f, 0.0f, 1.0f);
+        float alpha = juce::jmap<float>(e.gain, 0.0f, 1.0f, 0.0f, 1.0f);
         // g.setColour(juce::Colour::fromHSV(hue, 0.8f, 1.0f, alpha));
         float normpitch = juce::jmap<float>(e.pitch, -48.0f, 64.0f, 0.0f, 1.0f);
-        g.setColour(pitchGradient.getColourAtPosition(normpitch));
+        g.setColour(pitchGradient.getColourAtPosition(normpitch).withBrightness(alpha));
         float xcor = w - ((enginetime - e.timepos) / timespantoshow * w);
         float ycor = juce::jmap<float>(e.pitch, -48.0, 64.0, getHeight() - 5.0, 0.0);
         float gw = getWidth() / timespantoshow * e.duration;
