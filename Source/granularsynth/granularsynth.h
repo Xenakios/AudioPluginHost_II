@@ -1808,11 +1808,15 @@ class ToneGranulator
         num_out_chans = aotonumchans[order];
     }
     std::atomic<float> auxenvwarpmodulated = 0.0f;
+    std::atomic<uint32_t> modulatedParamToStore{0};
+    std::atomic<float> modulatedParValueForGUI{0.0f};
     void generate_grain()
     {
         double actgrate =
             modmatrix.m.getTargetValue(GranulatorModConfig::TargetIdentifier{PAR_DENSITY});
         actgrate = std::clamp(actgrate, -1.0, 8.0);
+        if (modulatedParamToStore.load() == PAR_DENSITY)
+            modulatedParValueForGUI.store(actgrate);
         double grate = 1.0 / std::pow(2.0, actgrate);
         for (int i = 0; i < granul_block_size; ++i)
         {

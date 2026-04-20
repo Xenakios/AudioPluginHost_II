@@ -752,14 +752,23 @@ class DashBoardComponent : public juce::Component
   public:
     ToneGranulator *gr = nullptr;
     std::vector<ToneGranulator::GrainVisualizerMessage> persisted_events;
+    struct ParamEvent
+    {
+        double timestamp = 0.0;
+        double value = 0.0;
+    };
+    std::vector<ParamEvent> paramValuesHistory;
+    juce::Path paramHistoryPath;
     double timespantoshow = 8.0;
     int throttlecounter = 0;
     float visualfadecoefficient = 1.0;
     bool showModulatorValues = false;
+
     juce::ColourGradient pitchGradient;
     std::unique_ptr<juce::VBlankAttachment> vblankAttachment;
     DashBoardComponent(ToneGranulator *g) : gr(g)
     {
+        paramHistoryPath.preallocateSpace(2048);
         timespantoshow = gr->gvsettings.timespantoshow;
         pitchGradient.clearColours();
         pitchGradient.addColour(0.00, juce::Colours::red);
@@ -772,6 +781,7 @@ class DashBoardComponent : public juce::Component
         else
             visualfadecoefficient = std::pow(0.93, 4);
         persisted_events.reserve(4096);
+        paramValuesHistory.reserve(1024);
         vblankAttachment = std::make_unique<juce::VBlankAttachment>(this, [this]() {
             updateGrainData();
             if (is_debug())
@@ -820,6 +830,11 @@ class DashBoardComponent : public juce::Component
         double enginetime = gr->playposframes / gr->m_sr;
         std::erase_if(persisted_events, [this, enginetime](auto const &ev) {
             return ev.timepos + ev.duration < enginetime - timespantoshow;
+        });
+        gr->modulatedParamToStore.store(ToneGranulator::PAR_DENSITY);
+        paramValuesHistory.emplace_back(enginetime, gr->modulatedParValueForGUI.load());
+        std::erase_if(paramValuesHistory, [this, enginetime](auto const &ev) {
+            return ev.timestamp < enginetime - timespantoshow;
         });
     }
 };
@@ -936,7 +951,7 @@ class AudioPluginAudioProcessorEditor final : public juce::AudioProcessorEditor,
     // juce::TabbedComponent insertsTabs;
     std::vector<std::unique_ptr<StepSeqComponent>> stepcomps;
     juce::Label infoLabel;
-    
+
     void saveSnapShot(int index);
     void loadSnapShot(int index);
     std::unordered_map<uint32_t, XapSlider *> idToSlider;

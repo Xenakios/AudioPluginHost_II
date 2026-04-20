@@ -899,6 +899,21 @@ void DashBoardComponent::paint(juce::Graphics &g)
         // ycor = juce::jmap<float>(e.azimuthdegrees, -180.0, 180.0, getHeight(), 0.0);
         // g.fillRect(xcor, ycor, 4.0f, 4.0f);
     }
+
+    paramHistoryPath.clear();
+    for (size_t i = 0; i < paramValuesHistory.size(); ++i)
+    {
+        const auto &e = paramValuesHistory[i];
+        float xcor = w - ((enginetime - e.timestamp) / timespantoshow * w);
+        xcor = std::clamp<float>(xcor + xoffs, xoffs, getWidth());
+        float ycor = juce::jmap<float>(e.value, 0.0, 8.0, getHeight() - 5.0, 0.0);
+        if (i == 0)
+            paramHistoryPath.startNewSubPath(juce::Point<float>(xcor, ycor));
+        else
+            paramHistoryPath.lineTo(juce::Point<float>(xcor, ycor));
+    }
+    g.setColour(juce::Colours::beige);
+    g.strokePath(paramHistoryPath, juce::PathStrokeType(3.0f));
     paintAmbisonicFieldHammerProjection(g);
     g.setColour(juce::Colours::yellow);
     float h = juce::Decibels::gainToDecibels(gr->compensationgainforgui.load());
