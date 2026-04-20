@@ -27,6 +27,11 @@ function generate_steps(steps, startstep, endstep, par0, par1, par2, par3) {
             if (partial > 0 && partial < 17)
                 steps[i] = Math.log2(partial) / 4.0;
         }
+        if (par0 == 4) {
+            if (i % 13 == 0 || i % 7 == 2)
+                steps[i] = 1.0;
+            else steps[i] = 0.0;
+        }
     }
     // sleep(1000);
     return steps;
