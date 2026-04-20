@@ -635,7 +635,7 @@ class VolumeEnvelopeComponent : public juce::Component
         if (stepindex >= 0 && stepindex < numsteps)
         {
             float delta = wheel.deltaY * 0.2;
-            auto &auxenv = granul->voices[0]->aux_envelope;
+            auto &auxenv = granul->voiceaux_envelope;
             float val = auxenv.steps[stepindex] + delta;
             StepModSource::Message msg;
             msg.opcode = StepModSource::Message::OP_SETSTEP;
@@ -656,7 +656,7 @@ class VolumeEnvelopeComponent : public juce::Component
         auto curveend = priorendcurve;
         float sinfreq = getWidth() / 8.0;
         auto &eluts = granul->eluts;
-        auto &auxenv = granul->voices[0]->aux_envelope;
+        auto &auxenv = granul->voiceaux_envelope;
 
         for (int i = 0; i < getWidth(); ++i)
         {
@@ -704,19 +704,6 @@ class VolumeEnvelopeComponent : public juce::Component
                 g.drawLine(x0, y, x1, y, 2.0f);
             }
         }
-    }
-    float cubic_interpolate(float x)
-    {
-        int index = x;
-        auto &test_table = granul->voices[0]->aux_envelope.steps;
-        float y0 = test_table[index + 0];
-        float y1 = test_table[index + 1];
-        float y2 = test_table[index + 2];
-        float y3 = test_table[index + 3];
-        float mu = x - index;
-        return sst::basic_blocks::dsp::quad_bspline(y0, y1, y2, mu);
-        // return sst::basic_blocks::dsp::cubic_ipol(y0, y1, y2, y3, mu);
-        return y0 + (y1 - y0) * mu;
     }
     void updateIfNeeded()
     {

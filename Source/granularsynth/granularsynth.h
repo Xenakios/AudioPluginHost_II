@@ -416,7 +416,7 @@ template <bool TaperEnabled> struct SimpleEnvelope
         phase = 0.0;
         steplen = (double)dursamples / (maxnumsteps - 1);
     }
-    float get_value(float xpos, float xwarp)
+    float get_value(float xpos, float xwarp) const
     {
         xpos = std::clamp(xpos, 0.0f, 1.0f);
         if (xwarp < 0.0f)
@@ -509,7 +509,7 @@ class GranulatorVoice
     FilterRouting filter_routing = FR_ALLSERIAL;
 
     alignas(32) SimpleEnvelope<true> gain_envelope;
-    alignas(32) SimpleEnvelope<false> aux_envelope;
+    alignas(32) SimpleEnvelope<false> *aux_envelope = nullptr;
     alignas(16) float modamounts[GrainEvent::MD_NUMDESTS];
     float pitch_base = 0.0f;
     float graingain = 0.0;
@@ -658,7 +658,7 @@ class GranulatorVoice
         actdur = 0.002f + 0.498f * actdur;
         grain_end_phase = sr * actdur;
         gain_envelope.start(grain_end_phase);
-        aux_envelope.start(grain_end_phase);
+        // aux_envelope.start(grain_end_phase);
         auxenvtimewarp = evpars.auxenvtimewarp;
 
         for (size_t i = 0; i < 2; ++i)
@@ -701,7 +701,7 @@ class GranulatorVoice
         if constexpr (GrainModulation)
         {
             double normphase = (double)phase / grain_end_phase;
-            aux_env_value = aux_envelope.get_value(normphase, auxenvtimewarp);
+            aux_env_value = aux_envelope->get_value(normphase, auxenvtimewarp);
         }
 
         std::visit(
@@ -1216,13 +1216,7 @@ class ToneGranulator
     alignas(16) std::array<float, 256> modSourceValues;
     std::unordered_map<int, int> midiCCMap;
     alignas(16) std::atomic<int> numVoicesUsed;
-    void set_aux_envelope_interpolation_mode(int m)
-    {
-        for (auto &v : voices)
-        {
-            v->aux_envelope.interpmode = m;
-        }
-    }
+    void set_aux_envelope_interpolation_mode(int m) { voiceaux_envelope.interpmode = m; }
     void handleStepSequencerMessages()
     {
         StepModSource::Message msg;
@@ -1231,16 +1225,15 @@ class ToneGranulator
             if (msg.dest == 1000 && msg.opcode == StepModSource::Message::OP_SETSTEP)
             {
                 const auto numsteps = SimpleEnvelope<false>::maxnumsteps;
-                for (auto &v : voices)
+
+                voiceaux_envelope.steps[msg.ival0] = msg.fval0;
+                if (msg.ival0 == numsteps - 1)
                 {
-                    v->aux_envelope.steps[msg.ival0] = msg.fval0;
-                    if (msg.ival0 == numsteps - 1)
-                    {
-                        // steps array has extra space for interpolation
-                        v->aux_envelope.steps[numsteps] = msg.fval0;
-                        v->aux_envelope.steps[numsteps + 1] = msg.fval0;
-                    }
+                    // steps array has extra space for interpolation
+                    voiceaux_envelope.steps[numsteps] = msg.fval0;
+                    voiceaux_envelope.steps[numsteps + 1] = msg.fval0;
                 }
+
                 // voiceaux_envelope.steps[msg.ival0] = msg.fval0;
             }
             if (msg.dest < stepModSources.size())
@@ -1687,6 +1680,7 @@ class ToneGranulator
         for (int i = 0; i < numvoices; ++i)
         {
             auto v = std::make_unique<GranulatorVoice>();
+            v->aux_envelope = &voiceaux_envelope;
             v->eluts = &eluts;
             voices.push_back(std::move(v));
         }

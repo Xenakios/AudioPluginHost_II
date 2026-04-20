@@ -424,7 +424,7 @@ choc::value::Value AudioPluginAudioProcessor::getState()
     }
     state.setMember("stepseqstates", stepseqstates);
 
-    auto auxenvstate = granulator.voices.front()->aux_envelope.getState();
+    auto auxenvstate = granulator.voiceaux_envelope.getState();
     state.setMember("auxenvstate", auxenvstate);
 
     auto modroutings = choc::value::createEmptyArray();
