@@ -449,6 +449,10 @@ void AudioPluginAudioProcessorEditor::timerCallback()
     ThreadMessage msg;
     while (processorRef.to_gui_fifo.pop(msg))
     {
+        if (msg.opcode == ThreadMessage::OP_STEPSEQUENCER)
+        {
+            auxenvcomp.repaint();
+        }
         if (msg.opcode == ThreadMessage::OP_FILTERTYPE)
         {
             for (auto &e : filterInfoMap)

@@ -424,6 +424,9 @@ choc::value::Value AudioPluginAudioProcessor::getState()
     }
     state.setMember("stepseqstates", stepseqstates);
 
+    auto auxenvstate = granulator.voices.front()->aux_envelope.getState();
+    state.setMember("auxenvstate", auxenvstate);
+
     auto modroutings = choc::value::createEmptyArray();
     auto &mm = granulator.modmatrix;
     for (int i = 0; i < GranulatorModConfig::FixedMatrixSize; ++i)
@@ -455,7 +458,22 @@ void AudioPluginAudioProcessor::setState(choc::value::ValueView state)
     {
         granulator.gvsettings.timespantoshow = state["gvs_timespan"].getWithDefault(8.0);
     }
-        
+    if (state.hasObjectMember("auxenvstate"))
+    {
+        auto auxenvstate = state["auxenvstate"];
+        granulator.set_aux_envelope_interpolation_mode(
+            auxenvstate["interpmode"].getWithDefault(0));
+        auto auxenvsteps = auxenvstate["steps"];
+        for (int i = 0; i < auxenvsteps.size(); ++i)
+        {
+            StepModSource::Message msg;
+            msg.opcode = StepModSource::Message::OP_SETSTEP;
+            msg.fval0 = auxenvsteps[i].getWithDefault(0.0);
+            msg.dest = 1000;
+            msg.ival0 = i;
+            granulator.fifo.push(msg);
+        }
+    }
     if (state.hasObjectMember("stepseqstates"))
     {
         auto stepseqstate = state["stepseqstates"];
@@ -601,6 +619,8 @@ void AudioPluginAudioProcessor::setStateInformation(const void *data, int sizeIn
 
 void AudioPluginAudioProcessor::sendExtraStatesToGUI()
 {
+    ThreadMessage msg{ThreadMessage::OP_STEPSEQUENCER};
+    to_gui_fifo.push(msg);
     {
         ThreadMessage msg;
         msg.opcode = ThreadMessage::OP_FILTERTYPE;

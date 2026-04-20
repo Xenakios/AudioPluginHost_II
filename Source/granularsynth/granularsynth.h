@@ -387,6 +387,19 @@ template <bool TaperEnabled> struct SimpleEnvelope
         IM_SPLINE
     };
     int interpmode = IM_SPLINE;
+    choc::value::Value getState()
+    {
+        auto result = choc::value::createObject("stepenvstate");
+        result.setMember("interpmode", interpmode);
+        auto auxenvsteps = choc::value::createEmptyArray();
+        for (auto &v : steps)
+        {
+            auxenvsteps.addArrayElement(v);
+        }
+        result.setMember("steps", auxenvsteps);
+        return result;
+    }
+    void setState(choc::value::ValueView state) {}
     SimpleEnvelope()
     {
         std::fill(steps.begin(), steps.end(), 0.0f);
