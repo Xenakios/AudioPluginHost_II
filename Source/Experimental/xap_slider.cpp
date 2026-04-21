@@ -22,7 +22,7 @@ void XapSlider::paintKnob(juce::Graphics &g)
         g.setColour(juce::Colours::lightgrey);
     float circleCentX = getWidth() / 2.0;
     float circleCentY = (getHeight() - texth) / 2.0 + texth;
-    float circleH = getHeight() - texth;
+    float circleH = getHeight() - texth - 5.0;
     g.fillEllipse(circleCentX - (circleH / 2.0), texth, circleH, circleH);
     float anglerange = 140.0;
     float angle =
@@ -31,5 +31,5 @@ void XapSlider::paintKnob(juce::Graphics &g)
     float x = circleCentX + (circleH / 2.0) * std::cos(rads);
     float y = circleCentY + (circleH / 2.0) * std::sin(rads);
     g.setColour(juce::Colours::green);
-    g.fillEllipse(x - 6.0, y - 6.0, 12.0, 12.0);
+    g.fillEllipse(x - 4.0, y - 4.0, 8.0, 8.0);
 }

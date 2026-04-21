@@ -957,7 +957,7 @@ class AudioPluginAudioProcessorEditor final : public juce::AudioProcessorEditor,
     ParameterGroupComponent mainParamsComponent{"Main", false};
     ParameterGroupComponent spatParamsComponent{"Spatialization", false};
     ParameterGroupComponent miscParamsComponent{"Misc parameters", false};
-    ParameterGroupComponent volumeParamsComponent{"Volume", false};
+    ParameterGroupComponent volumeParamsComponent{"Volume", true};
     ParameterGroupComponent timeParamsComponent{"Time", true};
     ParameterGroupComponent stackParamsComponent{"Stacking", true};
     ParameterGroupComponent insert1ParamsComponent{"Insert FX A", true};

@@ -83,7 +83,8 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor(AudioPluginAudi
         {
             XapSlider::Style style = XapSlider::SS_HorizontalSlider;
             if (pmd.groupName == "Time" || pmd.groupName == "Stacking" ||
-                pmd.groupName == "Insert A" || pmd.groupName == "Insert B")
+                pmd.groupName == "Insert A" || pmd.groupName == "Insert B" ||
+                pmd.groupName == "Volume")
                 style = XapSlider::SS_Knob;
             auto slid = std::make_unique<XapSlider>(style, pmd);
             slid->OnValueChanged = [this, pid = pmd.id, sli = slid.get()]() {
