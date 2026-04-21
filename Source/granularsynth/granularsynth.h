@@ -517,6 +517,7 @@ class GranulatorVoice
     float used_azi1 = 0.0f;
     float used_ele = 0.0f;
     float auxsend1 = 0.0;
+    float *highAtten = nullptr;
     uint8_t envstarttype = 0;
     uint8_t envendtype = 0;
     double envshape = 0.5;
@@ -687,6 +688,12 @@ class GranulatorVoice
             modamounts[i] = evpars.modamounts[i];
 
         graingain = std::clamp(evpars.volume, 0.0f, 1.0f);
+        if (pitch_base >= 12.0)
+        {
+            float hatten = xenakios::mapvalue(pitch_base, 12.0f, 64.0f, 1.0f, 1.0f - *highAtten);
+            // assert(hatten >= 0.0f && hatten <= 1.0f);
+            graingain *= hatten;
+        }
         graingain = graingain * graingain * graingain;
         auxsend1 = std::clamp(evpars.auxsend, 0.0f, 1.0f);
 
@@ -1152,6 +1159,7 @@ class ToneGranulator
         PAR_OSC_PW = 1850,
         PAR_ENVMORPH = 1900,
         PAR_GRAINVOLUME = 2000,
+        PAR_VOLUMEHIGHATTEN = 2050,
         PAR_NOISECORRELATION = 2100,
         PAR_NOISEMODE = 2150,
         PAR_STACKCOUNT = 2300,
@@ -1205,6 +1213,7 @@ class ToneGranulator
     float midiNoteModValue = 0.0f;
     // we can share this between voices as we don't need it stateful, at least for now
     SimpleEnvelope<false> voiceaux_envelope;
+    alignas(16) float highAttenShared = 0.5;
     struct ModSourceInfo
     {
         std::string name;
@@ -1449,6 +1458,14 @@ class ToneGranulator
                                    .withGroupName("Volume")
                                    .withID(PAR_VOLENVEASINGEND));
         parmetadatas.push_back(pmd()
+                                   .withRange(0.0, 1.0)
+                                   .withDefault(0.5)
+                                   .withLinearScaleFormatting("%", 100.0f)
+                                   .withName("High Atten")
+                                   .withGroupName("Volume")
+                                   .withID(PAR_VOLUMEHIGHATTEN)
+                                   .withFlags(CLAP_PARAM_IS_MODULATABLE));
+        parmetadatas.push_back(pmd()
                                    .withRange(-48.0, 48.0)
                                    .withDefault(0.0)
                                    .withLinearScaleFormatting("ST")
@@ -1681,6 +1698,7 @@ class ToneGranulator
         {
             auto v = std::make_unique<GranulatorVoice>();
             v->aux_envelope = &voiceaux_envelope;
+            v->highAtten = &highAttenShared;
             v->eluts = &eluts;
             voices.push_back(std::move(v));
         }
@@ -2028,6 +2046,7 @@ class ToneGranulator
             modmatrix.m.getTargetValue(GranulatorModConfig::TargetIdentifier{PAR_AUXENVTIMEWARP});
         float taillen = *idtoparvalptr[PAR_GRAINTAIL];
         taillen = 0.002 + 0.998 * std::pow(taillen, 3.0);
+        highAttenShared = *idtoparvalptr[PAR_VOLUMEHIGHATTEN];
         handleStepSequencerMessages();
         bool self_generate = false;
         if (events.size() == 0)
