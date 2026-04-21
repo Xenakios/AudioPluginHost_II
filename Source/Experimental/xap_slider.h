@@ -325,6 +325,8 @@ class XapSlider : public juce::Component
             return;
         if (m_style == SS_Knob)
         {
+            ev.source.enableUnboundedMouseMovement(true);
+            //setMouseCursor (juce::MouseCursor::NoCursor);
             float delta = (ev.y - mouseDragPos.y) * 0.005;
             float newvalnormalized = juce::jlimit<float>(0.0f, 1.0f, m_drag_start_pos - delta);
             m_value = m_pardesc.normalized01ToNatural(newvalnormalized);
@@ -348,6 +350,7 @@ class XapSlider : public juce::Component
     }
     void mouseUp(const juce::MouseEvent &ev) override
     {
+        setMouseCursor (juce::MouseCursor::NormalCursor);
         if (!isEnabled())
             return;
         m_mousedown = false;
