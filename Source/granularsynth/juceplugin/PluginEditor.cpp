@@ -497,7 +497,7 @@ void AudioPluginAudioProcessorEditor::resized()
 {
     oscillatorComponent.setBounds(0, 0, 500, 175);
     volumeParamsComponent.setBounds(0, oscillatorComponent.getBottom() + 1, 500, 125);
-    timeParamsComponent.setBounds(502, 0, 500, 125);
+    timeParamsComponent.setBounds(502, 0, 300, 125);
 
     envcomp.setBounds(502, timeParamsComponent.getBottom() + 1, 175, 175);
     auxenvcomp.setBounds(envcomp.getRight() + 2, timeParamsComponent.getBottom() + 1, 175, 175);

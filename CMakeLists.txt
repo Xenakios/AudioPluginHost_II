@@ -305,6 +305,7 @@ target_sources(ToneGranulatorPlugin
         Source/granularsynth/grainfx.cpp
         Source/granularsynth/js_impl.cpp
         Source/granularsynth/easing.cpp
+        Source/Experimental/xap_slider.cpp
 )   
 
 target_compile_options(ToneGranulatorPlugin PRIVATE -Werror=return-type "$<$<COMPILE_LANGUAGE:CXX>:-fno-char8_t>")

@@ -15,6 +15,7 @@ class XapSlider : public juce::Component
     juce::String m_labeltxt;
     bool m_mousedown = false;
     double m_drag_start_pos = 0.0;
+    juce::Point<int> mouseDragPos;
     ParamDesc m_pardesc;
     bool m_is_bipolar = false;
     std::vector<double> m_snap_positions;
@@ -130,30 +131,8 @@ class XapSlider : public juce::Component
     juce::TextEditor m_ed;
     void focusGained(juce::Component::FocusChangeType cause) override { repaint(); }
     void focusLost(juce::Component::FocusChangeType cause) override { repaint(); }
-    void paintKnob(juce::Graphics &g)
-    {
-        g.fillAll(juce::Colours::black);
-        g.setColour(juce::Colours::white);
-        if (!m_mousedown)
-            g.drawText(m_pardesc.name, 0, 0, getWidth(), 20, juce::Justification::centred);
-        else
-        {
-            g.drawText(getFormattedParamText(), 0, 0, getWidth(), 20, juce::Justification::centred);
-        }
-        g.setColour(juce::Colours::lightgrey);
-        float circleCentX = getWidth() / 2.0;
-        float circleCentY = (getHeight() - 20.0) / 2.0 + 20.0f;
-        float circleH = getHeight() - 20.0f;
-        g.fillEllipse(circleCentX - (circleH / 2.0), 20.0f, circleH, circleH);
-        float anglerange = 140.0;
-        float angle =
-            juce::jmap<float>(m_value, m_min_value, m_max_value, -anglerange, anglerange) - 90.0;
-        float rads = juce::degreesToRadians(angle);
-        float x = circleCentX + (circleH / 2.0) * std::cos(rads);
-        float y = circleCentY + (circleH / 2.0) * std::sin(rads);
-        g.setColour(juce::Colours::green);
-        g.fillEllipse(x - 6.0, y - 6.0, 12.0, 12.0);
-    }
+    void paintKnob(juce::Graphics &g);
+
     std::string getFormattedParamText()
     {
         auto val = m_value;
@@ -336,13 +315,24 @@ class XapSlider : public juce::Component
             return;
         }
         m_mousedown = true;
-        m_drag_start_pos = m_value;
+        m_drag_start_pos = m_pardesc.naturalToNormalized01(m_value);
+        mouseDragPos = ev.getPosition();
         repaint();
     }
     void mouseDrag(const juce::MouseEvent &ev) override
     {
         if (!isEnabled())
             return;
+        if (m_style == SS_Knob)
+        {
+            float delta = (ev.y - mouseDragPos.y) * 0.005;
+            float newvalnormalized = juce::jlimit<float>(0.0f, 1.0f, m_drag_start_pos - delta);
+            m_value = m_pardesc.normalized01ToNatural(newvalnormalized);
+            if (OnValueChanged)
+                OnValueChanged();
+            repaint();
+            return;
+        }
         m_value = juce::jmap<double>(ev.x, 2, getWidth() - 4, m_min_value, m_max_value);
         m_value = juce::jlimit(m_min_value, m_max_value, m_value);
 
