@@ -82,7 +82,8 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor(AudioPluginAudi
         if (!choc::text::startsWith(pmd.groupName, "LFO"))
         {
             XapSlider::Style style = XapSlider::SS_HorizontalSlider;
-            if (pmd.groupName == "Time")
+            if (pmd.groupName == "Time" || pmd.groupName == "Stacking" ||
+                pmd.groupName == "Insert A" || pmd.groupName == "Insert B")
                 style = XapSlider::SS_Knob;
             auto slid = std::make_unique<XapSlider>(style, pmd);
             slid->OnValueChanged = [this, pid = pmd.id, sli = slid.get()]() {
@@ -504,9 +505,9 @@ void AudioPluginAudioProcessorEditor::resized()
 
     spatParamsComponent.setBounds(0, 302, 500, 125);
     mainParamsComponent.setBounds(502, 302, 500, 125);
-    insert1ParamsComponent.setBounds(1004, 0, 500, 125);
-    insert2ParamsComponent.setBounds(1004, 126, 500, 125);
-    stackParamsComponent.setBounds(1004, 253, 500, 175);
+    insert1ParamsComponent.setBounds(880, 0, 620, 100);
+    insert2ParamsComponent.setBounds(880, 151, 620, 100);
+    stackParamsComponent.setBounds(1004, 302, 500, 125);
 
     lfoTabs.setBounds(0, mainParamsComponent.getBottom() + 1, getWidth(), 110);
 

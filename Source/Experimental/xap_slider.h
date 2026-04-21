@@ -141,7 +141,7 @@ class XapSlider : public juce::Component
         auto partext = valueToString(val);
         if (partext)
         {
-            if (m_pardesc.displayScale != ParamDesc::UNORDERED_MAP)
+            // if (m_pardesc.displayScale != ParamDesc::UNORDERED_MAP)
             {
                 return *partext;
             }

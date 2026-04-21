@@ -878,7 +878,7 @@ class ParameterGroupComponent : public juce::GroupComponent
         if (m_horizlayout)
         {
             layout.flexDirection = juce::FlexBox::Direction::row;
-            minh = 70.0;
+            minh = 50.0;
             maxh = 80.0;
         }
             
@@ -959,9 +959,9 @@ class AudioPluginAudioProcessorEditor final : public juce::AudioProcessorEditor,
     ParameterGroupComponent miscParamsComponent{"Misc parameters", false};
     ParameterGroupComponent volumeParamsComponent{"Volume", false};
     ParameterGroupComponent timeParamsComponent{"Time", true};
-    ParameterGroupComponent stackParamsComponent{"Stacking", false};
-    ParameterGroupComponent insert1ParamsComponent{"Insert FX A", false};
-    ParameterGroupComponent insert2ParamsComponent{"Insert FX B", false};
+    ParameterGroupComponent stackParamsComponent{"Stacking", true};
+    ParameterGroupComponent insert1ParamsComponent{"Insert FX A", true};
+    ParameterGroupComponent insert2ParamsComponent{"Insert FX B", true};
     VolumeEnvelopeComponent envcomp;
     VolumeEnvelopeComponent auxenvcomp;
 
