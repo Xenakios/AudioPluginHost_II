@@ -501,9 +501,9 @@ void AudioPluginAudioProcessorEditor::resized()
 
     spatParamsComponent.setBounds(0, 302, 500, 125);
     mainParamsComponent.setBounds(502, 302, 500, 125);
-    insert1ParamsComponent.setBounds(1004, 0, 500, 150);
-    insert2ParamsComponent.setBounds(1004, 151, 500, 150);
-    stackParamsComponent.setBounds(1004, 302, 500, 175);
+    insert1ParamsComponent.setBounds(1004, 0, 500, 125);
+    insert2ParamsComponent.setBounds(1004, 126, 500, 125);
+    stackParamsComponent.setBounds(1004, 253, 500, 175);
 
     lfoTabs.setBounds(0, mainParamsComponent.getBottom() + 1, getWidth(), 110);
 
@@ -884,9 +884,11 @@ void DashBoardComponent::paint(juce::Graphics &g)
         }
     }
     // g.setColour(juce::Colours::white);
-    float xoffs = 400.0f;
+    float xoffs = 450.0f;
     float w = getWidth() - xoffs;
     double enginetime = gr->playposframes / gr->m_sr;
+    g.saveState();
+    g.reduceClipRegion(juce::Rectangle<int>(xoffs, 0, getWidth(), getHeight()));
     for (auto &e : persisted_events)
     {
         // float hue = juce::jmap<float>(e.pitch, -48.0f, 64.0f, 0.0f, 0.8f);
@@ -896,8 +898,9 @@ void DashBoardComponent::paint(juce::Graphics &g)
         g.setColour(pitchGradient.getColourAtPosition(normpitch).withBrightness(alpha));
         float xcor = w - ((enginetime - e.timepos) / timespantoshow * w);
         float ycor = juce::jmap<float>(e.pitch, -48.0, 64.0, getHeight() - 5.0, 0.0);
-        float gw = getWidth() / timespantoshow * e.duration;
-        xcor = std::clamp<float>(xcor + xoffs, xoffs, getWidth());
+        float gw = w / timespantoshow * e.duration;
+        // xcor = std::clamp<float>(xcor + xoffs, xoffs, getWidth());
+        xcor = xcor + xoffs;
         g.fillEllipse(xcor, ycor, gw, 5.0);
         // g.setColour(juce::Colours::yellow);
         // ycor = juce::jmap<float>(e.azimuthdegrees, -180.0, 180.0, getHeight(), 0.0);
@@ -905,19 +908,31 @@ void DashBoardComponent::paint(juce::Graphics &g)
     }
 
     paramHistoryPath.clear();
-    for (size_t i = 0; i < paramValuesHistory.size(); ++i)
+    if (auto parid = gr->modulatedParamToStore.load())
     {
-        const auto &e = paramValuesHistory[i];
-        float xcor = w - ((enginetime - e.timestamp) / timespantoshow * w);
-        xcor = std::clamp<float>(xcor + xoffs, xoffs, getWidth());
-        float ycor = juce::jmap<float>(e.value, 0.0, 8.0, getHeight() - 5.0, 0.0);
-        if (i == 0)
-            paramHistoryPath.startNewSubPath(juce::Point<float>(xcor, ycor));
-        else
-            paramHistoryPath.lineTo(juce::Point<float>(xcor, ycor));
+        auto &pmd = gr->idtoparmetadata[parid];
+        float parmin = pmd->minVal;
+        float parmax = pmd->maxVal;
+        if (parid == ToneGranulator::PAR_PITCH)
+        {
+            parmin = -48.0f;
+            parmax = 64.0f;
+        }
+        for (size_t i = 0; i < paramValuesHistory.size(); ++i)
+        {
+            const auto &e = paramValuesHistory[i];
+            float xcor = w - ((enginetime - e.timestamp) / timespantoshow * w);
+            // xcor = std::clamp<float>(xcor + xoffs, xoffs, getWidth());
+            float ycor = juce::jmap<float>(e.value, parmin, parmax, getHeight() - 5.0, 0.0);
+            if (i == 0)
+                paramHistoryPath.startNewSubPath(juce::Point<float>(xcor, ycor));
+            else
+                paramHistoryPath.lineTo(juce::Point<float>(xcor, ycor));
+        }
+        g.setColour(juce::Colours::beige.withAlpha(0.5f));
+        g.strokePath(paramHistoryPath, juce::PathStrokeType(3.0f));
     }
-    g.setColour(juce::Colours::beige);
-    g.strokePath(paramHistoryPath, juce::PathStrokeType(3.0f));
+    g.restoreState();
     paintAmbisonicFieldHammerProjection(g);
     g.setColour(juce::Colours::yellow);
     float h = juce::Decibels::gainToDecibels(gr->compensationgainforgui.load());

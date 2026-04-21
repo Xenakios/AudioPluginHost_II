@@ -780,7 +780,7 @@ class DashBoardComponent : public juce::Component
             updateGrainData();
             if (is_debug())
             {
-                if (throttlecounter % 4 == 0)
+                if (throttlecounter % 1 == 0)
                     repaint();
                 ++throttlecounter;
             }
@@ -811,6 +811,16 @@ class DashBoardComponent : public juce::Component
         });
         menu.addItem("Show modulator values", true, showModulatorValues,
                      [this]() { showModulatorValues = !showModulatorValues; });
+        juce::PopupMenu param_menu;
+        for (auto &e : gr->parmetadatas)
+        {
+            if (e.flags & CLAP_PARAM_IS_MODULATABLE)
+            {
+                param_menu.addItem(e.groupName + "/" + e.name,
+                                   [this, id = e.id]() { gr->modulatedParamToStore.store(id); });
+            }
+        }
+        menu.addSubMenu("Parameter history", param_menu);
         menu.showMenuAsync(juce::PopupMenu::Options{});
     }
     void updateGrainData()
@@ -825,7 +835,7 @@ class DashBoardComponent : public juce::Component
         std::erase_if(persisted_events, [this, enginetime](auto const &ev) {
             return ev.timepos + ev.duration < enginetime - timespantoshow;
         });
-        gr->modulatedParamToStore.store(ToneGranulator::PAR_DENSITY);
+        
         paramValuesHistory.emplace_back(enginetime, gr->modulatedParValueForGUI.load());
         std::erase_if(paramValuesHistory, [this, enginetime](auto const &ev) {
             return ev.timestamp < enginetime - timespantoshow;

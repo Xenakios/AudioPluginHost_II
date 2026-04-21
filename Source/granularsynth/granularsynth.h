@@ -1846,8 +1846,7 @@ class ToneGranulator
         double actgrate =
             modmatrix.m.getTargetValue(GranulatorModConfig::TargetIdentifier{PAR_DENSITY});
         actgrate = std::clamp(actgrate, -1.0, 8.0);
-        if (modulatedParamToStore.load() == PAR_DENSITY)
-            modulatedParValueForGUI.store(actgrate);
+
         double grate = 1.0 / std::pow(2.0, actgrate);
         for (int i = 0; i < granul_block_size; ++i)
         {
@@ -2061,6 +2060,12 @@ class ToneGranulator
                 modSourceValues[STEPS0 + i] = stepModValues[i];
             modSourceValues[MIDINOTE] = midiNoteModValue;
             modmatrix.m.process();
+            if (modulatedParamToStore.load())
+            {
+                modulatedParValueForGUI.store(modmatrix.m.getTargetValue(
+                    GranulatorModConfig::TargetIdentifier{(int)modulatedParamToStore.load()}));
+            }
+
             if (!self_generate)
             {
                 GrainEvent *ev = nullptr;
