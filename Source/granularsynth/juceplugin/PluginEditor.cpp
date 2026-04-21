@@ -81,7 +81,10 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor(AudioPluginAudi
         auto &pmd = processorRef.granulator.parmetadatas[i];
         if (!choc::text::startsWith(pmd.groupName, "LFO"))
         {
-            auto slid = std::make_unique<XapSlider>(true, pmd);
+            XapSlider::Style style = XapSlider::SS_HorizontalSlider;
+            if (pmd.groupName == "Time")
+                style = XapSlider::SS_Knob;
+            auto slid = std::make_unique<XapSlider>(style, pmd);
             slid->OnValueChanged = [this, pid = pmd.id, sli = slid.get()]() {
                 ParameterMessage msg;
                 msg.id = pid;
@@ -891,9 +894,7 @@ void DashBoardComponent::paint(juce::Graphics &g)
     g.reduceClipRegion(juce::Rectangle<int>(xoffs, 0, getWidth(), getHeight()));
     for (auto &e : persisted_events)
     {
-        // float hue = juce::jmap<float>(e.pitch, -48.0f, 64.0f, 0.0f, 0.8f);
         float alpha = juce::jmap<float>(e.gain, 0.0f, 1.0f, 0.0f, 1.0f);
-        // g.setColour(juce::Colour::fromHSV(hue, 0.8f, 1.0f, alpha));
         float normpitch = juce::jmap<float>(e.pitch, -48.0f, 64.0f, 0.0f, 1.0f);
         g.setColour(pitchGradient.getColourAtPosition(normpitch).withBrightness(alpha));
         float xcor = w - ((enginetime - e.timepos) / timespantoshow * w);
@@ -902,9 +903,6 @@ void DashBoardComponent::paint(juce::Graphics &g)
         // xcor = std::clamp<float>(xcor + xoffs, xoffs, getWidth());
         xcor = xcor + xoffs;
         g.fillEllipse(xcor, ycor, gw, 5.0);
-        // g.setColour(juce::Colours::yellow);
-        // ycor = juce::jmap<float>(e.azimuthdegrees, -180.0, 180.0, getHeight(), 0.0);
-        // g.fillRect(xcor, ycor, 4.0f, 4.0f);
     }
 
     paramHistoryPath.clear();

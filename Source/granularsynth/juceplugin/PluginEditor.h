@@ -223,12 +223,18 @@ struct LFOComponent : public juce::Component
 {
     LFOComponent(int index, ToneGranulator *g)
         : lfoindex(index), gr(g),
-          rateSlider(true, *g->idtoparmetadata[ToneGranulator::PAR_LFORATES + index]),
-          deformSlider(true, *g->idtoparmetadata[ToneGranulator::PAR_LFODEFORMS + index]),
-          shiftSlider(true, *g->idtoparmetadata[ToneGranulator::PAR_LFOSHIFTS + index]),
-          warpSlider(true, *g->idtoparmetadata[ToneGranulator::PAR_LFOWARPS + index]),
-          shapeSlider(true, *g->idtoparmetadata[ToneGranulator::PAR_LFOSHAPES + index]),
-          unipolarSlider(true, *g->idtoparmetadata[ToneGranulator::PAR_LFOUNIPOLARS + index])
+          rateSlider(XapSlider::SS_HorizontalSlider,
+                     *g->idtoparmetadata[ToneGranulator::PAR_LFORATES + index]),
+          deformSlider(XapSlider::SS_HorizontalSlider,
+                       *g->idtoparmetadata[ToneGranulator::PAR_LFODEFORMS + index]),
+          shiftSlider(XapSlider::SS_HorizontalSlider,
+                      *g->idtoparmetadata[ToneGranulator::PAR_LFOSHIFTS + index]),
+          warpSlider(XapSlider::SS_HorizontalSlider,
+                     *g->idtoparmetadata[ToneGranulator::PAR_LFOWARPS + index]),
+          shapeSlider(XapSlider::SS_HorizontalSlider,
+                      *g->idtoparmetadata[ToneGranulator::PAR_LFOSHAPES + index]),
+          unipolarSlider(XapSlider::SS_HorizontalSlider,
+                         *g->idtoparmetadata[ToneGranulator::PAR_LFOUNIPOLARS + index])
     {
         addAndMakeVisible(rateSlider);
         rateSlider.OnValueChanged = [this]() {
@@ -554,11 +560,12 @@ struct ModulationRowComponent : public juce::Component
     juce::Label slotLabel;
     DropDownComponent sourceDrop;
     DropDownComponent viaDrop;
-    XapSlider depthSlider{true, ParamDesc()
-                                    .asFloat()
-                                    .withName("DEPTH")
-                                    .withRange(-1.0f, 1.0f)
-                                    .withLinearScaleFormatting("%", 100.0f)};
+    XapSlider depthSlider{XapSlider::SS_HorizontalSlider,
+                          ParamDesc()
+                              .asFloat()
+                              .withName("DEPTH")
+                              .withRange(-1.0f, 1.0f)
+                              .withLinearScaleFormatting("%", 100.0f)};
     DropDownComponent curveDrop;
     juce::TextEditor curveParEditor;
     DropDownComponent destDrop;
@@ -835,7 +842,7 @@ class DashBoardComponent : public juce::Component
         std::erase_if(persisted_events, [this, enginetime](auto const &ev) {
             return ev.timepos + ev.duration < enginetime - timespantoshow;
         });
-        
+
         paramValuesHistory.emplace_back(enginetime, gr->modulatedParValueForGUI.load());
         std::erase_if(paramValuesHistory, [this, enginetime](auto const &ev) {
             return ev.timestamp < enginetime - timespantoshow;
@@ -846,7 +853,12 @@ class DashBoardComponent : public juce::Component
 class ParameterGroupComponent : public juce::GroupComponent
 {
   public:
-    ParameterGroupComponent(juce::String groupName) : juce::GroupComponent{"", groupName} {}
+    bool m_horizlayout = false;
+    ParameterGroupComponent(juce::String groupName, bool horizLayout)
+        : juce::GroupComponent{"", groupName}
+    {
+        m_horizlayout = horizLayout;
+    }
     void addSlider(std::unique_ptr<XapSlider> &&s)
     {
         addAndMakeVisible(s.get());
@@ -861,6 +873,15 @@ class ParameterGroupComponent : public juce::GroupComponent
     {
         juce::FlexBox layout;
         layout.flexDirection = juce::FlexBox::Direction::column;
+        float minh = 25.0;
+        float maxh = 40.0f;
+        if (m_horizlayout)
+        {
+            layout.flexDirection = juce::FlexBox::Direction::row;
+            minh = 70.0;
+            maxh = 80.0;
+        }
+            
         layout.flexWrap = juce::FlexBox::Wrap::wrap;
 
         for (int i = 0; i < headerComponents.size(); ++i)
@@ -868,7 +889,7 @@ class ParameterGroupComponent : public juce::GroupComponent
             layout.items.add(juce::FlexItem(*headerComponents[i])
                                  .withFlex(1.0)
                                  .withMargin(2.0)
-                                 .withMinHeight(25)
+                                 .withMinHeight(minh)
                                  .withMinWidth(50)
                                  .withMaxWidth(getWidth()));
         }
@@ -878,7 +899,7 @@ class ParameterGroupComponent : public juce::GroupComponent
                                  .withFlex(1.0)
                                  .withMargin(2.0)
                                  .withMinHeight(20)
-                                 .withMaxHeight(40)
+                                 .withMaxHeight(maxh)
                                  .withMinWidth(50)
                                  .withMaxWidth(getWidth()));
         }
@@ -932,15 +953,15 @@ class AudioPluginAudioProcessorEditor final : public juce::AudioProcessorEditor,
   private:
     // MyCustomLNF lnf;
     AudioPluginAudioProcessor &processorRef;
-    ParameterGroupComponent oscillatorComponent{"Oscillator"};
-    ParameterGroupComponent mainParamsComponent{"Main"};
-    ParameterGroupComponent spatParamsComponent{"Spatialization"};
-    ParameterGroupComponent miscParamsComponent{"Misc parameters"};
-    ParameterGroupComponent volumeParamsComponent{"Volume"};
-    ParameterGroupComponent timeParamsComponent{"Time"};
-    ParameterGroupComponent stackParamsComponent{"Stacking"};
-    ParameterGroupComponent insert1ParamsComponent{"Insert FX A"};
-    ParameterGroupComponent insert2ParamsComponent{"Insert FX B"};
+    ParameterGroupComponent oscillatorComponent{"Oscillator", false};
+    ParameterGroupComponent mainParamsComponent{"Main", false};
+    ParameterGroupComponent spatParamsComponent{"Spatialization", false};
+    ParameterGroupComponent miscParamsComponent{"Misc parameters", false};
+    ParameterGroupComponent volumeParamsComponent{"Volume", false};
+    ParameterGroupComponent timeParamsComponent{"Time", true};
+    ParameterGroupComponent stackParamsComponent{"Stacking", false};
+    ParameterGroupComponent insert1ParamsComponent{"Insert FX A", false};
+    ParameterGroupComponent insert2ParamsComponent{"Insert FX B", false};
     VolumeEnvelopeComponent envcomp;
     VolumeEnvelopeComponent auxenvcomp;
 

@@ -23,8 +23,15 @@ class XapSlider : public juce::Component
     ParamDesc::FeatureState *m_fstate = nullptr;
 
   public:
-    XapSlider(bool isHorizontal, ParamDesc pdesc, ParamDesc::FeatureState *fstate = nullptr)
-        : m_pardesc(pdesc), m_fstate(fstate)
+    enum Style
+    {
+        SS_HorizontalSlider,
+        SS_VerticalSlider,
+        SS_Knob
+    };
+    Style m_style;
+    XapSlider(Style sty, ParamDesc pdesc, ParamDesc::FeatureState *fstate = nullptr)
+        : m_pardesc(pdesc), m_fstate(fstate), m_style(sty)
     {
         keypress_to_step.reserve(8);
         setParameterMetaData(pdesc, true);
@@ -123,8 +130,52 @@ class XapSlider : public juce::Component
     juce::TextEditor m_ed;
     void focusGained(juce::Component::FocusChangeType cause) override { repaint(); }
     void focusLost(juce::Component::FocusChangeType cause) override { repaint(); }
+    void paintKnob(juce::Graphics &g)
+    {
+        g.fillAll(juce::Colours::black);
+        g.setColour(juce::Colours::white);
+        if (!m_mousedown)
+            g.drawText(m_pardesc.name, 0, 0, getWidth(), 20, juce::Justification::centred);
+        else
+        {
+            g.drawText(getFormattedParamText(), 0, 0, getWidth(), 20, juce::Justification::centred);
+        }
+        g.setColour(juce::Colours::lightgrey);
+        float circleCentX = getWidth() / 2.0;
+        float circleCentY = (getHeight() - 20.0) / 2.0 + 20.0f;
+        float circleH = getHeight() - 20.0f;
+        g.fillEllipse(circleCentX - (circleH / 2.0), 20.0f, circleH, circleH);
+        float anglerange = 140.0;
+        float angle =
+            juce::jmap<float>(m_value, m_min_value, m_max_value, -anglerange, anglerange) - 90.0;
+        float rads = juce::degreesToRadians(angle);
+        float x = circleCentX + (circleH / 2.0) * std::cos(rads);
+        float y = circleCentY + (circleH / 2.0) * std::sin(rads);
+        g.setColour(juce::Colours::green);
+        g.fillEllipse(x - 6.0, y - 6.0, 12.0, 12.0);
+    }
+    std::string getFormattedParamText()
+    {
+        auto val = m_value;
+        if (m_pardesc.type == ParamDesc::INT)
+            val = std::floor(m_value);
+        auto partext = valueToString(val);
+        if (partext)
+        {
+            if (m_pardesc.displayScale != ParamDesc::UNORDERED_MAP)
+            {
+                return *partext;
+            }
+        }
+        return "no FMT, bug";
+    }
     void paint(juce::Graphics &g) override
     {
+        if (m_style == SS_Knob)
+        {
+            paintKnob(g);
+            return;
+        }
         g.fillAll(juce::Colours::black);
         g.setColour(juce::Colours::darkgrey);
         g.setFont(m_font.withHeight(getHeight() * 0.5f));
@@ -162,15 +213,12 @@ class XapSlider : public juce::Component
 
         g.drawText(m_labeltxt, 5, 0, getWidth() - 10, getHeight(),
                    juce::Justification::centredLeft);
-        auto val = m_value;
-        if (m_pardesc.type == ParamDesc::INT)
-            val = std::floor(m_value);
-        auto partext = valueToString(val);
-        if (partext)
+        auto partext = getFormattedParamText();
+        // if (partext)
         {
             if (m_pardesc.displayScale != ParamDesc::UNORDERED_MAP)
             {
-                g.drawText(*partext, 5, 0, getWidth() - 10, getHeight(),
+                g.drawText(partext, 5, 0, getWidth() - 10, getHeight(),
                            juce::Justification::centredRight);
             }
             else
@@ -182,14 +230,9 @@ class XapSlider : public juce::Component
                     g.setColour(juce::Colours::cyan);
                 else
                     g.setColour(juce::Colours::white);
-                g.drawText(*partext, midx + 2, 0, getWidth() - midx - 2, getHeight(),
+                g.drawText(partext, midx + 2, 0, getWidth() - midx - 2, getHeight(),
                            juce::Justification::centredLeft);
             }
-        }
-        else
-        {
-            g.drawText("NO FMT (BUG)", 5, 0, getWidth() - 10, getHeight(),
-                       juce::Justification::centredRight);
         }
     }
     void mouseDoubleClick(const juce::MouseEvent &event) override
@@ -292,7 +335,7 @@ class XapSlider : public juce::Component
             menu.showMenuAsync({});
             return;
         }
-
+        m_mousedown = true;
         m_drag_start_pos = m_value;
         repaint();
     }
