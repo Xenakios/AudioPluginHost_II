@@ -14,6 +14,7 @@ class XapSlider : public juce::Component
     double m_default_value = 0.0;
     juce::String m_labeltxt;
     bool m_mousedown = false;
+    bool was_started_in_fine_mode = false;
     double m_drag_start_pos = 0.0;
     juce::Point<int> mouseDragPos;
     ParamDesc m_pardesc;
@@ -315,6 +316,7 @@ class XapSlider : public juce::Component
             return;
         }
         m_mousedown = true;
+        was_started_in_fine_mode = ev.mods.isShiftDown();
         m_drag_start_pos = m_pardesc.naturalToNormalized01(m_value);
         mouseDragPos = ev.getPosition();
         repaint();
@@ -326,8 +328,10 @@ class XapSlider : public juce::Component
         if (m_style == SS_Knob)
         {
             ev.source.enableUnboundedMouseMovement(true);
-            //setMouseCursor (juce::MouseCursor::NoCursor);
+            // setMouseCursor (juce::MouseCursor::NoCursor);
             float delta = (ev.y - mouseDragPos.y) * 0.005;
+            if (was_started_in_fine_mode)
+                delta *= 0.1;
             float newvalnormalized = juce::jlimit<float>(0.0f, 1.0f, m_drag_start_pos - delta);
             m_value = m_pardesc.normalized01ToNatural(newvalnormalized);
             if (OnValueChanged)
@@ -350,7 +354,7 @@ class XapSlider : public juce::Component
     }
     void mouseUp(const juce::MouseEvent &ev) override
     {
-        setMouseCursor (juce::MouseCursor::NormalCursor);
+        setMouseCursor(juce::MouseCursor::NormalCursor);
         if (!isEnabled())
             return;
         m_mousedown = false;
