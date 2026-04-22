@@ -1,5 +1,6 @@
 #pragma once
 #include <vector>
+#include <span>
 // #include "sst/basic-blocks/dsp/CorrelatedNoise.h"
 #include "sst/basic-blocks/dsp/EllipticBlepOscillators.h"
 #include <print>
@@ -478,6 +479,8 @@ template <bool TaperEnabled> struct SimpleEnvelope
     }
 };
 
+constexpr size_t numPitchBandAttens = 5;
+
 class GranulatorVoice
 {
   public:
@@ -517,7 +520,7 @@ class GranulatorVoice
     float used_azi1 = 0.0f;
     float used_ele = 0.0f;
     float auxsend1 = 0.0;
-    float *highAtten = nullptr;
+    std::span<float> pitchBandAttens;
     uint8_t envstarttype = 0;
     uint8_t envendtype = 0;
     double envshape = 0.5;
@@ -688,11 +691,19 @@ class GranulatorVoice
             modamounts[i] = evpars.modamounts[i];
 
         graingain = std::clamp(evpars.volume, 0.0f, 1.0f);
-        if (pitch_base >= 12.0)
+        // if (pitch_base >= 12.0)
         {
-            float hatten = xenakios::mapvalue(pitch_base, 12.0f, 64.0f, 1.0f, 1.0f - *highAtten);
-            // assert(hatten >= 0.0f && hatten <= 1.0f);
-            graingain *= hatten;
+            float bandpos =
+                xenakios::mapvalue<float>(pitch_base, -48.0f, 64.0f, 0.0f, numPitchBandAttens - 1);
+            bandpos = std::clamp(bandpos, 0.0f, (float)numPitchBandAttens - 1);
+            int ind0 = bandpos;
+            int ind1 = ind0 + 1;
+            float frac = bandpos - ind0;
+            float g0 = pitchBandAttens[ind0];
+            float g1 = pitchBandAttens[ind1];
+            float gatten = g0 + (g1 - g0) * frac;
+            assert(gatten >= 0.0f && gatten <= 1.0f);
+            graingain *= gatten;
         }
         graingain = graingain * graingain * graingain;
         auxsend1 = std::clamp(evpars.auxsend, 0.0f, 1.0f);
@@ -1159,7 +1170,11 @@ class ToneGranulator
         PAR_OSC_PW = 1850,
         PAR_ENVMORPH = 1900,
         PAR_GRAINVOLUME = 2000,
-        PAR_VOLUMEHIGHATTEN = 2050,
+        PAR_PITCHBANDGAIN0 = 2010,
+        PAR_PITCHBANDGAIN1 = 2020,
+        PAR_PITCHBANDGAIN2 = 2030,
+        PAR_PITCHBANDGAIN3 = 2040,
+        PAR_PITCHBANDGAIN4 = 2050,
         PAR_NOISECORRELATION = 2100,
         PAR_NOISEMODE = 2150,
         PAR_STACKCOUNT = 2300,
@@ -1213,7 +1228,7 @@ class ToneGranulator
     float midiNoteModValue = 0.0f;
     // we can share this between voices as we don't need it stateful, at least for now
     SimpleEnvelope<false> voiceaux_envelope;
-    alignas(16) float highAttenShared = 0.5;
+    alignas(16) std::array<float, numPitchBandAttens + 5> pitchBandAttensShared;
     struct ModSourceInfo
     {
         std::string name;
@@ -1457,14 +1472,18 @@ class ToneGranulator
                                    .withName("Vol Env End Curve")
                                    .withGroupName("Volume")
                                    .withID(PAR_VOLENVEASINGEND));
-        parmetadatas.push_back(pmd()
-                                   .withRange(0.0, 1.0)
-                                   .withDefault(0.5)
-                                   .withLinearScaleFormatting("%", 100.0f)
-                                   .withName("High Atten")
-                                   .withGroupName("Volume")
-                                   .withID(PAR_VOLUMEHIGHATTEN)
-                                   .withFlags(CLAP_PARAM_IS_MODULATABLE));
+        for (int i = 0; i < numPitchBandAttens; ++i)
+        {
+            parmetadatas.push_back(pmd()
+                                       .withRange(0.0, 1.0)
+                                       .withDefault(1.0)
+                                       .withLinearScaleFormatting("%", 100.0f)
+                                       .withName(std::format("Pitch Gain {}", i + 1))
+                                       .withGroupName("Volume")
+                                       .withID(PAR_PITCHBANDGAIN0 + i * 10)
+                                       .withFlags(CLAP_PARAM_IS_MODULATABLE));
+        }
+
         parmetadatas.push_back(pmd()
                                    .withRange(-48.0, 48.0)
                                    .withDefault(0.0)
@@ -1693,12 +1712,12 @@ class ToneGranulator
                 modRanges[parmetadatas[i].id] = range;
             }
         }
-
+        std::fill(pitchBandAttensShared.begin(), pitchBandAttensShared.end(), 1.0f);
         for (int i = 0; i < numvoices; ++i)
         {
             auto v = std::make_unique<GranulatorVoice>();
             v->aux_envelope = &voiceaux_envelope;
-            v->highAtten = &highAttenShared;
+            v->pitchBandAttens = pitchBandAttensShared;
             v->eluts = &eluts;
             voices.push_back(std::move(v));
         }
@@ -2046,7 +2065,12 @@ class ToneGranulator
             modmatrix.m.getTargetValue(GranulatorModConfig::TargetIdentifier{PAR_AUXENVTIMEWARP});
         float taillen = *idtoparvalptr[PAR_GRAINTAIL];
         taillen = 0.002 + 0.998 * std::pow(taillen, 3.0);
-        highAttenShared = *idtoparvalptr[PAR_VOLUMEHIGHATTEN];
+        for (int i = 0; i < numPitchBandAttens; ++i)
+        {
+            pitchBandAttensShared[i] = *idtoparvalptr[PAR_PITCHBANDGAIN0 + i * 10];
+        }
+        pitchBandAttensShared[numPitchBandAttens] = pitchBandAttensShared[numPitchBandAttens - 1];
+
         handleStepSequencerMessages();
         bool self_generate = false;
         if (events.size() == 0)
