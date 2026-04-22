@@ -479,7 +479,7 @@ template <bool TaperEnabled> struct SimpleEnvelope
     }
 };
 
-constexpr size_t numPitchBandAttens = 5;
+constexpr size_t numPitchBandAttens = 7;
 
 class GranulatorVoice
 {
@@ -1175,6 +1175,8 @@ class ToneGranulator
         PAR_PITCHBANDGAIN2 = 2030,
         PAR_PITCHBANDGAIN3 = 2040,
         PAR_PITCHBANDGAIN4 = 2050,
+        PAR_PITCHBANDGAIN5 = 2060,
+        PAR_PITCHBANDGAIN6 = 2070,
         PAR_NOISECORRELATION = 2100,
         PAR_NOISEMODE = 2150,
         PAR_STACKCOUNT = 2300,
