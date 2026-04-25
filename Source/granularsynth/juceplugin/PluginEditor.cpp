@@ -4,8 +4,7 @@ void init_step_sequencer_js();
 void deinit_step_sequencer_js();
 void cancel_js();
 std::vector<float> generate_from_js(std::string jscode, std::vector<float> currentsteps,
-                                    int startstep, int endstep, float par0, float par1, float par2,
-                                    float par3);
+                                    int startstep, int endstep, std::vector<float> params);
 
 inline void updateAllFonts(juce::Component &parent, const juce::Font &newFont)
 {
@@ -738,21 +737,28 @@ StepSeqComponent::StepSeqComponent(int seqindex, ToneGranulator *g, juce::Thread
 
 void StepSeqComponent::runJSInThread()
 {
+    auto tokens = juce::StringArray::fromTokens(scriptParamsEditor.getText(), true);
+    if (tokens.size() < 1 || tokens.size() > 1024)
+    {
+        return;
+    }
     js_status.store(1);
     cancelButton.setVisible(true);
-    auto tokens = juce::StringArray::fromTokens(scriptParamsEditor.getText(), true);
-    std::array<float, 4> params = {0, 0, 0, 0};
-    for (int i = 0; i < params.size(); ++i)
-        if (i < tokens.size())
-            params[i] = tokens[i].getFloatValue();
+    std::vector<float> params;
+    params.reserve(tokens.size());
+    for (int i = 0; i < tokens.size(); ++i)
+    {
+        params.push_back(tokens[i].getFloatValue());
+    }
+
     threadPool->addJob([this, params]() {
         try
         {
             auto jscode = choc::file::loadFileAsString(
                 R"(C:\develop\AudioPluginHost_mk2\Source\granularsynth\generatesteps.js)");
             auto steps = gr->stepModSources[sindex].steps;
-            steps = generate_from_js(jscode, steps, editRange.getStart(), editRange.getEnd(),
-                                     params[0], params[1], params[2], params[3]);
+            steps =
+                generate_from_js(jscode, steps, editRange.getStart(), editRange.getEnd(), params);
             for (size_t i = 0; i < steps.size(); ++i)
             {
                 gr->fifo.push({StepModSource::Message::OP_SETSTEP, sindex, steps[i],

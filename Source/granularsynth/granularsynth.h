@@ -2229,8 +2229,8 @@ class ToneGranulator
                 modmatrix.m.getTargetValue(GranulatorModConfig::TargetIdentifier{PAR_MAINVOLUME});
             maingain = std::clamp(maingain, -96.0f, 0.0f);
             maingain = xenakios::decibelsToGain(maingain);
-
             gainlag.setTarget(compengain * maingain);
+            
             for (int k = 0; k < granul_block_size; ++k)
             {
                 gainlag.process();
