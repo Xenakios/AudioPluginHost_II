@@ -4,6 +4,7 @@
 #include <juce_audio_formats/juce_audio_formats.h>
 #include "../granularsynth.h"
 #include "containers/choc_SingleReaderSingleWriterFIFO.h"
+#include "threading/choc_SpinLock.h"
 
 inline bool is_debug()
 {
@@ -101,9 +102,11 @@ class AudioPluginAudioProcessor final : public juce::AudioProcessor
     juce::AudioBuffer<float> recordBuffer;
     choc::value::Value getState();
     void setState(choc::value::ValueView state);
+    void changeStateImpl(choc::value::ValueView state);
     void sendExtraStatesToGUI();
     std::unordered_map<uint32_t, uint32_t> directMidiMappings;
-
+    choc::value::Value pendingState;
+    choc::threading::SpinLock stateLock;
   private:
     alignas(32) std::vector<float> workBuffer;
     alignas(32) choc::fifo::SingleReaderSingleWriterFIFO<std::array<float, 16>> buffer_adapter;

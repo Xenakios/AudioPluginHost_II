@@ -1219,7 +1219,7 @@ class ToneGranulator
         MIDIVELO,
         MIDIAT,
         MIDICCSTART,
-        MIDICCEND = MIDICCSTART + 64,
+        MIDICCEND = MIDICCSTART + 128,
 
     };
     float dummyTargetValue = 0.0f;
@@ -1326,10 +1326,9 @@ class ToneGranulator
         shapeParToActualShape[2] = GranulatorModMatrix::lfo_t::SAW_TRI_RAMP;
         shapeParToActualShape[3] = GranulatorModMatrix::lfo_t::SMOOTH_NOISE;
         shapeParToActualShape[4] = GranulatorModMatrix::lfo_t::SH_NOISE;
-        for (int i = 0; i < 8; ++i)
+        for (int i = 0; i < 127; ++i)
         {
-            midiCCMap[21 + i] = MIDICCSTART + i;
-            midiCCMap[41 + i] = MIDICCSTART + 8 + i;
+            midiCCMap[i + 1] = MIDICCSTART + i;
         }
         fifo.reset(2048);
         scheduledGrains.reserve(2048);
@@ -1758,15 +1757,10 @@ class ToneGranulator
                                 GranulatorModConfig::SourceIdentifier{MIDIVELO});
         modSources.emplace_back("MIDI AFTERTOUCH", "MIDI NOTES",
                                 GranulatorModConfig::SourceIdentifier{MIDIAT});
-        for (uint32_t i = 0; i < 8; ++i)
+        for (uint32_t i = 1; i < 128; ++i)
         {
-            modSources.emplace_back(std::format("MIDI CC {}", i + 21), "MIDI CC",
+            modSources.emplace_back(std::format("MIDI CC {}", i), "MIDI CC",
                                     GranulatorModConfig::SourceIdentifier{i + MIDICCSTART});
-        }
-        for (uint32_t i = 0; i < 8; ++i)
-        {
-            modSources.emplace_back(std::format("MIDI CC {}", i + 41), "MIDI CC",
-                                    GranulatorModConfig::SourceIdentifier{i + 8 + MIDICCSTART});
         }
 
         for (auto &v : modSourceValues)
@@ -2230,7 +2224,7 @@ class ToneGranulator
             maingain = std::clamp(maingain, -96.0f, 0.0f);
             maingain = xenakios::decibelsToGain(maingain);
             gainlag.setTarget(compengain * maingain);
-            
+
             for (int k = 0; k < granul_block_size; ++k)
             {
                 gainlag.process();

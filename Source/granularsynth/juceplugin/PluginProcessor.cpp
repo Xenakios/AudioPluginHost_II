@@ -180,8 +180,17 @@ void AudioPluginAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
                                              juce::MidiBuffer &midiMessages)
 {
     juce::AudioProcessLoadMeasurer::ScopedTimer perftimer(perfMeasurer, buffer.getNumSamples());
-    juce::ignoreUnused(midiMessages);
-
+    {
+        std::lock_guard<choc::threading::SpinLock> locker(stateLock);
+        if (!pendingState.isVoid())
+        {
+            double t0 = juce::Time::getMillisecondCounterHiRes();
+            changeStateImpl(pendingState);
+            pendingState = choc::value::Value();
+            double t1 = juce::Time::getMillisecondCounterHiRes();
+            DBG("state change took " << t1 - t0 << " milliseconds");
+        }
+    }
     juce::ScopedNoDenormals noDenormals;
     auto totalNumInputChannels = getTotalNumInputChannels();
     auto totalNumOutputChannels = getTotalNumOutputChannels();
@@ -467,9 +476,8 @@ choc::value::Value AudioPluginAudioProcessor::getState()
     return state;
 }
 
-void AudioPluginAudioProcessor::setState(choc::value::ValueView state)
+void AudioPluginAudioProcessor::changeStateImpl(choc::value::ValueView state)
 {
-    suspendProcessing(true);
     if (!state[StateIgnoreStrings::dashboardsettings].getWithDefault(false))
     {
         granulator.gvsettings.timespantoshow = state["gvs_timespan"].getWithDefault(8.0);
@@ -606,6 +614,12 @@ void AudioPluginAudioProcessor::setState(choc::value::ValueView state)
     }
 }
 
+void AudioPluginAudioProcessor::setState(choc::value::ValueView state)
+{
+    std::lock_guard<choc::threading::SpinLock> locker(stateLock);
+    pendingState = state;
+}
+
 void AudioPluginAudioProcessor::getStateInformation(juce::MemoryBlock &destData)
 {
     auto state = getState();
@@ -628,7 +642,7 @@ void AudioPluginAudioProcessor::setStateInformation(const void *data, int sizeIn
     {
         DBG("tonegranulator error restoring state : " << ex.what());
     }
-    suspendProcessing(false);
+
     sendExtraStatesToGUI();
 }
 

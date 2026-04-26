@@ -229,7 +229,7 @@ void AudioPluginAudioProcessorEditor::loadSnapShot(int index)
     {
         DBG(ex.what());
     }
-    processorRef.suspendProcessing(false);
+    
     juce::Timer::callAfterDelay(100, [this]() { processorRef.sendExtraStatesToGUI(); });
 }
 
