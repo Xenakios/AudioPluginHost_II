@@ -108,7 +108,7 @@ class AudioPluginAudioProcessor final : public juce::AudioProcessor
     choc::value::Value pendingState;
     choc::threading::SpinLock stateLock;
     std::vector<choc::value::Value> snapshots;
-    std::atomic<int> currentsnapshot{-1};
+    
     void loadSnapShot(int index);
     void saveSnapShot(int index, choc::value::ValueView state);
 

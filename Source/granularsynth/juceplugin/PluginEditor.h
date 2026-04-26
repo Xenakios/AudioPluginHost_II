@@ -757,6 +757,7 @@ class DashBoardComponent : public juce::Component
     {
         double timestamp = 0.0;
         double value = 0.0;
+        double cpu_usage = 0.0;
     };
     std::vector<ParamEvent> paramValuesHistory;
     juce::Path paramHistoryPath;
@@ -767,6 +768,7 @@ class DashBoardComponent : public juce::Component
 
     juce::ColourGradient pitchGradient;
     std::unique_ptr<juce::VBlankAttachment> vblankAttachment;
+    std::function<double()> GetCPULoad;
     DashBoardComponent(ToneGranulator *g) : gr(g)
     {
         paramHistoryPath.preallocateSpace(2048);
@@ -830,6 +832,7 @@ class DashBoardComponent : public juce::Component
         menu.addSubMenu("Parameter history", param_menu);
         menu.showMenuAsync(juce::PopupMenu::Options{});
     }
+    void drawCPUGraph(juce::Graphics &g, double enginetime, double w, double xoffs);
     void updateGrainData()
     {
         timespantoshow = gr->gvsettings.timespantoshow;
@@ -842,8 +845,10 @@ class DashBoardComponent : public juce::Component
         std::erase_if(persisted_events, [this, enginetime](auto const &ev) {
             return ev.timepos + ev.duration < enginetime - timespantoshow;
         });
-
-        paramValuesHistory.emplace_back(enginetime, gr->modulatedParValueForGUI.load());
+        auto cpuload = 0.0;
+        if (GetCPULoad)
+            cpuload = GetCPULoad();
+        paramValuesHistory.emplace_back(enginetime, gr->modulatedParValueForGUI.load(), cpuload);
         std::erase_if(paramValuesHistory, [this, enginetime](auto const &ev) {
             return ev.timestamp < enginetime - timespantoshow;
         });
@@ -881,7 +886,7 @@ class ParameterGroupComponent : public juce::GroupComponent
             minh = 50.0;
             maxh = 80.0;
         }
-            
+
         layout.flexWrap = juce::FlexBox::Wrap::wrap;
 
         for (int i = 0; i < headerComponents.size(); ++i)

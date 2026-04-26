@@ -95,9 +95,13 @@ void AudioPluginAudioProcessor::saveSnapShot(int index, choc::value::ValueView s
 
 void AudioPluginAudioProcessor::loadSnapShot(int index)
 {
-    if (index >= 0 && index < snapshots.size() && !snapshots[index].isVoid())
+    if (index >= 0 && index < snapshots.size())
     {
-        setState(snapshots[index]);
+        if (!snapshots[index].isVoid())
+        {
+            setState(snapshots[index]);
+        }
+        granulator.currentSnapShot = index;
     }
 }
 
@@ -225,6 +229,7 @@ void AudioPluginAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
             double t0 = juce::Time::getMillisecondCounterHiRes();
             changeStateImpl(pendingState);
             pendingState = choc::value::Value();
+            sendExtraStatesToGUI();
             double t1 = juce::Time::getMillisecondCounterHiRes();
             DBG("state change took " << t1 - t0 << " milliseconds");
         }
@@ -241,6 +246,15 @@ void AudioPluginAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
         const auto msg = mm.getMessage();
         if (msg.isController())
         {
+            if (msg.getControllerNumber() == 50 && msg.getControllerValue() > 64)
+            {
+                int snapnumber = granulator.currentSnapShot + 1;
+                if (snapnumber >= snapshots.size())
+                {
+                    snapnumber = 0;
+                }
+                loadSnapShot(snapnumber);
+            }
             auto &mm = granulator.modmatrix;
             uint32_t ccnum = msg.getControllerNumber();
             auto dmit = directMidiMappings.find(ccnum);
@@ -615,8 +629,8 @@ void AudioPluginAudioProcessor::changeStateImpl(choc::value::ValueView state)
                 ParameterMessage parmsg;
                 parmsg.id = pars[i].id;
                 parmsg.value = v;
-                params_from_gui_fifo.push(parmsg);
-                // *granulator.idtoparvalptr[pars[i].id] = v;
+                //params_from_gui_fifo.push(parmsg);
+                *granulator.idtoparvalptr[pars[i].id] = v;
             }
         }
     }

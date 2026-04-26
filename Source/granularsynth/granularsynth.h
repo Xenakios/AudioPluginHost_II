@@ -1318,6 +1318,7 @@ class ToneGranulator
 
     )"));
         */
+    std::atomic<int> currentSnapShot{-1};
     ToneGranulator() : m_sr(44100.0), modmatrix(44100.0)
     {
         visualizer_fifo.reset(2048);

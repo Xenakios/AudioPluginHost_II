@@ -29,6 +29,10 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor(AudioPluginAudi
       auxenvcomp(&p.granulator, true), lfoTabs(juce::TabbedButtonBar::Orientation::TabsAtTop),
       dashBoardComponent(&p.granulator)
 {
+    dashBoardComponent.GetCPULoad = [this]() {
+        return processorRef.perfMeasurer.getLoadAsProportion();
+    };
+
     perfcomp = std::make_unique<PerformanceComponent>();
     perfcomp->RequestData = [this](int &maxvoices, int &usedvoices, float &cpu) {
         maxvoices = processorRef.granulator.voices.size();
@@ -218,7 +222,7 @@ void AudioPluginAudioProcessorEditor::saveSnapShot(int index)
 void AudioPluginAudioProcessorEditor::loadSnapShot(int index)
 {
     processorRef.loadSnapShot(index);
-    juce::Timer::callAfterDelay(100, [this]() { processorRef.sendExtraStatesToGUI(); });
+    // juce::Timer::callAfterDelay(100, [this]() { processorRef.sendExtraStatesToGUI(); });
 }
 
 AudioPluginAudioProcessorEditor::~AudioPluginAudioProcessorEditor()
@@ -857,6 +861,25 @@ void DashBoardComponent::paintAmbisonicFieldHammerProjection(juce::Graphics &g)
     }
 }
 
+void DashBoardComponent::drawCPUGraph(juce::Graphics &g, double enginetime, double w, double xoffs)
+{
+    paramHistoryPath.clear();
+    for (size_t i = 0; i < paramValuesHistory.size(); ++i)
+    {
+        const auto &e = paramValuesHistory[i];
+        float xcor = w - ((enginetime - e.timestamp) / timespantoshow * w);
+        // xcor = std::clamp<float>(xcor + xoffs, xoffs, getWidth());
+        xcor = xcor + xoffs;
+        float ycor = juce::jmap<float>(e.cpu_usage, 0.0, 1.0, getHeight() - 5.0, 0.0);
+        if (i == 0)
+            paramHistoryPath.startNewSubPath(juce::Point<float>(xcor, ycor));
+        else
+            paramHistoryPath.lineTo(juce::Point<float>(xcor, ycor));
+    }
+    g.setColour(juce::Colours::beige.withAlpha(0.5f));
+    g.strokePath(paramHistoryPath, juce::PathStrokeType(3.0f));
+}
+
 void DashBoardComponent::paint(juce::Graphics &g)
 {
     g.fillAll(juce::Colours::black);
@@ -917,6 +940,7 @@ void DashBoardComponent::paint(juce::Graphics &g)
             const auto &e = paramValuesHistory[i];
             float xcor = w - ((enginetime - e.timestamp) / timespantoshow * w);
             // xcor = std::clamp<float>(xcor + xoffs, xoffs, getWidth());
+            xcor = xcor + xoffs;
             float ycor = juce::jmap<float>(e.value, parmin, parmax, getHeight() - 5.0, 0.0);
             if (i == 0)
                 paramHistoryPath.startNewSubPath(juce::Point<float>(xcor, ycor));
@@ -926,6 +950,7 @@ void DashBoardComponent::paint(juce::Graphics &g)
         g.setColour(juce::Colours::beige.withAlpha(0.5f));
         g.strokePath(paramHistoryPath, juce::PathStrokeType(3.0f));
     }
+    drawCPUGraph(g, enginetime, w, xoffs);
     g.restoreState();
     paintAmbisonicFieldHammerProjection(g);
     g.setColour(juce::Colours::yellow);
@@ -942,6 +967,7 @@ void DashBoardComponent::paint(juce::Graphics &g)
     juce::String timeText = juce::String::formatted("%02d:%02d.%03d", mins, secs, ms);
     timeText += " " + juce::String(persisted_events.size()) + " events in history";
     timeText += " " + juce::String(gr->parmetadatas.size()) + " parameters";
+    timeText += " current snapshot : " + juce::String(gr->currentSnapShot);
     g.setFont(18.0f);
     g.drawText(timeText, xoffs, 1.0f, getWidth() - xoffs, 25, juce::Justification::left);
 }
