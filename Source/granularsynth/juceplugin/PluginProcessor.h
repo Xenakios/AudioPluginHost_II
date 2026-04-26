@@ -102,6 +102,7 @@ class AudioPluginAudioProcessor final : public juce::AudioProcessor
     choc::value::Value getState();
     void setState(choc::value::ValueView state);
     void sendExtraStatesToGUI();
+    std::unordered_map<uint32_t, uint32_t> directMidiMappings;
 
   private:
     alignas(32) std::vector<float> workBuffer;

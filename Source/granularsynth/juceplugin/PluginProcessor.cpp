@@ -13,11 +13,15 @@ AudioPluginAudioProcessor::AudioPluginAudioProcessor()
 #endif
       )
 {
+    directMidiMappings[21] = ToneGranulator::PAR_MAINVOLUME;
+    directMidiMappings[22] = ToneGranulator::PAR_DENSITY;
+    directMidiMappings[23] = ToneGranulator::PAR_PITCH;
+    directMidiMappings[24] = ToneGranulator::PAR_AZIMUTH;
     sliceThread.startThread();
     buffer_adapter.reset(1024);
     from_gui_fifo.reset(1024);
-    params_from_gui_fifo.reset(1024);
-    params_to_gui_fifo.reset(1024);
+    params_from_gui_fifo.reset(2048);
+    params_to_gui_fifo.reset(2048);
     to_gui_fifo.reset(1024);
     dirtyStateParam =
         new juce::AudioParameterFloat({"dirtystateparam", 1}, "Internal parameter", 0.0, 1.0, 0.0);
@@ -192,6 +196,18 @@ void AudioPluginAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
         {
             auto &mm = granulator.modmatrix;
             uint32_t ccnum = msg.getControllerNumber();
+            auto dmit = directMidiMappings.find(ccnum);
+            if (dmit != directMidiMappings.end())
+            {
+                const auto &pmd = granulator.idtoparmetadata[dmit->second];
+                float val =
+                    juce::jmap<float>(msg.getControllerValue(), 0, 127, pmd->minVal, pmd->maxVal);
+                *granulator.idtoparvalptr[dmit->second] = val;
+                ParameterMessage msg;
+                msg.id = dmit->second;
+                msg.value = val;
+                params_to_gui_fifo.push(msg);
+            }
             auto it = granulator.midiCCMap.find(ccnum);
             if (it != granulator.midiCCMap.end())
             {
@@ -461,8 +477,7 @@ void AudioPluginAudioProcessor::setState(choc::value::ValueView state)
     if (state.hasObjectMember("auxenvstate"))
     {
         auto auxenvstate = state["auxenvstate"];
-        granulator.set_aux_envelope_interpolation_mode(
-            auxenvstate["interpmode"].getWithDefault(0));
+        granulator.set_aux_envelope_interpolation_mode(auxenvstate["interpmode"].getWithDefault(0));
         auto auxenvsteps = auxenvstate["steps"];
         for (int i = 0; i < auxenvsteps.size(); ++i)
         {
