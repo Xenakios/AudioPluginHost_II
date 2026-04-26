@@ -159,6 +159,10 @@ add_library(AWLIMITED
     libs/airwindows_limited/plugins/DonutProc.cpp
     libs/airwindows_limited/plugins/GlitchShifter.cpp
     libs/airwindows_limited/plugins/GlitchShifterProc.cpp
+    libs/airwindows_limited/plugins/WoodenBoxProc.cpp
+    libs/airwindows_limited/plugins/WoodenBox.cpp
+    libs/airwindows_limited/plugins/PitchNasty.cpp
+    libs/airwindows_limited/plugins/PitchNastyProc.cpp
 )
 
 target_compile_features(AWLIMITED PUBLIC cxx_std_23)

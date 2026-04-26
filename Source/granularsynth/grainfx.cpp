@@ -12,6 +12,8 @@
 #include "plugins/ToTape9.h"
 #include "plugins/Donut.h"
 #include "plugins/GlitchShifter.h"
+#include "plugins/WoodenBox.h"
+#include "plugins/PitchNasty.h"
 
 std::vector<GrainInsertFX::ModeInfo> GrainInsertFX::getAvailableModes()
 {
@@ -30,6 +32,8 @@ std::vector<GrainInsertFX::ModeInfo> GrainInsertFX::getAvailableModes()
     result.emplace_back("AW ToTape9", "AirWindows", GFXAIRWINDOWS, 9);
     result.emplace_back("AW Donut", "AirWindows", GFXAIRWINDOWS, 10);
     result.emplace_back("AW GlitchShifter", "AirWindows", GFXAIRWINDOWS, 11);
+    result.emplace_back("AW WoodenBox", "AirWindows", GFXAIRWINDOWS, 12);
+    result.emplace_back("AW PitchNasty", "AirWindows", GFXAIRWINDOWS, 13);
     std::sort(result.begin(), result.end(),
               [](auto const &lhs, auto const &rhs) { return lhs.displayname < rhs.displayname; });
     auto models = sfpp::Filter::availableModels();
@@ -159,6 +163,16 @@ void GrainInsertFX::setMode(ModeInfo m)
         {
             awplugin = make_aw_safe<airwinconsolidated::GlitchShifter::GlitchShifter>(0);
             numParams = airwinconsolidated::GlitchShifter::kNumParameters;
+        }
+        else if (m.awtype == 12)
+        {
+            awplugin = make_aw_safe<airwinconsolidated::WoodenBox::WoodenBox>(0);
+            numParams = airwinconsolidated::WoodenBox::kNumParameters;
+        }
+        else if (m.awtype == 13)
+        {
+            awplugin = make_aw_safe<airwinconsolidated::PitchNasty::PitchNasty>(0);
+            numParams = airwinconsolidated::PitchNasty::kNumParameters;
         }
         assert(numParams < 11);
         if (awplugin)
