@@ -93,6 +93,7 @@ class AudioPluginAudioProcessor final : public juce::AudioProcessor
     choc::fifo::SingleReaderSingleWriterFIFO<ParameterMessage> params_to_gui_fifo;
     choc::fifo::SingleReaderSingleWriterFIFO<ThreadMessage> to_gui_fifo;
     juce::AudioProcessLoadMeasurer perfMeasurer;
+    std::atomic<float> cpu_load{0.0f};
     juce::ThreadPool tpool{juce::ThreadPool::Options{"granulatorworker", 1}};
     juce::TimeSliceThread sliceThread{"granulatortimeslicethread"};
     void startRecording();

@@ -31,6 +31,7 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor(AudioPluginAudi
 {
     dashBoardComponent.GetCPULoad = [this]() {
         return processorRef.perfMeasurer.getLoadAsProportion();
+        // return processorRef.cpu_load.load();
     };
 
     perfcomp = std::make_unique<PerformanceComponent>();

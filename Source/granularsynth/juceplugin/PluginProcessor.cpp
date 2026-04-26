@@ -222,6 +222,8 @@ void AudioPluginAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
                                              juce::MidiBuffer &midiMessages)
 {
     juce::AudioProcessLoadMeasurer::ScopedTimer perftimer(perfMeasurer, buffer.getNumSamples());
+    double cpu_bench_t0 = juce::Time::getMillisecondCounterHiRes();
+
     {
         std::lock_guard<choc::threading::SpinLock> locker(stateLock);
         if (!pendingState.isVoid())
@@ -440,6 +442,11 @@ void AudioPluginAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
             }
         }
     }
+    jassert(buffer.getNumSamples() > 0);
+    double cpu_bench_t1 = juce::Time::getMillisecondCounterHiRes();
+    double elapsed_secs = (cpu_bench_t1 - cpu_bench_t0) / 1000.0;
+    double max_secs = buffer.getNumSamples() / getSampleRate();
+    cpu_load.store(elapsed_secs / max_secs);
 }
 
 //==============================================================================
@@ -629,7 +636,7 @@ void AudioPluginAudioProcessor::changeStateImpl(choc::value::ValueView state)
                 ParameterMessage parmsg;
                 parmsg.id = pars[i].id;
                 parmsg.value = v;
-                //params_from_gui_fifo.push(parmsg);
+                // params_from_gui_fifo.push(parmsg);
                 *granulator.idtoparvalptr[pars[i].id] = v;
             }
         }
