@@ -13,6 +13,27 @@ AudioPluginAudioProcessor::AudioPluginAudioProcessor()
 #endif
       )
 {
+    snapshots.resize(64);
+    for (int i = 0; i < 64; ++i)
+    {
+        try
+        {
+            auto fname = std::format(
+                R"(C:\develop\AudioPluginHost_mk2\audio\granulatorpresets\{}.json)", i + 1);
+            if (std::filesystem::exists(fname))
+            {
+                auto jsontxt = choc::file::loadFileAsString(fname);
+                auto state = choc::json::parseValue(jsontxt);
+                state.setMember(StateIgnoreStrings::masterVolume, true);
+                state.setMember(StateIgnoreStrings::dashboardsettings, true);
+                snapshots[i] = state;
+            }
+        }
+        catch (std::exception &ex)
+        {
+            // DBG(i << " error loading state : " << ex.what());
+        }
+    }
     directMidiMappings[21] = ToneGranulator::PAR_MAINVOLUME;
     directMidiMappings[22] = ToneGranulator::PAR_DENSITY;
     directMidiMappings[23] = ToneGranulator::PAR_PITCH;
@@ -62,6 +83,23 @@ AudioPluginAudioProcessor::AudioPluginAudioProcessor()
 }
 
 AudioPluginAudioProcessor::~AudioPluginAudioProcessor() {}
+
+void AudioPluginAudioProcessor::saveSnapShot(int index, choc::value::ValueView state)
+{
+    if (index >= 0 && index < snapshots.size())
+    {
+        std::lock_guard<choc::threading::SpinLock> locker(stateLock);
+        snapshots[index] = state;
+    }
+}
+
+void AudioPluginAudioProcessor::loadSnapShot(int index)
+{
+    if (index >= 0 && index < snapshots.size() && !snapshots[index].isVoid())
+    {
+        setState(snapshots[index]);
+    }
+}
 
 void AudioPluginAudioProcessor::startRecording()
 {

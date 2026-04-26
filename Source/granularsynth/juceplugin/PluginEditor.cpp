@@ -212,24 +212,12 @@ void AudioPluginAudioProcessorEditor::saveSnapShot(int index)
     std::ofstream ostream(std::format(
         R"(C:\develop\AudioPluginHost_mk2\audio\granulatorpresets\{}.json)", index + 1));
     choc::json::writeAsJSON(ostream, state, true);
+    processorRef.saveSnapShot(index, state);
 }
 
 void AudioPluginAudioProcessorEditor::loadSnapShot(int index)
 {
-    try
-    {
-        auto jsontxt = choc::file::loadFileAsString(std::format(
-            R"(C:\develop\AudioPluginHost_mk2\audio\granulatorpresets\{}.json)", index + 1));
-        auto state = choc::json::parseValue(jsontxt);
-        state.setMember(StateIgnoreStrings::masterVolume, true);
-        state.setMember(StateIgnoreStrings::dashboardsettings, true);
-        processorRef.setState(state);
-    }
-    catch (std::exception &ex)
-    {
-        DBG(ex.what());
-    }
-    
+    processorRef.loadSnapShot(index);
     juce::Timer::callAfterDelay(100, [this]() { processorRef.sendExtraStatesToGUI(); });
 }
 

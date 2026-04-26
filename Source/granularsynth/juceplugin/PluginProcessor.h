@@ -107,6 +107,11 @@ class AudioPluginAudioProcessor final : public juce::AudioProcessor
     std::unordered_map<uint32_t, uint32_t> directMidiMappings;
     choc::value::Value pendingState;
     choc::threading::SpinLock stateLock;
+    std::vector<choc::value::Value> snapshots;
+    std::atomic<int> currentsnapshot{-1};
+    void loadSnapShot(int index);
+    void saveSnapShot(int index, choc::value::ValueView state);
+
   private:
     alignas(32) std::vector<float> workBuffer;
     alignas(32) choc::fifo::SingleReaderSingleWriterFIFO<std::array<float, 16>> buffer_adapter;
