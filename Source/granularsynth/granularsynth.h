@@ -686,6 +686,13 @@ class GranulatorVoice
                     insert_fx[i].paramvalues[j] = evpars.insertparams[i][j];
                 }
             }
+            else if (insert_fx[i].mainmode == GrainInsertFX::GFXXENAKIOS)
+            {
+                for (size_t j = 0; j < insert_fx[i].numParams; ++j)
+                {
+                    insert_fx[i].paramvalues[j] = evpars.insertparams[i][j];
+                }
+            }
         }
         for (int i = 0; i < GrainEvent::MD_NUMDESTS; ++i)
             modamounts[i] = evpars.modamounts[i];

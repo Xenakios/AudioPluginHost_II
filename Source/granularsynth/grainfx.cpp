@@ -1,5 +1,5 @@
 #include "grainfx.h"
-
+#include <print>
 #include "plugins/BezEQ.h"
 #include "plugins/HipCrush.h"
 #include "plugins/kWoodRoom.h"
@@ -14,6 +14,7 @@
 #include "plugins/GlitchShifter.h"
 #include "plugins/WoodenBox.h"
 #include "plugins/PitchNasty.h"
+#include "xgfx_dust.h"
 
 std::vector<GrainInsertFX::ModeInfo> GrainInsertFX::getAvailableModes()
 {
@@ -34,6 +35,7 @@ std::vector<GrainInsertFX::ModeInfo> GrainInsertFX::getAvailableModes()
     result.emplace_back("AW GlitchShifter", "AirWindows", GFXAIRWINDOWS, 11);
     result.emplace_back("AW WoodenBox", "AirWindows", GFXAIRWINDOWS, 12);
     result.emplace_back("AW PitchNasty", "AirWindows", GFXAIRWINDOWS, 13);
+    result.emplace_back("Xenakios Dust", "Xenakios", GFXXENAKIOS, 0);
     std::sort(result.begin(), result.end(),
               [](auto const &lhs, auto const &rhs) { return lhs.displayname < rhs.displayname; });
     auto models = sfpp::Filter::availableModels();
@@ -100,7 +102,7 @@ void GrainInsertFX::setMode(ModeInfo m)
             std::print("could not prepare filter {}\n", m.displayname);
         }
     }
-    if (m.mainmode == 2)
+    if (m.mainmode == GFXAIRWINDOWS)
     {
         mainmode = GFXNONE;
         numParams = 0;
@@ -186,6 +188,20 @@ void GrainInsertFX::setMode(ModeInfo m)
             {
                 paramvalues[i] = awplugin->getParameter(i);
             }
+        }
+    }
+    if (m.mainmode == GFXXENAKIOS)
+    {
+        mainmode = GFXXENAKIOS;
+        if (m.awtype == 0)
+        {
+            xenplugin = std::make_unique<DustFX>();
+            numParams = xenplugin->num_params();
+        }
+        std::fill(paramvalues.begin(), paramvalues.end(), 0.0f);
+        for (size_t i = 0; i < numParams; ++i)
+        {
+            paramvalues[i] = xenplugin->get_parameter(i);
         }
     }
 }

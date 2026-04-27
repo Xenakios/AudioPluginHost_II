@@ -3,7 +3,9 @@
 #include "sst/filters++.h"
 #include "text/choc_StringUtilities.h"
 #include "airwin_consolidated_base.h"
-#include <print>
+#include "xenfxbase.h"
+// #include <print>
+
 
 namespace sfpp = sst::filtersplusplus;
 struct FilterInfo
@@ -95,11 +97,13 @@ class GrainInsertFX
     alignas(16) std::array<float, 10> parammodvalues;
     alignas(32) sst::filtersplusplus::Filter sstfilter;
     alignas(32) std::unique_ptr<AirwinConsolidatedBase> awplugin;
+    alignas(32) std::unique_ptr<XenFXBase> xenplugin;
     enum GFXMAINMODE
     {
         GFXNONE,
         GFXSSTFILTER,
-        GFXAIRWINDOWS
+        GFXAIRWINDOWS,
+        GFXXENAKIOS
     };
     size_t mainmode = GFXNONE;
     double sr = 0.0;
@@ -128,9 +132,13 @@ class GrainInsertFX
             awplugin->getParameterName(index, buf);
             return buf;
         }
+        if (mainmode == GFXXENAKIOS && xenplugin && index < numParams)
+        {
+            return xenplugin->get_param_name(index);
+        }
         return "No parameter";
     }
-    std::vector<float> delaylinememory;
+    alignas(32) std::vector<float> delaylinememory;
     GrainInsertFX()
     {
         std::fill(paramvalues.begin(), paramvalues.end(), 0.0f);
@@ -144,10 +152,12 @@ class GrainInsertFX
 
     void reset()
     {
-        if (mainmode == 1)
+        if (mainmode == GFXSSTFILTER)
             sstfilter.reset();
-        if (mainmode == 2 && awplugin)
+        if (mainmode == GFXAIRWINDOWS && awplugin)
             awplugin->reset();
+        if (mainmode == GFXXENAKIOS && xenplugin)
+            xenplugin->reset();
     }
     void prepareInstance(double sampleRate, size_t ablockSize)
     {
@@ -189,6 +199,12 @@ class GrainInsertFX
             for (size_t i = 0; i < numParams; ++i)
                 awplugin->setParameter(i, std::clamp(paramvalues[i], 0.0f, 1.0f));
         }
+        else if (mainmode == GFXXENAKIOS)
+        {
+            assert(xenplugin);
+            for (size_t i = 0; i < numParams; ++i)
+                xenplugin->set_parameter(i, paramvalues[i]);
+        }
     }
     void processStereo(float &inleft, float &inright)
     {
@@ -217,6 +233,21 @@ class GrainInsertFX
             awplugin->processReplacing(inputs, outputs, 1);
             inleft = output0;
             inright = output1;
+            break;
+        }
+        case GFXXENAKIOS:
+        {
+            assert(xenplugin);
+            float input0 = inleft;
+            float input1 = inright;
+            float *inputs[2] = {&input0, &input1};
+            float output0 = 0.0f;
+            float output1 = 0.0f;
+            float *outputs[2] = {&output0, &output1};
+            xenplugin->process(inputs, outputs, 1);
+            inleft = output0;
+            inright = output1;
+            break;
         }
         }
     };
