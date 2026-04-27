@@ -607,7 +607,7 @@ void AudioPluginAudioProcessor::changeStateImpl(choc::value::ValueView state)
                 conf.pt = (decltype(conf.pt))filterstate["pt"].getWithDefault(0);
                 int mainmode = filterstate["mainmode"].getWithDefault(0);
                 int awtype = filterstate["awtype"].getWithDefault(0);
-                // granulator.set_filter(i, mainmode, awtype, m, conf);
+                granulator.set_filter(i, mainmode, awtype, m, conf);
 
                 ThreadMessage msg;
                 msg.opcode = ThreadMessage::OP_FILTERTYPE;
@@ -616,7 +616,7 @@ void AudioPluginAudioProcessor::changeStateImpl(choc::value::ValueView state)
                 msg.filterindex = i;
                 msg.filtermodel = m;
                 msg.filterconfig = conf;
-                from_gui_fifo.push(msg);
+                // from_gui_fifo.push(msg);
             }
         }
     }

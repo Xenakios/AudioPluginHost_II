@@ -198,6 +198,7 @@ void GrainInsertFX::setMode(ModeInfo m)
             xenplugin = std::make_unique<DustFX>();
             numParams = xenplugin->num_params();
         }
+        xenplugin->prepare(sr, 1);
         std::fill(paramvalues.begin(), paramvalues.end(), 0.0f);
         for (size_t i = 0; i < numParams; ++i)
         {
