@@ -678,6 +678,7 @@ class GranulatorVoice
                 float filtpitchspread =
                     xenakios::mapvalue(evpars.insertparams[i][3], 0.0f, 1.0f, -24.0f, 24.0f);
                 insert_fx[i].paramvalues[3] = std::clamp(filtpitchspread, -24.0f, 24.0f);
+                insert_fx[i].paramvalues[4] = std::clamp(evpars.insertparams[i][4], 0.0f, 1.0f);
             }
             else if (insert_fx[i].mainmode == GrainInsertFX::GFXAIRWINDOWS)
             {

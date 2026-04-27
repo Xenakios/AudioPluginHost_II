@@ -70,6 +70,38 @@ std::vector<GrainInsertFX::ModeInfo> GrainInsertFX::getAvailableModes()
     return result;
 }
 
+std::string GrainInsertFX::getParameterName(size_t index)
+{
+    if (mainmode == GFXNONE)
+        return "No parameter";
+    if (mainmode == GFXSSTFILTER)
+    {
+        if (index == 0)
+            return "Cutoff";
+        else if (index == 1)
+            return "Resonance";
+        else if (index == 2)
+            return "Extra parameter";
+        else if (index == 3)
+            return "Cutoff spread";
+        else if (index == 4)
+            return "Dry/Wet";
+        return "No parameter";
+    }
+    if (mainmode == GFXAIRWINDOWS && awplugin && index < numParams)
+    {
+        char buf[256];
+        memset(buf, 0, 256);
+        awplugin->getParameterName(index, buf);
+        return buf;
+    }
+    if (mainmode == GFXXENAKIOS && xenplugin && index < numParams)
+    {
+        return xenplugin->get_param_name(index);
+    }
+    return "No parameter";
+}
+
 void GrainInsertFX::setMode(ModeInfo m)
 {
     assert(sr > 0);
@@ -82,11 +114,12 @@ void GrainInsertFX::setMode(ModeInfo m)
     if (m.mainmode == GFXSSTFILTER)
     {
         mainmode = 1;
-        numParams = 4;
+        numParams = 5;
         paramvalues[0] = 1.0;
         paramvalues[1] = 0.0;
         paramvalues[2] = 0.0;
         paramvalues[3] = 0.5;
+        paramvalues[4] = 1.0;
         auto reqdelaysize =
             sst::filtersplusplus::Filter::requiredDelayLinesSizes(m.sstmodel, m.sstconfig);
 

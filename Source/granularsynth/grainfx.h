@@ -6,7 +6,6 @@
 #include "xenfxbase.h"
 // #include <print>
 
-
 namespace sfpp = sst::filtersplusplus;
 struct FilterInfo
 {
@@ -98,6 +97,7 @@ class GrainInsertFX
     alignas(32) sst::filtersplusplus::Filter sstfilter;
     alignas(32) std::unique_ptr<AirwinConsolidatedBase> awplugin;
     alignas(32) std::unique_ptr<XenFXBase> xenplugin;
+    alignas(32) float sstmixcoeffs[2] = {0.0f, 0.0f};
     enum GFXMAINMODE
     {
         GFXNONE,
@@ -109,35 +109,8 @@ class GrainInsertFX
     double sr = 0.0;
     size_t blockSize = 0;
     size_t numParams = 0;
-    std::string getParameterName(size_t index)
-    {
-        if (mainmode == GFXNONE)
-            return "No parameter";
-        if (mainmode == GFXSSTFILTER)
-        {
-            if (index == 0)
-                return "Cutoff";
-            else if (index == 1)
-                return "Resonance";
-            else if (index == 2)
-                return "Extra parameter";
-            else if (index == 3)
-                return "Cutoff spread";
-            return "No parameter";
-        }
-        if (mainmode == GFXAIRWINDOWS && awplugin && index < numParams)
-        {
-            char buf[256];
-            memset(buf, 0, 256);
-            awplugin->getParameterName(index, buf);
-            return buf;
-        }
-        if (mainmode == GFXXENAKIOS && xenplugin && index < numParams)
-        {
-            return xenplugin->get_param_name(index);
-        }
-        return "No parameter";
-    }
+    std::string getParameterName(size_t index);
+
     alignas(32) std::vector<float> delaylinememory;
     GrainInsertFX()
     {
@@ -189,6 +162,10 @@ class GrainInsertFX
             sstfilter.makeCoefficients(1, paramvalues[0] + paramvalues[3], paramvalues[1],
                                        paramvalues[2]);
             sstfilter.prepareBlock();
+
+            const float pidiv = M_PI / 2;
+            sstmixcoeffs[0] = std::cos(pidiv * paramvalues[4]);
+            sstmixcoeffs[1] = std::sin(pidiv * paramvalues[4]);
         }
         else if (mainmode == GFXAIRWINDOWS)
         {
@@ -217,8 +194,8 @@ class GrainInsertFX
             float outLeft = 0.0f;
             float outRight = 0.0f;
             sstfilter.processStereoSample(inleft, inright, outLeft, outRight);
-            inleft = outLeft;
-            inright = outRight;
+            inleft = sstmixcoeffs[0] * inleft + sstmixcoeffs[1] * outLeft;
+            inright = sstmixcoeffs[0] * inright + sstmixcoeffs[1] * outRight;
             break;
         }
         case GFXAIRWINDOWS:
