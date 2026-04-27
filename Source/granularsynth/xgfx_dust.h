@@ -40,7 +40,8 @@ class DustFX : public XenFXBase
         if (paramindex == 1)
         {
             size = value;
-            pulselensamples = sr * size * 0.05;
+            value = value * value * value;
+            pulselensamples = (0.0001 + value * 0.05) * sr;
         }
     }
     void process(float **inbuffer, float **outbuffer, size_t num_frames) override
@@ -48,7 +49,7 @@ class DustFX : public XenFXBase
         assert(sr > 0.0);
         for (int i = 0; i < num_frames; ++i)
         {
-            if (phases[0] == 0)
+            if (phase == 0)
             {
                 if (rng.nextFloat() > prob)
                 {
@@ -58,9 +59,6 @@ class DustFX : public XenFXBase
                 {
                     gains[0].setTarget(1.0);
                 }
-            }
-            if (phases[1] == 0)
-            {
                 if (rng.nextFloat() > prob)
                 {
                     gains[1].setTarget(0.0);
@@ -70,24 +68,22 @@ class DustFX : public XenFXBase
                     gains[1].setTarget(1.0);
                 }
             }
+
             gains[0].process();
             gains[1].process();
             outbuffer[0][i] = inbuffer[0][i] * SmoothingStrategy::getValue(gains[0]);
             outbuffer[1][i] = inbuffer[1][i] * SmoothingStrategy::getValue(gains[1]);
-            
-            ++phases[0];
-            if (phases[0] >= pulselensamples)
-                phases[0] = 0;
-            ++phases[1];
-            if (phases[1] >= pulselensamples)
-                phases[1] = 0;
+
+            ++phase;
+            if (phase >= pulselensamples)
+                phase = 0;
         }
     }
     float prob = 1.0f;
     float size = 0.0f;
     float sr = 0.0f;
     int pulselensamples = 0;
-    int phases[2] = {0, 0};
+    int phase = 0;
     sst::basic_blocks::dsp::LagSmoothingStrategy::smoothValue_t gains[2];
     xenakios::Xoroshiro128Plus rng;
 };
