@@ -472,11 +472,14 @@ struct ModulationRowComponent : public juce::Component
         destDrop.setSelectedId(1);
         destDrop.OnItemSelected = [updatfunc, this]() {
             auto id = destDrop.selectedId;
-            if (id > 1)
+            if (id > 0)
             {
-                auto pmd = gr->idtoparmetadata[destDrop.selectedId];
-                auto d = gr->modRanges[destDrop.selectedId];
-                depthSlider.setModulationDisplayDepth(d, pmd->unit);
+                if (id > 1)
+                {
+                    auto pmd = gr->idtoparmetadata[destDrop.selectedId];
+                    auto d = gr->modRanges[destDrop.selectedId];
+                    depthSlider.setModulationDisplayDepth(d, pmd->unit);
+                }
                 updatfunc();
             }
         };
