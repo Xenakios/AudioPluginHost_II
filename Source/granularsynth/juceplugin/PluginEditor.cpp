@@ -137,7 +137,7 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor(AudioPluginAudi
         }
     }
 
-    for (int i = 0; i < 12; ++i)
+    for (int i = 0; i < 16; ++i)
     {
         auto modcomp = std::make_unique<ModulationRowComponent>(&processorRef.granulator);
         modcomp->modslotindex = i;
@@ -207,7 +207,7 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor(AudioPluginAudi
     // setLookAndFeel(&lnf);
     // updateAllFonts(*this, lnf.myFont);
     addAndMakeVisible(dashBoardComponent);
-    setSize(1500, 880);
+    setSize(1500, 930);
     startTimer(50);
 }
 
@@ -513,7 +513,7 @@ void AudioPluginAudioProcessorEditor::resized()
         modrowflex.items.add(
             juce::FlexItem(*modRowComps[i]).withFlex(1).withMinHeight(25).withMargin(1));
     }
-    modrowflex.performLayout(juce::Rectangle<int>{0, yoffs, getWidth(), 170});
+    modrowflex.performLayout(juce::Rectangle<int>{0, yoffs, getWidth(), 220});
     infoLabel.setBounds(0, getHeight() - 25, getWidth() - 71, 24);
 
     int vish = 140;
