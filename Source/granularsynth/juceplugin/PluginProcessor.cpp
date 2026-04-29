@@ -108,12 +108,14 @@ void AudioPluginAudioProcessor::startRecording()
     juce::File outfile{R"(C:\MusicAudio\Dome\granulatorlivebounces)"};
     outfile = outfile.getNonexistentChildFile("recording", ".wav");
     std::unique_ptr<juce::OutputStream> ostream = std::make_unique<juce::FileOutputStream>(outfile);
-    auto writer = wavformat.createWriterFor(ostream, juce::AudioFormatWriterOptions()
-                                                         .withSampleRate(44100)
-                                                         .withBitsPerSample(32)
-                                                         .withNumChannels(16));
+    auto writer =
+        wavformat.createWriterFor(ostream, juce::AudioFormatWriterOptions()
+                                               .withSampleRate(44100)
+                                               .withBitsPerSample(32)
+                                               .withNumChannels(granulator.num_out_chans));
     if (writer)
     {
+        recordBuffer.setSize(granulator.num_out_chans, 4096);
         threadedWriter = std::make_unique<juce::AudioFormatWriter::ThreadedWriter>(
             writer.release(), sliceThread, 65536);
         isRecording = true;
@@ -182,10 +184,10 @@ void AudioPluginAudioProcessor::changeProgramName(int index, const juce::String 
 void AudioPluginAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 {
     DBG("prepareToPlay");
-    recordBuffer.setSize(16, samplesPerBlock);
+
     perfMeasurer.reset(sampleRate, samplesPerBlock);
-    workBuffer.resize(samplesPerBlock * 32);
-    granulator.prepare(sampleRate, {}, 3, GranulatorVoice::FR_ALLSERIAL, 0.002f, 0.002f);
+    workBuffer.resize(samplesPerBlock * 64);
+    granulator.prepare(sampleRate, {}, 4, GranulatorVoice::FR_ALLSERIAL, 0.002f, 0.002f);
 }
 
 void AudioPluginAudioProcessor::releaseResources() {}
@@ -419,7 +421,7 @@ void AudioPluginAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
     }
     */
 
-    std::array<float, 16> adapter_block;
+    std::array<float, ambisonicOrderNumChannels(maxAmbiSonicOrder)> adapter_block;
     std::fill(adapter_block.begin(), adapter_block.end(), 0.0f);
     int procnumoutchs = granulator.num_out_chans;
     while (buffer_adapter.getUsedSlots() < buffer.getNumSamples())
@@ -437,31 +439,38 @@ void AudioPluginAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
 
     buffer.clear();
     auto channelDatas = buffer.getArrayOfWritePointers();
-    auto recordDatas = recordBuffer.getArrayOfWritePointers();
+    float *const *recordDatas = nullptr;
+    if (recordBuffer.getNumChannels() > 0)
+        recordDatas = recordBuffer.getArrayOfWritePointers();
+    int granulnumoutchans = granulator.num_out_chans;
     if (totalNumOutputChannels == 2)
     {
         const float midGain = 1.414f;
         for (int j = 0; j < buffer.getNumSamples(); ++j)
         {
             buffer_adapter.pop(adapter_block);
-            for (int k = 0; k < 16; ++k)
-                recordDatas[k][j] = adapter_block[k];
+            if (recordDatas)
+            {
+                for (int k = 0; k < granulnumoutchans; ++k)
+                    recordDatas[k][j] = adapter_block[k];
+            }
+
             float m = adapter_block[0] * midGain;
             float s = adapter_block[1];
             channelDatas[0][j] = std::clamp((m + s) * 0.5f, -1.0f, 1.0f);
             channelDatas[1][j] = std::clamp((m - s) * 0.5f, -1.0f, 1.0f);
         }
-        if (isRecording && threadedWriter)
+        if (recordDatas && isRecording && threadedWriter)
         {
             threadedWriter->write(recordDatas, buffer.getNumSamples());
         }
     }
-    if (totalNumOutputChannels == 16)
+    if (totalNumOutputChannels >= procnumoutchs)
     {
         for (int j = 0; j < buffer.getNumSamples(); ++j)
         {
             buffer_adapter.pop(adapter_block);
-            for (int i = 0; i < 16; ++i)
+            for (int i = 0; i < procnumoutchs; ++i)
             {
                 // float s = workBuffer[j * procnumoutchs + i];
                 float s = adapter_block[i];

@@ -109,13 +109,14 @@ class AudioPluginAudioProcessor final : public juce::AudioProcessor
     choc::value::Value pendingState;
     choc::threading::SpinLock stateLock;
     std::vector<choc::value::Value> snapshots;
-    
+
     void loadSnapShot(int index);
     void saveSnapShot(int index, choc::value::ValueView state);
 
   private:
     alignas(32) std::vector<float> workBuffer;
-    alignas(32) choc::fifo::SingleReaderSingleWriterFIFO<std::array<float, 16>> buffer_adapter;
+    alignas(32) choc::fifo::SingleReaderSingleWriterFIFO<
+        std::array<float, ambisonicOrderNumChannels(maxAmbiSonicOrder)>> buffer_adapter;
     void setStateDirtyHack();
     int prior_ambi_order = -1;
     std::unordered_map<juce::AudioProcessorParameter *, int> jucepartoindex;

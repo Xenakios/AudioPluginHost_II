@@ -21,6 +21,9 @@
 using namespace sst::basic_blocks::mod_matrix;
 
 const int granul_block_size = 8;
+const int maxAmbiSonicOrder = 4;
+
+inline constexpr int ambisonicOrderNumChannels(int order) { return (order + 1) * (order + 1); }
 
 template <typename T> inline int sgn(T val) { return (T(0) < val) - (val < T(0)); }
 
@@ -502,7 +505,8 @@ class GranulatorVoice
     float polarity_gain = 1.0f;
     int prior_osc_type = -1;
     EasingLUTS *eluts = nullptr;
-    alignas(16) std::array<float, 32> ambcoeffs;
+    // 2x up to 7th order Ambisonics
+    alignas(16) std::array<float, 128> ambcoeffs;
     enum FilterRouting
     {
         FR_ALLOFF,
@@ -641,16 +645,18 @@ class GranulatorVoice
             sphericalToCartesian(azimuth, elevation, x, y, z);
             float *coeffdata = ambcoeffs.data();
             if (inchan == 1)
-                coeffdata = ambcoeffs.data() + 16;
+                coeffdata = ambcoeffs.data() + 64;
             if (ambisonic_order == 1)
                 SHEval1(x, y, z, coeffdata);
             else if (ambisonic_order == 2)
                 SHEval2(x, y, z, coeffdata);
             else if (ambisonic_order == 3)
                 SHEval3(x, y, z, coeffdata);
+            else if (ambisonic_order == 4)
+                SHEval4(x, y, z, coeffdata);
             if (doambnormalization)
             {
-                for (int i = 0; i < 16; ++i)
+                for (int i = 0; i < num_outputchans; ++i)
                     coeffdata[i] *= n3d2sn3d[i];
             }
         };
@@ -860,11 +866,13 @@ class GranulatorVoice
                         fadegain = 0.0f;
                 }
             }
+            outsample0 *= fadegain;
+            outsample1 *= fadegain;
             for (int chan = 0; chan < num_outputchans; ++chan)
             {
-                outputs[i * 16 + chan] = 0.0f;
-                outputs[i * 16 + chan] += outsample0 * ambcoeffs[chan] * fadegain;
-                outputs[i * 16 + chan] += outsample1 * ambcoeffs[chan + 16] * fadegain;
+                outputs[i * 64 + chan] = 0.0f;
+                outputs[i * 64 + chan] += outsample0 * ambcoeffs[chan];
+                outputs[i * 64 + chan] += outsample1 * ambcoeffs[chan + 64];
             }
         }
         for (auto &f : insert_fx)
@@ -1391,10 +1399,10 @@ class ToneGranulator
                                    .withGroupName("Main output")
                                    .withID(PAR_MAINVOLUME));
         parmetadatas.push_back(pmd()
-                                   .withUnorderedMapFormatting({{0, "Stereo"},
-                                                                {1, "Ambisonic 1ST Order"},
-                                                                {2, "Ambisonic 2ND Order"},
-                                                                {3, "Ambisonic 3RD Order"}},
+                                   .withUnorderedMapFormatting({{0, "Ambisonic 1st Order"},
+                                                                {1, "Ambisonic 2nd Order"},
+                                                                {2, "Ambisonic 3rd Order"},
+                                                                {3, "Ambisonic 4th Order"}},
                                                                true)
                                    .withDefault(2)
                                    .withName("Spatialization mode")
@@ -1869,16 +1877,16 @@ class ToneGranulator
         modmatrix.m.prepare(modmatrix.rt, samplerate, granul_block_size);
         thread_op = 1;
     }
-    std::map<int, int> aotonumchans{{1, 4}, {2, 9}, {3, 16}};
+
     std::atomic<bool> is_prepared{false};
     void set_ambisonics_order(int order)
     {
         for (auto &v : voices)
         {
             v->ambisonic_order = order;
-            v->num_outputchans = aotonumchans[order];
+            v->num_outputchans = ambisonicOrderNumChannels(order);
         }
-        num_out_chans = aotonumchans[order];
+        num_out_chans = ambisonicOrderNumChannels(order);
     }
     std::atomic<float> auxenvwarpmodulated = 0.0f;
     std::atomic<uint32_t> modulatedParamToStore{0};
@@ -2197,8 +2205,8 @@ class ToneGranulator
                         ev = &scheduledGrains[scheduledIndex];
                 }
             }
-            alignas(16) double mixsum[16][granul_block_size];
-            for (int i = 0; i < 16; ++i)
+            alignas(16) double mixsum[64][granul_block_size];
+            for (int i = 0; i < num_out_chans; ++i)
             {
                 for (int j = 0; j < granul_block_size; ++j)
                 {
@@ -2213,14 +2221,14 @@ class ToneGranulator
                 if (voices[j]->active)
                 {
                     ++numactive;
-                    alignas(16) float voiceout[16 * granul_block_size];
+                    alignas(16) float voiceout[64 * granul_block_size];
                     voices[j]->process<true>(voiceout, granul_block_size);
 
                     for (int k = 0; k < granul_block_size; ++k)
                     {
                         for (int chan = 0; chan < num_out_chans; ++chan)
                         {
-                            mixsum[chan][k] += voiceout[16 * k + chan];
+                            mixsum[chan][k] += voiceout[64 * k + chan];
                         }
                     }
                 }
