@@ -824,6 +824,7 @@ class DashBoardComponent : public juce::Component
         menu.addItem("Show modulator values", true, showModulatorValues,
                      [this]() { showModulatorValues = !showModulatorValues; });
         juce::PopupMenu param_menu;
+        param_menu.addItem("-None-", [this]() { gr->modulatedParamToStore.store(0); });
         for (auto &e : gr->parmetadatas)
         {
             if (e.flags & CLAP_PARAM_IS_MODULATABLE)
@@ -832,7 +833,7 @@ class DashBoardComponent : public juce::Component
                                    [this, id = e.id]() { gr->modulatedParamToStore.store(id); });
             }
         }
-        menu.addSubMenu("Parameter history", param_menu);
+        menu.addSubMenu("Parameter scope", param_menu);
         menu.showMenuAsync(juce::PopupMenu::Options{});
     }
     void drawCPUGraph(juce::Graphics &g, double enginetime, double w, double xoffs);

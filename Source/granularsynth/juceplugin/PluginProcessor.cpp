@@ -1,17 +1,13 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 // #include "Tunings.h"
-//==============================================================================
+
+// .withInput("Input", juce::AudioChannelSet::stereo(), true)
+
 AudioPluginAudioProcessor::AudioPluginAudioProcessor()
     : AudioProcessor(BusesProperties()
-#if !JucePlugin_IsMidiEffect
-#if !JucePlugin_IsSynth
                          .withInput("Input", juce::AudioChannelSet::stereo(), true)
-#endif
-                         .withOutput("Output", juce::AudioChannelSet::ambisonic(3), true)
-
-#endif
-      )
+                         .withOutput("Output", juce::AudioChannelSet::ambisonic(3), true))
 {
     snapshots.resize(64);
     for (int i = 0; i < 64; ++i)
@@ -194,8 +190,39 @@ void AudioPluginAudioProcessor::prepareToPlay(double sampleRate, int samplesPerB
 
 void AudioPluginAudioProcessor::releaseResources() {}
 
+juce::String getBusesLayoutDescription(const juce::AudioProcessor::BusesLayout &layout)
+{
+    juce::String description;
+
+    auto appendBuses = [&description](const juce::Array<juce::AudioChannelSet> &buses,
+                                      juce::String type) {
+        description << type << " Buses (" << buses.size() << "):\n";
+
+        if (buses.isEmpty())
+        {
+            description << "  None\n";
+            return;
+        }
+
+        for (int i = 0; i < buses.size(); ++i)
+        {
+            const auto &bus = buses.getReference(i);
+            description << "  Bus " << i << ": "
+                        << bus.getDescription() // e.g., "Stereo" or "5.1 Surround"
+                        << " [" << bus.size() << " channels]\n";
+        }
+    };
+
+    appendBuses(layout.inputBuses, "Input");
+    description << "\n";
+    appendBuses(layout.outputBuses, "Output");
+
+    return description;
+}
+
 bool AudioPluginAudioProcessor::isBusesLayoutSupported(const BusesLayout &layouts) const
 {
+    // DBG("Host requested : " << getBusesLayoutDescription(layouts));
     return true;
     // This is the place where you check if the layout is supported.
     // In this template code we only support mono or stereo.
