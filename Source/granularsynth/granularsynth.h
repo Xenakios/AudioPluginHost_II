@@ -21,7 +21,7 @@
 using namespace sst::basic_blocks::mod_matrix;
 
 const int granul_block_size = 8;
-const int maxAmbiSonicOrder = 4;
+const uint8_t maxAmbiSonicOrder = 7;
 
 inline constexpr int ambisonicOrderNumChannels(int order) { return (order + 1) * (order + 1); }
 
@@ -684,6 +684,12 @@ class GranulatorVoice
                 SHEval3(x, y, z, coeffdata);
             else if (ambisonic_order == 4)
                 SHEval4(x, y, z, coeffdata);
+            else if (ambisonic_order == 5)
+                SHEval5(x, y, z, coeffdata);
+            else if (ambisonic_order == 6)
+                SHEval6(x, y, z, coeffdata);
+            else if (ambisonic_order == 7)
+                SHEval7(x, y, z, coeffdata);
             if (doambnormalization)
             {
                 for (int i = 0; i < num_outputchans; ++i)
@@ -1469,7 +1475,10 @@ class ToneGranulator
                                    .withUnorderedMapFormatting({{0, "Ambisonic 1st Order"},
                                                                 {1, "Ambisonic 2nd Order"},
                                                                 {2, "Ambisonic 3rd Order"},
-                                                                {3, "Ambisonic 4th Order"}},
+                                                                {3, "Ambisonic 4th Order"},
+                                                                {4, "Ambisonic 5th Order"},
+                                                                {5, "Ambisonic 6th Order"},
+                                                                {6, "Ambisonic 7th Order"}},
                                                                true)
                                    .withDefault(2)
                                    .withName("Spatialization mode")
