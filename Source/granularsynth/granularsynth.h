@@ -693,7 +693,11 @@ class GranulatorVoice
                 SHEval7(x, y, z, coeffdata);
             if (doambnormalization)
             {
-                for (int i = 0; i < num_outputchans; ++i)
+                // if we use the actual output channel count, this won't autovectorize
+                // but using the constant, it will and will always take 8 steps
+                // so we lose a little with the lowest ambisonic orders, but otherwise
+                // this works better than using the actual active output channel count
+                for (int i = 0; i < 64; ++i)
                     coeffdata[i] *= n3d2sn3d[i];
             }
         };
@@ -742,20 +746,19 @@ class GranulatorVoice
             modamounts[i] = evpars.modamounts[i];
 
         graingain = std::clamp(evpars.volume, 0.0f, 1.0f);
-        // if (pitch_base >= 12.0)
-        {
-            float bandpos =
-                xenakios::mapvalue<float>(pitch_base, -48.0f, 64.0f, 0.0f, numPitchBandAttens - 1);
-            bandpos = std::clamp(bandpos, 0.0f, (float)numPitchBandAttens - 1);
-            int ind0 = bandpos;
-            int ind1 = ind0 + 1;
-            float frac = bandpos - ind0;
-            float g0 = pitchBandAttens[ind0];
-            float g1 = pitchBandAttens[ind1];
-            float gatten = g0 + (g1 - g0) * frac;
-            assert(gatten >= 0.0f && gatten <= 1.0f);
-            graingain *= gatten;
-        }
+
+        float bandpos =
+            xenakios::mapvalue<float>(pitch_base, -48.0f, 64.0f, 0.0f, numPitchBandAttens - 1);
+        bandpos = std::clamp(bandpos, 0.0f, (float)numPitchBandAttens - 1);
+        int ind0 = bandpos;
+        int ind1 = ind0 + 1;
+        float frac = bandpos - ind0;
+        float g0 = pitchBandAttens[ind0];
+        float g1 = pitchBandAttens[ind1];
+        float gatten = g0 + (g1 - g0) * frac;
+        assert(gatten >= 0.0f && gatten <= 1.0f);
+        graingain *= gatten;
+
         graingain = graingain * graingain * graingain;
         auxsend1 = std::clamp(evpars.auxsend, 0.0f, 1.0f);
 
@@ -882,9 +885,6 @@ class GranulatorVoice
                 outsample = split + outsample;
                 */
             }
-
-            float send1 = auxsend1 * outsample;
-            outsample = (1.0f - auxsend1) * outsample;
 
             ++phase;
             float fadegain = 1.0f;
@@ -2368,7 +2368,7 @@ class ToneGranulator
                 }
             }
 #else
-            
+
             for (size_t j = 0; j < voices.size(); ++j)
             {
                 if (voices[j]->active)
