@@ -912,8 +912,8 @@ class GranulatorVoice
             for (; chan <= num_outputchans - 8; chan += 8)
             {
                 // Load 8 ambisonics coefficients for each source
-                __m256 coeffs0 = _mm256_loadu_ps(&ambcoeffs[chan]);      // coeffs for outsample0
-                __m256 coeffs1 = _mm256_loadu_ps(&ambcoeffs[chan + 64]); // coeffs for outsample1
+                __m256 coeffs0 = _mm256_load_ps(&ambcoeffs[chan]);      // coeffs for outsample0
+                __m256 coeffs1 = _mm256_load_ps(&ambcoeffs[chan + 64]); // coeffs for outsample1
 
                 // Broadcast the scalar audio samples across all 8 lanes
                 __m256 sample0 = _mm256_set1_ps(outsample0);
@@ -925,7 +925,7 @@ class GranulatorVoice
                                     _mm256_mul_ps(sample1, coeffs1)); // + outsample1 * coeffs1
 
                 // Store results into the output buffer
-                _mm256_storeu_ps(&outputs[i * 64 + chan], result);
+                _mm256_store_ps(&outputs[i * 64 + chan], result);
             }
 
             // Scalar fallback for any remaining channels (if num_outputchans isn't a multiple of 8)
