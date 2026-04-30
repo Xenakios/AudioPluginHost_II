@@ -1369,27 +1369,32 @@ class ToneGranulator
     {
         int pos = -1;
         int len = 0;
-        double delta = 0.0;
-        void start(float samplerate, float lenms)
+        int middlepos = 0;
+        std::function<void(void)> callback;
+        void start(float samplerate, float lenms, std::function<void(void)> action_at_zero)
         {
             pos = 0;
             len = samplerate * (lenms / 1000.0);
+            middlepos = len / 2;
+            callback = std::move(action_at_zero);
         }
         float step()
         {
             if (pos == -1)
                 return 1.0f;
+            if (pos == middlepos && callback)
+                callback();
             float result = 0.0f;
-            if (pos >= 0 && pos < len / 2)
-                result = 1.0f - 1.0f / (len / 2.0f) * pos;
-            if (pos >= len / 2)
-                result = 1.0f / (len / 2.0f) * (pos - len / 2.0f);
+            if (pos >= 0 && pos < middlepos)
+                result = 1.0f - 1.0f / middlepos * pos;
+            if (pos >= middlepos)
+                result = 1.0f / middlepos * (pos - middlepos);
             ++pos;
             if (pos == len)
                 pos = -1;
-            return result;
+            result = std::clamp(result, 0.0f, 1.0f);
+            return result * result;
         }
-        bool atzero() { return pos == len / 2; }
     };
     RampDownUp fadeForLargeStateChange;
     ToneGranulator() : m_sr(44100.0), modmatrix(44100.0)
@@ -1942,7 +1947,17 @@ class ToneGranulator
         if (current_ambisonic_order == order || fadeForLargeStateChange.pos >= 0)
             return;
         pending_ambisonic_order = order;
-        fadeForLargeStateChange.start(m_sr, 100.0f);
+        fadeForLargeStateChange.start(m_sr, 1000.0f, [this]() {
+            current_ambisonic_order = pending_ambisonic_order;
+            num_out_chans = ambisonicOrderNumChannels(current_ambisonic_order);
+            // std::print(std::cerr, "fade ramper reached zero\n");
+            for (auto &vc : voices)
+            {
+                vc->active = false;
+                vc->ambisonic_order = current_ambisonic_order;
+                vc->num_outputchans = ambisonicOrderNumChannels(current_ambisonic_order);
+            }
+        });
         return;
         current_ambisonic_order = order;
         for (auto &v : voices)
@@ -2314,18 +2329,6 @@ class ToneGranulator
                 float gain = gainlag.getValue();
                 float safefadegain = fadeForLargeStateChange.step();
                 gain *= safefadegain;
-                if (fadeForLargeStateChange.atzero())
-                {
-                    current_ambisonic_order = pending_ambisonic_order;
-                    num_out_chans = ambisonicOrderNumChannels(current_ambisonic_order);
-                    std::print("fade ramper reached zero\n");
-                    for (auto &vc : voices)
-                    {
-                        vc->active = false;
-                        vc->ambisonic_order = current_ambisonic_order;
-                        vc->num_outputchans = ambisonicOrderNumChannels(current_ambisonic_order);
-                    }
-                }
                 for (int chan = 0; chan < num_out_chans; ++chan)
                 {
                     outputbuffer[(bufframecount + k) * num_out_chans + chan] =
