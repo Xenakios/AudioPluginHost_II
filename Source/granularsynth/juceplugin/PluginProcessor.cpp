@@ -419,7 +419,7 @@ void AudioPluginAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
     while (buffer_adapter.getUsedSlots() < buffer.getNumSamples())
     {
         std::span<float> procspan{workBuffer};
-        granulator.process_block(procspan, granul_block_size);
+        granulator.process_block(procspan);
         procnumoutchs = granulator.num_out_chans;
         for (int j = 0; j < granul_block_size; ++j)
         {

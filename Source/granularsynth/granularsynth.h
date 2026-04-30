@@ -2181,8 +2181,9 @@ class ToneGranulator
                 graingen_phase -= 1.0;
         }
     }
-    void process_block(std::span<float> outputbuffer, int nframes)
+    void process_block(std::span<float> outputbuffer)
     {
+        assert(outputbuffer.size() == granul_block_size);
         if (thread_op == 1)
         {
             std::swap(events_to_switch, events);
@@ -2217,199 +2218,195 @@ class ToneGranulator
             self_generate = true;
         bool doambcoeffsnormalization = *idtoparvalptr[PAR_AMBUSENORMALIZATION];
         int bufframecount = 0;
-        while (bufframecount < nframes)
+
+        for (uint32_t i = 0; i < modmatrix.numLfos; ++i)
         {
-            for (uint32_t i = 0; i < modmatrix.numLfos; ++i)
-            {
-                float shift = modmatrix.m.getTargetValue(
-                    GranulatorModConfig::TargetIdentifier{(int)(PAR_LFOSHIFTS + i)});
-                modmatrix.m_lfos[i]->applyPhaseOffset(shift);
-                float rate = modmatrix.m.getTargetValue(
-                    GranulatorModConfig::TargetIdentifier{(int)(PAR_LFORATES + i)});
-                float deform = modmatrix.m.getTargetValue(
-                    GranulatorModConfig::TargetIdentifier{(int)(PAR_LFODEFORMS + i)});
-                float warp = modmatrix.m.getTargetValue(
-                    GranulatorModConfig::TargetIdentifier{(int)(PAR_LFOWARPS + i)});
-                int shape = *idtoparvalptr[PAR_LFOSHAPES + i];
-                shape = shapeParToActualShape[shape];
-                modmatrix.m_lfos[i]->process_block(rate, deform, shape, false, 1.0f, warp);
-                bool unipolar = (*idtoparvalptr[PAR_LFOUNIPOLARS + i]) > 0.5f;
-                if (!unipolar)
-                    modSourceValues[LFO0 + i] = modmatrix.m_lfos[i]->outputBlock[0];
-                else
-                    modSourceValues[LFO0 + i] = (modmatrix.m_lfos[i]->outputBlock[0] + 1.0f) * 0.5f;
-            }
-            for (size_t i = 0; i < stepModSources.size(); ++i)
-                modSourceValues[STEPS0 + i] = stepModValues[i];
-            modSourceValues[MIDINOTE] = midiNoteModValue;
-            modmatrix.m.process();
-            if (modulatedParamToStore.load())
-            {
-                modulatedParValueForGUI.store(modmatrix.m.getTargetValue(
-                    GranulatorModConfig::TargetIdentifier{(int)modulatedParamToStore.load()}));
-            }
-
-            if (!self_generate)
-            {
-                GrainEvent *ev = nullptr;
-                if (evindex < events.size())
-                    ev = &events[evindex];
-                while (ev &&
-                       std::floor(ev->time_position * m_sr) < playposframes + granul_block_size)
-                {
-                    bool wasfound = false;
-                    for (int j = 0; j < voices.size(); ++j)
-                    {
-                        if (!voices[j]->active)
-                        {
-                            // std::print("starting voice {} for event {}\n", j, evindex);
-                            voices[j]->grainid = graincount;
-                            voices[j]->start(*ev);
-                            wasfound = true;
-                            ++graincount;
-                            break;
-                        }
-                    }
-                    if (!wasfound)
-                    {
-                        ++missedgrains;
-                    }
-                    ++evindex;
-                    if (evindex >= events.size())
-                        ev = nullptr;
-                    else
-                        ev = &events[evindex];
-                }
-            }
+            float shift = modmatrix.m.getTargetValue(
+                GranulatorModConfig::TargetIdentifier{(int)(PAR_LFOSHIFTS + i)});
+            modmatrix.m_lfos[i]->applyPhaseOffset(shift);
+            float rate = modmatrix.m.getTargetValue(
+                GranulatorModConfig::TargetIdentifier{(int)(PAR_LFORATES + i)});
+            float deform = modmatrix.m.getTargetValue(
+                GranulatorModConfig::TargetIdentifier{(int)(PAR_LFODEFORMS + i)});
+            float warp = modmatrix.m.getTargetValue(
+                GranulatorModConfig::TargetIdentifier{(int)(PAR_LFOWARPS + i)});
+            int shape = *idtoparvalptr[PAR_LFOSHAPES + i];
+            shape = shapeParToActualShape[shape];
+            modmatrix.m_lfos[i]->process_block(rate, deform, shape, false, 1.0f, warp);
+            bool unipolar = (*idtoparvalptr[PAR_LFOUNIPOLARS + i]) > 0.5f;
+            if (!unipolar)
+                modSourceValues[LFO0 + i] = modmatrix.m_lfos[i]->outputBlock[0];
             else
-            {
-                generate_grain();
-                GrainEvent *ev = nullptr;
-                if (scheduledIndex < scheduledGrains.size())
-                    ev = &scheduledGrains[scheduledIndex];
-                while (ev &&
-                       std::floor(ev->time_position * m_sr) < playposframes + granul_block_size)
-                {
-                    bool voicewasfound = false;
-                    for (int j = 0; j < voices.size(); ++j)
-                    {
-                        if (!voices[j]->active)
-                        {
-                            // std::print("starting voice {} for scheduled event {}\n", j, evindex);
-                            if (graincount % 2 == 0)
-                                voices[j]->polarity_gain = 1.0f;
-                            else
-                                voices[j]->polarity_gain = -1.0f;
-                            voices[j]->grainid = graincount;
-                            voices[j]->doambnormalization = doambcoeffsnormalization;
-                            voices[j]->tail_len = taillen;
-                            voices[j]->tail_fade_len = std::clamp(taillen * 0.5, 0.002, 1.0);
-                            voices[j]->start(*ev);
-                            voicewasfound = true;
-                            GrainVisualizerMessage vmsg;
-                            vmsg.timepos = ev->time_position;
-                            vmsg.pitch = voices[j]->pitch_base;
-                            vmsg.duration = voices[j]->grain_end_phase / m_sr;
-                            vmsg.gain = voices[j]->graingain;
-                            vmsg.azimuth0degrees = voices[j]->used_azi0;
-                            vmsg.azimuth1degrees = voices[j]->used_azi1;
-                            vmsg.elevationdegrees = ev->elevation;
-                            visualizer_fifo.push(vmsg);
-                            ++graincount;
-                            break;
-                        }
-                    }
-                    // flag scheduled event for removal
-                    ev->time_position = -1.0;
-                    if (!voicewasfound)
-                    {
-                        ++missedgrains;
-                    }
-                    ++scheduledIndex;
-                    if (scheduledIndex >= scheduledGrains.size())
-                        ev = nullptr;
-                    else
-                        ev = &scheduledGrains[scheduledIndex];
-                }
-            }
-            alignas(32) float mixsum[granul_block_size][64];
-            for (int i = 0; i < num_out_chans; ++i)
-            {
-                for (int j = 0; j < granul_block_size; ++j)
-                {
-                    mixsum[j][i] = 0.0f;
-                }
-            }
+                modSourceValues[LFO0 + i] = (modmatrix.m_lfos[i]->outputBlock[0] + 1.0f) * 0.5f;
+        }
+        for (size_t i = 0; i < stepModSources.size(); ++i)
+            modSourceValues[STEPS0 + i] = stepModValues[i];
+        modSourceValues[MIDINOTE] = midiNoteModValue;
+        modmatrix.m.process();
+        if (modulatedParamToStore.load())
+        {
+            modulatedParValueForGUI.store(modmatrix.m.getTargetValue(
+                GranulatorModConfig::TargetIdentifier{(int)modulatedParamToStore.load()}));
+        }
 
-            int numactive = 0;
-            alignas(32) float voiceout[64 * granul_block_size];
+        if (!self_generate)
+        {
+            GrainEvent *ev = nullptr;
+            if (evindex < events.size())
+                ev = &events[evindex];
+            while (ev && std::floor(ev->time_position * m_sr) < playposframes + granul_block_size)
+            {
+                bool wasfound = false;
+                for (int j = 0; j < voices.size(); ++j)
+                {
+                    if (!voices[j]->active)
+                    {
+                        // std::print("starting voice {} for event {}\n", j, evindex);
+                        voices[j]->grainid = graincount;
+                        voices[j]->start(*ev);
+                        wasfound = true;
+                        ++graincount;
+                        break;
+                    }
+                }
+                if (!wasfound)
+                {
+                    ++missedgrains;
+                }
+                ++evindex;
+                if (evindex >= events.size())
+                    ev = nullptr;
+                else
+                    ev = &events[evindex];
+            }
+        }
+        else
+        {
+            generate_grain();
+            GrainEvent *ev = nullptr;
+            if (scheduledIndex < scheduledGrains.size())
+                ev = &scheduledGrains[scheduledIndex];
+            while (ev && std::floor(ev->time_position * m_sr) < playposframes + granul_block_size)
+            {
+                bool voicewasfound = false;
+                for (int j = 0; j < voices.size(); ++j)
+                {
+                    if (!voices[j]->active)
+                    {
+                        // std::print("starting voice {} for scheduled event {}\n", j, evindex);
+                        if (graincount % 2 == 0)
+                            voices[j]->polarity_gain = 1.0f;
+                        else
+                            voices[j]->polarity_gain = -1.0f;
+                        voices[j]->grainid = graincount;
+                        voices[j]->doambnormalization = doambcoeffsnormalization;
+                        voices[j]->tail_len = taillen;
+                        voices[j]->tail_fade_len = std::clamp(taillen * 0.5, 0.002, 1.0);
+                        voices[j]->start(*ev);
+                        voicewasfound = true;
+                        GrainVisualizerMessage vmsg;
+                        vmsg.timepos = ev->time_position;
+                        vmsg.pitch = voices[j]->pitch_base;
+                        vmsg.duration = voices[j]->grain_end_phase / m_sr;
+                        vmsg.gain = voices[j]->graingain;
+                        vmsg.azimuth0degrees = voices[j]->used_azi0;
+                        vmsg.azimuth1degrees = voices[j]->used_azi1;
+                        vmsg.elevationdegrees = ev->elevation;
+                        visualizer_fifo.push(vmsg);
+                        ++graincount;
+                        break;
+                    }
+                }
+                // flag scheduled event for removal
+                ev->time_position = -1.0;
+                if (!voicewasfound)
+                {
+                    ++missedgrains;
+                }
+                ++scheduledIndex;
+                if (scheduledIndex >= scheduledGrains.size())
+                    ev = nullptr;
+                else
+                    ev = &scheduledGrains[scheduledIndex];
+            }
+        }
+        alignas(32) float mixsum[granul_block_size][64];
+        for (int i = 0; i < num_out_chans; ++i)
+        {
+            for (int j = 0; j < granul_block_size; ++j)
+            {
+                mixsum[j][i] = 0.0f;
+            }
+        }
+
+        int numactive = 0;
+        alignas(32) float voiceout[64 * granul_block_size];
 // #define USE_AVX_SUMMING
 #ifdef USE_AVX_SUMMING
-            for (size_t j = 0; j < voices.size(); ++j)
+        for (size_t j = 0; j < voices.size(); ++j)
+        {
+            if (voices[j]->active)
             {
-                if (voices[j]->active)
+                ++numactive;
+                voices[j]->process<true>(voiceout, granul_block_size);
+                for (int k = 0; k < granul_block_size; ++k)
                 {
-                    ++numactive;
-                    voices[j]->process<true>(voiceout, granul_block_size);
-                    for (int k = 0; k < granul_block_size; ++k)
-                    {
-                        float *src = &voiceout[64 * k];
-                        float *dst = &mixsum[k][0];
+                    float *src = &voiceout[64 * k];
+                    float *dst = &mixsum[k][0];
 
-                        int chan = 0;
-                        for (; chan <= num_out_chans - 8; chan += 8)
-                        {
-                            _mm256_store_ps(&dst[chan], _mm256_add_ps(_mm256_load_ps(&dst[chan]),
-                                                                      _mm256_load_ps(&src[chan])));
-                        }
-                        for (; chan < num_out_chans; ++chan)
-                            dst[chan] += src[chan];
+                    int chan = 0;
+                    for (; chan <= num_out_chans - 8; chan += 8)
+                    {
+                        _mm256_store_ps(&dst[chan], _mm256_add_ps(_mm256_load_ps(&dst[chan]),
+                                                                  _mm256_load_ps(&src[chan])));
                     }
+                    for (; chan < num_out_chans; ++chan)
+                        dst[chan] += src[chan];
                 }
             }
+        }
 #else
 
-            for (size_t j = 0; j < voices.size(); ++j)
+        for (size_t j = 0; j < voices.size(); ++j)
+        {
+            if (voices[j]->active)
             {
-                if (voices[j]->active)
+                ++numactive;
+                voices[j]->process<true>(voiceout, granul_block_size);
+                for (int k = 0; k < granul_block_size; ++k)
                 {
-                    ++numactive;
-                    voices[j]->process<true>(voiceout, granul_block_size);
-                    for (int k = 0; k < granul_block_size; ++k)
+                    for (int chan = 0; chan < num_out_chans; ++chan)
                     {
-                        for (int chan = 0; chan < num_out_chans; ++chan)
-                        {
-                            mixsum[k][chan] += voiceout[64 * k + chan];
-                        }
+                        mixsum[k][chan] += voiceout[64 * k + chan];
                     }
                 }
             }
-#endif
-            double compengain = 1.0;
-            if (numactive > 0)
-                compengain = 1.0 / std::sqrt(numactive);
-            float maingain =
-                modmatrix.m.getTargetValue(GranulatorModConfig::TargetIdentifier{PAR_MAINVOLUME});
-            maingain = std::clamp(maingain, -96.0f, 0.0f);
-            maingain = xenakios::decibelsToGain(maingain);
-            gainlag.setTarget(compengain * maingain);
-
-            for (int k = 0; k < granul_block_size; ++k)
-            {
-                gainlag.process();
-                float gain = gainlag.getValue();
-                float safefadegain = fadeForLargeStateChange.step();
-                gain *= safefadegain;
-                for (int chan = 0; chan < num_out_chans; ++chan)
-                {
-                    outputbuffer[(bufframecount + k) * num_out_chans + chan] =
-                        mixsum[k][chan] * gain;
-                }
-            }
-            compensationgainforgui = gainlag.getValue();
-            bufframecount += granul_block_size;
-            playposframes += granul_block_size;
         }
+#endif
+        double compengain = 1.0;
+        if (numactive > 0)
+            compengain = 1.0 / std::sqrt(numactive);
+        float maingain =
+            modmatrix.m.getTargetValue(GranulatorModConfig::TargetIdentifier{PAR_MAINVOLUME});
+        maingain = std::clamp(maingain, -96.0f, 0.0f);
+        maingain = xenakios::decibelsToGain(maingain);
+        gainlag.setTarget(compengain * maingain);
+
+        for (int k = 0; k < granul_block_size; ++k)
+        {
+            gainlag.process();
+            float gain = gainlag.getValue();
+            float safefadegain = fadeForLargeStateChange.step();
+            gain *= safefadegain;
+            for (int chan = 0; chan < num_out_chans; ++chan)
+            {
+                outputbuffer[(bufframecount + k) * num_out_chans + chan] = mixsum[k][chan] * gain;
+            }
+        }
+        compensationgainforgui = gainlag.getValue();
+
+        playposframes += granul_block_size;
+
         int voicesused = 0;
         for (auto &v : voices)
         {
