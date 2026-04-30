@@ -2332,34 +2332,59 @@ class ToneGranulator
                         ev = &scheduledGrains[scheduledIndex];
                 }
             }
-            alignas(16) double mixsum[64][granul_block_size];
+            alignas(32) float mixsum[granul_block_size][64];
             for (int i = 0; i < num_out_chans; ++i)
             {
                 for (int j = 0; j < granul_block_size; ++j)
                 {
-                    mixsum[i][j] = 0.0f;
+                    mixsum[j][i] = 0.0f;
                 }
             }
 
             int numactive = 0;
+            alignas(32) float voiceout[64 * granul_block_size];
+// #define USE_AVX_SUMMING
+#ifdef USE_AVX_SUMMING
+            for (size_t j = 0; j < voices.size(); ++j)
+            {
+                if (voices[j]->active)
+                {
+                    ++numactive;
+                    voices[j]->process<true>(voiceout, granul_block_size);
+                    for (int k = 0; k < granul_block_size; ++k)
+                    {
+                        float *src = &voiceout[64 * k];
+                        float *dst = &mixsum[k][0];
 
+                        int chan = 0;
+                        for (; chan <= num_out_chans - 8; chan += 8)
+                        {
+                            _mm256_store_ps(&dst[chan], _mm256_add_ps(_mm256_load_ps(&dst[chan]),
+                                                                      _mm256_load_ps(&src[chan])));
+                        }
+                        for (; chan < num_out_chans; ++chan)
+                            dst[chan] += src[chan];
+                    }
+                }
+            }
+#else
+            
             for (int j = 0; j < voices.size(); ++j)
             {
                 if (voices[j]->active)
                 {
                     ++numactive;
-                    alignas(32) float voiceout[64 * granul_block_size];
                     voices[j]->process<true>(voiceout, granul_block_size);
-
                     for (int k = 0; k < granul_block_size; ++k)
                     {
                         for (int chan = 0; chan < num_out_chans; ++chan)
                         {
-                            mixsum[chan][k] += voiceout[64 * k + chan];
+                            mixsum[k][chan] += voiceout[64 * k + chan];
                         }
                     }
                 }
             }
+#endif
             double compengain = 1.0;
             if (numactive > 0)
                 compengain = 1.0 / std::sqrt(numactive);
@@ -2378,7 +2403,7 @@ class ToneGranulator
                 for (int chan = 0; chan < num_out_chans; ++chan)
                 {
                     outputbuffer[(bufframecount + k) * num_out_chans + chan] =
-                        mixsum[chan][k] * gain;
+                        mixsum[k][chan] * gain;
                 }
             }
             compensationgainforgui = gainlag.getValue();
