@@ -556,6 +556,36 @@ class GranulatorVoice
         gmode.sstconfig = config;
         insert_fx[filtindex].setMode(gmode);
     }
+    void calculate_ambisonic_coeffs(float *destarray, float azimuth, float elevation)
+    {
+        float x = 0.0;
+        float y = 0.0;
+        float z = 0.0;
+        sphericalToCartesian(azimuth, elevation, x, y, z);
+    }
+    void update_ambisonic_coeffs()
+    {
+        float azi0 = degreesToRadians(used_azi0);
+        float azi1 = degreesToRadians(used_azi1);
+        float ele = degreesToRadians(used_ele);
+        /*
+        calculate_ambisonic_coeffs(ambcoeffs.data(), azi0, ele);
+        calculate_ambisonic_coeffs(ambcoeffs.data() + 64, azi1, ele);
+        if (ambisonic_order == 1)
+            SHEval1(x, y, z, coeffdata);
+        else if (ambisonic_order == 2)
+            SHEval2(x, y, z, coeffdata);
+        else if (ambisonic_order == 3)
+            SHEval3(x, y, z, coeffdata);
+        else if (ambisonic_order == 4)
+            SHEval4(x, y, z, coeffdata);
+        if (doambnormalization)
+        {
+            for (int i = 0; i < num_outputchans; ++i)
+                coeffdata[i] *= n3d2sn3d[i];
+        }
+        */
+    }
     void start(GrainEvent &evpars)
     {
         active = true;
