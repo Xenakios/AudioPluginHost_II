@@ -2369,7 +2369,7 @@ class ToneGranulator
             }
 #else
             
-            for (int j = 0; j < voices.size(); ++j)
+            for (size_t j = 0; j < voices.size(); ++j)
             {
                 if (voices[j]->active)
                 {
