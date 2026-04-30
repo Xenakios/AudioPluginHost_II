@@ -1887,6 +1887,7 @@ class ToneGranulator
         current_ambisonic_order = order;
         for (auto &v : voices)
         {
+            v->active = false;
             v->ambisonic_order = order;
             v->num_outputchans = ambisonicOrderNumChannels(order);
         }

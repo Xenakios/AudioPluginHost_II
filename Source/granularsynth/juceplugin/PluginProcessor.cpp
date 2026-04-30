@@ -415,11 +415,12 @@ void AudioPluginAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
 
     alignas(16) std::array<float, ambisonicOrderNumChannels(maxAmbiSonicOrder)> adapter_block;
     std::fill(adapter_block.begin(), adapter_block.end(), 0.0f);
-    int procnumoutchs = granulator.num_out_chans;
+    int procnumoutchs = 0; 
     while (buffer_adapter.getUsedSlots() < buffer.getNumSamples())
     {
         std::span<float> procspan{workBuffer};
         granulator.process_block(procspan, granul_block_size);
+        procnumoutchs = granulator.num_out_chans;
         for (int j = 0; j < granul_block_size; ++j)
         {
             for (int i = 0; i < procnumoutchs; ++i)
@@ -429,7 +430,7 @@ void AudioPluginAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
             buffer_adapter.push(adapter_block);
         }
     }
-
+    procnumoutchs = granulator.num_out_chans;
     buffer.clear();
     auto channelDatas = buffer.getArrayOfWritePointers();
     float *const *recordDatas = nullptr;
