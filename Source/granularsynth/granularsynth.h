@@ -1410,7 +1410,7 @@ class ToneGranulator
                                    .withID(PAR_AMBORDER));
         parmetadatas.push_back(pmd()
                                    .asOnOffBool()
-                                   .withDefault(0)
+                                   .withDefault(1)
                                    .withName("Spatialization coeffs normalization")
                                    .withGroupName("Spatialization")
                                    .withID(PAR_AMBUSENORMALIZATION));
@@ -1835,10 +1835,10 @@ class ToneGranulator
         }
     }
     float next_samplerate = 0.0f;
-    int next_ambisonics_order = -1;
+    int current_ambisonic_order = 0;
 
-    void prepare(float samplerate, events_t evlist, int ambisonics_order, int filter_routing,
-                 float tail_len, float tail_fade_len)
+    void prepare(float samplerate, events_t evlist, int filter_routing, float tail_len,
+                 float tail_fade_len)
     {
         if (thread_op == 1)
         {
@@ -1867,7 +1867,7 @@ class ToneGranulator
             v->set_insert_type(1, 0, 0, {}, {});
         }
         next_samplerate = samplerate;
-        next_ambisonics_order = ambisonics_order;
+
         // next_filt0type = filt0type;
         // next_filt1type = filt1type;
         // next_filter_routing = filter_routing;
@@ -1881,6 +1881,10 @@ class ToneGranulator
     std::atomic<bool> is_prepared{false};
     void set_ambisonics_order(int order)
     {
+        assert(order > 0 && order < 8);
+        if (current_ambisonic_order == order)
+            return;
+        current_ambisonic_order = order;
         for (auto &v : voices)
         {
             v->ambisonic_order = order;
@@ -2055,7 +2059,7 @@ class ToneGranulator
                 graingen_phase -= 1.0;
         }
     }
-    void process_block(float *outputbuffer, int nframes)
+    void process_block(std::span<float> outputbuffer, int nframes)
     {
         if (thread_op == 1)
         {
@@ -2063,7 +2067,7 @@ class ToneGranulator
             evindex = 0;
             playposframes = 0;
             m_sr = next_samplerate;
-            set_ambisonics_order(next_ambisonics_order);
+
             // initFilter(m_sr, next_filter_routing, next_filt0type, next_filt1type,
             // next_tail_len,
             //            next_tail_fade_len);
@@ -2073,7 +2077,8 @@ class ToneGranulator
             graingen_phase_prior = 2.0;
             thread_op = 0;
         }
-        osc_type = *idtoparvalptr[ToneGranulator::PAR_OSCTYPE];
+        osc_type = *idtoparvalptr[PAR_OSCTYPE];
+        set_ambisonics_order(1 + *idtoparvalptr[PAR_AMBORDER]);
         auxenvwarpmodulated =
             modmatrix.m.getTargetValue(GranulatorModConfig::TargetIdentifier{PAR_AUXENVTIMEWARP});
         float taillen = *idtoparvalptr[PAR_GRAINTAIL];

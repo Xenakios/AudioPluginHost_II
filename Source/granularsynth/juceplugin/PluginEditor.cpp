@@ -970,6 +970,8 @@ void DashBoardComponent::paint(juce::Graphics &g)
     // timeText += " " + juce::String(persisted_events.size()) + " events in history";
     // timeText += " " + juce::String(gr->parmetadatas.size()) + " parameters";
     timeText += " current snapshot : " + juce::String(gr->currentSnapShot);
+    timeText += " ambisonic order " + juce::String(gr->current_ambisonic_order);
+    timeText += " engine channels " + juce::String(gr->num_out_chans);
     g.setFont(18.0f);
     g.drawText(timeText, xoffs, 1.0f, getWidth() - xoffs, 25, juce::Justification::left);
 }

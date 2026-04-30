@@ -186,8 +186,9 @@ void AudioPluginAudioProcessor::prepareToPlay(double sampleRate, int samplesPerB
     DBG("prepareToPlay");
 
     perfMeasurer.reset(sampleRate, samplesPerBlock);
-    workBuffer.resize(samplesPerBlock * 64);
-    granulator.prepare(sampleRate, {}, 4, GranulatorVoice::FR_ALLSERIAL, 0.002f, 0.002f);
+    // workBuffer.resize(samplesPerBlock * 64);
+    workBuffer.resize(granul_block_size * 64);
+    granulator.prepare(sampleRate, {}, GranulatorVoice::FR_ALLSERIAL, 0.002f, 0.002f);
 }
 
 void AudioPluginAudioProcessor::releaseResources() {}
@@ -390,16 +391,7 @@ void AudioPluginAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
             *granulator.idtoparvalptr[parmsg.id] = parmsg.value;
         }
     }
-    // if (prior_ambi_order != parAmbiOrder->getIndex())
-    {
-        /*
-        prior_ambi_order = parAmbiOrder->getIndex();
-        if (prior_ambi_order >= 1)
-            granulator.set_ambisonics_order(prior_ambi_order);
-        if (prior_ambi_order == 0)
-            granulator.set_ambisonics_order(1);
-        */
-    }
+    
     const auto &pars = getParameters();
     for (int i = 0; i < 16; ++i)
     {
@@ -421,12 +413,13 @@ void AudioPluginAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
     }
     */
 
-    std::array<float, ambisonicOrderNumChannels(maxAmbiSonicOrder)> adapter_block;
+    alignas(16) std::array<float, ambisonicOrderNumChannels(maxAmbiSonicOrder)> adapter_block;
     std::fill(adapter_block.begin(), adapter_block.end(), 0.0f);
     int procnumoutchs = granulator.num_out_chans;
     while (buffer_adapter.getUsedSlots() < buffer.getNumSamples())
     {
-        granulator.process_block(workBuffer.data(), granul_block_size);
+        std::span<float> procspan{workBuffer};
+        granulator.process_block(procspan, granul_block_size);
         for (int j = 0; j < granul_block_size; ++j)
         {
             for (int i = 0; i < procnumoutchs; ++i)
