@@ -1370,12 +1370,16 @@ class ToneGranulator
         int pos = -1;
         int len = 0;
         int middlepos = 0;
+        double curvalue = 0.0;
+        double delta = 0.0;
         std::function<void(void)> callback;
         void start(float samplerate, float lenms, std::function<void(void)> action_at_zero)
         {
             pos = 0;
             len = samplerate * (lenms / 1000.0);
             middlepos = len / 2;
+            curvalue = 1.0;
+            delta = 1.0 / middlepos;
             callback = std::move(action_at_zero);
         }
         float step()
@@ -1384,17 +1388,18 @@ class ToneGranulator
                 return 1.0f;
             if (pos == middlepos && callback)
                 callback();
-            float result = 0.0f;
+            float result = curvalue;
             if (pos >= 0 && pos < middlepos)
-                result = 1.0f - 1.0f / middlepos * pos;
-            if (pos >= middlepos)
-                result = 1.0f / middlepos * (pos - middlepos);
+                curvalue -= delta;
+            else
+                curvalue += delta;
             ++pos;
             if (pos == len)
                 pos = -1;
             result = std::clamp(result, 0.0f, 1.0f);
             return result * result;
         }
+        bool is_active() const { return pos >= 0; }
     };
     RampDownUp fadeForLargeStateChange;
     ToneGranulator() : m_sr(44100.0), modmatrix(44100.0)
@@ -1944,7 +1949,7 @@ class ToneGranulator
     void set_ambisonics_order(int order)
     {
         assert(order > 0 && order < 8);
-        if (current_ambisonic_order == order || fadeForLargeStateChange.pos >= 0)
+        if (current_ambisonic_order == order || fadeForLargeStateChange.is_active())
             return;
         pending_ambisonic_order = order;
         fadeForLargeStateChange.start(m_sr, 1000.0f, [this]() {
@@ -1955,7 +1960,7 @@ class ToneGranulator
             {
                 vc->active = false;
                 vc->ambisonic_order = current_ambisonic_order;
-                vc->num_outputchans = ambisonicOrderNumChannels(current_ambisonic_order);
+                vc->num_outputchans = num_out_chans;
             }
         });
         return;
