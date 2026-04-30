@@ -312,7 +312,7 @@ target_sources(ToneGranulatorPlugin
         Source/Experimental/xap_slider.cpp
 )   
 
-target_compile_options(ToneGranulatorPlugin PRIVATE -Werror=return-type "$<$<COMPILE_LANGUAGE:CXX>:-fno-char8_t>")
+target_compile_options(ToneGranulatorPlugin PRIVATE -mavx2 -mfma -Werror=return-type "$<$<COMPILE_LANGUAGE:CXX>:-fno-char8_t>")
 target_compile_definitions(ToneGranulatorPlugin
     PUBLIC
         # JUCE_WEB_BROWSER and JUCE_USE_CURL would be on by default, but you might not need them.

@@ -17,6 +17,7 @@
 #include "sst/basic-blocks/params/ParamMetadata.h"
 #include "containers/choc_SingleReaderSingleWriterFIFO.h"
 #include "easing.h"
+#include <immintrin.h>
 
 using namespace sst::basic_blocks::mod_matrix;
 
@@ -506,7 +507,7 @@ class GranulatorVoice
     int prior_osc_type = -1;
     EasingLUTS *eluts = nullptr;
     // 2x up to 7th order Ambisonics
-    alignas(16) std::array<float, 128> ambcoeffs;
+    alignas(32) std::array<float, 128> ambcoeffs;
     enum FilterRouting
     {
         FR_ALLOFF,
@@ -904,12 +905,43 @@ class GranulatorVoice
             }
             outsample0 *= fadegain;
             outsample1 *= fadegain;
+#define USE_AVX2_AMBIS
+#ifdef USE_AVX2_AMBIS
+            // Process 8 channels at a time using AVX
+            int chan = 0;
+            for (; chan <= num_outputchans - 8; chan += 8)
+            {
+                // Load 8 ambisonics coefficients for each source
+                __m256 coeffs0 = _mm256_loadu_ps(&ambcoeffs[chan]);      // coeffs for outsample0
+                __m256 coeffs1 = _mm256_loadu_ps(&ambcoeffs[chan + 64]); // coeffs for outsample1
+
+                // Broadcast the scalar audio samples across all 8 lanes
+                __m256 sample0 = _mm256_set1_ps(outsample0);
+                __m256 sample1 = _mm256_set1_ps(outsample1);
+
+                // Multiply-accumulate: sample * coefficients
+                __m256 result =
+                    _mm256_fmadd_ps(sample0, coeffs0,                 // outsample0 * coeffs0
+                                    _mm256_mul_ps(sample1, coeffs1)); // + outsample1 * coeffs1
+
+                // Store results into the output buffer
+                _mm256_storeu_ps(&outputs[i * 64 + chan], result);
+            }
+
+            // Scalar fallback for any remaining channels (if num_outputchans isn't a multiple of 8)
+            for (; chan < num_outputchans; ++chan)
+            {
+                outputs[i * 64 + chan] =
+                    outsample0 * ambcoeffs[chan] + outsample1 * ambcoeffs[chan + 64];
+            }
+#else
             for (int chan = 0; chan < num_outputchans; ++chan)
             {
                 outputs[i * 64 + chan] = 0.0f;
                 outputs[i * 64 + chan] += outsample0 * ambcoeffs[chan];
                 outputs[i * 64 + chan] += outsample1 * ambcoeffs[chan + 64];
             }
+#endif
         }
         for (auto &f : insert_fx)
             f.concludeBlock();
@@ -2316,7 +2348,7 @@ class ToneGranulator
                 if (voices[j]->active)
                 {
                     ++numactive;
-                    alignas(16) float voiceout[64 * granul_block_size];
+                    alignas(32) float voiceout[64 * granul_block_size];
                     voices[j]->process<true>(voiceout, granul_block_size);
 
                     for (int k = 0; k < granul_block_size; ++k)
