@@ -61,7 +61,7 @@ struct GranulatorModConfig
     {
         int id = 0;
         float par0 = 0.0f;
-        bool operator==(const MyCurve &other) { return id == other.id; }
+        bool operator==(const MyCurve &other) const { return id == other.id; }
     };
     using CurveIdentifier = MyCurve;
     enum CurveTypes
@@ -2183,7 +2183,7 @@ class ToneGranulator
     }
     void process_block(std::span<float> outputbuffer)
     {
-        assert(outputbuffer.size() == granul_block_size);
+        assert(outputbuffer.size() == granul_block_size * 64);
         if (thread_op == 1)
         {
             std::swap(events_to_switch, events);

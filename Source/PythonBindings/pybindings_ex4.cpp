@@ -518,34 +518,18 @@ inline py::array_t<float> render_saw_bank(double samplerate, double outdur, int 
 }
 
 inline py::array_t<float> render_granulator(ToneGranulator &gran, double samplerate,
-                                            events_t evlist, std::string outputmode,
+                                            events_t evlist, int ambisonic_order,
                                             double outputduration)
 {
     if (evlist.empty() && (outputduration <= 0.0 || outputduration > 600.0))
         throw std::runtime_error(std::format(
             "output duration {} invalid (should be larger than 0 and less than 600 seconds)",
             outputduration));
-    int chans = 0;
-    int ambiorder = 0;
-    if (outputmode == "ambisonics_1st_order")
-    {
-        chans = 4;
-        ambiorder = 1;
-    }
-    if (outputmode == "ambisonics_2nd_order")
-    {
-        chans = 9;
-        ambiorder = 2;
-    }
-    if (outputmode == "ambisonics_3rd_order")
-    {
-        chans = 16;
-        ambiorder = 3;
-    }
+    ambisonic_order = std::clamp(ambisonic_order, 1, 7);
+    int chans = ambisonicOrderNumChannels(ambisonic_order);
     if (chans == 0)
         throw std::runtime_error("invalid audio output mode");
-    gran.prepare(samplerate, std::move(evlist), ambiorder, GranulatorVoice::FR_ALLSERIAL, 0.002,
-                 0.002);
+    gran.prepare(samplerate, std::move(evlist), GranulatorVoice::FR_ALLSERIAL, 0.002, 0.002);
     if (gran.events_to_switch.empty() && outputduration == 0.0)
         throw std::runtime_error("grain event list empty after events were erased");
     // we can't know the exact tail amount needed until processing...
@@ -578,19 +562,21 @@ inline py::array_t<float> render_granulator(ToneGranulator &gran, double sampler
     using ms = std::chrono::duration<double, std::milli>;
     const auto start_time = clock::now();
     int outframecount = 0;
-    float procbuf[16 * granul_block_size];
+    float procbuf[64 * granul_block_size];
     for (int i = 0; i < 16 * granul_block_size; ++i)
         procbuf[i] = 0.0f;
+    *gran.idtoparvalptr[ToneGranulator::PAR_AMBORDER] = ambisonic_order;
     while (outframecount < frames)
     {
         int framestoprocess = std::min(granul_block_size, frames - outframecount);
-        gran.process_block(procbuf, granul_block_size);
+        gran.process_block(procbuf);
+        int procnumchans = gran.num_out_chans;
         for (int i = 0; i < framestoprocess; ++i)
         {
             int pos = outframecount + i;
             for (int j = 0; j < chans; ++j)
             {
-                writebufs[j][pos] = procbuf[i * chans + j];
+                writebufs[j][pos] = procbuf[i * procnumchans + j];
             }
         }
         outframecount += granul_block_size;

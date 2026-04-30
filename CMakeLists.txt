@@ -188,7 +188,7 @@ pybind11_add_module(xenakios
 
 # Source/Experimental/xaudiograph.cpp
 # target_link_libraries(xenakios PRIVATE juce::juce_core juce::juce_audio_utils)
-target_compile_options(xenakios PRIVATE -Werror=return-type)
+target_compile_options(xenakios PRIVATE -mavx2 -mfma -Werror=return-type)
 target_include_directories(xenakios PRIVATE libs/pybind11/include)
 target_link_libraries(xenakios PRIVATE AWLIMITED)
 
