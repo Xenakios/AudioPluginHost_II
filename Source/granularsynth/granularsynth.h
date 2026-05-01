@@ -1993,7 +1993,7 @@ class ToneGranulator
         if (current_ambisonic_order == order || fadeForLargeStateChange.is_active())
             return;
         pending_ambisonic_order = order;
-        fadeForLargeStateChange.start(m_sr, 1000.0f, [this]() {
+        fadeForLargeStateChange.start(m_sr, 500.0f, [this]() {
             current_ambisonic_order = pending_ambisonic_order;
             num_out_chans = ambisonicOrderNumChannels(current_ambisonic_order);
             // std::print(std::cerr, "fade ramper reached zero\n");
@@ -2248,7 +2248,9 @@ class ToneGranulator
             modulatedParValueForGUI.store(modmatrix.m.getTargetValue(
                 GranulatorModConfig::TargetIdentifier{(int)modulatedParamToStore.load()}));
         }
-
+        float ambiofadebuf[granul_block_size];
+        for (int i = 0; i < granul_block_size; ++i)
+            ambiofadebuf[i] = fadeForLargeStateChange.step();
         if (!self_generate)
         {
             GrainEvent *ev = nullptr;
@@ -2396,7 +2398,7 @@ class ToneGranulator
         {
             gainlag.process();
             float gain = gainlag.getValue();
-            float safefadegain = fadeForLargeStateChange.step();
+            float safefadegain = ambiofadebuf[k]; // fadeForLargeStateChange.step();
             gain *= safefadegain;
             for (int chan = 0; chan < num_out_chans; ++chan)
             {

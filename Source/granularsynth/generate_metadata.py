@@ -1,6 +1,7 @@
 import re
 import xenakios
 
+
 def to_python_constant(name: str) -> str:
     name = name.upper()
     name = name.replace(" ", "_")
@@ -10,15 +11,18 @@ def to_python_constant(name: str) -> str:
     return name
 
 
-def gen_param_metadata():
+def gen_param_metadata(justprintmd: bool):
     g = xenakios.ToneGranulator()
     meta = g.get_metadata()
+    if justprintmd:
+        print(meta)
+        return
     with open(
         r"C:\Users\teemu\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\xenakios_params.py",
         "w",
     ) as f:
         f.write("# Auto-generated - do not edit manually\n")
-        f.write("# Run gen_params.py to regenerate\n\n")
+        f.write("# Run generate_metadata.py to regenerate\n\n")
         f.write("from enum import IntEnum\n\n")
         f.write("class Param(IntEnum):\n")
         for param in meta["parameters"]:
@@ -37,3 +41,7 @@ def gen_param_metadata():
         f.write("    STEPS3 = 5\n")
         f.write("    XOR1 = 12\n")
         f.write("    XOR2 = 13\n")
+
+
+if __name__ == "__main__":
+    gen_param_metadata(False)

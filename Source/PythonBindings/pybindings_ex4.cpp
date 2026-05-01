@@ -585,15 +585,22 @@ inline py::array_t<float> render_granulator(ToneGranulator &gran, double sampler
     *gran.idtoparvalptr[ToneGranulator::PAR_AMBORDER] = ambisonic_order;
     while (outframecount < frames)
     {
-        int framestoprocess = std::min(granul_block_size, frames - outframecount);
+        int framestooutput = std::min(granul_block_size, frames - outframecount);
         gran.process_block(procbuf);
         int procnumchans = gran.num_out_chans;
-        for (int i = 0; i < framestoprocess; ++i)
+        for (int i = 0; i < framestooutput; ++i)
         {
             int pos = outframecount + i;
             for (int j = 0; j < chans; ++j)
             {
-                writebufs[j][pos] = procbuf[i * procnumchans + j];
+                float osamp = procbuf[i * procnumchans + j];
+                if (!std::isnormal(osamp) && osamp != 0.0f)
+                {
+                    throw std::runtime_error(
+                        std::format("invalid sample in channel {} at position {}", j, pos));
+                }
+                osamp = std::clamp(osamp, -1.0f, 1.0f);
+                writebufs[j][pos] = osamp;
             }
         }
         outframecount += granul_block_size;
