@@ -332,6 +332,10 @@ inline void granulator_set_modulation(ToneGranulator &g, int modslot, int modsou
 {
     if (modslot >= 0 && modslot < GranulatorModConfig::FixedMatrixSize)
     {
+        auto &pmd = g.idtoparmetadata[modtarget];
+        if (!(pmd->flags & CLAP_PARAM_IS_MODULATABLE))
+            throw std::runtime_error(
+                std::format("parameter {} [id {}] is not modulatable", pmd->name, pmd->id));
         g.modmatrix.rt.updateActiveAt(modslot, true);
         g.modmatrix.rt.updateRoutingAt(modslot,
                                        GranulatorModConfig::SourceIdentifier{(uint32_t)modsource},
@@ -342,6 +346,12 @@ inline void granulator_set_modulation(ToneGranulator &g, int modslot, int modsou
         {
             g.modmatrix.rt.routes[modslot].sourceVia = std::nullopt;
         }
+    }
+    else
+    {
+        throw std::runtime_error(
+            std::format("invalid modulation slot index {}, must be in range 0-{}", modslot,
+                        GranulatorModConfig::FixedMatrixSize - 1));
     }
 }
 

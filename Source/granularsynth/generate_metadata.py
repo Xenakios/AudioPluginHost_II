@@ -39,6 +39,8 @@ def gen_param_metadata(justprintmd: bool):
         f.write("    POWER16 = 26\n")
         f.write("    STEPS2 = 4\n")
         f.write("    STEPS3 = 5\n")
+        f.write("    STEPS4 = 6\n")
+        f.write("    STEPS5 = 7\n")
         f.write("    XOR1 = 12\n")
         f.write("    XOR2 = 13\n")
 
