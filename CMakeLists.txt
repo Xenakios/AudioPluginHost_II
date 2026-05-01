@@ -221,6 +221,11 @@ add_custom_command(TARGET xenakios POST_BUILD
      
   COMMENT "Generating Python stubs")
 
+add_custom_command(TARGET xenakios POST_BUILD 
+  COMMAND python 
+  "C:/develop/AudioPluginHost_mk2/Source/granularsynth/generate_metadata.py"
+  COMMENT "Generating Python file from ToneGranulator")
+
 # this is used for simple C++ testing/experimenting stuff without Juce
 add_executable(TestingProgram 
     Source/Experimental/misctest.cpp 
