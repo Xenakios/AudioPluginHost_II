@@ -134,12 +134,15 @@ class NoiseGen
                 logisticx0 = logisticx1;
             }
         }
+        // imode0, no interpolation
         float outvalue = lastvalue;
+        // linear interpolation for correlated noise and logistic chaos
         if (imode == 1 || imode == 4)
         {
             outvalue = lastvalue + (nextvalue - lastvalue) * phase;
         }
-        if (imode == 2)
+        // mess up output value based on osc phase
+        else if (imode == 2)
         {
             uint8_t phaseinteger = 255 * phase;
             uint8_t oscinteger = (nextvalue + 1.0 * 0.5) * 255;
@@ -147,7 +150,8 @@ class NoiseGen
             oscinteger = phaseinteger ^ oscinteger;
             outvalue = -1.0f + (oscinteger / 255.0) * 2.0f;
         }
-        if (imode == 3)
+        // interpolate correlated noise with easing function
+        else if (imode == 3)
         {
             outvalue = lastvalue + (nextvalue - lastvalue) * BounceEaseIn(phase);
             // outvalue = lastvalue + (nextvalue - lastvalue) * ElasticEaseIn(phase);

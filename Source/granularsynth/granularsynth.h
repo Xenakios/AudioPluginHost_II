@@ -1717,14 +1717,18 @@ class ToneGranulator
                                    .withGroupName("Oscillator")
                                    .withID(PAR_NOISECORRELATION)
                                    .withFlags(CLAP_PARAM_IS_MODULATABLE));
-        parmetadatas.push_back(pmd()
-                                   .asInt()
-                                   .withRange(0.0, 4.0)
-                                   .withDefault(0.0)
-                                   .withLinearScaleFormatting("", 1.0f)
-                                   .withName("Noise Interpolation")
-                                   .withGroupName("Oscillator")
-                                   .withID(PAR_NOISEMODE));
+        parmetadatas.push_back(
+            pmd()
+                .withUnorderedMapFormatting({{0, "Correlated noise No interpolation"},
+                                             {1, "Correlated noise Linear interpolation"},
+                                             {2, "Correlated noise Corrupted output"},
+                                             {3, "Correlated noise BounceIn interpolation"},
+                                             {4, "Logistic Chaos Linear interpolation"}},
+                                            true)
+                .withDefault(1)
+                .withName("Mode")
+                .withGroupName("Oscillator")
+                .withID(PAR_NOISEMODE));
         for (size_t i = 0; i < GranulatorVoice::numInsertSlots; ++i)
         {
             auto groupname = std::format("Insert {}", char('A' + i));
@@ -2026,7 +2030,7 @@ class ToneGranulator
         fadeForLargeStateChange.start(m_sr, 500.0f, [this]() {
             current_ambisonic_order = pending_ambisonic_order;
             num_out_chans = ambisonicOrderNumChannels(current_ambisonic_order);
-            std::print(std::cerr, "changed ambisonic order to {}\n", current_ambisonic_order);
+            // std::print(std::cerr, "changed ambisonic order to {}\n", current_ambisonic_order);
             for (auto &vc : voices)
             {
                 vc->active = false;
