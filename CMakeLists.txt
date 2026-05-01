@@ -223,7 +223,7 @@ add_custom_command(TARGET xenakios POST_BUILD
 
 add_custom_command(TARGET xenakios POST_BUILD 
   COMMAND python 
-  "C:/develop/AudioPluginHost_mk2/Source/granularsynth/generate_metadata.py"
+  "${CMAKE_CURRENT_SOURCE_DIR}/Source/granularsynth/generate_metadata.py"
   COMMENT "Generating Python file from ToneGranulator")
 
 # this is used for simple C++ testing/experimenting stuff without Juce

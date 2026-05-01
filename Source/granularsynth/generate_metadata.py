@@ -1,3 +1,4 @@
+import sysconfig
 import re
 import xenakios
 
@@ -18,7 +19,7 @@ def gen_param_metadata(justprintmd: bool):
         print(meta)
         return
     with open(
-        r"C:\Users\teemu\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\xenakios_params.py",
+        f"{sysconfig.get_path('purelib')}\\xenakios_granulator_constants.py",
         "w",
     ) as f:
         f.write("# Auto-generated - do not edit manually\n")
@@ -52,6 +53,15 @@ def gen_param_metadata(justprintmd: bool):
         f.write("    BIPOLARTOUNIPOLAR = 21\n")
         f.write("    UNIPOLARTOBIPOLAR = 22\n")
         f.write("    BITMIRROR = 20\n")
+        f.write("\nclass OscTypes(IntEnum):\n")
+        f.write("    SINE = 0\n")
+        f.write("    SEMISINE = 1\n")
+        f.write("    TRIANGLE = 2\n")
+        f.write("    SAW = 3\n")
+        f.write("    SQUARE = 4\n")
+        f.write("    FM = 5\n")
+        f.write("    NOISE = 6\n")
+
 
 if __name__ == "__main__":
     gen_param_metadata(False)
