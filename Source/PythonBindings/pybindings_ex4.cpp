@@ -546,7 +546,8 @@ inline py::array_t<float> render_saw_bank(double samplerate, double outdur, int 
 
 inline py::array_t<float> render_granulator(ToneGranulator &gran, double samplerate,
                                             events_t evlist, int ambisonic_order,
-                                            double outputduration)
+                                            double outputduration,
+                                            xenakios::AutomationSequence *automation)
 {
     if (evlist.empty() && (outputduration <= 0.0 || outputduration > 600.0))
         throw std::runtime_error(std::format(
@@ -593,9 +594,28 @@ inline py::array_t<float> render_granulator(ToneGranulator &gran, double sampler
     for (int i = 0; i < 16 * granul_block_size; ++i)
         procbuf[i] = 0.0f;
     *gran.idtoparvalptr[ToneGranulator::PAR_AMBORDER] = ambisonic_order;
+    std::optional<xenakios::AutomationSequence::Iterator> aiter;
+    if (automation)
+    {
+        automation->sort_events();
+        aiter.emplace(xenakios::AutomationSequence::Iterator(*automation, samplerate));
+    }
     while (outframecount < frames)
     {
         int framestooutput = std::min(granul_block_size, frames - outframecount);
+        if (aiter)
+        {
+            auto aevents = aiter->readNextEvents(granul_block_size);
+            for (auto &ev : aevents)
+            {
+                auto ait = gran.idtoparvalptr.find(ev.id);
+                if (ait != gran.idtoparvalptr.end())
+                {
+                    *ait->second = ev.value;
+                }
+            }
+        }
+
         gran.process_block(procbuf);
         int procnumchans = gran.num_out_chans;
         for (int i = 0; i < framestooutput; ++i)
@@ -843,5 +863,5 @@ void init_py4(py::module_ &m, py::module_ &m_const)
         .def("set_modulation", granulator_set_modulation, "slot"_a, "src"_a, "via"_a, "depth"_a,
              "curve"_a, "target"_a)
         .def("render", render_granulator, "samplerate"_a, "event_list"_a, "outputmode"_a,
-             "outputduration"_a = 0.0);
+             "outputduration"_a = 0.0, "automation"_a = nullptr);
 }
