@@ -41,9 +41,17 @@ def gen_param_metadata(justprintmd: bool):
         f.write("    STEPS3 = 5\n")
         f.write("    STEPS4 = 6\n")
         f.write("    STEPS5 = 7\n")
+        f.write("    STEPS6 = 8\n")
+        f.write("    STEPS7 = 9\n")
         f.write("    XOR1 = 12\n")
         f.write("    XOR2 = 13\n")
-
+        f.write("    XOR3 = 14\n")
+        f.write("    XOR4 = 15\n")
+        f.write("    EXPSIN1 = 10\n")
+        f.write("    EXPSIN2 = 11\n")
+        f.write("    BIPOLARTOUNIPOLAR = 21\n")
+        f.write("    UNIPOLARTOBIPOLAR = 22\n")
+        f.write("    BITMIRROR = 20\n")
 
 if __name__ == "__main__":
     gen_param_metadata(False)

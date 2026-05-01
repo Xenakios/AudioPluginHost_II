@@ -1996,7 +1996,7 @@ class ToneGranulator
         fadeForLargeStateChange.start(m_sr, 500.0f, [this]() {
             current_ambisonic_order = pending_ambisonic_order;
             num_out_chans = ambisonicOrderNumChannels(current_ambisonic_order);
-            // std::print(std::cerr, "fade ramper reached zero\n");
+            std::print(std::cerr, "changed ambisonic order to {}\n", current_ambisonic_order);
             for (auto &vc : voices)
             {
                 vc->active = false;

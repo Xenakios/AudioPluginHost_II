@@ -593,7 +593,7 @@ inline py::array_t<float> render_granulator(ToneGranulator &gran, double sampler
     float procbuf[64 * granul_block_size];
     for (int i = 0; i < 16 * granul_block_size; ++i)
         procbuf[i] = 0.0f;
-    *gran.idtoparvalptr[ToneGranulator::PAR_AMBORDER] = ambisonic_order;
+    *gran.idtoparvalptr[ToneGranulator::PAR_AMBORDER] = ambisonic_order - 1;
     std::optional<xenakios::AutomationSequence::Iterator> aiter;
     if (automation)
     {
