@@ -506,6 +506,7 @@ class GranulatorVoice
     float polarity_gain = 1.0f;
     int prior_osc_type = -1;
     EasingLUTS *eluts = nullptr;
+    std::span<int> osctypemapping;
     // 2x up to 7th order Ambisonics
     alignas(32) std::array<float, 128> ambcoeffs;
     enum FilterRouting
@@ -590,7 +591,10 @@ class GranulatorVoice
     void start(GrainEvent &evpars)
     {
         active = true;
-        int newosctype = std::clamp<int>(evpars.generator_type, 0.0, 6.0);
+        int newosctype = std::clamp(evpars.generator_type, 0, 6);
+        assert(osctypemapping.size() == 7);
+        newosctype = osctypemapping[newosctype];
+        newosctype = std::clamp(newosctype, 0, 6);
         if (newosctype != prior_osc_type)
         {
             prior_osc_type = newosctype;
@@ -1315,6 +1319,7 @@ class ToneGranulator
     // we can share this between voices as we don't need it stateful, at least for now
     SimpleEnvelope<false> voiceaux_envelope;
     alignas(16) std::array<float, numPitchBandAttens + 5> pitchBandAttensShared;
+    alignas(16) std::array<int, 7> osctypemapping;
     struct ModSourceInfo
     {
         std::string name;
@@ -1440,9 +1445,38 @@ class ToneGranulator
         bool is_active() const { return pos >= 0; }
     };
     RampDownUp fadeForLargeStateChange;
+    void set_osc_type_mapping(std::vector<int> mapping)
+    {
+        for (size_t i = 0; i < osctypemapping.size(); ++i)
+        {
+            if (i < mapping.size())
+            {
+                osctypemapping[i] = mapping[i];
+            }
+        }
+    }
+    void create_voices()
+    {
+        std::fill(pitchBandAttensShared.begin(), pitchBandAttensShared.end(), 1.0f);
+        // by default one to one mapping but for easier working with modulation
+        for (size_t i = 0; i < osctypemapping.size(); ++i)
+        {
+            osctypemapping[i] = i;
+        }
+        for (int i = 0; i < numvoices; ++i)
+        {
+            auto v = std::make_unique<GranulatorVoice>();
+            v->aux_envelope = &voiceaux_envelope;
+            v->pitchBandAttens = pitchBandAttensShared;
+            v->osctypemapping = osctypemapping;
+            v->eluts = &eluts;
+            voices.push_back(std::move(v));
+        }
+    }
     ToneGranulator() : m_sr(44100.0), modmatrix(44100.0)
     {
         visualizer_fifo.reset(2048);
+
         shapeParToActualShape[0] = GranulatorModMatrix::lfo_t::SINE;
         shapeParToActualShape[1] = GranulatorModMatrix::lfo_t::PULSE;
         shapeParToActualShape[2] = GranulatorModMatrix::lfo_t::SAW_TRI_RAMP;
@@ -1839,15 +1873,9 @@ class ToneGranulator
                 modRanges[parmetadatas[i].id] = range;
             }
         }
-        std::fill(pitchBandAttensShared.begin(), pitchBandAttensShared.end(), 1.0f);
-        for (int i = 0; i < numvoices; ++i)
-        {
-            auto v = std::make_unique<GranulatorVoice>();
-            v->aux_envelope = &voiceaux_envelope;
-            v->pitchBandAttens = pitchBandAttensShared;
-            v->eluts = &eluts;
-            voices.push_back(std::move(v));
-        }
+
+        create_voices();
+
         for (size_t i = 0; i < parmetadatas.size(); ++i)
         {
             const auto &md = parmetadatas[i];

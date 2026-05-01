@@ -858,6 +858,7 @@ void init_py4(py::module_ &m, py::module_ &m_const)
         .def(py::init<>())
         .def("set_voice_aux_envelope", &ToneGranulator::set_voice_aux_envelope)
         .def("set_voice_gain_envelope", &ToneGranulator::set_voice_gain_envelope)
+        .def("set_oscillator_type_mapping", &ToneGranulator::set_osc_type_mapping)
         .def("get_metadata", granulator_get_metadatas)
         .def("set_parameter", granulator_set_param)
         .def("set_modulation", granulator_set_modulation, "slot"_a, "src"_a, "via"_a, "depth"_a,
