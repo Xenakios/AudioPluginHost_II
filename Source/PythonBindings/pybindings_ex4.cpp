@@ -291,12 +291,29 @@ inline std::vector<std::string> get_sst_filter_types()
     return result;
 }
 
-inline void granulator_print_params(ToneGranulator &g)
+inline py::dict granulator_get_metadatas(ToneGranulator &g)
 {
+    py::dict result;
+    py::list paramlist;
     for (const auto &p : g.parmetadatas)
     {
-        std::print("{:12} {}/{} {}\n", p.id, p.groupName, p.name, p.defaultVal);
+        // std::print("{:12} {}/{} {}\n", p.id, p.groupName, p.name, p.defaultVal);
+        py::dict dict;
+        dict["name"] = p.name;
+        dict["id"] = p.id;
+        paramlist.append(dict);
     }
+    result["parameters"] = paramlist;
+    py::list modsourceslist;
+    for (auto &e : g.modSources)
+    {
+        py::dict dict;
+        dict["name"] = e.name;
+        dict["id"] = e.id.src;
+        modsourceslist.append(dict);
+    }
+    result["modsources"] = modsourceslist;
+    return result;
 }
 
 inline void granulator_set_param(ToneGranulator &gran, int64_t parid, float v)
@@ -804,7 +821,7 @@ void init_py4(py::module_ &m, py::module_ &m_const)
         .def(py::init<>())
         .def("set_voice_aux_envelope", &ToneGranulator::set_voice_aux_envelope)
         .def("set_voice_gain_envelope", &ToneGranulator::set_voice_gain_envelope)
-        .def("print_parameters", granulator_print_params)
+        .def("get_metadata", granulator_get_metadatas)
         .def("set_parameter", granulator_set_param)
         .def("set_modulation", granulator_set_modulation, "slot"_a, "src"_a, "via"_a, "depth"_a,
              "curve"_a, "target"_a)
