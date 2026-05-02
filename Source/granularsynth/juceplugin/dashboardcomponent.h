@@ -87,7 +87,7 @@ class DashBoardComponent : public juce::Component
         menu.addSubMenu("Parameter scope", param_menu);
         menu.showMenuAsync(juce::PopupMenu::Options{});
     }
-    void drawCPUGraph(juce::Graphics &g, double enginetime, double w, double xoffs);
+    void drawCPUGraph(juce::Graphics &g, double enginetime, juce::Rectangle<float> area);
     void updateGrainData()
     {
         timespantoshow = gr->gvsettings.timespantoshow;
