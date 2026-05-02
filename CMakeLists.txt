@@ -311,6 +311,7 @@ target_sources(ToneGranulatorPlugin
     PRIVATE
         Source/granularsynth/juceplugin/PluginProcessor.cpp
         Source/granularsynth/juceplugin/PluginEditor.cpp
+        Source/granularsynth/juceplugin/dashboardcomponent.cpp
         Source/granularsynth/grainfx.cpp
         Source/granularsynth/js_impl.cpp
         Source/granularsynth/easing.cpp
