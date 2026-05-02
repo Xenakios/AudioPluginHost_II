@@ -83,6 +83,17 @@ void DashBoardComponent::drawCPUGraph(juce::Graphics &g, double enginetime,
     }
     g.setColour(juce::Colours::beige.withAlpha(0.5f));
     g.strokePath(paramHistoryPath, juce::PathStrokeType(3.0f));
+    g.setColour(juce::Colours::white);
+    g.drawRect(area);
+    area = area.reduced(2.0f);
+    g.drawText("100%", area, juce::Justification::topLeft);
+    g.drawText("CPU LOAD", area, juce::Justification::centredTop);
+    g.drawText("0%", area, juce::Justification::bottomLeft);
+    if (GetCPULoad)
+    {
+        g.drawText(juce::String((int)(GetCPULoad() * 100.0f)) + "%", area,
+                   juce::Justification::centredLeft);
+    }
 }
 
 void DashBoardComponent::paint(juce::Graphics &g)
@@ -111,8 +122,11 @@ void DashBoardComponent::paint(juce::Graphics &g)
         }
     }
     // g.setColour(juce::Colours::white);
-    juce::Rectangle<float> cloudArea{450.0f, 0.0f, getWidth() - 450.0f, getHeight() - 50.0f};
-
+    juce::Rectangle<float> cloudArea{450.0f, 0.0f, getWidth() - 450.0f, getHeight() - 123.0f};
+    juce::Rectangle<float> scopeArea{cloudArea.getX(), cloudArea.getBottom() + 1.0f,
+                                     cloudArea.getWidth(), 60.0f};
+    juce::Rectangle<float> cpuArea{cloudArea.getX(), scopeArea.getBottom() + 1.0f,
+                                   cloudArea.getWidth(), 60.0f};
     double enginetime = gr->playposframes / gr->m_sr;
     g.saveState();
     g.reduceClipRegion(juce::Rectangle<int>(cloudArea.getX(), 0, getWidth(), getHeight()));
@@ -131,7 +145,7 @@ void DashBoardComponent::paint(juce::Graphics &g)
     }
 
     paramHistoryPath.clear();
-    /*
+
     if (auto parid = gr->modulatedParamToStore.load())
     {
         auto &pmd = gr->idtoparmetadata[parid];
@@ -145,10 +159,12 @@ void DashBoardComponent::paint(juce::Graphics &g)
         for (size_t i = 0; i < paramValuesHistory.size(); ++i)
         {
             const auto &e = paramValuesHistory[i];
-            float xcor = w - ((enginetime - e.timestamp) / timespantoshow * w);
+            float xcor = scopeArea.getWidth() -
+                         ((enginetime - e.timestamp) / timespantoshow * scopeArea.getWidth());
             // xcor = std::clamp<float>(xcor + xoffs, xoffs, getWidth());
-            xcor = xcor + xoffs;
-            float ycor = juce::jmap<float>(e.value, parmin, parmax, getHeight() - 5.0, 0.0);
+            xcor = xcor + scopeArea.getX();
+            float ycor = juce::jmap<float>(e.value, parmin, parmax, scopeArea.getBottom() - 5.0,
+                                           scopeArea.getY());
             if (i == 0)
                 paramHistoryPath.startNewSubPath(juce::Point<float>(xcor, ycor));
             else
@@ -156,11 +172,17 @@ void DashBoardComponent::paint(juce::Graphics &g)
         }
         g.setColour(juce::Colours::beige.withAlpha(0.5f));
         g.strokePath(paramHistoryPath, juce::PathStrokeType(3.0f));
+        g.setColour(juce::Colours::white);
+        g.drawRect(scopeArea);
+        scopeArea = scopeArea.reduced(2.0f);
+        g.drawText(pmd->name, scopeArea, juce::Justification::centredTop);
+        g.drawText(pmd->valueToString(pmd->minVal).value_or("NO FMT"), scopeArea,
+                   juce::Justification::bottomLeft);
+        g.drawText(pmd->valueToString(pmd->maxVal).value_or("NO FMT"), scopeArea,
+                   juce::Justification::topLeft);
     }
-    */
-    juce::Rectangle<float> scopeArea{cloudArea.getX(), cloudArea.getBottom(), cloudArea.getWidth(),
-                                     50.0f};
-    drawCPUGraph(g, enginetime, scopeArea);
+
+    drawCPUGraph(g, enginetime, cpuArea);
     g.restoreState();
     paintAmbisonicFieldHammerProjection(g);
     g.setColour(juce::Colours::yellow);

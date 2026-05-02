@@ -80,8 +80,10 @@ class DashBoardComponent : public juce::Component
         {
             if (e.flags & CLAP_PARAM_IS_MODULATABLE)
             {
-                param_menu.addItem(e.groupName + "/" + e.name,
-                                   [this, id = e.id]() { gr->modulatedParamToStore.store(id); });
+                param_menu.addItem(e.groupName + "/" + e.name, [this, id = e.id]() {
+                    paramValuesHistory.clear();
+                    gr->modulatedParamToStore.store(id);
+                });
             }
         }
         menu.addSubMenu("Parameter scope", param_menu);
