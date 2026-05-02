@@ -842,11 +842,11 @@ class PerformanceComponent : public juce::Component, public juce::Timer
     std::function<void(int &, int &, float &)> RequestData;
 };
 
-class AudioPluginAudioProcessorEditor final : public juce::AudioProcessorEditor, public juce::Timer
+class MainPageComponent final : public juce::Component, juce::Timer
 {
   public:
-    explicit AudioPluginAudioProcessorEditor(AudioPluginAudioProcessor &);
-    ~AudioPluginAudioProcessorEditor() override;
+    explicit MainPageComponent(AudioPluginAudioProcessor &);
+    ~MainPageComponent() override;
     void timerCallback() override;
     //==============================================================================
     void paint(juce::Graphics &) override;
@@ -875,7 +875,7 @@ class AudioPluginAudioProcessorEditor final : public juce::AudioProcessorEditor,
     std::vector<std::unique_ptr<ModulationRowComponent>> modRowComps;
     std::vector<std::unique_ptr<LFOComponent>> lfocomps;
     juce::TabbedComponent lfoTabs;
-    // juce::TabbedComponent insertsTabs;
+
     std::vector<std::unique_ptr<StepSeqComponent>> stepcomps;
     juce::Label infoLabel;
 
@@ -885,8 +885,33 @@ class AudioPluginAudioProcessorEditor final : public juce::AudioProcessorEditor,
     std::unique_ptr<PerformanceComponent> perfcomp;
     std::unique_ptr<juce::TextButton> recordButton;
     PresetsComponent presetsComponent;
-    DashBoardComponent dashBoardComponent;
+    
     void showFilterMenu(int whichfilter);
     void updateInsertParameterMetaDatas();
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(MainPageComponent)
+};
+
+class DashPage : public juce::Component
+{
+  public:
+    DashPage(ToneGranulator *gran) : gr(gran), dashBoardComponent(gr)
+    {
+        addAndMakeVisible(dashBoardComponent);
+    }
+    void resized() override { dashBoardComponent.setBounds(0, 0, getWidth(), getHeight()); }
+    ToneGranulator *gr = nullptr;
+    DashBoardComponent dashBoardComponent;
+};
+
+class AudioPluginAudioProcessorEditor final : public juce::AudioProcessorEditor
+{
+  public:
+    explicit AudioPluginAudioProcessorEditor(AudioPluginAudioProcessor &);
+    ~AudioPluginAudioProcessorEditor() override;
+    void resized() override;
+    MainPageComponent mainPage;
+    DashPage dashPage;
+    juce::TabbedComponent mainTabs;
+    
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(AudioPluginAudioProcessorEditor)
 };

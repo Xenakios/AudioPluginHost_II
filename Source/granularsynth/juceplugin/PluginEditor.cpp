@@ -23,16 +23,29 @@ inline void updateAllFonts(juce::Component &parent, const juce::Font &newFont)
     }
 }
 
-//==============================================================================
 AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor(AudioPluginAudioProcessor &p)
-    : AudioProcessorEditor(&p), processorRef(p), envcomp(&p.granulator, false),
-      auxenvcomp(&p.granulator, true), lfoTabs(juce::TabbedButtonBar::Orientation::TabsAtTop),
-      dashBoardComponent(&p.granulator)
+    : juce::AudioProcessorEditor(p), mainPage(p),
+      dashPage(&p.granulator), mainTabs(juce::TabbedButtonBar::Orientation::TabsAtTop)
 {
-    dashBoardComponent.GetCPULoad = [this]() {
-        return processorRef.perfMeasurer.getLoadAsProportion();
-        // return processorRef.cpu_load.load();
-    };
+    mainTabs.addTab("DASHBOARD", juce::Colours::grey, &dashPage, false);
+    mainTabs.addTab("DETAILS", juce::Colours::grey, &mainPage, false);
+    mainTabs.setCurrentTabIndex(1);
+    addAndMakeVisible(mainTabs);
+    setSize(1500, 850);
+}
+
+AudioPluginAudioProcessorEditor::~AudioPluginAudioProcessorEditor() {}
+
+void AudioPluginAudioProcessorEditor::resized()
+{
+    mainTabs.setBounds(0, 0, getWidth(), getHeight());
+}
+
+MainPageComponent::MainPageComponent(AudioPluginAudioProcessor &p)
+    : processorRef(p), envcomp(&p.granulator, false), auxenvcomp(&p.granulator, true),
+      lfoTabs(juce::TabbedButtonBar::Orientation::TabsAtTop)
+{
+    
 
     perfcomp = std::make_unique<PerformanceComponent>();
     perfcomp->RequestData = [this](int &maxvoices, int &usedvoices, float &cpu) {
@@ -206,12 +219,12 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor(AudioPluginAudi
 
     // setLookAndFeel(&lnf);
     // updateAllFonts(*this, lnf.myFont);
-    addAndMakeVisible(dashBoardComponent);
+    
     setSize(1500, 930);
     startTimer(50);
 }
 
-void AudioPluginAudioProcessorEditor::saveSnapShot(int index)
+void MainPageComponent::saveSnapShot(int index)
 {
     auto state = processorRef.getState();
     std::ofstream ostream(std::format(
@@ -220,19 +233,19 @@ void AudioPluginAudioProcessorEditor::saveSnapShot(int index)
     processorRef.saveSnapShot(index, state);
 }
 
-void AudioPluginAudioProcessorEditor::loadSnapShot(int index)
+void MainPageComponent::loadSnapShot(int index)
 {
     processorRef.loadSnapShot(index);
     // juce::Timer::callAfterDelay(100, [this]() { processorRef.sendExtraStatesToGUI(); });
 }
 
-AudioPluginAudioProcessorEditor::~AudioPluginAudioProcessorEditor()
+MainPageComponent::~MainPageComponent()
 {
     setLookAndFeel(nullptr);
     deinit_step_sequencer_js();
 }
 
-void AudioPluginAudioProcessorEditor::updateInsertParameterMetaDatas()
+void MainPageComponent::updateInsertParameterMetaDatas()
 {
     auto f = [this](ParameterGroupComponent *g) {
         for (auto &s : g->sliders)
@@ -253,7 +266,7 @@ void AudioPluginAudioProcessorEditor::updateInsertParameterMetaDatas()
     }
 }
 
-void AudioPluginAudioProcessorEditor::handleFilterSelection(int filterindex)
+void MainPageComponent::handleFilterSelection(int filterindex)
 {
     DropDownComponent *c = filter1Drop.get();
     if (filterindex == 1)
@@ -274,8 +287,8 @@ void AudioPluginAudioProcessorEditor::handleFilterSelection(int filterindex)
     juce::Timer::callAfterDelay(250, [this]() { updateInsertParameterMetaDatas(); });
 }
 
-void AudioPluginAudioProcessorEditor::fillDropWithFilters(int filterIndex, DropDownComponent &drop,
-                                                          std::string rootText)
+void MainPageComponent::fillDropWithFilters(int filterIndex, DropDownComponent &drop,
+                                            std::string rootText)
 {
     drop.rootNode.text = rootText;
     std::map<std::string, DropDownComponent::Node *> nodemap;
@@ -350,7 +363,7 @@ void AudioPluginAudioProcessorEditor::fillDropWithFilters(int filterIndex, DropD
 #endif
 }
 
-void AudioPluginAudioProcessorEditor::showFilterMenu(int whichfilter)
+void MainPageComponent::showFilterMenu(int whichfilter)
 {
     juce::PopupMenu menu;
     auto models = sfpp::Filter::availableModels();
@@ -413,7 +426,7 @@ void AudioPluginAudioProcessorEditor::showFilterMenu(int whichfilter)
     menu.showMenuAsync(juce::PopupMenu::Options{});
 }
 
-void AudioPluginAudioProcessorEditor::timerCallback()
+void MainPageComponent::timerCallback()
 {
 
     envcomp.updateIfNeeded();
@@ -482,12 +495,9 @@ void AudioPluginAudioProcessorEditor::timerCallback()
 }
 
 //==============================================================================
-void AudioPluginAudioProcessorEditor::paint(juce::Graphics &g)
-{
-    g.fillAll(juce::Colours::darkgrey);
-}
+void MainPageComponent::paint(juce::Graphics &g) { g.fillAll(juce::Colours::darkgrey); }
 
-void AudioPluginAudioProcessorEditor::resized()
+void MainPageComponent::resized()
 {
     oscillatorComponent.setBounds(0, 0, 500, 175);
     volumeParamsComponent.setBounds(0, oscillatorComponent.getBottom() + 1, 500, 125);
@@ -516,10 +526,7 @@ void AudioPluginAudioProcessorEditor::resized()
     modrowflex.performLayout(juce::Rectangle<int>{0, yoffs, getWidth(), 220});
     infoLabel.setBounds(0, getHeight() - 25, getWidth() - 71, 24);
 
-    int vish = 140;
-    if (dashBoardComponent.is_extended_size)
-        vish = 400;
-    dashBoardComponent.setBounds(1, getHeight() - vish - 25, getWidth() - 2, vish);
+    
 }
 
 void StepSeqComponent::paint(juce::Graphics &g)
@@ -797,4 +804,3 @@ void StepSeqComponent::runExternalProgram()
         }
     });
 }
-
