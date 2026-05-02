@@ -76,7 +76,11 @@ class DashBoardComponent : public juce::Component
                      [this]() { showModulatorValues = !showModulatorValues; });
         juce::PopupMenu param_menu;
         param_menu.addItem("-None-", [this]() { gr->modulatedParamToStore.store(0); });
-        for (auto &e : gr->parmetadatas)
+        auto metadata = gr->parmetadatas;
+        std::sort(metadata.begin(), metadata.end(), [](auto &lhs, auto &rhs) {
+            return lhs.groupName + "/" + lhs.name < rhs.groupName + "/" + rhs.name;
+        });
+        for (auto &e : metadata)
         {
             if (e.flags & CLAP_PARAM_IS_MODULATABLE)
             {
