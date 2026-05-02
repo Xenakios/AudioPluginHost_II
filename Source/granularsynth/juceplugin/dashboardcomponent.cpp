@@ -92,7 +92,7 @@ void DashBoardComponent::drawCPUGraph(juce::Graphics &g, double enginetime,
     if (GetCPULoad)
     {
         g.drawText(juce::String((int)(GetCPULoad() * 100.0f)) + "%", area,
-                   juce::Justification::centredLeft);
+                   juce::Justification::topRight);
     }
 }
 
@@ -180,6 +180,13 @@ void DashBoardComponent::paint(juce::Graphics &g)
                    juce::Justification::bottomLeft);
         g.drawText(pmd->valueToString(pmd->maxVal).value_or("NO FMT"), scopeArea,
                    juce::Justification::topLeft);
+    }
+    else
+    {
+        g.setColour(juce::Colours::white);
+        g.drawRect(scopeArea);
+        scopeArea = scopeArea.reduced(2.0f);
+        g.drawText("No parameter selected", scopeArea, juce::Justification::centredTop);
     }
 
     drawCPUGraph(g, enginetime, cpuArea);

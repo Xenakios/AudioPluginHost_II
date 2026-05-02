@@ -271,12 +271,14 @@ struct LFOComponent : public juce::Component
     void resized()
     {
         // shapeCombo.setBounds(0, 0, 200, 25);
-        shapeSlider.setBounds(0, 0, 200, 25);
+        shapeSlider.setBounds(0, 0, 250, 25);
         unipolarSlider.setBounds(shapeSlider.getRight() + 1, 0, 200, 25);
-        rateSlider.setBounds(0, shapeSlider.getBottom() + 1, 400, 25);
-        deformSlider.setBounds(0, rateSlider.getBottom() + 1, 400, 25);
-        shiftSlider.setBounds(rateSlider.getRight() + 1, shapeSlider.getBottom() + 1, 400, 25);
-        warpSlider.setBounds(rateSlider.getRight() + 1, shiftSlider.getBottom() + 1, 400, 25);
+        rateSlider.setBounds(0, shapeSlider.getBottom() + 1, getWidth() / 2 - 2, 25);
+        deformSlider.setBounds(0, rateSlider.getBottom() + 1, getWidth() / 2 - 2, 25);
+        shiftSlider.setBounds(rateSlider.getRight() + 1, shapeSlider.getBottom() + 1,
+                              getWidth() / 2 - 2, 25);
+        warpSlider.setBounds(rateSlider.getRight() + 1, shiftSlider.getBottom() + 1,
+                             getWidth() / 2 - 2, 25);
     }
     int lfoindex = -1;
     ToneGranulator *gr = nullptr;
@@ -842,17 +844,17 @@ class PerformanceComponent : public juce::Component, public juce::Timer
     std::function<void(int &, int &, float &)> RequestData;
 };
 
-class MainPageComponent final : public juce::Component, juce::Timer
+class MainPageComponent final : public juce::Component
 {
   public:
     explicit MainPageComponent(AudioPluginAudioProcessor &);
     ~MainPageComponent() override;
-    void timerCallback() override;
+    
     //==============================================================================
     void paint(juce::Graphics &) override;
     void resized() override;
 
-  private:
+  
     // MyCustomLNF lnf;
     AudioPluginAudioProcessor &processorRef;
     ParameterGroupComponent oscillatorComponent{"Oscillator", false};
@@ -921,13 +923,72 @@ class DashPage : public juce::Component
     DashBoardComponent dashBoardComponent;
 };
 
-class AudioPluginAudioProcessorEditor final : public juce::AudioProcessorEditor
+class ModulationPage : public juce::Component
+{
+  public:
+    ModulationPage(AudioPluginAudioProcessor &p) : processorRef(p)
+    {
+        for (int i = 0; i < 8; ++i)
+        {
+            auto lfoc = std::make_unique<LFOComponent>(i, &processorRef.granulator);
+            lfoc->stateChangedCallback = [this](uint32_t parid, float val) {
+                ParameterMessage parmsg;
+                parmsg.id = parid;
+                parmsg.value = val;
+                processorRef.params_from_gui_fifo.push(parmsg);
+            };
+            /*
+            idToSlider[ToneGranulator::PAR_LFORATES + i] = &lfoc->rateSlider;
+            idToSlider[ToneGranulator::PAR_LFODEFORMS + i] = &lfoc->deformSlider;
+            idToSlider[ToneGranulator::PAR_LFOSHIFTS + i] = &lfoc->shiftSlider;
+            idToSlider[ToneGranulator::PAR_LFOWARPS + i] = &lfoc->warpSlider;
+            idToSlider[ToneGranulator::PAR_LFOSHAPES + i] = &lfoc->shapeSlider;
+            idToSlider[ToneGranulator::PAR_LFOUNIPOLARS + i] = &lfoc->unipolarSlider;
+            lfoTabs.addTab("LFO " + juce::String(i + 1), juce::Colours::darkgrey, lfoc.get(),
+                           false);
+            */
+            addAndMakeVisible(*lfoc);
+            lfocomps.push_back(std::move(lfoc));
+        }
+        /*
+        for (int i = 0; i < 8; ++i)
+        {
+            auto stepcomp = std::make_unique<StepSeqComponent>(i, &processorRef.granulator,
+                                                               &processorRef.tpool);
+            lfoTabs.addTab("STEP SEQ " + juce::String(i + 1), juce::Colours::darkgrey,
+                           stepcomp.get(), false);
+            stepcomps.push_back(std::move(stepcomp));
+        }
+        */
+    }
+    void resized() override
+    {
+        juce::FlexBox flex;
+        flex.flexDirection = juce::FlexBox::Direction::column;
+        flex.flexWrap = juce::FlexBox::Wrap::wrap;
+        for (int i = 0; i < lfocomps.size(); ++i)
+        {
+            flex.items.add(
+                juce::FlexItem(*lfocomps[i]).withFlex(1.0).withMargin(2.0).withMinHeight(80.0));
+        }
+        flex.performLayout(juce::Rectangle<int>(0, 0, getWidth(), 350));
+    }
+    AudioPluginAudioProcessor &processorRef;
+    std::vector<std::unique_ptr<LFOComponent>> lfocomps;
+    std::vector<std::unique_ptr<StepSeqComponent>> stepcomps;
+    std::vector<std::unique_ptr<ModulationRowComponent>> modRowComps;
+};
+
+class AudioPluginAudioProcessorEditor final : public juce::AudioProcessorEditor, public juce::Timer
 {
   public:
     explicit AudioPluginAudioProcessorEditor(AudioPluginAudioProcessor &);
     ~AudioPluginAudioProcessorEditor() override;
     void resized() override;
+    void timerCallback() override;
+    AudioPluginAudioProcessor& processorRef;
     MainPageComponent mainPage;
+    ModulationPage modulationPage;
     DashPage dashPage;
     juce::TabbedComponent mainTabs;
 

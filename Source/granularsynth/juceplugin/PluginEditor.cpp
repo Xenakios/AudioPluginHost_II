@@ -24,17 +24,89 @@ inline void updateAllFonts(juce::Component &parent, const juce::Font &newFont)
 }
 
 AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor(AudioPluginAudioProcessor &p)
-    : juce::AudioProcessorEditor(p), mainPage(p),
-      dashPage(p), mainTabs(juce::TabbedButtonBar::Orientation::TabsAtTop)
+    : juce::AudioProcessorEditor(p), processorRef(p), mainPage(p), modulationPage(p), dashPage(p),
+      mainTabs(juce::TabbedButtonBar::Orientation::TabsAtTop)
 {
+    mainTabs.addTab("MAIN", juce::Colours::grey, &mainPage, false);
+    mainTabs.addTab("MODULATION", juce::Colours::grey, &modulationPage, false);
     mainTabs.addTab("DASHBOARD", juce::Colours::grey, &dashPage, false);
-    mainTabs.addTab("DETAILS", juce::Colours::grey, &mainPage, false);
-    mainTabs.setCurrentTabIndex(1);
+
+    mainTabs.setCurrentTabIndex(0);
     addAndMakeVisible(mainTabs);
+
     setSize(1500, 830);
+    startTimer(50);
 }
 
 AudioPluginAudioProcessorEditor::~AudioPluginAudioProcessorEditor() {}
+
+void AudioPluginAudioProcessorEditor::timerCallback()
+{
+    mainPage.envcomp.updateIfNeeded();
+    mainPage.auxenvcomp.updateIfNeeded();
+
+    mainPage.infoLabel.setText(
+        std::format("[CPU Load {:3.0f}%] [{}/{} voices {}/{} scheduled] [{} in {} out] ",
+                    processorRef.perfMeasurer.getLoadAsPercentage(),
+                    processorRef.granulator.numVoicesUsed.load(), processorRef.granulator.numvoices,
+                    processorRef.granulator.scheduledGrains.size(),
+                    processorRef.granulator.scheduledGrains.capacity(),
+                    processorRef.getTotalNumInputChannels(),
+                    processorRef.getTotalNumOutputChannels()),
+
+        juce::dontSendNotification);
+    for (auto &c : mainPage.stepcomps)
+    {
+        c->updateGUI();
+    }
+    ParameterMessage parmsg;
+    while (processorRef.params_to_gui_fifo.pop(parmsg))
+    {
+        auto it = mainPage.idToSlider.find(parmsg.id);
+        if (it != mainPage.idToSlider.end())
+        {
+            auto xs = it->second;
+            xs->setValue(parmsg.value);
+        }
+    }
+    ThreadMessage msg;
+    while (processorRef.to_gui_fifo.pop(msg))
+    {
+        if (msg.opcode == ThreadMessage::OP_STEPSEQUENCER)
+        {
+            mainPage.auxenvcomp.repaint();
+        }
+        if (msg.opcode == ThreadMessage::OP_FILTERTYPE)
+        {
+            for (auto &e : mainPage.filterInfoMap)
+            {
+                if (e.second.mainmode == msg.insertmainmode && e.second.awtype == msg.awtype &&
+                    e.second.sstmodel == msg.filtermodel && e.second.sstconfig == msg.filterconfig)
+                {
+                    if (msg.filterindex == 0)
+                        mainPage.filter1Drop->setSelectedId(e.first);
+                    if (msg.filterindex == 1)
+                        mainPage.filter2Drop->setSelectedId(e.first);
+                    break;
+                }
+            }
+            mainPage.updateInsertParameterMetaDatas();
+        }
+        if (msg.opcode == ThreadMessage::OP_MODROUTING && msg.modslot < mainPage.modRowComps.size())
+        {
+            mainPage.modRowComps[msg.modslot]->sourceDrop.setSelectedId(msg.modsource);
+
+            mainPage.modRowComps[msg.modslot]->viaDrop.setSelectedId(msg.modvia);
+
+            mainPage.modRowComps[msg.modslot]->depthSlider.setValue(msg.depth,
+                                                                    juce::dontSendNotification);
+            mainPage.modRowComps[msg.modslot]->destDrop.setSelectedId(msg.moddest);
+
+            mainPage.modRowComps[msg.modslot]->setTarget(msg.moddest);
+            mainPage.modRowComps[msg.modslot]->curveDrop.setSelectedId(msg.modcurve);
+        }
+    }
+}
 
 void AudioPluginAudioProcessorEditor::resized()
 {
@@ -45,7 +117,6 @@ MainPageComponent::MainPageComponent(AudioPluginAudioProcessor &p)
     : processorRef(p), envcomp(&p.granulator, false), auxenvcomp(&p.granulator, true),
       lfoTabs(juce::TabbedButtonBar::Orientation::TabsAtTop)
 {
-    
 
     perfcomp = std::make_unique<PerformanceComponent>();
     perfcomp->RequestData = [this](int &maxvoices, int &usedvoices, float &cpu) {
@@ -214,9 +285,9 @@ MainPageComponent::MainPageComponent(AudioPluginAudioProcessor &p)
 
     // setLookAndFeel(&lnf);
     // updateAllFonts(*this, lnf.myFont);
-    
+
     setSize(1500, 930);
-    startTimer(50);
+    
 }
 
 MainPageComponent::~MainPageComponent()
@@ -406,75 +477,6 @@ void MainPageComponent::showFilterMenu(int whichfilter)
     menu.showMenuAsync(juce::PopupMenu::Options{});
 }
 
-void MainPageComponent::timerCallback()
-{
-
-    envcomp.updateIfNeeded();
-    auxenvcomp.updateIfNeeded();
-
-    infoLabel.setText(
-        std::format("[CPU Load {:3.0f}%] [{}/{} voices {}/{} scheduled] [{} in {} out] ",
-                    processorRef.perfMeasurer.getLoadAsPercentage(),
-                    processorRef.granulator.numVoicesUsed.load(), processorRef.granulator.numvoices,
-                    processorRef.granulator.scheduledGrains.size(),
-                    processorRef.granulator.scheduledGrains.capacity(),
-                    processorRef.getTotalNumInputChannels(),
-                    processorRef.getTotalNumOutputChannels()),
-
-        juce::dontSendNotification);
-    for (auto &c : stepcomps)
-    {
-        c->updateGUI();
-    }
-    ParameterMessage parmsg;
-    while (processorRef.params_to_gui_fifo.pop(parmsg))
-    {
-        auto it = idToSlider.find(parmsg.id);
-        if (it != idToSlider.end())
-        {
-            auto xs = it->second;
-            xs->setValue(parmsg.value);
-        }
-    }
-    ThreadMessage msg;
-    while (processorRef.to_gui_fifo.pop(msg))
-    {
-        if (msg.opcode == ThreadMessage::OP_STEPSEQUENCER)
-        {
-            auxenvcomp.repaint();
-        }
-        if (msg.opcode == ThreadMessage::OP_FILTERTYPE)
-        {
-            for (auto &e : filterInfoMap)
-            {
-                if (e.second.mainmode == msg.insertmainmode && e.second.awtype == msg.awtype &&
-                    e.second.sstmodel == msg.filtermodel && e.second.sstconfig == msg.filterconfig)
-                {
-                    if (msg.filterindex == 0)
-                        filter1Drop->setSelectedId(e.first);
-                    if (msg.filterindex == 1)
-                        filter2Drop->setSelectedId(e.first);
-                    break;
-                }
-            }
-            updateInsertParameterMetaDatas();
-        }
-        if (msg.opcode == ThreadMessage::OP_MODROUTING && msg.modslot < modRowComps.size())
-        {
-            modRowComps[msg.modslot]->sourceDrop.setSelectedId(msg.modsource);
-
-            modRowComps[msg.modslot]->viaDrop.setSelectedId(msg.modvia);
-
-            modRowComps[msg.modslot]->depthSlider.setValue(msg.depth, juce::dontSendNotification);
-            modRowComps[msg.modslot]->destDrop.setSelectedId(msg.moddest);
-
-            modRowComps[msg.modslot]->setTarget(msg.moddest);
-            modRowComps[msg.modslot]->curveDrop.setSelectedId(msg.modcurve);
-        }
-    }
-}
-
-//==============================================================================
 void MainPageComponent::paint(juce::Graphics &g) { g.fillAll(juce::Colours::darkgrey); }
 
 void MainPageComponent::resized()
@@ -505,8 +507,6 @@ void MainPageComponent::resized()
     }
     modrowflex.performLayout(juce::Rectangle<int>{0, yoffs, getWidth(), 220});
     infoLabel.setBounds(0, getHeight() - 25, getWidth() - 71, 24);
-
-    
 }
 
 void StepSeqComponent::paint(juce::Graphics &g)
