@@ -4,7 +4,7 @@ void DashBoardComponent::paintAmbisonicFieldHammerProjection(juce::Graphics &g)
 {
     g.setColour(juce::Colours::white);
     float ellipW = 400.0f;
-    float h = ellipW / 2;
+    float h = ellipW / 1.5;
 
     float halfW = ellipW / 2.0f;
     float halfH = h / 2.0;

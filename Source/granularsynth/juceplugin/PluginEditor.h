@@ -224,14 +224,12 @@ struct LFOComponent : public juce::Component
 {
     LFOComponent(int index, ToneGranulator *g)
         : lfoindex(index), gr(g),
-          rateSlider(XapSlider::SS_HorizontalSlider,
-                     *g->idtoparmetadata[ToneGranulator::PAR_LFORATES + index]),
-          deformSlider(XapSlider::SS_HorizontalSlider,
+          rateSlider(XapSlider::SS_Knob, *g->idtoparmetadata[ToneGranulator::PAR_LFORATES + index]),
+          deformSlider(XapSlider::SS_Knob,
                        *g->idtoparmetadata[ToneGranulator::PAR_LFODEFORMS + index]),
-          shiftSlider(XapSlider::SS_HorizontalSlider,
+          shiftSlider(XapSlider::SS_Knob,
                       *g->idtoparmetadata[ToneGranulator::PAR_LFOSHIFTS + index]),
-          warpSlider(XapSlider::SS_HorizontalSlider,
-                     *g->idtoparmetadata[ToneGranulator::PAR_LFOWARPS + index]),
+          warpSlider(XapSlider::SS_Knob, *g->idtoparmetadata[ToneGranulator::PAR_LFOWARPS + index]),
           shapeSlider(XapSlider::SS_HorizontalSlider,
                       *g->idtoparmetadata[ToneGranulator::PAR_LFOSHAPES + index]),
           unipolarSlider(XapSlider::SS_HorizontalSlider,
@@ -270,15 +268,17 @@ struct LFOComponent : public juce::Component
     }
     void resized()
     {
-        // shapeCombo.setBounds(0, 0, 200, 25);
         shapeSlider.setBounds(0, 0, 250, 25);
         unipolarSlider.setBounds(shapeSlider.getRight() + 1, 0, 200, 25);
-        rateSlider.setBounds(0, shapeSlider.getBottom() + 1, getWidth() / 2 - 2, 25);
-        deformSlider.setBounds(0, rateSlider.getBottom() + 1, getWidth() / 2 - 2, 25);
-        shiftSlider.setBounds(rateSlider.getRight() + 1, shapeSlider.getBottom() + 1,
-                              getWidth() / 2 - 2, 25);
-        warpSlider.setBounds(rateSlider.getRight() + 1, shiftSlider.getBottom() + 1,
-                             getWidth() / 2 - 2, 25);
+
+        juce::FlexBox flex;
+        flex.flexDirection = juce::FlexBox::Direction::row;
+
+        flex.items.add(juce::FlexItem(rateSlider).withFlex(1.0));
+        flex.items.add(juce::FlexItem(deformSlider).withFlex(1.0));
+        flex.items.add(juce::FlexItem(shiftSlider).withFlex(1.0));
+        flex.items.add(juce::FlexItem(warpSlider).withFlex(1.0));
+        flex.performLayout(juce::Rectangle<int>(0, 25, getWidth(), getHeight() - 25));
     }
     int lfoindex = -1;
     ToneGranulator *gr = nullptr;
@@ -849,12 +849,11 @@ class MainPageComponent final : public juce::Component
   public:
     explicit MainPageComponent(AudioPluginAudioProcessor &);
     ~MainPageComponent() override;
-    
+
     //==============================================================================
     void paint(juce::Graphics &) override;
     void resized() override;
 
-  
     // MyCustomLNF lnf;
     AudioPluginAudioProcessor &processorRef;
     ParameterGroupComponent oscillatorComponent{"Oscillator", false};
@@ -875,13 +874,12 @@ class MainPageComponent final : public juce::Component
     void handleFilterSelection(int filterindex);
     void fillDropWithFilters(int filterIndex, DropDownComponent &drop, std::string rootText);
     std::vector<std::unique_ptr<ModulationRowComponent>> modRowComps;
-    std::vector<XapSlider*> xapsliders;
+    std::vector<XapSlider *> xapsliders;
     juce::TabbedComponent lfoTabs;
 
     std::vector<std::unique_ptr<StepSeqComponent>> stepcomps;
     juce::Label infoLabel;
 
-    
     std::unique_ptr<PerformanceComponent> perfcomp;
     std::unique_ptr<juce::TextButton> recordButton;
 
@@ -986,7 +984,7 @@ class AudioPluginAudioProcessorEditor final : public juce::AudioProcessorEditor,
     ~AudioPluginAudioProcessorEditor() override;
     void resized() override;
     void timerCallback() override;
-    AudioPluginAudioProcessor& processorRef;
+    AudioPluginAudioProcessor &processorRef;
     MainPageComponent mainPage;
     ModulationPage modulationPage;
     DashPage dashPage;
