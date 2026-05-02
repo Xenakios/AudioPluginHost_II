@@ -884,8 +884,7 @@ class MainPageComponent final : public juce::Component, juce::Timer
     std::unordered_map<uint32_t, XapSlider *> idToSlider;
     std::unique_ptr<PerformanceComponent> perfcomp;
     std::unique_ptr<juce::TextButton> recordButton;
-    PresetsComponent presetsComponent;
-    
+
     void showFilterMenu(int whichfilter);
     void updateInsertParameterMetaDatas();
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(MainPageComponent)
@@ -894,12 +893,23 @@ class MainPageComponent final : public juce::Component, juce::Timer
 class DashPage : public juce::Component
 {
   public:
-    DashPage(ToneGranulator *gran) : gr(gran), dashBoardComponent(gr)
+    DashPage(AudioPluginAudioProcessor &p) : processorRef(p), dashBoardComponent(&p.granulator)
     {
+        // presetsComponent.OnSave = [this](int index) { saveSnapShot(index); };
+        // presetsComponent.OnLoad = [this](int index) { loadSnapShot(index); };
+        dashBoardComponent.GetCPULoad = [this]() {
+            return processorRef.perfMeasurer.getLoadAsProportion();
+        };
         addAndMakeVisible(dashBoardComponent);
+        addAndMakeVisible(presetsComponent);
     }
-    void resized() override { dashBoardComponent.setBounds(0, 0, getWidth(), getHeight()); }
-    ToneGranulator *gr = nullptr;
+    void resized() override
+    {
+        presetsComponent.setBounds(0, 0, getWidth(), 50);
+        dashBoardComponent.setBounds(0, 51, getWidth(), getHeight() - 51);
+    }
+    AudioPluginAudioProcessor &processorRef;
+    PresetsComponent presetsComponent;
     DashBoardComponent dashBoardComponent;
 };
 
@@ -912,6 +922,6 @@ class AudioPluginAudioProcessorEditor final : public juce::AudioProcessorEditor
     MainPageComponent mainPage;
     DashPage dashPage;
     juce::TabbedComponent mainTabs;
-    
+
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(AudioPluginAudioProcessorEditor)
 };

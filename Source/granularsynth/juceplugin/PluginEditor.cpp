@@ -25,13 +25,13 @@ inline void updateAllFonts(juce::Component &parent, const juce::Font &newFont)
 
 AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor(AudioPluginAudioProcessor &p)
     : juce::AudioProcessorEditor(p), mainPage(p),
-      dashPage(&p.granulator), mainTabs(juce::TabbedButtonBar::Orientation::TabsAtTop)
+      dashPage(p), mainTabs(juce::TabbedButtonBar::Orientation::TabsAtTop)
 {
     mainTabs.addTab("DASHBOARD", juce::Colours::grey, &dashPage, false);
     mainTabs.addTab("DETAILS", juce::Colours::grey, &mainPage, false);
     mainTabs.setCurrentTabIndex(1);
     addAndMakeVisible(mainTabs);
-    setSize(1500, 850);
+    setSize(1500, 830);
 }
 
 AudioPluginAudioProcessorEditor::~AudioPluginAudioProcessorEditor() {}
@@ -205,11 +205,6 @@ MainPageComponent::MainPageComponent(AudioPluginAudioProcessor &p)
                        false);
         stepcomps.push_back(std::move(stepcomp));
     }
-
-    presetsComponent.OnSave = [this](int index) { saveSnapShot(index); };
-    presetsComponent.OnLoad = [this](int index) { loadSnapShot(index); };
-    lfoTabs.addTab("PRESETS", juce::Colours::darkgrey, &presetsComponent, false);
-
     addAndMakeVisible(lfoTabs);
     // lfoTabs.getTabbedButtonBar().setColour(juce::TabbedButtonBar::ColourIds::tabOutlineColourId,
     //                                        juce::Colours::yellowgreen);
