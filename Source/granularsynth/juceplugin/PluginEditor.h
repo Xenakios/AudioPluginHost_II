@@ -875,13 +875,13 @@ class MainPageComponent final : public juce::Component
     void handleFilterSelection(int filterindex);
     void fillDropWithFilters(int filterIndex, DropDownComponent &drop, std::string rootText);
     std::vector<std::unique_ptr<ModulationRowComponent>> modRowComps;
-    std::vector<std::unique_ptr<LFOComponent>> lfocomps;
+    std::vector<XapSlider*> xapsliders;
     juce::TabbedComponent lfoTabs;
 
     std::vector<std::unique_ptr<StepSeqComponent>> stepcomps;
     juce::Label infoLabel;
 
-    std::unordered_map<uint32_t, XapSlider *> idToSlider;
+    
     std::unique_ptr<PerformanceComponent> perfcomp;
     std::unique_ptr<juce::TextButton> recordButton;
 
@@ -991,6 +991,6 @@ class AudioPluginAudioProcessorEditor final : public juce::AudioProcessorEditor,
     ModulationPage modulationPage;
     DashPage dashPage;
     juce::TabbedComponent mainTabs;
-
+    std::unordered_map<uint32_t, XapSlider *> idToSlider;
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(AudioPluginAudioProcessorEditor)
 };

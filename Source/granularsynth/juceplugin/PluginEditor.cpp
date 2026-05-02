@@ -33,7 +33,20 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor(AudioPluginAudi
 
     mainTabs.setCurrentTabIndex(0);
     addAndMakeVisible(mainTabs);
-
+    for (int i = 0; i < 8; ++i)
+    {
+        auto lfoc = modulationPage.lfocomps[i].get();
+        idToSlider[ToneGranulator::PAR_LFORATES + i] = &lfoc->rateSlider;
+        idToSlider[ToneGranulator::PAR_LFODEFORMS + i] = &lfoc->deformSlider;
+        idToSlider[ToneGranulator::PAR_LFOSHIFTS + i] = &lfoc->shiftSlider;
+        idToSlider[ToneGranulator::PAR_LFOWARPS + i] = &lfoc->warpSlider;
+        idToSlider[ToneGranulator::PAR_LFOSHAPES + i] = &lfoc->shapeSlider;
+        idToSlider[ToneGranulator::PAR_LFOUNIPOLARS + i] = &lfoc->unipolarSlider;
+    }
+    for (auto e : mainPage.xapsliders)
+    {
+        idToSlider[e->getParameterMetaData().id] = e;
+    }
     setSize(1500, 830);
     startTimer(50);
 }
@@ -62,8 +75,8 @@ void AudioPluginAudioProcessorEditor::timerCallback()
     ParameterMessage parmsg;
     while (processorRef.params_to_gui_fifo.pop(parmsg))
     {
-        auto it = mainPage.idToSlider.find(parmsg.id);
-        if (it != mainPage.idToSlider.end())
+        auto it = idToSlider.find(parmsg.id);
+        if (it != idToSlider.end())
         {
             auto xs = it->second;
             xs->setValue(parmsg.value);
@@ -181,7 +194,8 @@ MainPageComponent::MainPageComponent(AudioPluginAudioProcessor &p)
                 msg.value = sli->getValue();
                 processorRef.params_from_gui_fifo.push(msg);
             };
-            idToSlider[pmd.id] = slid.get();
+            xapsliders.push_back(slid.get());
+
             if (pmd.groupName == "Oscillator")
             {
                 oscillatorComponent.addSlider(std::move(slid));
@@ -252,6 +266,7 @@ MainPageComponent::MainPageComponent(AudioPluginAudioProcessor &p)
     auto &idtomd = processorRef.granulator.idtoparmetadata;
     for (int i = 0; i < 8; ++i)
     {
+        /*
         auto lfoc = std::make_unique<LFOComponent>(i, &processorRef.granulator);
         lfoc->stateChangedCallback = [this](uint32_t parid, float val) {
             ParameterMessage parmsg;
@@ -259,14 +274,10 @@ MainPageComponent::MainPageComponent(AudioPluginAudioProcessor &p)
             parmsg.value = val;
             processorRef.params_from_gui_fifo.push(parmsg);
         };
-        idToSlider[ToneGranulator::PAR_LFORATES + i] = &lfoc->rateSlider;
-        idToSlider[ToneGranulator::PAR_LFODEFORMS + i] = &lfoc->deformSlider;
-        idToSlider[ToneGranulator::PAR_LFOSHIFTS + i] = &lfoc->shiftSlider;
-        idToSlider[ToneGranulator::PAR_LFOWARPS + i] = &lfoc->warpSlider;
-        idToSlider[ToneGranulator::PAR_LFOSHAPES + i] = &lfoc->shapeSlider;
-        idToSlider[ToneGranulator::PAR_LFOUNIPOLARS + i] = &lfoc->unipolarSlider;
-        lfoTabs.addTab("LFO " + juce::String(i + 1), juce::Colours::darkgrey, lfoc.get(), false);
-        lfocomps.push_back(std::move(lfoc));
+        */
+
+        // lfoTabs.addTab("LFO " + juce::String(i + 1), juce::Colours::darkgrey, lfoc.get(), false);
+        // lfocomps.push_back(std::move(lfoc));
     }
     for (int i = 0; i < 8; ++i)
     {
@@ -287,7 +298,6 @@ MainPageComponent::MainPageComponent(AudioPluginAudioProcessor &p)
     // updateAllFonts(*this, lnf.myFont);
 
     setSize(1500, 930);
-    
 }
 
 MainPageComponent::~MainPageComponent()
