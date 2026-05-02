@@ -53,6 +53,7 @@ using namespace std::literals;
 static constexpr auto masterVolume = "ignore_param_mastervolume"sv;
 static constexpr auto modulationRouting = "ignore_modulationrouting"sv;
 static constexpr auto dashboardsettings = "ignore_dashboard"sv;
+static constexpr auto ambisonicOrder = "ignore_ambiorder"sv;
 } // namespace StateIgnoreStrings
 
 class AudioPluginAudioProcessor final : public juce::AudioProcessor
@@ -118,7 +119,7 @@ class AudioPluginAudioProcessor final : public juce::AudioProcessor
     alignas(32) choc::fifo::SingleReaderSingleWriterFIFO<
         std::array<float, ambisonicOrderNumChannels(maxAmbiSonicOrder)>> buffer_adapter;
     void setStateDirtyHack();
-    
+
     std::unordered_map<juce::AudioProcessorParameter *, int> jucepartoindex;
     juce::AudioParameterFloat *dirtyStateParam = nullptr;
 

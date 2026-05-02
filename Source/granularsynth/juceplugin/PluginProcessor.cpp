@@ -22,6 +22,7 @@ AudioPluginAudioProcessor::AudioPluginAudioProcessor()
                 auto state = choc::json::parseValue(jsontxt);
                 state.setMember(StateIgnoreStrings::masterVolume, true);
                 state.setMember(StateIgnoreStrings::dashboardsettings, true);
+                state.setMember(StateIgnoreStrings::ambisonicOrder, true);
                 snapshots[i] = state;
             }
         }
@@ -391,7 +392,7 @@ void AudioPluginAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
             *granulator.idtoparvalptr[parmsg.id] = parmsg.value;
         }
     }
-    
+
     const auto &pars = getParameters();
     for (int i = 0; i < 16; ++i)
     {
@@ -415,7 +416,7 @@ void AudioPluginAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
 
     alignas(16) std::array<float, ambisonicOrderNumChannels(maxAmbiSonicOrder)> adapter_block;
     std::fill(adapter_block.begin(), adapter_block.end(), 0.0f);
-    int procnumoutchs = 0; 
+    int procnumoutchs = 0;
     while (buffer_adapter.getUsedSlots() < buffer.getNumSamples())
     {
         std::span<float> procspan{workBuffer};
@@ -655,9 +656,12 @@ void AudioPluginAudioProcessor::changeStateImpl(choc::value::ValueView state)
         auto params = state["params"];
         auto &pars = granulator.parmetadatas;
         bool ignoreMasterVolume = state[StateIgnoreStrings::masterVolume].getWithDefault(false);
+        bool ignoreAmbisonicOrder = state[StateIgnoreStrings::ambisonicOrder].getWithDefault(false);
         for (int i = 0; i < pars.size(); ++i)
         {
             if (ignoreMasterVolume && pars[i].id == ToneGranulator::PAR_MAINVOLUME)
+                continue;
+            if (ignoreAmbisonicOrder && pars[i].id == ToneGranulator::PAR_AMBORDER)
                 continue;
             std::string id = std::to_string(pars[i].id);
             if (params.hasObjectMember(id))
