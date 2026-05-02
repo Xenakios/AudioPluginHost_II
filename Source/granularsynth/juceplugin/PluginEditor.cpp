@@ -219,21 +219,6 @@ MainPageComponent::MainPageComponent(AudioPluginAudioProcessor &p)
     startTimer(50);
 }
 
-void MainPageComponent::saveSnapShot(int index)
-{
-    auto state = processorRef.getState();
-    std::ofstream ostream(std::format(
-        R"(C:\develop\AudioPluginHost_mk2\audio\granulatorpresets\{}.json)", index + 1));
-    choc::json::writeAsJSON(ostream, state, true);
-    processorRef.saveSnapShot(index, state);
-}
-
-void MainPageComponent::loadSnapShot(int index)
-{
-    processorRef.loadSnapShot(index);
-    // juce::Timer::callAfterDelay(100, [this]() { processorRef.sendExtraStatesToGUI(); });
-}
-
 MainPageComponent::~MainPageComponent()
 {
     setLookAndFeel(nullptr);

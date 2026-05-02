@@ -879,8 +879,6 @@ class MainPageComponent final : public juce::Component, juce::Timer
     std::vector<std::unique_ptr<StepSeqComponent>> stepcomps;
     juce::Label infoLabel;
 
-    void saveSnapShot(int index);
-    void loadSnapShot(int index);
     std::unordered_map<uint32_t, XapSlider *> idToSlider;
     std::unique_ptr<PerformanceComponent> perfcomp;
     std::unique_ptr<juce::TextButton> recordButton;
@@ -895,14 +893,24 @@ class DashPage : public juce::Component
   public:
     DashPage(AudioPluginAudioProcessor &p) : processorRef(p), dashBoardComponent(&p.granulator)
     {
-        // presetsComponent.OnSave = [this](int index) { saveSnapShot(index); };
-        // presetsComponent.OnLoad = [this](int index) { loadSnapShot(index); };
+        presetsComponent.OnSave = [this](int index) { saveSnapShot(index); };
+        presetsComponent.OnLoad = [this](int index) { loadSnapShot(index); };
         dashBoardComponent.GetCPULoad = [this]() {
             return processorRef.perfMeasurer.getLoadAsProportion();
         };
         addAndMakeVisible(dashBoardComponent);
         addAndMakeVisible(presetsComponent);
     }
+    void loadSnapShot(int index) { processorRef.loadSnapShot(index); }
+    void saveSnapShot(int index)
+    {
+        auto state = processorRef.getState();
+        std::ofstream ostream(std::format(
+            R"(C:\develop\AudioPluginHost_mk2\audio\granulatorpresets\{}.json)", index + 1));
+        choc::json::writeAsJSON(ostream, state, true);
+        processorRef.saveSnapShot(index, state);
+    }
+
     void resized() override
     {
         presetsComponent.setBounds(0, 0, getWidth(), 50);
