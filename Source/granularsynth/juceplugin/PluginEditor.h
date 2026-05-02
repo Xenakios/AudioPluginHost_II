@@ -268,8 +268,8 @@ struct LFOComponent : public juce::Component
     }
     void resized()
     {
-        shapeSlider.setBounds(0, 0, 250, 25);
-        unipolarSlider.setBounds(shapeSlider.getRight() + 1, 0, 200, 25);
+        shapeSlider.setBounds(0, 0, 240, 25);
+        unipolarSlider.setBounds(shapeSlider.getRight() + 1, 0, 100, 25);
 
         juce::FlexBox flex;
         flex.flexDirection = juce::FlexBox::Direction::row;
@@ -969,7 +969,7 @@ class ModulationPage : public juce::Component
             flex.items.add(
                 juce::FlexItem(*lfocomps[i]).withFlex(1.0).withMargin(2.0).withMinHeight(80.0));
         }
-        flex.performLayout(juce::Rectangle<int>(0, 0, getWidth(), 350));
+        flex.performLayout(juce::Rectangle<int>(0, 0, getWidth(), 175));
     }
     AudioPluginAudioProcessor &processorRef;
     std::vector<std::unique_ptr<LFOComponent>> lfocomps;

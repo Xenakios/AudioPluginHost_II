@@ -269,6 +269,16 @@ class XapSlider : public juce::Component
     {
         if (!isEnabled())
             return;
+        if (m_pardesc.displayScale == ParamDesc::UNORDERED_MAP &&
+            m_pardesc.discreteValues.size() == 2)
+        {
+            if (m_value >= 0.5)
+                setValue(0.0, true);
+            else
+                setValue(1.0, true);
+
+            return;
+        }
         if (m_pardesc.displayScale == ParamDesc::UNORDERED_MAP)
         {
             juce::PopupMenu menu;
