@@ -398,7 +398,6 @@ struct ModulationRowComponent : public juce::Component
                                 (int)sourceDrop.selectedId,
                                 (int)viaDrop.selectedId,
                                 (int)curveDrop.selectedId,
-                                curveParEditor.getText().getFloatValue(),
                                 (float)depthSlider.getValue(),
                                 (uint32_t)destDrop.selectedId};
             stateChangedCallback(pars);
@@ -414,7 +413,6 @@ struct ModulationRowComponent : public juce::Component
                                 (int)sourceDrop.selectedId,
                                 (int)viaDrop.selectedId,
                                 (int)curveDrop.selectedId,
-                                curveParEditor.getText().getFloatValue(),
                                 (float)depthSlider.getValue(),
                                 (uint32_t)destDrop.selectedId};
             stateChangedCallback(pars);
@@ -467,9 +465,6 @@ struct ModulationRowComponent : public juce::Component
             Node{"BIT MIRROR", GranulatorModConfig::CURVE_BITMIRROR});
         curveDrop.setSelectedId(GranulatorModConfig::CURVE_LINEAR);
         curveDrop.OnItemSelected = updatfunc;
-
-        curveParEditor.setText("0.0", juce::dontSendNotification);
-        curveParEditor.onReturnKey = updatfunc;
 
         addAndMakeVisible(destDrop);
         initDestinationDrop();
@@ -558,7 +553,6 @@ struct ModulationRowComponent : public juce::Component
         int source = 0;
         int via = 0;
         int curve = 1;
-        float curvepar0 = 0.0f;
         float depth = 0.0f;
         uint32_t target;
     };
@@ -574,7 +568,6 @@ struct ModulationRowComponent : public juce::Component
                               .withRange(-1.0f, 1.0f)
                               .withLinearScaleFormatting("%", 100.0f)};
     DropDownComponent curveDrop;
-    juce::TextEditor curveParEditor;
     DropDownComponent destDrop;
 };
 
