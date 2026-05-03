@@ -69,6 +69,7 @@ struct GranulatorModConfig
         CURVE_LINEAR = 1,
         CURVE_SQUARE,
         CURVE_CUBE,
+        CURVE_STEPS1,
         CURVE_STEPS2,
         CURVE_STEPS3,
         CURVE_STEPS4,
@@ -164,6 +165,8 @@ struct GranulatorModConfig
             return [](auto x) { return x * x * x; };
         case CURVE_TOPOWER16:
             return [](auto x) { return std::pow(x, 16) * sgn(x); };
+        case CURVE_STEPS1:
+            return [id](auto x) { return std::round(x * 1) / 1; };
         case CURVE_STEPS2:
             return [id](auto x) { return std::round(x * 2) / 2; };
         case CURVE_STEPS3:

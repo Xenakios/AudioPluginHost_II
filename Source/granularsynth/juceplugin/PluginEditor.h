@@ -456,11 +456,11 @@ struct ModulationRowComponent : public juce::Component
         }
         curveDrop.rootNode.children.emplace_back(xornode);
         Node stepnode{"STEPS"};
-        for (int i = 0; i < 6; ++i)
+        for (int i = 0; i < 7; ++i)
         {
-            int actnumsteps = (2 + i) * 2 + 1;
+            int actnumsteps = (1 + i) * 2 + 1;
             stepnode.children.push_back(
-                Node{std::format("{} STEPS", actnumsteps), GranulatorModConfig::CURVE_STEPS2 + i});
+                Node{std::format("{} STEPS", actnumsteps), GranulatorModConfig::CURVE_STEPS1 + i});
         }
         curveDrop.rootNode.children.emplace_back(stepnode);
         curveDrop.rootNode.children.push_back(
