@@ -279,7 +279,7 @@ class XapSlider : public juce::Component
 
             return;
         }
-        if (m_pardesc.displayScale == ParamDesc::UNORDERED_MAP)
+        if (m_pardesc.displayScale == ParamDesc::UNORDERED_MAP && m_style != SS_Knob)
         {
             juce::PopupMenu menu;
             for (auto &e : m_pardesc.discreteValues)
