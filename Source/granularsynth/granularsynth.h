@@ -70,13 +70,7 @@ struct GranulatorModConfig
         CURVE_SQUARE,
         CURVE_CUBE,
         CURVE_STEPS1,
-        CURVE_STEPS2,
-        CURVE_STEPS3,
-        CURVE_STEPS4,
-        CURVE_STEPS5,
-        CURVE_STEPS6,
-        CURVE_STEPS7,
-        CURVE_EXPSIN1,
+        CURVE_EXPSIN1 = CURVE_STEPS1 + 16,
         CURVE_EXPSIN2,
         CURVE_XOR1,
         CURVE_XOR2,
@@ -155,6 +149,15 @@ struct GranulatorModConfig
     }
     static std::function<float(float)> getCurveOperator(CurveIdentifier id)
     {
+        if (id.id >= CURVE_STEPS1 && id.id < CURVE_STEPS1 + 16)
+        {
+            return [id](auto x) {
+                const int numsteps = id.id - CURVE_STEPS1 + 1;
+                x = (x + 1.0f) * 0.5;
+                x = std::round(x * numsteps) / numsteps;
+                return -1.0f + 2.0f * x;
+            };
+        }
         switch (id.id)
         {
         case CURVE_LINEAR:
@@ -165,20 +168,6 @@ struct GranulatorModConfig
             return [](auto x) { return x * x * x; };
         case CURVE_TOPOWER16:
             return [](auto x) { return std::pow(x, 16) * sgn(x); };
-        case CURVE_STEPS1:
-            return [id](auto x) { return std::round(x * 1) / 1; };
-        case CURVE_STEPS2:
-            return [id](auto x) { return std::round(x * 2) / 2; };
-        case CURVE_STEPS3:
-            return [id](auto x) { return std::round(x * 3) / 3; };
-        case CURVE_STEPS4:
-            return [id](auto x) { return std::round(x * 4) / 4; };
-        case CURVE_STEPS5:
-            return [](auto x) { return std::round(x * 5) / 5; };
-        case CURVE_STEPS6:
-            return [](auto x) { return std::round(x * 6) / 6; };
-        case CURVE_STEPS7:
-            return [](auto x) { return std::round(x * 7) / 7; };
         case CURVE_EXPSIN1:
             return [](auto x) { return expsin(x, 1, 8.0f); };
         case CURVE_EXPSIN2:
