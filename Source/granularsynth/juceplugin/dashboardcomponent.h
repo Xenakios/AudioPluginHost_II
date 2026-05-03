@@ -26,7 +26,7 @@ class DashBoardComponent : public juce::Component
     std::function<double()> GetCPULoad;
     DashBoardComponent(ToneGranulator *g) : gr(g)
     {
-        // addAndMakeVisible(haGrid);
+        addAndMakeVisible(haGrid);
         paramHistoryPath.preallocateSpace(2048);
         timespantoshow = gr->gvsettings.timespantoshow;
         pitchGradient.clearColours();

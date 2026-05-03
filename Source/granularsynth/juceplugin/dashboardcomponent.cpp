@@ -3,7 +3,6 @@
 void DashBoardComponent::paintAmbisonicFieldHammerProjection(juce::Graphics &g)
 {
     g.saveState();
-    haGrid.paint(g);
     for (auto &e : persisted_events)
     {
         if (e.visualfade > 0.01)
@@ -12,6 +11,7 @@ void DashBoardComponent::paintAmbisonicFieldHammerProjection(juce::Graphics &g)
             float x = ptcor.getX();
             float y = ptcor.getY();
             haGrid.toArea.transformPoint(x, y);
+            y += getHeight() / 2.0 - haGrid.getHeight() / 2.0;
             g.setColour(juce::Colours::cyan.withAlpha(e.visualfade));
             e.visualfade *= visualfadecoefficient;
             g.fillEllipse(x - 6.0, y - 6.0, 12.0f, 12.0f);
