@@ -1,12 +1,13 @@
 #pragma once
 
 #include "PluginProcessor.h"
-
+#include "IEM/HammerAitovGrid.h"
 class DashBoardComponent : public juce::Component
 {
   public:
     ToneGranulator *gr = nullptr;
     std::vector<ToneGranulator::GrainVisualizerMessage> persisted_events;
+    HammerAitovGrid haGrid;
     struct ParamEvent
     {
         double timestamp = 0.0;
@@ -25,6 +26,7 @@ class DashBoardComponent : public juce::Component
     std::function<double()> GetCPULoad;
     DashBoardComponent(ToneGranulator *g) : gr(g)
     {
+        // addAndMakeVisible(haGrid);
         paramHistoryPath.preallocateSpace(2048);
         timespantoshow = gr->gvsettings.timespantoshow;
         pitchGradient.clearColours();
@@ -113,5 +115,12 @@ class DashBoardComponent : public juce::Component
         std::erase_if(paramValuesHistory, [this, enginetime](auto const &ev) {
             return ev.timestamp < enginetime - timespantoshow;
         });
+    }
+
+    void resized() override
+    {
+        float h = getHeight();
+        haGrid.setBounds(0.0, h / 2 - 150.0f, 499, 300);
+        //haGrid.toArea = haGrid.toArea.translated(0.0f, h / 2 - 150.0f);
     }
 };

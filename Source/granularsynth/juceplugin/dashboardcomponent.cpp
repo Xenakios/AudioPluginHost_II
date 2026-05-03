@@ -2,16 +2,54 @@
 
 void DashBoardComponent::paintAmbisonicFieldHammerProjection(juce::Graphics &g)
 {
+    g.saveState();
+    haGrid.paint(g);
+    for (auto &e : persisted_events)
+    {
+        if (e.visualfade > 0.01)
+        {
+            auto ptcor = haGrid.anglesToPoint(e.azimuth0degrees, -e.elevationdegrees);
+            float x = ptcor.getX();
+            float y = ptcor.getY();
+            haGrid.toArea.transformPoint(x, y);
+            g.setColour(juce::Colours::cyan.withAlpha(e.visualfade));
+            e.visualfade *= visualfadecoefficient;
+            g.fillEllipse(x - 6.0, y - 6.0, 12.0f, 12.0f);
+        }
+    }
+    g.restoreState();
+    return;
     g.setColour(juce::Colours::white);
     float ellipW = 400.0f;
     float h = ellipW / 1.5;
-
     float halfW = ellipW / 2.0f;
     float halfH = h / 2.0;
     float centerX = halfW;
     float centerY = getHeight() / 2.0;
     g.drawEllipse(0.0f, centerY - halfH, ellipW, h, 2.0f);
+    g.drawLine(centerX, centerY - halfH, centerX, centerY + halfH, 2.0f);
+    g.drawLine(centerX - halfW, centerY, centerX + halfW, centerY, 2.0f);
+    float lineX = centerX - halfW / 2.0f;
+    float dx = (lineX - centerX) / halfW;
+    float dy = halfH * std::sqrt(1.0f - dx * dx);
+    g.drawLine(lineX, centerY - dy, lineX, centerY + dy, 2.0f);
+    g.drawText("LEFT", juce::Rectangle<float>(lineX + 2.0f, centerY, 70.0f, 25.0f),
+               juce::Justification::centredLeft);
+    lineX = centerX + halfW / 2.0f;
+    g.drawLine(lineX, centerY - dy, lineX, centerY + dy, 2.0f);
+    g.drawText("RIGHT", juce::Rectangle<float>(lineX + 2.0f, centerY, 70.0f, 25.0f),
+               juce::Justification::centredLeft);
 
+    g.drawText("FRONT", juce::Rectangle<float>(centerX + 2.0, centerY, 70.0f, 25.0f),
+               juce::Justification::centredLeft);
+    g.drawText("BACK", juce::Rectangle<float>(centerX - halfW + 2.0, centerY, 70.0f, 25.0f),
+               juce::Justification::centredLeft);
+    g.drawText("BACK", juce::Rectangle<float>(centerX + halfW - 70.0, centerY, 70.0f, 25.0f),
+               juce::Justification::centredRight);
+    g.drawText("TOP", juce::Rectangle<float>(centerX - 20.0, centerY - halfH - 20.0f, 70.0f, 25.0f),
+               juce::Justification::centredTop);
+    g.drawText("BOTTOM", juce::Rectangle<float>(centerX - 20.0, centerY + halfH, 70.0f, 25.0f),
+               juce::Justification::centredBottom);
     for (auto &e : persisted_events)
     {
         if (e.visualfade > 0.01)
@@ -122,7 +160,7 @@ void DashBoardComponent::paint(juce::Graphics &g)
         }
     }
     // g.setColour(juce::Colours::white);
-    juce::Rectangle<float> cloudArea{450.0f, 0.0f, getWidth() - 450.0f, getHeight() - 123.0f};
+    juce::Rectangle<float> cloudArea{500.0f, 0.0f, getWidth() - 500.0f, getHeight() - 123.0f};
     juce::Rectangle<float> scopeArea{cloudArea.getX(), cloudArea.getBottom() + 1.0f,
                                      cloudArea.getWidth(), 60.0f};
     juce::Rectangle<float> cpuArea{cloudArea.getX(), scopeArea.getBottom() + 1.0f,
