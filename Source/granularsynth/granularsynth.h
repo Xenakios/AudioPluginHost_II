@@ -21,8 +21,8 @@
 
 using namespace sst::basic_blocks::mod_matrix;
 
-const int granul_block_size = 8;
-const uint8_t maxAmbiSonicOrder = 7;
+inline constexpr int granul_block_size = 8;
+inline constexpr uint8_t maxAmbiSonicOrder = 7;
 
 inline constexpr int ambisonicOrderNumChannels(int order) { return (order + 1) * (order + 1); }
 
@@ -1187,7 +1187,7 @@ inline double calculate_inverse(double y, double a, double b, double d)
 class ToneGranulator
 {
   public:
-    const int numvoices = 32;
+    const int numvoices = 64;
     double m_sr = 0.0;
     int graincount = 0;
 
