@@ -349,7 +349,12 @@ void AudioPluginAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
         }
 
         auto &mm = granulator.modmatrix;
-        if (msg.opcode == ThreadMessage::OP_MODROUTING || msg.opcode == ThreadMessage::OP_MODPARAM)
+        if (msg.opcode == ThreadMessage::OP_MODPARAM && msg.moddest == -1)
+        {
+            mm.rt.updateDepthAt(msg.modslot, msg.depth);
+        }
+        else if (msg.opcode == ThreadMessage::OP_MODROUTING ||
+                 msg.opcode == ThreadMessage::OP_MODPARAM)
         {
             jassert(msg.moddest >= 1);
             auto it = granulator.modRanges.find(msg.moddest);

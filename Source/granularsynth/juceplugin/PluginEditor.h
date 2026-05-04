@@ -914,8 +914,20 @@ class DashPage : public juce::Component
                     msg.id = ToneGranulator::PAR_DURATION;
                 else if (i == 4)
                     msg.id = ToneGranulator::PAR_OSC_SYNC;
-                else
+                else if (i == 5)
+                {
+                    ThreadMessage tmsg;
+                    tmsg.opcode = ThreadMessage::OP_MODPARAM;
+                    tmsg.modslot = 0;
+                    tmsg.depth = knobptr->getValue() * 24.0;
+                    processorRef.from_gui_fifo.push(tmsg);
                     return;
+                }
+                else
+                {
+                    return;
+                }
+
                 auto &pmd = processorRef.granulator.idtoparmetadata[msg.id];
                 float val =
                     juce::jmap<float>(knobptr->getValue(), -1.0f, 1.0f, pmd->minVal, pmd->maxVal);
