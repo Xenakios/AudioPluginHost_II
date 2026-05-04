@@ -26,7 +26,7 @@ class DashBoardComponent : public juce::Component
     std::function<double()> GetCPULoad;
     DashBoardComponent(ToneGranulator *g) : gr(g)
     {
-        addAndMakeVisible(haGrid);
+        // addAndMakeVisible(haGrid);
         paramHistoryPath.preallocateSpace(2048);
         timespantoshow = gr->gvsettings.timespantoshow;
         pitchGradient.clearColours();
@@ -35,10 +35,10 @@ class DashBoardComponent : public juce::Component
         pitchGradient.addColour(0.50, juce::Colours::yellow);
         pitchGradient.addColour(0.75, juce::Colours::cyan);
         pitchGradient.addColour(1.00, juce::Colours::white);
-        if (!is_debug())
+        //if (!is_debug())
             visualfadecoefficient = 0.93;
-        else
-            visualfadecoefficient = std::pow(0.93, 4);
+        //else
+        //    visualfadecoefficient = std::pow(0.93, 4);
         persisted_events.reserve(4096);
         paramValuesHistory.reserve(1024);
         vblankAttachment = std::make_unique<juce::VBlankAttachment>(this, [this]() {
@@ -56,6 +56,7 @@ class DashBoardComponent : public juce::Component
         });
     }
     void paint(juce::Graphics &g) override;
+    void paintAmbisonicFieldPolar(juce::Graphics &g);
     void paintAmbisonicFieldHammerProjection(juce::Graphics &g);
     bool is_extended_size = false;
     void mouseDown(const juce::MouseEvent &ev) override

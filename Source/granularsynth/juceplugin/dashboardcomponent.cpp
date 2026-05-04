@@ -1,5 +1,46 @@
 #include "dashboardcomponent.h"
 
+struct PolarPoint
+{
+    float x, y;
+    bool front_hemisphere; // true if ele >= 0
+};
+
+PolarPoint polar_project(float azi_deg, float ele_deg)
+{
+    // Map elevation: 0 (horizon) -> edge, 90 (zenith) -> centre
+    float r = 1.0f - fabsf(ele_deg) / 90.0f;
+
+    float azi_rad = azi_deg * (M_PI / 180.0f);
+
+    return {r * sinf(azi_rad),  // x
+            r * -cosf(azi_rad), // y, negative so 0° is "up"
+            ele_deg >= 0.0f};
+}
+
+void DashBoardComponent::paintAmbisonicFieldPolar(juce::Graphics &g)
+{
+    g.setColour(juce::Colours::white);
+    juce::Rectangle<float> area{8.0f, getHeight() / 2.0f - 200.0f, 400.0f, 400.0f};
+    g.drawEllipse(area, 2.0f);
+    for (auto &e : persisted_events)
+    {
+        if (e.visualfade > 0.01)
+        {
+            auto pt = polar_project(-e.azimuth0degrees, e.elevationdegrees);
+            if (pt.front_hemisphere)
+                g.setColour(juce::Colours::cyan.withAlpha(e.visualfade));
+            else
+                g.setColour(juce::Colours::green.withAlpha(e.visualfade));
+            float xcor = area.getCentreX() + pt.x * area.getWidth() / 2.0;
+            float ycor = area.getCentreY() + pt.y * area.getHeight() / 2.0;
+            float ptsize = juce::jmap(e.elevationdegrees, -90.0f, 90.0f, 5.0f, 15.0f);
+            g.fillEllipse(xcor - ptsize / 2.0, ycor - ptsize / 2.0, ptsize, ptsize);
+            e.visualfade *= visualfadecoefficient;
+        }
+    }
+}
+
 void DashBoardComponent::paintAmbisonicFieldHammerProjection(juce::Graphics &g)
 {
     g.saveState();
@@ -229,7 +270,8 @@ void DashBoardComponent::paint(juce::Graphics &g)
 
     drawCPUGraph(g, enginetime, cpuArea);
     g.restoreState();
-    paintAmbisonicFieldHammerProjection(g);
+    paintAmbisonicFieldPolar(g);
+    // paintAmbisonicFieldHammerProjection(g);
     g.setColour(juce::Colours::yellow);
     float h = juce::Decibels::gainToDecibels(gr->compensationgainforgui.load());
     h = std::clamp(h, -40.0f, 0.0f);

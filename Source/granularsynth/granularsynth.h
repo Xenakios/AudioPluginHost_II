@@ -653,11 +653,34 @@ class GranulatorVoice
 
         float azispread = std::clamp(evpars.azimuth_spread, -180.0f, 180.0f);
         // float azi0 = std::clamp(-evpars.azimuth - azispread, -360.0f, 360.0f);
-        float azi0 = wrap_value(-180.0f, -evpars.azimuth - azispread, 180.0f);
-        // float azi1 = std::clamp(-evpars.azimuth + azispread, -360.0f, 360.0f);
+
         float azi1 = wrap_value(-180.0f, -evpars.azimuth + azispread, 180.0f);
-        // float ele = std::clamp(evpars.elevation, -360.0f, 360.0f);
-        float ele = wrap_value(-180.0f, evpars.elevation, 180.0f);
+        // float azi0 = wrap_value(-180.0f, -evpars.azimuth - azispread, 180.0f);
+        // float azi0 = wrap_value(-180.0f, -evpars.azimuth, 180.0f);
+        // float ele = evpars.elevation;
+        // Normalize elevation to [0, 360) using modulo arithmetic
+        float ele_norm = fmodf(evpars.elevation + 90.0f, 360.0f);
+        if (ele_norm < 0.0f)
+            ele_norm += 360.0f;
+
+        bool flipped = false;
+        float ele;
+
+        if (ele_norm <= 180.0f)
+        {
+            // Normal hemisphere: elevation in [-90, 90]
+            ele = ele_norm - 90.0f;
+        }
+        else
+        {
+            // Past the pole: reflect back and flip azimuth
+            ele = 90.0f - (ele_norm - 180.0f);
+            flipped = true;
+        }
+        assert(ele >= -90.0f && ele <= 90.0f);
+        // Rotate azimuth 180° if we flipped over a pole
+        float azi0 = wrap_value(-180.0f, -evpars.azimuth + (flipped ? 180.0f : 0.0f), 180.0f);
+        assert(azi0 >= -180.0f && azi0 <= 180.0f);
         used_azi0 = azi0;
         used_azi1 = azi1;
         used_ele = ele;
