@@ -914,12 +914,14 @@ class DashPage : public juce::Component
                     msg.id = ToneGranulator::PAR_DURATION;
                 else if (i == 4)
                     msg.id = ToneGranulator::PAR_OSC_SYNC;
-                else if (i == 5)
+                else if (i == 5 || i == 6 || i == 7)
                 {
+                    auto targetid = processorRef.granulator.modmatrix.rt.routes[i - 5].target->baz;
                     ThreadMessage tmsg;
                     tmsg.opcode = ThreadMessage::OP_MODPARAM;
-                    tmsg.modslot = 0;
-                    tmsg.depth = knobptr->getValue() * 24.0;
+                    tmsg.modslot = i - 5;
+                    auto range = processorRef.granulator.modRanges[targetid];
+                    tmsg.depth = knobptr->getValue() * range * 0.5;
                     processorRef.from_gui_fifo.push(tmsg);
                     return;
                 }
