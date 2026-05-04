@@ -1,5 +1,18 @@
 #include "dashboardcomponent.h"
 
+void drawRotatedText(juce::Graphics &g, const juce::String &text, float x, float y,
+                     float angleDegrees)
+{
+    g.saveState();
+
+    g.addTransform(juce::AffineTransform::rotation(
+        angleDegrees * (juce::MathConstants<float>::pi / 180.0f), x, y));
+
+    g.drawText(text, (int)x - 50, (int)y - 10, 100, 20, juce::Justification::centred);
+
+    g.restoreState();
+}
+
 struct PolarPoint
 {
     float x, y;
@@ -21,8 +34,14 @@ PolarPoint polar_project(float azi_deg, float ele_deg)
 void DashBoardComponent::paintAmbisonicFieldPolar(juce::Graphics &g)
 {
     g.setColour(juce::Colours::white);
-    juce::Rectangle<float> area{8.0f, getHeight() / 2.0f - 200.0f, 400.0f, 400.0f};
+    juce::Rectangle<float> area{35.0f, getHeight() / 2.0f - 200.0f, 400.0f, 400.0f};
     g.drawEllipse(area, 2.0f);
+    drawRotatedText(g, "LEFT", area.getX() - 10.f, area.getCentreY(), -90.0f);
+    drawRotatedText(g, "RIGHT", area.getRight() + 10.0f, area.getCentreY(), 90.0f);
+    g.drawText("FRONT", area.getCentreX() - 20.0f, area.getY() - 20.0f, 40.0f, 20.0f,
+               juce::Justification::centredTop);
+    g.drawText("BACK", area.getCentreX() - 20.0f, area.getBottom(), 40.0f, 20.0f,
+               juce::Justification::centredBottom);
     for (auto &e : persisted_events)
     {
         if (e.visualfade > 0.01)
