@@ -894,6 +894,37 @@ class DashPage : public juce::Component
         };
         addAndMakeVisible(dashBoardComponent);
         addAndMakeVisible(presetsComponent);
+        for (int i = 0; i < 16; ++i)
+        {
+            ParamDesc pmd = ParamDesc()
+                                .asFloat()
+                                .withRange(-1.0, 1.0)
+                                .withName(std::format("M{}", i + 1))
+                                .withLinearScaleFormatting("");
+            auto knob = std::make_unique<XapSlider>(XapSlider::SS_Knob, pmd);
+            knob->OnValueChanged = [this, i, knobptr = knob.get()]() {
+                ParameterMessage msg;
+                if (i == 0)
+                    msg.id = ToneGranulator::PAR_PITCH;
+                else if (i == 1)
+                    msg.id = ToneGranulator::PAR_AZIMUTH;
+                else if (i == 2)
+                    msg.id = ToneGranulator::PAR_DENSITY;
+                else if (i == 3)
+                    msg.id = ToneGranulator::PAR_DURATION;
+                else if (i == 4)
+                    msg.id = ToneGranulator::PAR_OSC_SYNC;
+                else
+                    return;
+                auto &pmd = processorRef.granulator.idtoparmetadata[msg.id];
+                float val =
+                    juce::jmap<float>(knobptr->getValue(), -1.0f, 1.0f, pmd->minVal, pmd->maxVal);
+                msg.value = val;
+                processorRef.params_from_gui_fifo.push(msg);
+            };
+            addAndMakeVisible(knob.get());
+            perfSliders.push_back(std::move(knob));
+        }
     }
     void loadSnapShot(int index) { processorRef.loadSnapShot(index); }
     void saveSnapShot(int index)
@@ -908,11 +939,19 @@ class DashPage : public juce::Component
     void resized() override
     {
         presetsComponent.setBounds(0, 0, getWidth(), 50);
-        dashBoardComponent.setBounds(0, 51, getWidth(), getHeight() - 51);
+        juce::FlexBox flex;
+        flex.flexDirection = juce::FlexBox::Direction::row;
+        for (auto &c : perfSliders)
+        {
+            flex.items.add(juce::FlexItem(*c).withFlex(1.0).withMaxHeight(70));
+        }
+        flex.performLayout(juce::Rectangle<int>(0, 50, getWidth(), 70));
+        dashBoardComponent.setBounds(0, 121, getWidth(), getHeight() - 121);
     }
     AudioPluginAudioProcessor &processorRef;
     PresetsComponent presetsComponent;
     DashBoardComponent dashBoardComponent;
+    std::vector<std::unique_ptr<XapSlider>> perfSliders;
 };
 
 class ModulationPage : public juce::Component
